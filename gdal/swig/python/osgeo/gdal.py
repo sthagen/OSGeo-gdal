@@ -790,7 +790,11 @@ def VectorTranslateOptions(options=None, format=None,
         if layerName is not None:
             new_options += ['-nln', layerName]
         if geometryType is not None:
-            new_options += ['-nlt', geometryType]
+            if _is_str_or_unicode(geometryType):
+                new_options += ['-nlt', geometryType]
+            else:
+                for opt in geometryType:
+                    new_options += ['-nlt', opt]
         if dim is not None:
             new_options += ['-dim', dim]
         if zField is not None:
@@ -1733,6 +1737,14 @@ StatBuf_swigregister(StatBuf)
 def VSIStatL(*args):
     """VSIStatL(char const * utf8_path, int nFlags=0) -> int"""
     return _gdal.VSIStatL(*args)
+
+def GetFileMetadata(*args):
+    """GetFileMetadata(char const * utf8_path, char const * domain, char ** options=None) -> char **"""
+    return _gdal.GetFileMetadata(*args)
+
+def SetFileMetadata(*args):
+    """SetFileMetadata(char const * utf8_path, char ** metadata, char const * domain, char ** options=None) -> bool"""
+    return _gdal.SetFileMetadata(*args)
 
 def VSIFOpenL(*args):
     """VSIFOpenL(char const * utf8_path, char const * pszMode) -> VSILFILE"""
