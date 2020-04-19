@@ -3485,13 +3485,6 @@ void netCDFDataset::SetProjectionFromVar( int nGroupId, int nVarId,
 
         if( !poDS->bSwitchedXY )
         {
-            // Check for bottom-up from the Y-axis order.
-            // See bugs #4284 and #4251.
-            poDS->bBottomUp = (pdfYCoord[0] <= pdfYCoord[1]);
-
-            CPLDebug("GDAL_netCDF", "set bBottomUp = %d from Y axis",
-                    static_cast<int>(poDS->bBottomUp));
-
             // Convert ]180,540] longitude values to ]-180,0].
             if( NCDFIsVarLongitude(nGroupDimXID, nVarDimXID, nullptr) &&
                 CPLTestBool(CPLGetConfigOption("GDAL_NETCDF_CENTERLONG_180",
@@ -3706,14 +3699,6 @@ void netCDFDataset::SetProjectionFromVar( int nGroupId, int nVarId,
                 node_offset = 0;
             }
 
-            // Check for reverse order of y-coordinate.
-            if( !bSwitchedXY && yMinMax[0] > yMinMax[1] )
-            {
-                const double dfTmp = yMinMax[0];
-                yMinMax[0] = yMinMax[1];
-                yMinMax[1] = dfTmp;
-            }
-
             double dfCoordOffset = 0.0;
             double dfCoordScale = 1.0;
             if( !nc_get_att_double(nGroupId, nVarDimXID,
@@ -3734,6 +3719,17 @@ void netCDFDataset::SetProjectionFromVar( int nGroupId, int nVarId,
                 yMinMax[1] = dfCoordOffset + yMinMax[1] * dfCoordScale;
             }
 
+            // Check for reverse order of y-coordinate.
+            if( !bSwitchedXY )
+            {
+                poDS->bBottomUp = (yMinMax[0] <= yMinMax[1]);
+                CPLDebug("GDAL_netCDF", "set bBottomUp = %d from Y axis",
+                        static_cast<int>(poDS->bBottomUp));
+                if( !poDS->bBottomUp )
+                {
+                    std::swap(yMinMax[0], yMinMax[1]);
+                }
+            }
 
             // Geostationary satellites can specify units in (micro)radians
             // So we check if they do, and if so convert to linear units (meters)
@@ -7375,7 +7371,11 @@ GDALDataset *netCDFDataset::Open( GDALOpenInfo *poOpenInfo )
     if ( bVsiFile && bReadOnly && CPLIsUserFaultMappingSupported() )
       pCtx = CPLCreateUserFaultMapping(osFilenameForNCOpen, &pVma, &nVmaSize);
     if (pCtx != nullptr && pVma != nullptr && nVmaSize > 0)
-      status2 = nc_open_mem(osFilenameForNCOpen, nMode, static_cast<size_t>(nVmaSize), pVma, &cdfid);
+    {
+      // netCDF code, at least for netCDF 4.7.0, is confused by filenames like
+      // /vsicurl/http[s]://example.com/foo.nc, so just pass the final part
+      status2 = nc_open_mem(CPLGetFilename(osFilenameForNCOpen), nMode, static_cast<size_t>(nVmaSize), pVma, &cdfid);
+    }
     else
       status2 = nc_open(osFilenameForNCOpen, nMode, &cdfid);
 #else
