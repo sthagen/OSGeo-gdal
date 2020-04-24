@@ -12663,7 +12663,7 @@ static void GTiffDatasetSetAreaOrPointMD( GTIF* hGTIF,
                                           GDALMultiDomainMetadata& m_oGTiffMDMD )
 {
     // Is this a pixel-is-point dataset?
-    short nRasterType = 0;
+    unsigned short nRasterType = 0;
 
     if( GDALGTIFKeyGetSHORT(hGTIF, GTRasterTypeGeoKey, &nRasterType,
                     0, 1 ) == 1 )
@@ -13244,8 +13244,11 @@ void GTiffDataset::LoadICCProfile()
         if( TIFFGetField(m_hTIFF, TIFFTAG_WHITEPOINT, &pWP) )
         {
             if( !TIFFGetFieldDefaulted( m_hTIFF, TIFFTAG_TRANSFERFUNCTION, &pTFR,
-                                        &pTFG, &pTFB) )
+                                        &pTFG, &pTFB) ||
+                pTFR == nullptr || pTFG == nullptr || pTFB == nullptr )
+            {
                 return;
+            }
 
             const int TIFFTAG_TRANSFERRANGE = 0x0156;
             TIFFGetFieldDefaulted( m_hTIFF, TIFFTAG_TRANSFERRANGE,
@@ -14592,7 +14595,7 @@ void GTiffDataset::LoadGeoreferencingAndPamIfNeeded()
         double *padfMatrix = nullptr;
         uint16 nCount = 0;
         bool bPixelIsPoint = false;
-        short nRasterType = 0;
+        unsigned short nRasterType = 0;
         bool bPointGeoIgnore = false;
 
         std::set<signed char> aoSetPriorities;
