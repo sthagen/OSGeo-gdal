@@ -1372,7 +1372,7 @@ static std::string SanitizeItemName(const std::string& osItemName)
     if( osRet != osItemName )
     {
         CPLError(CE_Warning, CPLE_AppDefined,
-                 "Lable item name %s has been sanitized to %s",
+                 "Label item name %s has been sanitized to %s",
                  osItemName.c_str(), osRet.c_str());
     }
     return osRet;
@@ -2304,7 +2304,7 @@ GDALDataset *VICARDataset::Open( GDALOpenInfo * poOpenInfo )
         const int nRecords = poDS->nRasterYSize * nBands;
         try
         {
-            // + 1 to store implictly the size of the last record
+            // + 1 to store implicitly the size of the last record
             poDS->m_anRecordOffsets.resize( nRecords + 1 );
         }
         catch( const std::exception& e )
@@ -2706,7 +2706,7 @@ VICARDataset *VICARDataset::CreateInternal(const char* pszFilename,
         }
         try
         {
-            // + 1 to store implictly the size of the last record
+            // + 1 to store implicitly the size of the last record
             anRecordOffsets.resize( nYSize + 1 );
         }
         catch( const std::exception& e )

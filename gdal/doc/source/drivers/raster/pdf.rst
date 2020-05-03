@@ -71,7 +71,10 @@ Configuration options
    features should be rendered. If the option is not specified, all
    features are rendered (Poppler and PDFium).
 -  *GDAL_PDF_BANDS* = 3 or 4 : whether the PDF should be rendered as a
-   RGB (3) or RGBA (4) image. Defaults to 3.
+   RGB (3) or RGBA (4) image. The default value will depend on the PDF rendering
+   used (Poppler vs PDFium) and on the content found in the PDF file (if an
+   image with transparency is recognized, then 4 will be used). When 3 bands
+   is selected, a white background is used.
 -  *GDAL_PDF_LAYERS* = list of layers (comma separated) to turn ON (or
    "ALL" to turn all layers ON). The layer names can be obtained by
    querying the LAYERS metadata domain. When this option is specified,
@@ -323,7 +326,7 @@ Creation Options
 
 -  **EXCLUSIVE_LAYERS=names**: Comma separated list of layer names, such
    that only one of those layers can be visible at a time. This is the
-   behaviour of radio-buttons in a graphical user interface. The layer
+   behavior of radio-buttons in a graphical user interface. The layer
    names can come from LAYER_NAME (main raster layer name),
    EXTRA_RASTERS_LAYER_NAME, EXTRA_LAYER_NAME and
    OGR_DISPLAY_LAYER_NAMES.

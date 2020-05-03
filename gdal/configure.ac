@@ -1097,8 +1097,16 @@ dnl System library paths are things like /lib, /usr/lib, /lib64, /usr/lib64, and
 dnl There may be others as well, that will need be addressed as they arise. We avoid wildcards such as
 dnl /usr/lib/* to avoid potential cases such as /usr/lib/mysql/lib, which might not have an /etc/ld.so.conf.d
 dnl entry and would not shadow any possible custom installs anyway:
+
 AC_DEFUN([STRIP_SYSTEM_LIBRARY_PATHS],[
+    if echo "x" | sed -E "s/x/y/" >/dev/null 2>/dev/null; then
         STRIPPED_LIBRARY_NAME="$(echo [$1] | sed -E 's:-L/(usr/)?(lib(64)?|lib/x86_64-linux-gnu)/*[[[:space:]]]+::')"
+    elif echo "x" | sed -r "s/x/y/" >/dev/null 2>/dev/null; then
+        dnl Compatibility with older GNU sed that doesn't support -E
+        STRIPPED_LIBRARY_NAME="$(echo [$1] | sed -r 's:-L/(usr/)?(lib(64)?|lib/x86_64-linux-gnu)/*[[[:space:]]]+::')"
+    else
+        STRIPPED_LIBRARY_NAME="$(echo [$1])"
+    fi
 ])
 
 dnl ---------------------------------------------------------------------------
@@ -1165,7 +1173,7 @@ dnl ---------------------------------------------------------------------------
 AM_ICONV
 
 dnl Extra test needed for GCC 4.5 on Solaris 11, where there is
-dnl a different behaviour if the tests are compiled with gcc or g++.
+dnl a different behavior if the tests are compiled with gcc or g++.
 dnl So we introduce a ICONV_CPP_CONST that must be used instead of
 dnl ICONV_CONST when used from .cpp files.
 if test "$am_func_iconv" = "yes"; then
@@ -2181,7 +2189,7 @@ HAVE_CHARLS=no
 CHARLS_INC=
 
 if test "$with_charls" = "yes" -o "$with_charls" = "" ; then
-
+  dnl CharLS 1.x
   AC_CHECK_HEADERS([CharLS/interface.h])
   if test "$ac_cv_header_CharLS_interface_h" = "yes"; then
     AC_CHECK_LIB(CharLS,JpegLsDecode,HAVE_CHARLS=yes)
@@ -2190,6 +2198,7 @@ if test "$with_charls" = "yes" -o "$with_charls" = "" ; then
         CHARLS_INC="-DCHARLS_INTERFACE_H"
     fi
   else
+    dnl CharLS 2.0
     AC_CHECK_HEADERS([CharLS/charls.h])
     if test "$ac_cv_header_CharLS_charls_h" = "yes"; then
         AC_LANG_PUSH([C++])
@@ -2198,6 +2207,18 @@ if test "$with_charls" = "yes" -o "$with_charls" = "" ; then
         if test "$HAVE_CHARLS" = "yes"; then
             LIBS="-lCharLS $LIBS"
             CHARLS_INC="-DCHARLS_2"
+        fi
+    else
+        dnl CharLS 2.1
+        AC_CHECK_HEADERS([charls/charls.h])
+        if test "$ac_cv_header_charls_charls_h" = "yes"; then
+            AC_LANG_PUSH([C++])
+            AC_CHECK_LIB(charls,JpegLsDecode,HAVE_CHARLS=yes)
+            AC_LANG_POP([C++])
+            if test "$HAVE_CHARLS" = "yes"; then
+                LIBS="-lcharls $LIBS"
+                CHARLS_INC="-DCHARLS_2_1"
+            fi
         fi
     fi
   fi
@@ -2931,7 +2952,7 @@ else
       LIBS="$NETCDF_LIBS $LIBS"
     fi
 
-dnl previous behaviour without nc-config
+dnl previous behavior without nc-config
 
 dnl test linking using default settings
 elif test "$with_netcdf" = "yes" -o "$with_netcdf" = "" ; then

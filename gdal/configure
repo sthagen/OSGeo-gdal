@@ -22669,6 +22669,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
 
 
+
 # Check whether --with-libz was given.
 if test "${with_libz+set}" = set; then :
   withval=$with_libz;
@@ -30258,8 +30259,7 @@ HAVE_CHARLS=no
 CHARLS_INC=
 
 if test "$with_charls" = "yes" -o "$with_charls" = "" ; then
-
-  for ac_header in CharLS/interface.h
+    for ac_header in CharLS/interface.h
 do :
   ac_fn_c_check_header_mongrel "$LINENO" "CharLS/interface.h" "ac_cv_header_CharLS_interface_h" "$ac_includes_default"
 if test "x$ac_cv_header_CharLS_interface_h" = xyes; then :
@@ -30317,7 +30317,7 @@ fi
         CHARLS_INC="-DCHARLS_INTERFACE_H"
     fi
   else
-    for ac_header in CharLS/charls.h
+        for ac_header in CharLS/charls.h
 do :
   ac_fn_c_check_header_mongrel "$LINENO" "CharLS/charls.h" "ac_cv_header_CharLS_charls_h" "$ac_includes_default"
 if test "x$ac_cv_header_CharLS_charls_h" = xyes; then :
@@ -30385,6 +30385,77 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
         if test "$HAVE_CHARLS" = "yes"; then
             LIBS="-lCharLS $LIBS"
             CHARLS_INC="-DCHARLS_2"
+        fi
+    else
+                for ac_header in charls/charls.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "charls/charls.h" "ac_cv_header_charls_charls_h" "$ac_includes_default"
+if test "x$ac_cv_header_charls_charls_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_CHARLS_CHARLS_H 1
+_ACEOF
+
+fi
+
+done
+
+        if test "$ac_cv_header_charls_charls_h" = "yes"; then
+            ac_ext=cpp
+ac_cpp='$CXXCPP $CPPFLAGS'
+ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
+
+            { $as_echo "$as_me:${as_lineno-$LINENO}: checking for JpegLsDecode in -lcharls" >&5
+$as_echo_n "checking for JpegLsDecode in -lcharls... " >&6; }
+if ${ac_cv_lib_charls_JpegLsDecode+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lcharls  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char JpegLsDecode ();
+int
+main ()
+{
+return JpegLsDecode ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_lib_charls_JpegLsDecode=yes
+else
+  ac_cv_lib_charls_JpegLsDecode=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_charls_JpegLsDecode" >&5
+$as_echo "$ac_cv_lib_charls_JpegLsDecode" >&6; }
+if test "x$ac_cv_lib_charls_JpegLsDecode" = xyes; then :
+  HAVE_CHARLS=yes
+fi
+
+            ac_ext=c
+ac_cpp='$CPP $CPPFLAGS'
+ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+ac_compiler_gnu=$ac_cv_c_compiler_gnu
+
+            if test "$HAVE_CHARLS" = "yes"; then
+                LIBS="-lcharls $LIBS"
+                CHARLS_INC="-DCHARLS_2_1"
+            fi
         fi
     fi
   fi
@@ -32369,7 +32440,13 @@ $as_echo_n "checking libnetcdf compiler and linker flags with nc-config... " >&6
     NETCDF_INCLUDEDIR=`$NETCDF_NCCONFIG --includedir`
     NETCDF_LIBS=`$NETCDF_NCCONFIG --libs`
 
+    if echo "x" | sed -E "s/x/y/" >/dev/null 2>/dev/null; then
         STRIPPED_LIBRARY_NAME="$(echo "${NETCDF_LIBS}" | sed -E 's:-L/(usr/)?(lib(64)?|lib/x86_64-linux-gnu)/*[[:space:]]+::')"
+    elif echo "x" | sed -r "s/x/y/" >/dev/null 2>/dev/null; then
+                STRIPPED_LIBRARY_NAME="$(echo "${NETCDF_LIBS}" | sed -r 's:-L/(usr/)?(lib(64)?|lib/x86_64-linux-gnu)/*[[:space:]]+::')"
+    else
+        STRIPPED_LIBRARY_NAME="$(echo "${NETCDF_LIBS}")"
+    fi
 
     NETCDF_LIBS="$STRIPPED_LIBRARY_NAME"
     echo ""
@@ -34348,7 +34425,13 @@ $as_echo "no, mysql is pre-4.x" >&6; }
       HAVE_MYSQL=yes
       MYSQL_LIB="`$MYSQL_CONFIG --libs`"
 
+    if echo "x" | sed -E "s/x/y/" >/dev/null 2>/dev/null; then
         STRIPPED_LIBRARY_NAME="$(echo "${MYSQL_LIB}" | sed -E 's:-L/(usr/)?(lib(64)?|lib/x86_64-linux-gnu)/*[[:space:]]+::')"
+    elif echo "x" | sed -r "s/x/y/" >/dev/null 2>/dev/null; then
+                STRIPPED_LIBRARY_NAME="$(echo "${MYSQL_LIB}" | sed -r 's:-L/(usr/)?(lib(64)?|lib/x86_64-linux-gnu)/*[[:space:]]+::')"
+    else
+        STRIPPED_LIBRARY_NAME="$(echo "${MYSQL_LIB}")"
+    fi
 
       MYSQL_LIB="$STRIPPED_LIBRARY_NAME"
       MYSQL_INC="`$MYSQL_CONFIG --include`"
@@ -37391,7 +37474,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
                 ac_sqlite3_version=`cat $ac_sqlite3_header_path \
                     | grep '#define.*SQLITE_VERSION.*\"' | sed -e 's/.* "//' \
                         | sed -e 's/"//'`
-                if test $ac_sqlite3_version != ""; then
+                if test "$ac_sqlite3_version" != ""; then
                     SQLITE3_VERSION=$ac_sqlite3_version
                 else
                     { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Can not find SQLITE_VERSION macro in sqlite3.h header to retrieve SQLite version!" >&5
@@ -37776,7 +37859,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
                 ac_sqlite3_version=`cat $ac_sqlite3_header_path \
                     | grep '#define.*SQLITE_VERSION.*\"' | sed -e 's/.* "//' \
                         | sed -e 's/"//'`
-                if test $ac_sqlite3_version != ""; then
+                if test "$ac_sqlite3_version" != ""; then
                     SQLITE3_VERSION=$ac_sqlite3_version
                 else
                     { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Can not find SQLITE_VERSION macro in sqlite3.h header to retrieve SQLite version!" >&5
@@ -39105,7 +39188,13 @@ if test "${HAVE_GEOS}" = "yes" ; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: Using C API from GEOS $GEOS_VERSION" >&5
 $as_echo "$as_me: Using C API from GEOS $GEOS_VERSION" >&6;}
 
+    if echo "x" | sed -E "s/x/y/" >/dev/null 2>/dev/null; then
         STRIPPED_LIBRARY_NAME="$(echo "${GEOS_LIBS}" | sed -E 's:-L/(usr/)?(lib(64)?|lib/x86_64-linux-gnu)/*[[:space:]]+::')"
+    elif echo "x" | sed -r "s/x/y/" >/dev/null 2>/dev/null; then
+                STRIPPED_LIBRARY_NAME="$(echo "${GEOS_LIBS}" | sed -r 's:-L/(usr/)?(lib(64)?|lib/x86_64-linux-gnu)/*[[:space:]]+::')"
+    else
+        STRIPPED_LIBRARY_NAME="$(echo "${GEOS_LIBS}")"
+    fi
 
   GEOS_LIBS="$STRIPPED_LIBRARY_NAME"
   LIBS="${GEOS_LIBS} ${LIBS}"
@@ -39384,7 +39473,13 @@ if test "${HAVE_SFCGAL}" = "yes" ; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: Using C API from SFCGAL $SFCGAL_VERSION" >&5
 $as_echo "$as_me: Using C API from SFCGAL $SFCGAL_VERSION" >&6;}
 
+    if echo "x" | sed -E "s/x/y/" >/dev/null 2>/dev/null; then
         STRIPPED_LIBRARY_NAME="$(echo "${SFCGAL_LIBS}" | sed -E 's:-L/(usr/)?(lib(64)?|lib/x86_64-linux-gnu)/*[[:space:]]+::')"
+    elif echo "x" | sed -r "s/x/y/" >/dev/null 2>/dev/null; then
+                STRIPPED_LIBRARY_NAME="$(echo "${SFCGAL_LIBS}" | sed -r 's:-L/(usr/)?(lib(64)?|lib/x86_64-linux-gnu)/*[[:space:]]+::')"
+    else
+        STRIPPED_LIBRARY_NAME="$(echo "${SFCGAL_LIBS}")"
+    fi
 
   SFCGAL_LIBS="$STRIPPED_LIBRARY_NAME"
   LIBS="${SFCGAL_LIBS} ${LIBS}"
