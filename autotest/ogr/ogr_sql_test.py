@@ -560,7 +560,7 @@ def test_ogr_sql_24():
 
     result = 'success'
 
-    ds = ogr.Open('data/smalltest.dgn')
+    ds = ogr.Open('data/dgn/smalltest.dgn')
 
     sql_layer = ds.ExecuteSQL('SELECT * from elements where colorindex=83 and type=3')
 
@@ -635,7 +635,7 @@ def test_ogr_sql_26():
 
 def test_ogr_sql_27():
 
-    ds = ogr.Open('data/testdatetime.csv')
+    ds = ogr.Open('data/csv/testdatetime.csv')
 
     sql_lyr = ds.ExecuteSQL("SELECT * FROM testdatetime WHERE "
                             "timestamp < '2010/04/01 00:00:00' AND "
@@ -1408,10 +1408,36 @@ def test_ogr_sql_48():
     ds.ReleaseResultSet(sql_lyr)
     assert i == 1001
 
+###############################################################################
+# Test arithmetic expressions
+
+
+def test_ogr_sql_49():
+
+    # expressions and expected result
+    expressions = [ ( "1/1", 1),
+                    ( "1/1.", 1.),
+                    ( "cast((1) as integer)/1." , 1. ),
+                    ( "1./cast((1) as integer)" , 1. ),
+                    ( "1.5+1" , 2.5 ),
+                    ( "(1*1)+1.5" , 2.5 ),
+                    ( "1+1" , 2 ),
+                    ( "cast(1 as integer)+ 1234567890123" , 1234567890124 ),
+                    ( "cast(1 as integer)* 1234567890123" , 1234567890123 )
+    ]
+
+    for expression, expected in expressions:
+        sql_lyr = gdaltest.ds.ExecuteSQL('select {} as result from poly limit 1'.format( expression ) )
+        tr = ogrtest.check_features_against_list(sql_lyr, 'result', [expected])
+
+        gdaltest.ds.ReleaseResultSet(sql_lyr)
+
+        assert tr
+
+
+###############################################################################
+
 
 def test_ogr_sql_cleanup():
     gdaltest.lyr = None
     gdaltest.ds = None
-
-
-

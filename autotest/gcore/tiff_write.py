@@ -39,8 +39,6 @@ import pytest
 
 import gdaltest
 
-run_tiff_write_api_proxy = True
-
 ###############################################################################
 
 
@@ -3814,7 +3812,7 @@ def test_tiff_write_105():
 # Test the direct copy mechanism of JPEG source
 
 
-def test_tiff_write_106(filename='../gdrivers/data/byte_with_xmp.jpg', options=None, check_cs=True):
+def test_tiff_write_106(filename='../gdrivers/data/jpeg/byte_with_xmp.jpg', options=None, check_cs=True):
 
     if options is None:
         options = ['COMPRESS=JPEG']
@@ -3864,33 +3862,33 @@ def test_tiff_write_109():
 
 
 def test_tiff_write_110():
-    return test_tiff_write_106(filename='../gdrivers/data/albania.jpg', check_cs=False)
+    return test_tiff_write_106(filename='../gdrivers/data/jpeg/albania.jpg', check_cs=False)
 
 # Whole copy of YCbCr *DOES* give exact pixels w.r.t. original image
 
 
 def test_tiff_write_111():
-    return test_tiff_write_106(filename='../gdrivers/data/albania.jpg', options=['COMPRESS=JPEG', 'BLOCKYSIZE=260'])
+    return test_tiff_write_106(filename='../gdrivers/data/jpeg/albania.jpg', options=['COMPRESS=JPEG', 'BLOCKYSIZE=260'])
 
 
 def test_tiff_write_111_bis():
-    return test_tiff_write_106(filename='../gdrivers/data/albania.jpg', options=['COMPRESS=JPEG', 'BLOCKYSIZE=260', 'INTERLEAVE=PIXEL'])
+    return test_tiff_write_106(filename='../gdrivers/data/jpeg/albania.jpg', options=['COMPRESS=JPEG', 'BLOCKYSIZE=260', 'INTERLEAVE=PIXEL'])
 
 
 def test_tiff_write_111_ter():
-    return test_tiff_write_106(filename='../gdrivers/data/albania.jpg', options=['COMPRESS=JPEG', 'BLOCKYSIZE=260', 'INTERLEAVE=BAND'], check_cs=False)
+    return test_tiff_write_106(filename='../gdrivers/data/jpeg/albania.jpg', options=['COMPRESS=JPEG', 'BLOCKYSIZE=260', 'INTERLEAVE=BAND'], check_cs=False)
 
 # Tiled organization of YCbCr does *NOT* give exact pixels w.r.t. original image
 
 
 def test_tiff_write_112():
-    return test_tiff_write_106(filename='../gdrivers/data/albania.jpg', options=['COMPRESS=JPEG', 'TILED=YES'], check_cs=False)
+    return test_tiff_write_106(filename='../gdrivers/data/jpeg/albania.jpg', options=['COMPRESS=JPEG', 'TILED=YES'], check_cs=False)
 
 # The source is a JPEG in RGB colorspace (usually it is YCbCr).
 
 
 def test_tiff_write_113():
-    return test_tiff_write_106(filename='../gdrivers/data/rgbsmall_rgb.jpg', options=['COMPRESS=JPEG', 'BLOCKYSIZE=8'])
+    return test_tiff_write_106(filename='../gdrivers/data/jpeg/rgbsmall_rgb.jpg', options=['COMPRESS=JPEG', 'BLOCKYSIZE=8'])
 
 ###############################################################################
 # Test CreateCopy() interruption
@@ -4642,7 +4640,7 @@ def test_tiff_write_128():
         pytest.skip()
 
     gdal.SetConfigOption('GDAL_JPEG_TO_RGB', 'NO')
-    src_ds = gdal.Open('../gdrivers/data/rgb_ntf_cmyk.jpg')
+    src_ds = gdal.Open('../gdrivers/data/jpeg/rgb_ntf_cmyk.jpg')
     gdal.SetConfigOption('GDAL_JPEG_TO_RGB', None)
 
     # Will received implicitly CMYK photometric interpretation.
@@ -5658,7 +5656,7 @@ def test_tiff_write_147():
 
     gdal.SetConfigOption('GDAL_JPEG_TO_RGB', 'NO')
     gdal.SetConfigOption('GDAL_PAM_ENABLED', 'NO')
-    gdal.Translate('/vsimem/tiff_write_147.tif', '../gdrivers/data/rgb_ntf_cmyk.jpg', options='-outsize 1000% 1000% -co COMPRESS=JPEG -co PHOTOMETRIC=CMYK')
+    gdal.Translate('/vsimem/tiff_write_147.tif', '../gdrivers/data/jpeg/rgb_ntf_cmyk.jpg', options='-outsize 1000% 1000% -co COMPRESS=JPEG -co PHOTOMETRIC=CMYK')
     gdal.SetConfigOption('GDAL_JPEG_TO_RGB', None)
     gdal.SetConfigOption('GDAL_PAM_ENABLED', None)
     out_ds = gdal.Open('/vsimem/tiff_write_147.tif')
@@ -5677,12 +5675,12 @@ def test_tiff_write_148():
         pytest.skip()
 
     gdal.SetConfigOption('GDAL_JPEG_TO_RGB', 'NO')
-    tmp_ds = gdal.Translate('', '../gdrivers/data/rgb_ntf_cmyk.jpg', format='MEM')
+    tmp_ds = gdal.Translate('', '../gdrivers/data/jpeg/rgb_ntf_cmyk.jpg', format='MEM')
     gdal.SetConfigOption('GDAL_JPEG_TO_RGB', None)
     original_stats = [tmp_ds.GetRasterBand(i + 1).ComputeStatistics(True) for i in range(4)]
     gdal.SetConfigOption('GDAL_JPEG_TO_RGB', 'NO')
     gdal.SetConfigOption('GDAL_PAM_ENABLED', 'NO')
-    gdal.Translate('/vsimem/tiff_write_148.tif', '../gdrivers/data/rgb_ntf_cmyk.jpg', options='-outsize 1000% 1000% -co COMPRESS=JPEG -co PHOTOMETRIC=CMYK')
+    gdal.Translate('/vsimem/tiff_write_148.tif', '../gdrivers/data/jpeg/rgb_ntf_cmyk.jpg', options='-outsize 1000% 1000% -co COMPRESS=JPEG -co PHOTOMETRIC=CMYK')
     gdal.SetConfigOption('GDAL_JPEG_TO_RGB', None)
     gdal.SetConfigOption('GDAL_PAM_ENABLED', None)
     out_ds = gdal.Open('GTIFF_RAW:/vsimem/tiff_write_148.tif')
@@ -6830,7 +6828,7 @@ def test_tiff_write_181_xmp():
     new_ds = gdaltest.tiff_drv.CreateCopy('tmp/test_181.tif', src_ds)
     src_ds = None
 
-    xmp_ds = gdal.Open('../gdrivers/data/byte_with_xmp.tif')
+    xmp_ds = gdal.Open('../gdrivers/data/gtiff/byte_with_xmp.tif')
     xmp = xmp_ds.GetMetadata('xml:XMP')
     xmp_ds = None
     assert 'W5M0MpCehiHzreSzNTczkc9d' in xmp[0], 'Wrong input file without XMP'
@@ -6854,7 +6852,7 @@ def test_tiff_write_181_xmp():
 
 def test_tiff_write_182_xmp_delete():
 
-    shutil.copyfile('../gdrivers/data/byte_with_xmp.tif', 'tmp/test_182.tif')
+    shutil.copyfile('../gdrivers/data/gtiff/byte_with_xmp.tif', 'tmp/test_182.tif')
 
     chg_ds = gdal.Open('tmp/test_182.tif', gdal.GA_Update)
     read_xmp = chg_ds.GetMetadata('xml:XMP')
@@ -7181,20 +7179,6 @@ def test_tiff_write_too_many_tiles():
                 src_ds.BuildOverviews('NEAR', [2])
         assert 'File too large regarding tile size' in gdal.GetLastErrorMsg()
 
-
-###############################################################################
-# Ask to run again tests with GDAL_API_PROXY=YES
-
-
-def tiff_write_api_proxy():
-
-    if not run_tiff_write_api_proxy:
-        pytest.skip()
-
-    import test_py_scripts
-    ret = test_py_scripts.run_py_script_as_external_script('.', 'tiff_write', ' -api_proxy', display_live_on_parent_stdout=True)
-
-    assert ret.find('Failed:    0') != -1
 
 ###############################################################################
 
