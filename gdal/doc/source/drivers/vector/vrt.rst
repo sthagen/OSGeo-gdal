@@ -242,6 +242,8 @@ layer name, and may have the following subelements:
      Defaults to the value of "name".
   *  **nullable** can be used to specify whether the field
      is nullable. It defaults to "true".
+  *  **unique** can be used to specify whether the field
+     has a unique constraint. It defaults to "false". (GDAL >= 3.2)
 
 - **FeatureCount** (optional) : This element is used to
   define the feature count of the layer (when no spatial or attribute
@@ -326,15 +328,13 @@ layer as a point layer, and as being in the WGS84 coordinate system.
 .. code-block:: XML
 
    <OGRVRTDataSource>
-
        <OGRVRTLayer name="worms">
            <SrcDataSource>ODBC:DISEASE,worms</SrcDataSource>
-       <SrcLayer>worms</SrcLayer>
-       <GeometryType>wkbPoint</GeometryType>
+           <SrcLayer>worms</SrcLayer>
+           <GeometryType>wkbPoint</GeometryType>
            <LayerSRS>WGS84</LayerSRS>
-       <GeometryField encoding="PointFromColumns" x="x" y="y"/>
+           <GeometryField encoding="PointFromColumns" x="x" y="y"/>
        </OGRVRTLayer>
-
    </OGRVRTDataSource>
 
 Example: Renaming attributes

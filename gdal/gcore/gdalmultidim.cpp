@@ -1767,7 +1767,7 @@ bool GDALMDArray::SetOffset(CPL_UNUSED double dfOffset)
  */
 double GDALMDArray::GetScale(CPL_UNUSED bool* pbHasScale) const
 {
-    if( *pbHasScale )
+    if( pbHasScale )
         *pbHasScale = false;
     return 1.0;
 }
@@ -1793,7 +1793,7 @@ double GDALMDArray::GetScale(CPL_UNUSED bool* pbHasScale) const
  */
 double GDALMDArray::GetOffset(CPL_UNUSED bool* pbHasOffset) const
 {
-    if( *pbHasOffset )
+    if( pbHasOffset )
         *pbHasOffset = false;
     return 0.0;
 }
@@ -5391,28 +5391,28 @@ struct GDALGroupHS
 {
     std::shared_ptr<GDALGroup> m_poImpl;
 
-    explicit GDALGroupHS(std::shared_ptr<GDALGroup> poGroup): m_poImpl(poGroup) {}
+    explicit GDALGroupHS(const std::shared_ptr<GDALGroup>& poGroup): m_poImpl(poGroup) {}
 };
 
 struct GDALMDArrayHS
 {
     std::shared_ptr<GDALMDArray> m_poImpl;
 
-    explicit GDALMDArrayHS(std::shared_ptr<GDALMDArray> poArray): m_poImpl(poArray) {}
+    explicit GDALMDArrayHS(const std::shared_ptr<GDALMDArray>& poArray): m_poImpl(poArray) {}
 };
 
 struct GDALAttributeHS
 {
     std::shared_ptr<GDALAttribute> m_poImpl;
 
-    explicit GDALAttributeHS(std::shared_ptr<GDALAttribute> poAttr): m_poImpl(poAttr) {}
+    explicit GDALAttributeHS(const std::shared_ptr<GDALAttribute>& poAttr): m_poImpl(poAttr) {}
 };
 
 struct GDALDimensionHS
 {
     std::shared_ptr<GDALDimension> m_poImpl;
 
-    explicit GDALDimensionHS(std::shared_ptr<GDALDimension> poDim): m_poImpl(poDim) {}
+    explicit GDALDimensionHS(const std::shared_ptr<GDALDimension>& poDim): m_poImpl(poDim) {}
 };
 
 /************************************************************************/
@@ -7694,6 +7694,7 @@ std::shared_ptr<GDALMDArray> GDALDimensionWeakIndexingVar::GetIndexingVariable()
     return m_poIndexingVariable.lock();
 }
 
+// cppcheck-suppress passedByValue
 bool GDALDimensionWeakIndexingVar::SetIndexingVariable(std::shared_ptr<GDALMDArray> poIndexingVariable)
 {
     m_poIndexingVariable = poIndexingVariable;

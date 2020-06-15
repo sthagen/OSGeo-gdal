@@ -43,21 +43,143 @@ from osgeo import osr
 import pytest
 
 ###############################################################################
+@pytest.fixture(autouse=True, scope='module')
+def startup_and_cleanup():
+
+    gdaltest.have_gml_reader = ogr.Open('data/gml/ionic_wfs.gml') is not None
+
+    yield
+
+    gdal.SetConfigOption('GML_SKIP_RESOLVE_ELEMS', None)
+    gdal.SetConfigOption('GML_SAVE_RESOLVED_TO', None)
+
+    gdaltest.clean_tmp()
+
+    fl = gdal.ReadDir('/vsimem/')
+    if fl is not None:
+        print(fl)
+
+    try:
+        os.remove('data/gml/bom.gfs')
+    except OSError:
+        pass
+    try:
+        os.remove('data/gml/utf8.gfs')
+    except OSError:
+        pass
+    try:
+        os.remove('data/gml/ticket_2349_test_1.gfs')
+    except OSError:
+        pass
+    try:
+        os.remove('data/gml/citygml.gfs')
+    except OSError:
+        pass
+    try:
+        os.remove('data/gml/gnis_pop_100.gfs')
+    except OSError:
+        pass
+    try:
+        os.remove('data/gml/gnis_pop_110.gfs')
+    except OSError:
+        pass
+    try:
+        os.remove('data/gml/paris_typical_strike_demonstration.gfs')
+    except OSError:
+        pass
+    try:
+        os.remove('data/gml/global_geometry.gfs')
+    except OSError:
+        pass
+    try:
+        os.remove('tmp/global_geometry.gfs')
+    except OSError:
+        pass
+    try:
+        os.remove('tmp/global_geometry.xml')
+    except OSError:
+        pass
+    try:
+        os.remove('data/gml/curveProperty.gfs')
+    except OSError:
+        pass
+    try:
+        os.remove('tmp/ogr_gml_26.gml')
+        os.remove('tmp/ogr_gml_26.xsd')
+    except OSError:
+        pass
+    try:
+        os.remove('tmp/ogr_gml_27.gml')
+        os.remove('tmp/ogr_gml_27.xsd')
+    except OSError:
+        pass
+    try:
+        os.remove('tmp/ogr_gml_28.gml')
+        os.remove('tmp/ogr_gml_28.gfs')
+    except OSError:
+        pass
+    try:
+        os.remove('tmp/GmlTopo-sample.sqlite')
+    except OSError:
+        pass
+    try:
+        os.remove('tmp/GmlTopo-sample.gfs')
+    except OSError:
+        pass
+    try:
+        os.remove('tmp/GmlTopo-sample.resolved.gml')
+    except OSError:
+        pass
+    try:
+        os.remove('tmp/GmlTopo-sample.xml')
+    except OSError:
+        pass
+    try:
+        os.remove('tmp/sample_gml_face_hole_negative_no.sqlite')
+    except OSError:
+        pass
+    try:
+        os.remove('tmp/sample_gml_face_hole_negative_no.gfs')
+    except OSError:
+        pass
+    try:
+        os.remove('tmp/sample_gml_face_hole_negative_no.resolved.gml')
+    except OSError:
+        pass
+    try:
+        os.remove('tmp/sample_gml_face_hole_negative_no.xml')
+    except OSError:
+        pass
+    try:
+        os.remove('data/gml/wfs_typefeature.gfs')
+    except OSError:
+        pass
+    try:
+        os.remove('tmp/ogr_gml_51.gml')
+        os.remove('tmp/ogr_gml_51.xsd')
+    except OSError:
+        pass
+    try:
+        os.remove('tmp/gmlattributes.gml')
+        os.remove('tmp/gmlattributes.gfs')
+    except OSError:
+        pass
+    files = os.listdir('data')
+    for filename in files:
+        if len(filename) > 13 and filename[-13:] == '.resolved.gml':
+            os.unlink('data/gml/' + filename)
+    gdal.Unlink('data/gml/test_xsi_nil_gfs.gfs')
+
+###############################################################################
 # Test reading geometry and attribute from ionic wfs gml file.
 #
 
 
 def test_ogr_gml_1():
-
-    gdaltest.have_gml_reader = 0
+    if not gdaltest.have_gml_reader:
+        pytest.skip()
 
     gml_ds = ogr.Open('data/gml/ionic_wfs.gml')
-    if gml_ds is None:
-        if gdal.GetLastErrorMsg().find('Xerces') != -1:
-            pytest.skip()
-        pytest.fail('failed to open test file.')
-
-    gdaltest.have_gml_reader = 1
 
     assert gml_ds.GetLayerCount() == 1, 'wrong number of layers'
 
@@ -1366,6 +1488,10 @@ def test_ogr_gml_41():
 
     gdaltest.have_gml_validation = False
 
+    #if gdal.GetDriverByName('GMLAS'):
+    #    gdaltest.have_gml_validation = True
+    #    return
+
     if not gdaltest.have_gml_reader:
         pytest.skip()
 
@@ -1391,13 +1517,15 @@ def test_ogr_gml_41():
     gdaltest.have_gml_validation = True
 
 ###############################################################################
-# Test validating against .xsd
 
-
-def test_ogr_gml_42():
+def validate(filename):
 
     if not gdaltest.have_gml_validation:
         pytest.skip()
+
+    #if gdal.GetDriverByName('GMLAS'):
+    #    assert gdal.OpenEx('GMLAS:' + filename, open_options=['VALIDATE=YES', 'FAIL_IF_VALIDATION_ERROR=YES']) is not None
+    #    return
 
     try:
         os.mkdir('tmp/cache/SCHEMAS_OPENGIS_NET')
@@ -1409,7 +1537,7 @@ def test_ogr_gml_42():
     except OSError:
         gdaltest.unzip('tmp/cache/SCHEMAS_OPENGIS_NET', 'tmp/cache/SCHEMAS_OPENGIS_NET.zip')
 
-    ds = ogr.Open('data/gml/expected_gml_gml32.gml')
+    ds = ogr.Open(filename)
 
     gdal.SetConfigOption('GDAL_OPENGIS_SCHEMAS', './tmp/cache/SCHEMAS_OPENGIS_NET')
     lyr = ds.ExecuteSQL('SELECT ValidateSchema()')
@@ -1422,6 +1550,14 @@ def test_ogr_gml_42():
     ds.ReleaseResultSet(lyr)
 
     assert val != 0
+
+###############################################################################
+# Test validating against .xsd
+
+
+def test_ogr_gml_42():
+
+    validate('data/gml/expected_gml_gml32.gml')
 
 ###############################################################################
 # Test automated downloading of WFS schema
@@ -1533,30 +1669,11 @@ def test_ogr_gml_45():
     dst_feat = None
     ds = None
 
-    if not gdaltest.have_gml_validation:
+    try:
+        validate('/vsimem/ogr_gml_45.gml')
+    finally:
         gdal.Unlink('/vsimem/ogr_gml_45.gml')
         gdal.Unlink('/vsimem/ogr_gml_45.xsd')
-        pytest.skip()
-
-    # Validate document
-
-    ds = ogr.Open('/vsimem/ogr_gml_45.gml')
-
-    gdal.SetConfigOption('GDAL_OPENGIS_SCHEMAS', './tmp/cache/SCHEMAS_OPENGIS_NET')
-    lyr = ds.ExecuteSQL('SELECT ValidateSchema()')
-    gdal.SetConfigOption('GDAL_OPENGIS_SCHEMAS', None)
-
-    feat = lyr.GetNextFeature()
-    val = feat.GetFieldAsInteger(0)
-    feat = None
-
-    ds.ReleaseResultSet(lyr)
-    ds = None
-
-    gdal.Unlink('/vsimem/ogr_gml_45.gml')
-    gdal.Unlink('/vsimem/ogr_gml_45.xsd')
-
-    assert val != 0
 
 
 ###############################################################################
@@ -1618,37 +1735,10 @@ def test_ogr_gml_46():
             ds = None
 
             # Validate document
-
-            ds = ogr.Open('/vsimem/ogr_gml_46.gml')
-
-            lyr = ds.GetLayer(0)
-            feat = lyr.GetNextFeature()
-            got_geom = feat.GetGeometryRef()
-
-            if got_geom is None:
-                got_geom_wkt = ''
-            else:
-                got_geom_wkt = got_geom.ExportToWkt()
-
-            if got_geom_wkt != wkt:
-                gdaltest.post_reason('geometry do not match')
-                print('got %s, expected %s' % (got_geom_wkt, wkt))
-
-            feat = None
-
-            gdal.SetConfigOption('GDAL_OPENGIS_SCHEMAS', './tmp/cache/SCHEMAS_OPENGIS_NET')
-            lyr = ds.ExecuteSQL('SELECT ValidateSchema()')
-            gdal.SetConfigOption('GDAL_OPENGIS_SCHEMAS', None)
-
-            feat = lyr.GetNextFeature()
-            val = feat.GetFieldAsInteger(0)
-            feat = None
-
-            ds.ReleaseResultSet(lyr)
-            ds = None
-
-            if val == 0:
-                gdaltest.post_reason('validation failed for format=%s, wkt=%s' % (frmt, wkt))
+            try:
+                validate('/vsimem/ogr_gml_46.gml')
+            except:
+                print('validation failed for format=%s, wkt=%s' % (frmt, wkt))
 
                 f = gdal.VSIFOpenL('/vsimem/ogr_gml_46.gml', 'rb')
                 content = gdal.VSIFReadL(1, 10000, f)
@@ -1659,11 +1749,9 @@ def test_ogr_gml_46():
                 content = gdal.VSIFReadL(1, 10000, f)
                 gdal.VSIFCloseL(f)
                 print(content)
-
-            gdal.Unlink('/vsimem/ogr_gml_46.gml')
-            gdal.Unlink('/vsimem/ogr_gml_46.xsd')
-
-            assert val != 0
+            finally:
+                gdal.Unlink('/vsimem/ogr_gml_46.gml')
+                gdal.Unlink('/vsimem/ogr_gml_46.xsd')
 
         # Only minor schema changes
         if frmt == 'GML3Deegree':
@@ -1673,34 +1761,10 @@ def test_ogr_gml_46():
 ###############################################################################
 # Test validation of WFS GML documents
 
+@pytest.mark.parametrize('filename', ['data/gml/wfs10.xml', 'data/gml/wfs11.xml', 'data/gml/wfs20.xml'])
+def test_ogr_gml_validate_wfs(filename):
+    validate(filename)
 
-def test_ogr_gml_47():
-
-    if not gdaltest.have_gml_validation:
-        pytest.skip()
-
-    filenames = ['data/gml/wfs10.xml', 'data/gml/wfs11.xml', 'data/gml/wfs20.xml']
-
-    for filename in filenames:
-
-        # Validate document
-
-        ds = ogr.Open(filename)
-
-        gdal.SetConfigOption('GDAL_OPENGIS_SCHEMAS', './tmp/cache/SCHEMAS_OPENGIS_NET')
-        lyr = ds.ExecuteSQL('SELECT ValidateSchema()')
-        gdal.SetConfigOption('GDAL_OPENGIS_SCHEMAS', None)
-
-        feat = lyr.GetNextFeature()
-        val = feat.GetFieldAsInteger(0)
-        feat = None
-
-        ds.ReleaseResultSet(lyr)
-        ds = None
-
-        assert val != 0, ('validation failed for file=%s' % filename)
-
-    
 ###############################################################################
 # Test that we can parse some particular .xsd files that have the geometry
 # field declared as :
@@ -3611,133 +3675,46 @@ def test_ogr_gml_standalone_geom():
 
 
 ###############################################################################
-#  Cleanup
+# Test unique fields
 
+@pytest.mark.parametrize('gml_format', ['GML2','GML3','GML3.2'])
+@pytest.mark.parametrize('constraint_met', [True, False])
+def test_ogr_gml_unique(gml_format, constraint_met):
 
-def test_ogr_gml_cleanup():
     if not gdaltest.have_gml_reader:
         pytest.skip()
 
-    gdal.SetConfigOption('GML_SKIP_RESOLVE_ELEMS', None)
-    gdal.SetConfigOption('GML_SAVE_RESOLVED_TO', None)
+    try:
+        ds = ogr.GetDriverByName('GML').CreateDataSource('/vsimem/test_ogr_gml_unique.gml', options=['FORMAT='+gml_format])
+        lyr = ds.CreateLayer('test', geom_type=ogr.wkbNone)
+        field_defn = ogr.FieldDefn('field_not_unique', ogr.OFTString)
+        lyr.CreateField(field_defn)
+        field_defn = ogr.FieldDefn('field_unique', ogr.OFTString)
+        field_defn.SetUnique(True)
+        lyr.CreateField(field_defn)
+        f = ogr.Feature(lyr.GetLayerDefn())
+        f['field_unique'] = 'foo'
+        lyr.CreateFeature(f)
+        f = ogr.Feature(lyr.GetLayerDefn())
+        f['field_unique'] = 'bar' if constraint_met else 'foo'
+        lyr.CreateFeature(f)
+        f = None
+        ds = None
 
-    gdaltest.clean_tmp()
+        ds = gdal.OpenEx('/vsimem/test_ogr_gml_unique.gml')
+        lyr = ds.GetLayerByName('test')
+        assert lyr.GetLayerDefn().GetFieldDefn(lyr.GetLayerDefn().GetFieldIndex('field_not_unique')).IsUnique() == 0
+        assert lyr.GetLayerDefn().GetFieldDefn(lyr.GetLayerDefn().GetFieldIndex('field_unique')).IsUnique() == 1
+        ds = None
 
-    fl = gdal.ReadDir('/vsimem/')
-    if fl is not None:
-        print(fl)
+        if gdaltest.have_gml_validation:
+            if constraint_met:
+                validate("/vsimem/test_ogr_gml_unique.gml")
+            else:
+                with gdaltest.error_handler():
+                    with pytest.raises(Exception):
+                        validate("/vsimem/test_ogr_gml_unique.gml")
 
-    return test_ogr_gml_clean_files()
-
-
-def test_ogr_gml_clean_files():
-    try:
-        os.remove('data/gml/bom.gfs')
-    except OSError:
-        pass
-    try:
-        os.remove('data/gml/utf8.gfs')
-    except OSError:
-        pass
-    try:
-        os.remove('data/gml/ticket_2349_test_1.gfs')
-    except OSError:
-        pass
-    try:
-        os.remove('data/gml/citygml.gfs')
-    except OSError:
-        pass
-    try:
-        os.remove('data/gml/gnis_pop_100.gfs')
-    except OSError:
-        pass
-    try:
-        os.remove('data/gml/gnis_pop_110.gfs')
-    except OSError:
-        pass
-    try:
-        os.remove('data/gml/paris_typical_strike_demonstration.gfs')
-    except OSError:
-        pass
-    try:
-        os.remove('data/gml/global_geometry.gfs')
-    except OSError:
-        pass
-    try:
-        os.remove('tmp/global_geometry.gfs')
-    except OSError:
-        pass
-    try:
-        os.remove('tmp/global_geometry.xml')
-    except OSError:
-        pass
-    try:
-        os.remove('data/gml/curveProperty.gfs')
-    except OSError:
-        pass
-    try:
-        os.remove('tmp/ogr_gml_26.gml')
-        os.remove('tmp/ogr_gml_26.xsd')
-    except OSError:
-        pass
-    try:
-        os.remove('tmp/ogr_gml_27.gml')
-        os.remove('tmp/ogr_gml_27.xsd')
-    except OSError:
-        pass
-    try:
-        os.remove('tmp/ogr_gml_28.gml')
-        os.remove('tmp/ogr_gml_28.gfs')
-    except OSError:
-        pass
-    try:
-        os.remove('tmp/GmlTopo-sample.sqlite')
-    except OSError:
-        pass
-    try:
-        os.remove('tmp/GmlTopo-sample.gfs')
-    except OSError:
-        pass
-    try:
-        os.remove('tmp/GmlTopo-sample.resolved.gml')
-    except OSError:
-        pass
-    try:
-        os.remove('tmp/GmlTopo-sample.xml')
-    except OSError:
-        pass
-    try:
-        os.remove('tmp/sample_gml_face_hole_negative_no.sqlite')
-    except OSError:
-        pass
-    try:
-        os.remove('tmp/sample_gml_face_hole_negative_no.gfs')
-    except OSError:
-        pass
-    try:
-        os.remove('tmp/sample_gml_face_hole_negative_no.resolved.gml')
-    except OSError:
-        pass
-    try:
-        os.remove('tmp/sample_gml_face_hole_negative_no.xml')
-    except OSError:
-        pass
-    try:
-        os.remove('data/gml/wfs_typefeature.gfs')
-    except OSError:
-        pass
-    try:
-        os.remove('tmp/ogr_gml_51.gml')
-        os.remove('tmp/ogr_gml_51.xsd')
-    except OSError:
-        pass
-    try:
-        os.remove('tmp/gmlattributes.gml')
-        os.remove('tmp/gmlattributes.gfs')
-    except OSError:
-        pass
-    files = os.listdir('data')
-    for filename in files:
-        if len(filename) > 13 and filename[-13:] == '.resolved.gml':
-            os.unlink('data/gml/' + filename)
-    gdal.Unlink('data/gml/test_xsi_nil_gfs.gfs')
+    finally:
+        gdal.Unlink("/vsimem/test_ogr_gml_unique.gml")
+        gdal.Unlink("/vsimem/test_ogr_gml_unique.xsd")
