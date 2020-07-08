@@ -1331,6 +1331,38 @@ def test_ogr_openfilegdb_weird_winding_order():
     assert g.GetGeometryCount() == 1
     assert g.GetGeometryRef(0).GetGeometryCount() == 17
 
+###############################################################################
+# Test bugfix for https://github.com/OSGeo/gdal/issues/1369
+# where a polygon with inner rings has its exterior ring with wrong orientation
+
+def test_ogr_openfilegdb_utc_datetime():
+
+    ds = ogr.Open('data/filegdb/testdatetimeutc.gdb')
+    lyr = ds.GetLayer(0)
+    f = lyr.GetNextFeature()
+    # Check that the timezone +00 is present
+    assert f.GetFieldAsString('EditDate') == '2020/06/22 07:49:36+00'
+
+
+###############################################################################
+# Test that field alias are correctly read and mapped to OGR field alternativ
+# names
+
+def test_ogr_fgdb_alias():
+    ds = ogr.Open('data/filegdb/field_alias.gdb')
+
+    lyr = ds.GetLayer(0)
+    assert lyr.GetLayerDefn().GetFieldDefn(lyr.GetLayerDefn().GetFieldIndex('text')).GetAlternativeName() == 'My Text Field'
+    assert lyr.GetLayerDefn().GetFieldDefn(lyr.GetLayerDefn().GetFieldIndex('short_int')).GetAlternativeName() == 'My Short Int Field'
+    assert lyr.GetLayerDefn().GetFieldDefn(lyr.GetLayerDefn().GetFieldIndex('long_int')).GetAlternativeName() == 'My Long Int Field'
+    assert lyr.GetLayerDefn().GetFieldDefn(lyr.GetLayerDefn().GetFieldIndex('float')).GetAlternativeName() == 'My Float Field'
+    assert lyr.GetLayerDefn().GetFieldDefn(lyr.GetLayerDefn().GetFieldIndex('double')).GetAlternativeName() == 'My Double Field'
+    assert lyr.GetLayerDefn().GetFieldDefn(lyr.GetLayerDefn().GetFieldIndex('date')).GetAlternativeName() == 'My Date Field'
+    assert lyr.GetLayerDefn().GetFieldDefn(lyr.GetLayerDefn().GetFieldIndex('blob')).GetAlternativeName() == 'My Blob Field'
+    assert lyr.GetLayerDefn().GetFieldDefn(lyr.GetLayerDefn().GetFieldIndex('guid')).GetAlternativeName() == 'My GUID field'
+    assert lyr.GetLayerDefn().GetFieldDefn(lyr.GetLayerDefn().GetFieldIndex('raster')).GetAlternativeName() == 'My Raster Field'
+    assert lyr.GetLayerDefn().GetFieldDefn(lyr.GetLayerDefn().GetFieldIndex('SHAPE_Length')).GetAlternativeName() == ''
+
 
 ###############################################################################
 # Cleanup

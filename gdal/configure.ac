@@ -328,6 +328,7 @@ dnl Checks for library functions.
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS(snprintf vsnprintf)
 AC_CHECK_FUNCS(atoll)
+AC_CHECK_FUNCS(strtoll)
 AC_CHECK_FUNCS(strtoull)
 AC_CHECK_FUNCS(strtof)
 AC_CHECK_FUNCS(getcwd)
@@ -2387,18 +2388,29 @@ HAVE_CHARLS=no
 CHARLS_INC=
 
 if test "$with_charls" = "yes" -o "$with_charls" = "" ; then
-  dnl CharLS 1.x
-  AC_CHECK_HEADERS([CharLS/interface.h])
-  if test "$ac_cv_header_CharLS_interface_h" = "yes"; then
-    AC_CHECK_LIB(CharLS,JpegLsDecode,HAVE_CHARLS=yes)
+  dnl CharLS 2.1
+  AC_CHECK_HEADERS([charls/version.h])
+  if test "$ac_cv_header_charls_version_h" = "yes"; then
+    AC_LANG_PUSH([C++])
+    AC_CHECK_LIB(charls,JpegLsDecode,HAVE_CHARLS=yes)
+    AC_LANG_POP([C++])
     if test "$HAVE_CHARLS" = "yes"; then
-        LIBS="-lCharLS $LIBS"
-        CHARLS_INC="-DCHARLS_INTERFACE_H"
+        LIBS="-lcharls $LIBS"
+        CHARLS_INC="-DCHARLS_2_1"
     fi
   else
-    dnl CharLS 2.0
-    AC_CHECK_HEADERS([CharLS/charls.h])
-    if test "$ac_cv_header_CharLS_charls_h" = "yes"; then
+    dnl CharLS 1.x
+    AC_CHECK_HEADERS([CharLS/interface.h])
+    if test "$ac_cv_header_CharLS_interface_h" = "yes"; then
+      AC_CHECK_LIB(CharLS,JpegLsDecode,HAVE_CHARLS=yes)
+      if test "$HAVE_CHARLS" = "yes"; then
+          LIBS="-lCharLS $LIBS"
+          CHARLS_INC="-DCHARLS_INTERFACE_H"
+      fi
+    else
+      dnl CharLS 2.0
+      AC_CHECK_HEADERS([CharLS/charls.h])
+      if test "$ac_cv_header_CharLS_charls_h" = "yes"; then
         AC_LANG_PUSH([C++])
         AC_CHECK_LIB(CharLS,JpegLsDecode,HAVE_CHARLS=yes)
         AC_LANG_POP([C++])
@@ -2406,18 +2418,7 @@ if test "$with_charls" = "yes" -o "$with_charls" = "" ; then
             LIBS="-lCharLS $LIBS"
             CHARLS_INC="-DCHARLS_2"
         fi
-    else
-        dnl CharLS 2.1
-        AC_CHECK_HEADERS([charls/charls.h])
-        if test "$ac_cv_header_charls_charls_h" = "yes"; then
-            AC_LANG_PUSH([C++])
-            AC_CHECK_LIB(charls,JpegLsDecode,HAVE_CHARLS=yes)
-            AC_LANG_POP([C++])
-            if test "$HAVE_CHARLS" = "yes"; then
-                LIBS="-lcharls $LIBS"
-                CHARLS_INC="-DCHARLS_2_1"
-            fi
-        fi
+      fi
     fi
   fi
 fi
@@ -5970,6 +5971,43 @@ fi
 AC_SUBST(EXR_CFLAGS,$EXR_CFLAGS)
 
 dnl ---------------------------------------------------------------------------
+dnl Detect libheif
+dnl ---------------------------------------------------------------------------
+
+AC_ARG_WITH(heif,[  --with-heif            Include HEIF support via libheif library],,)
+
+HAVE_HEIF=no
+HEIF_CFLAGS=""
+
+if test "$with_heif" = "no" ; then
+
+  AC_MSG_NOTICE([HEIF support disabled.])
+
+else
+
+  PKG_PROG_PKG_CONFIG([0.21])
+  PKG_CHECK_MODULES([HEIF], [libheif >= 1.1], [], [HAVE_HEIF=no])
+
+  if test -n "$HEIF_LIBS"; then
+
+    # Test that the package found is for the right architecture
+    saved_LIBS="$LIBS"
+    LIBS="$HEIF_LIBS"
+    AC_CHECK_LIB(heif,heif_context_get_list_of_top_level_image_IDs, [HAVE_HEIF=yes], [HAVE_HEIF=no])
+    LIBS="$saved_LIBS"
+
+    if test "$HAVE_HEIF" = "yes"; then
+        OPT_GDAL_FORMATS="heif $OPT_GDAL_FORMATS"
+        LIBS="$HEIF_LIBS $LIBS"
+    else
+        HEIF_CFLAGS=""
+    fi
+  fi
+fi
+
+AC_SUBST(HEIF_CFLAGS,$HEIF_CFLAGS)
+
+dnl ---------------------------------------------------------------------------
 dnl Test if sprintf can be overloaded with _XOPEN_SOURCE being defined or other,
 dnl includes being included before, which mingw64 4.8 doesn't like (#6390)
 dnl ---------------------------------------------------------------------------
@@ -6116,6 +6154,7 @@ LOC_MSG([  MongoCXX v3 support:       ${MONGOCXXV3_ENABLED}])
 LOC_MSG([  HDFS support:              ${HDFS_ENABLED}])
 LOC_MSG([  TileDB support:            ${TILEDB_SETTING}])
 LOC_MSG([  EXR support:               ${HAVE_EXR}])
+LOC_MSG([  HEIF support:              ${HAVE_HEIF}])
 LOC_MSG([  userfaultfd support:       ${ENABLE_UFFD}])
 LOC_MSG([  misc. gdal formats:       ${GDALFORMATS_ENABLED}])
 LOC_MSG([  disabled gdal formats:    ${GDALFORMATS_DISABLED}])

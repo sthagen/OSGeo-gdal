@@ -33,6 +33,7 @@ import pytest
 import sys
 
 from osgeo import gdal
+from osgeo import osr
 
 import gdaltest
 
@@ -908,3 +909,75 @@ def test_cog_zoom_level_strategy(zoom_level_strategy,expected_gt):
 
     ds = None
     gdal.Unlink(filename)
+
+
+
+###############################################################################
+
+def test_cog_resampling_options():
+
+    filename = '/vsimem/test_cog_resampling_options.tif'
+    src_ds = gdal.Open('data/byte.tif')
+
+    ds = gdal.GetDriverByName('COG').CreateCopy(filename, src_ds,
+        options = ['TILING_SCHEME=GoogleMapsCompatible', 'WARP_RESAMPLING=NEAREST'])
+    cs1 = ds.GetRasterBand(1).Checksum()
+
+    ds = gdal.GetDriverByName('COG').CreateCopy(filename, src_ds,
+        options = ['TILING_SCHEME=GoogleMapsCompatible', 'WARP_RESAMPLING=CUBIC'])
+    cs2 = ds.GetRasterBand(1).Checksum()
+
+    ds = gdal.GetDriverByName('COG').CreateCopy(filename, src_ds,
+        options = ['TILING_SCHEME=GoogleMapsCompatible', 'RESAMPLING=NEAREST', 'WARP_RESAMPLING=CUBIC'])
+    cs3 = ds.GetRasterBand(1).Checksum()
+
+    assert cs1 != cs2
+    assert cs2 == cs3
+
+    src_ds = gdal.Translate('', 'data/byte.tif', options='-of MEM -outsize 129 0')
+    ds = gdal.GetDriverByName('COG').CreateCopy(filename, src_ds,
+        options = ['BLOCKSIZE=128', 'OVERVIEW_RESAMPLING=NEAREST'])
+    cs1 = ds.GetRasterBand(1).GetOverview(0).Checksum()
+
+    ds = gdal.GetDriverByName('COG').CreateCopy(filename, src_ds,
+        options = ['BLOCKSIZE=128','OVERVIEW_RESAMPLING=BILINEAR'])
+    cs2 = ds.GetRasterBand(1).GetOverview(0).Checksum()
+
+    ds = gdal.GetDriverByName('COG').CreateCopy(filename, src_ds,
+        options = ['BLOCKSIZE=128','RESAMPLING=NEAREST', 'OVERVIEW_RESAMPLING=BILINEAR'])
+    cs3 = ds.GetRasterBand(1).GetOverview(0).Checksum()
+
+    assert cs1 != cs2
+    assert cs2 == cs3
+
+    ds = None
+    gdal.Unlink(filename)
+
+
+###############################################################################
+
+def test_cog_invalid_warp_resampling():
+
+    filename = '/vsimem/test_cog_invalid_warp_resampling.tif'
+    src_ds = gdal.Open('data/byte.tif')
+
+    with gdaltest.error_handler():
+        assert gdal.GetDriverByName('COG').CreateCopy(filename, src_ds,
+            options = ['TILING_SCHEME=GoogleMapsCompatible', 'RESAMPLING=INVALID']) is None
+    gdal.Unlink(filename)
+
+
+###############################################################################
+
+def test_cog_overview_size():
+
+    src_ds = gdal.GetDriverByName('MEM').Create('', 20480 // 4, 40960 // 4)
+    src_ds.SetGeoTransform([1723840, 7 * 4, 0, 5555840, 0, -7 * 4])
+    srs = osr.SpatialReference()
+    srs.ImportFromEPSG(2193)
+    src_ds.SetProjection(srs.ExportToWkt())
+    filename = '/vsimem/test_cog_overview_size.tif'
+    ds = gdal.GetDriverByName('COG').CreateCopy(filename, src_ds, options = ['TILING_SCHEME=NZTM2000', 'ALIGNED_LEVELS=4', 'OVERVIEW_RESAMPLING=NONE'])
+    assert (ds.RasterXSize, ds.RasterYSize) == (20480 // 4, 40960 // 4)
+    ovr_size = [ (ds.GetRasterBand(1).GetOverview(i).XSize, ds.GetRasterBand(1).GetOverview(i).YSize) for i in range(ds.GetRasterBand(1).GetOverviewCount()) ]
+    assert ovr_size == [(2048, 4096), (1024, 2048), (512, 1024), (256, 512), (128, 256)]
