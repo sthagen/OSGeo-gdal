@@ -54,7 +54,9 @@ def test_mem_md_basic():
     assert not rg.GetAttributes()
     assert not rg.GetDimensions()
     assert not rg.OpenMDArray("not existing")
+    assert not rg.OpenMDArrayFromFullname("not existing")
     assert not rg.OpenGroup("not existing")
+    assert not rg.OpenGroupFromFullname("not existing")
     assert not rg.GetAttribute("not existing")
 
 
@@ -78,6 +80,15 @@ def test_mem_md_subgroup():
 
     subsubg = subg.CreateGroup('subsubgroup')
     assert subsubg.GetFullName() == '/subgroup/subsubgroup'
+
+    subsubg = rg.OpenGroupFromFullname('/subgroup/subsubgroup')
+    assert subsubg is not None
+    assert subsubg.GetFullName() == '/subgroup/subsubgroup'
+
+    subg.CreateMDArray("myarray", [], gdal.ExtendedDataType.Create(gdal.GDT_Byte))
+    array = rg.OpenMDArrayFromFullname('/subgroup/myarray')
+    assert array is not None
+    assert array.GetFullName() == '/subgroup/myarray'
 
     copy_ds = drv.CreateCopy('', ds)
     assert copy_ds
@@ -1666,6 +1677,47 @@ def test_mem_md_array_get_mask():
         myarray.SetNoDataValueDouble(nv)
         mask = myarray.GetMask()
         assert [x for x in struct.unpack('B' * 2, mask.Read())] == expected, myarray.GetName()
+
+
+def test_mem_md_array_resolvemdarray():
+
+    drv = gdal.GetDriverByName('MEM')
+    ds = drv.CreateMultiDimensional('myds')
+    rg = ds.GetRootGroup()
+
+    a = rg.CreateGroup("a")
+    aa = a.CreateGroup("aa")
+    a.CreateGroup("ab")
+    b = rg.CreateGroup("b")
+
+    a.CreateMDArray("var_a", [], gdal.ExtendedDataType.Create(gdal.GDT_Int16))
+    a.CreateMDArray("var_c", [], gdal.ExtendedDataType.Create(gdal.GDT_Int16))
+    aa.CreateMDArray("var_aa", [], gdal.ExtendedDataType.Create(gdal.GDT_Int16))
+    b.CreateMDArray("var_b", [], gdal.ExtendedDataType.Create(gdal.GDT_Int16))
+    b.CreateMDArray("var_c", [], gdal.ExtendedDataType.Create(gdal.GDT_Int16))
+
+    assert rg.ResolveMDArray("x", "/") is None
+
+    assert rg.ResolveMDArray("/a/var_a", "/").GetFullName() == "/a/var_a"
+    assert rg.ResolveMDArray("var_a", "/").GetFullName() == "/a/var_a"
+    assert rg.ResolveMDArray("var_a", "").GetFullName() == "/a/var_a"
+    assert rg.ResolveMDArray("var_a", "/a").GetFullName() == "/a/var_a"
+    assert rg.ResolveMDArray("var_a", "/a/aa").GetFullName() == "/a/var_a"
+    assert rg.ResolveMDArray("var_a", "/a/ab").GetFullName() == "/a/var_a"
+    assert rg.ResolveMDArray("var_a", "/b").GetFullName() == "/a/var_a"
+
+    assert rg.ResolveMDArray("var_aa", "/").GetFullName() == "/a/aa/var_aa"
+    assert a.ResolveMDArray("var_aa", "/").GetFullName() == "/a/aa/var_aa"
+    assert a.ResolveMDArray("var_aa", "/aa").GetFullName() == "/a/aa/var_aa"
+    assert aa.ResolveMDArray("var_aa", "/").GetFullName() == "/a/aa/var_aa"
+
+    assert rg.ResolveMDArray("var_b", "").GetFullName() == "/b/var_b"
+
+    assert rg.ResolveMDArray("var_c", "/a").GetFullName() == "/a/var_c"
+    assert rg.ResolveMDArray("var_c", "/a/aa").GetFullName() == "/a/var_c"
+    assert rg.ResolveMDArray("var_c", "/b").GetFullName() == "/b/var_c"
+    assert a.ResolveMDArray("var_c", "").GetFullName() == "/a/var_c"
+    assert b.ResolveMDArray("var_c", "").GetFullName() == "/b/var_c"
 
 
 def XX_test_all_forever():
