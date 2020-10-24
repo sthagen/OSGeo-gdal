@@ -697,9 +697,6 @@ HAVE_GEOS
 GEOS_CFLAGS
 GEOS_LIBS
 WEBP_SETTING
-SDE_LIB
-SDE_INC
-SDE_ENABLED
 IDB_LIB
 IDB_INC
 HAVE_IDB
@@ -848,6 +845,7 @@ bashcompdir
 PKG_CONFIG
 LTLIBICONV
 LIBICONV
+LIBDEFLATE_SETTING
 LIBZ_SETTING
 RENAME_INTERNAL_SHAPELIB_SYMBOLS
 RENAME_INTERNAL_LIBGEOTIFF_SYMBOLS
@@ -989,6 +987,7 @@ with_rename_internal_shapelib_symbols
 with_local
 with_threads
 with_libz
+with_libdeflate
 enable_rpath
 with_libiconv_prefix
 with_bash_completion
@@ -1115,6 +1114,7 @@ enable_driver_wcs
 enable_driver_wms
 enable_driver_wmts
 enable_driver_daas
+enable_driver_ogcapi
 enable_driver_amigocloud
 enable_driver_carto
 enable_driver_cloudant
@@ -1197,8 +1197,6 @@ with_pcre
 with_teigha
 with_teigha_plt
 with_idb
-with_sde
-with_sde_version
 with_epsilon
 with_webp
 with_geos
@@ -2054,6 +2052,8 @@ Optional Features:
                           requires curl)
   --disable-driver-daas   disable daas format support (enabled by default,
                           requires curl)
+  --disable-driver-ogcapi disable ogcapi format support (enabled by default,
+                          requires curl)
   --disable-driver-amigocloud
                           disable amigocloud driver support (enabled by default,
                           requires curl)
@@ -2141,6 +2141,9 @@ Optional Packages:
   --with-local=dir      Include /usr/local or other local tree for INCLUDE/LIBS
   --with-threads=ARG    Include thread safe support (ARG=yes(default), no or linkopt)
   --with-libz=ARG       Include libz support (ARG=internal or libz directory)
+  --with-libdeflate       enable libdeflate usage (optional for faster Deflate
+                          support (still requires zlib) (ARG=yes/no/prefix),
+                          enabled by default)
   --with-gnu-ld           assume the C compiler uses GNU ld default=no
   --with-libiconv-prefix[=DIR]  search for libiconv in DIR/include and DIR/lib
   --without-libiconv-prefix     don't search for libiconv in includedir and libdir
@@ -2219,8 +2222,6 @@ Optional Packages:
   --with-teigha=path Include Teigha DWG/DGN support
   --with-teigha-plt=platform Teigha platform
   --with-idb=DIR        Include Informix DataBlade support (DIR points to Informix root)
-  --with-sde=DIR        Include ESRI SDE support (DIR is SDE's install dir).
-  --with-sde-version=VERSION NUMBER  Set ESRI SDE version number (Default is 80).
   --with-epsilon=ARG    Include EPSILON support (ARG=no, yes or libepsilon install root path)
   --with-webp=ARG    Include WEBP support (ARG=no, yes or libwebp install root path)
   --with-geos=ARG         Include GEOS support (ARG=yes, no or geos-config
@@ -22924,6 +22925,148 @@ LIBZ_SETTING=$LIBZ_SETTING
 
 
 
+LIBDEFLATE_SETTING=no
+
+
+# Check whether --with-libdeflate was given.
+if test "${with_libdeflate+set}" = set; then :
+  withval=$with_libdeflate;
+fi
+
+
+if test "$with_libdeflate" != "no" ; then
+
+  if test "$with_libdeflate" != "" -a "$with_libdeflate" != "yes"; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for libdeflate_zlib_decompress in -ldeflate" >&5
+$as_echo_n "checking for libdeflate_zlib_decompress in -ldeflate... " >&6; }
+if ${ac_cv_lib_deflate_libdeflate_zlib_decompress+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-ldeflate -L$with_libdeflate/lib $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char libdeflate_zlib_decompress ();
+int
+main ()
+{
+return libdeflate_zlib_decompress ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_deflate_libdeflate_zlib_decompress=yes
+else
+  ac_cv_lib_deflate_libdeflate_zlib_decompress=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_deflate_libdeflate_zlib_decompress" >&5
+$as_echo "$ac_cv_lib_deflate_libdeflate_zlib_decompress" >&6; }
+if test "x$ac_cv_lib_deflate_libdeflate_zlib_decompress" = xyes; then :
+  libdeflate_lib=yes
+else
+  libdeflate_lib=no
+fi
+
+  else
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for libdeflate_zlib_decompress in -ldeflate" >&5
+$as_echo_n "checking for libdeflate_zlib_decompress in -ldeflate... " >&6; }
+if ${ac_cv_lib_deflate_libdeflate_zlib_decompress+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-ldeflate  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char libdeflate_zlib_decompress ();
+int
+main ()
+{
+return libdeflate_zlib_decompress ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_deflate_libdeflate_zlib_decompress=yes
+else
+  ac_cv_lib_deflate_libdeflate_zlib_decompress=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_deflate_libdeflate_zlib_decompress" >&5
+$as_echo "$ac_cv_lib_deflate_libdeflate_zlib_decompress" >&6; }
+if test "x$ac_cv_lib_deflate_libdeflate_zlib_decompress" = xyes; then :
+  libdeflate_lib=yes
+else
+  libdeflate_lib=no
+fi
+
+  fi
+
+  if test "$libdeflate_lib" = "no" -a "$with_libdeflate" = "yes"; then
+    as_fn_error $? "libdeflate library not found" "$LINENO" 5
+  fi
+
+  if test "$with_libdeflate" != "" -a "$with_libdeflate" != "yes"; then
+    if test -r "$with_libdeflate/include/libdeflate.h" ; then
+      libdeflate_h=yes
+    else
+      libdeflate_h=no
+    fi
+  else
+    ac_fn_c_check_header_mongrel "$LINENO" "libdeflate.h" "ac_cv_header_libdeflate_h" "$ac_includes_default"
+if test "x$ac_cv_header_libdeflate_h" = xyes; then :
+  libdeflate_h=yes
+else
+  libdeflate_h=no
+fi
+
+
+  fi
+  if test "$libdeflate_h" = "no" -a "$with_libdeflate" = "yes"; then
+    as_fn_error $? "libdeflate headers not found" "$LINENO" 5
+  fi
+
+  if test "$libdeflate_lib" = "yes" -a "$libdeflate_h" = "yes" ; then
+    LIBDEFLATE_SETTING=yes
+  fi
+
+fi
+
+if test "$LIBDEFLATE_SETTING" = "yes" ; then
+  if test "$with_libdeflate" != "" -a "$with_libdeflate" != "yes"; then
+    EXTRA_INCLUDES="-I$with_libdeflate/include $EXTRA_INCLUDES"
+    LIBS="-L$with_libdeflate/lib -ldeflate $LIBS"
+  else
+    LIBS="-ldeflate $LIBS"
+  fi
+fi
+
+LIBDEFLATE_SETTING=$LIBDEFLATE_SETTING
+
+
+
       if test "X$prefix" = "XNONE"; then
     acl_final_prefix="$ac_default_prefix"
   else
@@ -28971,6 +29114,33 @@ else
   INTERNAL_FORMAT_daas_ENABLED=no
 fi
 
+# Check whether --enable-driver-ogcapi was given.
+if test "${enable_driver_ogcapi+set}" = set; then :
+  enableval=$enable_driver_ogcapi;
+fi
+cur_driver_enabled=yes
+requested=$enable_driver_ogcapi
+if test "$all_drivers_disabled" = "yes"; then :
+  if test "x$requested" = "xyes"; then :
+    cur_driver_enabled=yes
+  else
+    cur_driver_enabled=no
+  fi
+else
+  if test "x$requested" != "xno"; then :
+    cur_driver_enabled=yes
+  else
+    cur_driver_enabled=no
+  fi
+fi
+
+if test "$cur_driver_enabled" = "yes"; then :
+  INTERNAL_FORMAT_ogcapi_ENABLED=yes
+else
+  GDALFORMATS_DISABLED="$GDALFORMATS_DISABLED ogcapi"
+  INTERNAL_FORMAT_ogcapi_ENABLED=no
+fi
+
 
 
 # Check whether --enable-driver-amigocloud was given.
@@ -29713,6 +29883,11 @@ if test "$CURL_SETTING" = "yes" ; then
   driver_enabled=$INTERNAL_FORMAT_daas_ENABLED
   if test "x$driver_enabled" = "xyes"; then
     GDALFORMATS_ENABLED="$GDALFORMATS_ENABLED daas"
+  fi
+
+  driver_enabled=$INTERNAL_FORMAT_ogcapi_ENABLED
+  if test "x$driver_enabled" = "xyes"; then
+    GDALFORMATS_ENABLED="$GDALFORMATS_ENABLED ogcapi"
   fi
 
 
@@ -31228,6 +31403,63 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
     if test "$HAVE_CHARLS" = "yes"; then
         LIBS="-lcharls $LIBS"
         CHARLS_INC="-DCHARLS_2_1"
+    else
+        ac_ext=cpp
+ac_cpp='$CXXCPP $CPPFLAGS'
+ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
+
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for JpegLsDecode in -lCharLS" >&5
+$as_echo_n "checking for JpegLsDecode in -lCharLS... " >&6; }
+if ${ac_cv_lib_CharLS_JpegLsDecode+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lCharLS  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char JpegLsDecode ();
+int
+main ()
+{
+return JpegLsDecode ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_lib_CharLS_JpegLsDecode=yes
+else
+  ac_cv_lib_CharLS_JpegLsDecode=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_CharLS_JpegLsDecode" >&5
+$as_echo "$ac_cv_lib_CharLS_JpegLsDecode" >&6; }
+if test "x$ac_cv_lib_CharLS_JpegLsDecode" = xyes; then :
+  HAVE_CHARLS=yes
+fi
+
+        ac_ext=c
+ac_cpp='$CPP $CPPFLAGS'
+ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+ac_compiler_gnu=$ac_cv_c_compiler_gnu
+
+        if test "$HAVE_CHARLS" = "yes"; then
+            LIBS="-lCharLS $LIBS"
+            CHARLS_INC="-DCHARLS_2_1"
+        fi
     fi
   else
         for ac_header in CharLS/interface.h
@@ -38096,335 +38328,6 @@ IDB_LIB=${IDB_LIB}
 
 
 
-SDE_ENABLED=no
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether we should include ESRI SDE support..." >&5
-$as_echo "$as_me: checking whether we should include ESRI SDE support..." >&6;}
-
-# Check whether --with-sde was given.
-if test "${with_sde+set}" = set; then :
-  withval=$with_sde;
-fi
-
-
-
-# Check whether --with-sde-version was given.
-if test "${with_sde_version+set}" = set; then :
-  withval=$with_sde_version; SDE_VERSION=$with_sde_version
-else
-  SDE_VERSION=80
-fi
-
-
-if test -z "$SDE_VERSION" -o `expr "$SDE_VERSION" \>\= 92` = 1; then
-SDE_VERSION=""
-fi
-if test "$with_sde" = "yes" ; then
-
-  as_ac_Lib=`$as_echo "ac_cv_lib_sde$SDE_VERSION''_SE_connection_create" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for SE_connection_create in -lsde$SDE_VERSION" >&5
-$as_echo_n "checking for SE_connection_create in -lsde$SDE_VERSION... " >&6; }
-if eval \${$as_ac_Lib+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lsde$SDE_VERSION  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char SE_connection_create ();
-int
-main ()
-{
-return SE_connection_create ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  eval "$as_ac_Lib=yes"
-else
-  eval "$as_ac_Lib=no"
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-eval ac_res=\$$as_ac_Lib
-	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-if eval test \"x\$"$as_ac_Lib"\" = x"yes"; then :
-  SDE_ENABLED=yes
-fi
-
-
-  if test -n "$SDE_ENABLED" ; then
-      SDE_LIB="-lsde$SDE_VERSION -lpe$SDE_VERSION -lsg$SDE_VERSION"
-      { $as_echo "$as_me:${as_lineno-$LINENO}: checking for main in -lpthread" >&5
-$as_echo_n "checking for main in -lpthread... " >&6; }
-if ${ac_cv_lib_pthread_main+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lpthread  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-
-int
-main ()
-{
-return main ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_pthread_main=yes
-else
-  ac_cv_lib_pthread_main=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_pthread_main" >&5
-$as_echo "$ac_cv_lib_pthread_main" >&6; }
-if test "x$ac_cv_lib_pthread_main" = xyes; then :
-  SDE_LIB="$SDE_LIB -lpthread"
-fi
-
-      { $as_echo "$as_me:${as_lineno-$LINENO}: checking for main in -lsocket" >&5
-$as_echo_n "checking for main in -lsocket... " >&6; }
-if ${ac_cv_lib_socket_main+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lsocket  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-
-int
-main ()
-{
-return main ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_socket_main=yes
-else
-  ac_cv_lib_socket_main=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_socket_main" >&5
-$as_echo "$ac_cv_lib_socket_main" >&6; }
-if test "x$ac_cv_lib_socket_main" = xyes; then :
-  SDE_LIB="$SDE_LIB -lsocket"
-fi
-
-      { $as_echo "$as_me:${as_lineno-$LINENO}: checking for main in -ldl" >&5
-$as_echo_n "checking for main in -ldl... " >&6; }
-if ${ac_cv_lib_dl_main+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-ldl  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-
-int
-main ()
-{
-return main ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_dl_main=yes
-else
-  ac_cv_lib_dl_main=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_dl_main" >&5
-$as_echo "$ac_cv_lib_dl_main" >&6; }
-if test "x$ac_cv_lib_dl_main" = xyes; then :
-  SDE_LIB="$SDE_LIB -ldl"
-fi
-
-      { $as_echo "$as_me:${as_lineno-$LINENO}: result:         using ESRI SDE from system libs." >&5
-$as_echo "        using ESRI SDE from system libs." >&6; }
-  else
-      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING:         ESRI SDE not found in system libs... use --with-sde=DIR." >&5
-$as_echo "$as_me: WARNING:         ESRI SDE not found in system libs... use --with-sde=DIR." >&2;}
-  fi
-
-elif test -n "$with_sde" -a "$with_sde" != "no" ; then
-
-  SDE_DIR=$with_sde
-
-  test -f $SDE_DIR/arcsde/coverages/include/sdetype.h && SDE_INCDIR="$SDE_DIR/arcsde/coverages/include"
-  test -f $SDE_DIR/include/sdetype.h && SDE_INCDIR="$SDE_DIR/include"
-  test -f $SDE_DIR/sdetype.h && SDE_INCDIR="$SDE_DIR"
-
-  test -f $SDE_DIR/lib/libsde$SDE_VERSION.a && SDE_LIBDIR="$SDE_DIR/lib"
-  test -f $SDE_DIR/lib64/libsde$SDE_VERSION.a && SDE_LIBDIR="$SDE_DIR/lib64"
-  test -f $SDE_DIR/libsde$SDE_VERSION.a && SDE_LIBDIR="$SDE_DIR"
-
-  test -f $SDE_DIR/lib/libsde$SDE_VERSION.so -o -f $SDE_DIR/lib/libsde$SDE_VERSION.sl && SDE_LIBDIR="$SDE_DIR/lib"
-  test -f $SDE_DIR/lib64/libsde$SDE_VERSION.so -o -f $SDE_DIR/lib64/libsde$SDE_VERSION.sl && SDE_LIBDIR="$SDE_DIR/lib64"
-  test -f $SDE_DIR/libsde$SDE_VERSION.so -o -f $SDE_DIR/libsde$SDE_VERSION.sl && SDE_LIBDIR="$SDE_DIR"
-
-  if test -n "$SDE_INCDIR" -a -n "$SDE_LIBDIR" ; then
-      SDE_INC=-I$SDE_INCDIR
-      SDE_LIB="-L$SDE_LIBDIR -lsde$SDE_VERSION -lpe$SDE_VERSION -lsg$SDE_VERSION"
-      { $as_echo "$as_me:${as_lineno-$LINENO}: checking for main in -lpthread" >&5
-$as_echo_n "checking for main in -lpthread... " >&6; }
-if ${ac_cv_lib_pthread_main+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lpthread  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-
-int
-main ()
-{
-return main ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_pthread_main=yes
-else
-  ac_cv_lib_pthread_main=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_pthread_main" >&5
-$as_echo "$ac_cv_lib_pthread_main" >&6; }
-if test "x$ac_cv_lib_pthread_main" = xyes; then :
-  SDE_LIB="$SDE_LIB -lpthread"
-fi
-
-      { $as_echo "$as_me:${as_lineno-$LINENO}: checking for main in -lsocket" >&5
-$as_echo_n "checking for main in -lsocket... " >&6; }
-if ${ac_cv_lib_socket_main+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lsocket  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-
-int
-main ()
-{
-return main ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_socket_main=yes
-else
-  ac_cv_lib_socket_main=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_socket_main" >&5
-$as_echo "$ac_cv_lib_socket_main" >&6; }
-if test "x$ac_cv_lib_socket_main" = xyes; then :
-  SDE_LIB="$SDE_LIB -lsocket"
-fi
-
-      { $as_echo "$as_me:${as_lineno-$LINENO}: checking for main in -ldl" >&5
-$as_echo_n "checking for main in -ldl... " >&6; }
-if ${ac_cv_lib_dl_main+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-ldl  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-
-int
-main ()
-{
-return main ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_dl_main=yes
-else
-  ac_cv_lib_dl_main=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_dl_main" >&5
-$as_echo "$ac_cv_lib_dl_main" >&6; }
-if test "x$ac_cv_lib_dl_main" = xyes; then :
-  SDE_LIB="$SDE_LIB -ldl"
-fi
-
-  else
-      as_fn_error $? "\"Could not find sdetype.h or libsde$SDE_VERSION.a/libsde$SDE_VERSION.so in $SDE_DIR.\"" "$LINENO" 5
-  fi
-
-  if test "`arch`" = "x86_64" ; then
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result:         Adding -DSDE64 for 64bit platform." >&5
-$as_echo "        Adding -DSDE64 for 64bit platform." >&6; }
-    SDE_INC="$SDE_INC -DSDE64"
-  fi
-
-  SDE_ENABLED=yes
-  OPT_GDAL_FORMATS="sde $OPT_GDAL_FORMATS"
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result:         using ESRI SDE from $SDE_DIR." >&5
-$as_echo "        using ESRI SDE from $SDE_DIR." >&6; }
-
-else
-
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result:         ESRI SDE support not requested." >&5
-$as_echo "        ESRI SDE support not requested." >&6; }
-fi
-
-SDE_ENABLED=$SDE_ENABLED
-
-SDE_INC=$SDE_INC
-
-SDE_LIB=$SDE_LIB
-
-
-
 
 # Check whether --with-epsilon was given.
 if test "${with_epsilon+set}" = set; then :
@@ -40603,12 +40506,13 @@ if test "$with_pdfium" != "no" -a "$with_pdfium" != ""; then
     rm -f testpdfium.*
     echo '#include "public/fpdfview.h"' > testpdfium.cpp
     echo '#include "core/fpdfapi/page/cpdf_page.h"' >> testpdfium.cpp
+    echo '#include "constants/transparency.h"' >> testpdfium.cpp # specific to pdfium_build_gdal_3_2
     echo 'int main(int argc, char** argv) { FPDF_InitLibrary(); FPDF_DestroyLibrary(); return 0; } ' >> testpdfium.cpp
     TEST_CXX_FLAGS=""
     if test ! -z "`uname | grep Darwin`" ; then
         TEST_CXX_FLAGS="$TEST_CXX_FLAGS -stdlib=libstdc++"
     fi
-    if ${CXX} ${CXXFLAGS} ${CPPFLAGS} $TEST_CXX_FLAGS testpdfium.cpp -o testpdfium ${PDFIUM_INC} ${PDFIUM_LIB} >/dev/null 2>/dev/null; then
+    if ${CXX} ${CXXFLAGS} ${CPPFLAGS} $TEST_CXX_FLAGS -std=c++14 testpdfium.cpp -o testpdfium ${PDFIUM_INC} ${PDFIUM_LIB} >/dev/null 2>/dev/null; then
         HAVE_PDFIUM=yes
         CXXFLAGS="$TEST_CXX_FLAGS $CXXFLAGS"
         if test "$PDF_PLUGIN" = "no"; then
@@ -40622,7 +40526,7 @@ $as_echo "yes" >&6; }
     rm -f testpdfium
 
     if test "$HAVE_PDFIUM" = "no" -a "$with_pdfium" != ""; then
-        as_fn_error $? "pdfium requested but not found. Must come from https://github.com/rouault/pdfium_build_gdal_3_1" "$LINENO" 5
+        as_fn_error $? "pdfium requested but not found. Must come from https://github.com/rouault/pdfium_build_gdal_3_2" "$LINENO" 5
     fi
 else
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: disabled" >&5
@@ -45050,6 +44954,9 @@ echo ""
 echo "  LIBZ support:              ${LIBZ_SETTING}"
 
 
+echo "  libdeflate support:        ${LIBDEFLATE_SETTING}"
+
+
 echo "  LIBLZMA support:           ${LIBLZMA_SETTING}"
 
 
@@ -45200,9 +45107,6 @@ echo "  OCI support:               ${HAVE_OCI}"
 
 
 echo "  GEORASTER support:         ${HAVE_GEORASTER}"
-
-
-echo "  SDE support:               ${SDE_ENABLED}"
 
 
 echo "  Rasdaman support:          ${RASDAMAN_ENABLED}"

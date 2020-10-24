@@ -38,6 +38,7 @@ performed.
 .. option:: --calc=expression
 
     Calculation in gdalnumeric syntax using ``+``, ``-``, ``/``, ``*``, or any numpy array functions (i.e. ``log10()``).
+    Multiple ``--calc`` options can be listed to produce a multiband file (GDAL >= 3.2).
 
 .. option:: -A <filename>
 
@@ -58,6 +59,11 @@ performed.
 .. option:: --type=<datatype>
 
     Output datatype, must be one of [``Int32``, ``Int16``, ``Float64``, ``UInt16``, ``Byte``, ``UInt32``, ``Float32``].
+ 
+    .. note::
+    
+       Despite the datatype set using ``--type``, when doing intermediate aritmethic operations using operands of the
+       same type, the operation result will honor the original datatype. This may lead into unexpected results in the final result.
     
 .. option:: --format=<gdal_format>
 
@@ -78,7 +84,7 @@ performed.
 
 .. option:: --allBands=[A-Z]
 
-    Process all bands of given raster (A-Z).
+    Process all bands of given raster (A-Z). Requires a single calc for all bands.
 
 .. option:: --overwrite
 
@@ -106,6 +112,15 @@ Average of two layers:
 .. code-block::
 
     gdal_calc.py -A input.tif -B input2.tif --outfile=result.tif --calc="(A+B)/2"
+    
+.. note::
+
+   In the previous example, beware that if A and B inputs are of the same datatype, for example integers, you
+   may need to force the conversion of one of the operands before the division operation.
+   
+   .. code-block::
+
+      gdal_calc.py -A input.tif -B input2.tif --outfile=result.tif --calc="(A.astype(numpy.float64) + B) / 2"
 
 Set values of zero and below to null:
 
@@ -118,3 +133,9 @@ Using logical operator to keep a range of values from input:
 .. code-block::
 
     gdal_calc.py -A input.tif --outfile=result.tif --calc="A*logical_and(A>100,A<150)"
+
+Work with multiple bands:
+
+.. code-block::
+
+    gdal_calc.py -A input.tif --A_band=1 -B input.tif --B_band=2 --outfile=result.tif --calc="(A+B)/2" --calc="B*logical_and(A>100,A<150)"

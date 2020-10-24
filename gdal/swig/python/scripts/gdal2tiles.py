@@ -869,7 +869,7 @@ def setup_input_srs(input_dataset, options):
 
     if input_srs is not None:
         input_srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
-    
+
     return input_srs, input_srs_wkt
 
 
@@ -888,7 +888,9 @@ def setup_output_srs(input_srs, options):
     else:
         output_srs = tmsMap[options.profile].srs.Clone()
 
-    output_srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+    if output_srs:
+        output_srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+
     return output_srs
 
 
@@ -1872,12 +1874,15 @@ class GDAL2Tiles(object):
             # Get the maximal zoom level (native resolution of the raster)
             if self.tmaxz is None:
                 self.tmaxz = self.nativezoom
+            elif self.tmaxz > self.nativezoom:
+                print('Clamping max zoom level to %d' % self.nativezoom)
+                self.tmaxz = self.nativezoom
 
             # Generate table with min max tile coordinates for all zoomlevels
             self.tminmax = list(range(0, self.tmaxz + 1))
             self.tsize = list(range(0, self.tmaxz + 1))
             for tz in range(0, self.tmaxz + 1):
-                tsize = 2.0**(self.tmaxz - tz) * self.tile_size
+                tsize = 2.0**(self.nativezoom - tz) * self.tile_size
                 tminx, tminy = 0, 0
                 tmaxx = int(math.ceil(self.warped_input_dataset.RasterXSize / tsize)) - 1
                 tmaxy = int(math.ceil(self.warped_input_dataset.RasterYSize / tsize)) - 1
@@ -2114,8 +2119,7 @@ class GDAL2Tiles(object):
                     tsize = int(self.tsize[tz])   # tile_size in raster coordinates for actual zoom
                     xsize = self.warped_input_dataset.RasterXSize     # size of the raster in pixels
                     ysize = self.warped_input_dataset.RasterYSize
-                    if tz >= self.tmaxz:
-                        querysize = self.tile_size
+                    querysize = self.tile_size
 
                     rx = tx * tsize
                     rxsize = 0
@@ -2591,8 +2595,8 @@ class GDAL2Tiles(object):
             <title>%(htmltitle)s</title>
 
             <!-- Leaflet -->
-            <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.5/leaflet.css" />
-            <script src="http://cdn.leafletjs.com/leaflet-0.7.5/leaflet.js"></script>
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@0.7.5/dist/leaflet.css" />
+            <script src="https://unpkg.com/leaflet@0.7.5/dist/leaflet.js"></script>
 
             <style>
                 body { margin:0; padding:0; }
@@ -2865,9 +2869,9 @@ class GDAL2Tiles(object):
 
         elif self.options.profile == 'raster':
 
-            base_res =  2**(self.tmaxz) * self.out_gt[1]
-            args['maxres'] = base_res
+            base_res =  2**(self.nativezoom) * self.out_gt[1]
             resolutions = [ base_res / 2**i for i in range(self.tmaxz+1) ]
+            args['maxres'] = resolutions[self.tminz]
             args['resolutions'] = '[' + ','.join('%.18g' % res for res in resolutions) + ']'
             args['tilegrid_extent'] = '[%.18g,%.18g,%.18g,%.18g]' % (self.ominx, self.ominy, self.omaxx, self.omaxy)
 
@@ -3189,11 +3193,18 @@ def multi_threaded_tiling(input_file, output_folder, options):
     shutil.rmtree(os.path.dirname(conf.src_file))
 
 
-def main():
+def main(argv):
     # TODO: gbataille - use mkdtemp to work in a temp directory
     # TODO: gbataille - debug intermediate tiles.vrt not produced anymore?
     # TODO: gbataille - Refactor generate overview tiles to not depend on self variables
-    argv = gdal.GeneralCmdLineProcessor(sys.argv)
+
+    # For multiprocessing, we need to propagate the configuration options to
+    # the environment, so that forked processes can inherit them.
+    for i in range(len(argv)):
+        if argv[i] == '--config' and i + 2 < len(argv):
+            os.environ[argv[i+1]] = argv[i+2]
+
+    argv = gdal.GeneralCmdLineProcessor(argv)
     if argv is None:
         return
     input_file, output_folder, options = process_args(argv[1:])
@@ -3205,7 +3216,7 @@ def main():
         multi_threaded_tiling(input_file, output_folder, options)
 
 
-if __name__ == '__main__':
-    main()
-
 # vim: set tabstop=4 shiftwidth=4 expandtab:
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))

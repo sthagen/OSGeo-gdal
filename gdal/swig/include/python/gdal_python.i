@@ -66,16 +66,20 @@ static void update_buffer_size(void* obj, char* data, char* data_aligned, size_t
 
 
   have_warned = 0
-  def deprecation_warn(module):
+  def deprecation_warn(module, sub_package=None):
     global have_warned
 
     if have_warned == 1:
         return
 
     have_warned = 1
+    if sub_package:
+        new_module = sub_package+'.'+module
+    else:
+        new_module = module
 
     from warnings import warn
-    warn('%s.py was placed in a namespace, it is now available as osgeo.%s' % (module,module),
+    warn('%s.py was placed in a namespace, it is now available as osgeo.%s' % (module, new_module),
          DeprecationWarning)
 
 
@@ -344,7 +348,7 @@ void wrapper_VSIGetMemFileBuffer(const char *utf8_path, GByte **out, vsi_l_offse
                      GDALProgressFunc callback = NULL,
                      void* callback_data=NULL) {
     // This check is a bit too late. resample_alg should already have been
-    // validated, so we are a bit in undefined behaviour land, but compilers
+    // validated, so we are a bit in undefined behavior land, but compilers
     // should hopefully do the right thing
     if( static_cast<int>(resample_alg) < 0 ||
         static_cast<int>(resample_alg) > static_cast<int>(GRIORA_LAST) )
@@ -662,7 +666,7 @@ CPLErr ReadRaster1(  int xoff, int yoff, int xsize, int ysize,
                     void* callback_data=NULL )
 {
     // This check is a bit too late. resample_alg should already have been
-    // validated, so we are a bit in undefined behaviour land, but compilers
+    // validated, so we are a bit in undefined behavior land, but compilers
     // should hopefully do the right thing
     if( static_cast<int>(resample_alg) < 0 ||
         static_cast<int>(resample_alg) > static_cast<int>(GRIORA_LAST) )
@@ -1050,6 +1054,13 @@ CPLErr ReadRaster1(  int xoff, int yoff, int xsize, int ysize,
       from osgeo import gdalnumeric
       return gdalnumeric.MDArrayReadAsArray(self, array_start_idx, count, array_step, buffer_datatype, buf_obj)
 
+  def AdviseRead(self, array_start_idx = None, count = None):
+      if not array_start_idx:
+        array_start_idx = [0] * self.GetDimensionCount()
+      if not count:
+        count = [ (self.GetDimensions()[i].GetSize() - array_start_idx[i]) for i in range (self.GetDimensionCount()) ]
+      return _gdal.MDArray_AdviseRead(self, array_start_idx, count)
+
   def __getitem__(self, item):
 
         def stringify(v):
@@ -1126,6 +1137,32 @@ CPLErr ReadRaster1(  int xoff, int yoff, int xsize, int ysize,
 
       from osgeo import gdalnumeric
       return gdalnumeric.MDArrayWriteArray(self, array, array_start_idx, array_step)
+
+  def ReadAsMaskedArray(self,
+                  array_start_idx = None,
+                  count = None,
+                  array_step = None):
+      """ Return a numpy masked array of ReadAsArray() with GetMask() """
+      import numpy
+      mask = self.GetMask()
+      if mask is not None:
+          array = self.ReadAsArray(array_start_idx, count, array_step)
+          mask_array = mask.ReadAsArray(array_start_idx, count, array_step)
+          bool_array = ~mask_array.astype(numpy.bool)
+          return numpy.ma.array(array, mask=bool_array)
+      else:
+          return numpy.ma.array(self.ReadAsArray(array_start_idx, count, array_step), mask=None)
+
+  def GetShape(self):
+    """ Return the shape of the array """
+    if not self.GetDimensionCount():
+      return None
+    shp = ()
+    for dim in self.GetDimensions():
+      shp += (dim.GetSize(),)
+    return shp
+
+  shape = property(fget=GetShape, doc='Returns the shape of the array.')
 
 %}
 }
