@@ -2456,7 +2456,7 @@ class Dataset(MajorObject):
 
 
     def ReadRaster1(self, *args, **kwargs):
-        """ReadRaster1(Dataset self, int xoff, int yoff, int xsize, int ysize, int * buf_xsize=None, int * buf_ysize=None, GDALDataType * buf_type=None, int band_list=0, GIntBig * buf_pixel_space=None, GIntBig * buf_line_space=None, GIntBig * buf_band_space=None, GDALRIOResampleAlg resample_alg, GDALProgressFunc callback=0, void * callback_data=None) -> CPLErr"""
+        """ReadRaster1(Dataset self, double xoff, double yoff, double xsize, double ysize, int * buf_xsize=None, int * buf_ysize=None, GDALDataType * buf_type=None, int band_list=0, GIntBig * buf_pixel_space=None, GIntBig * buf_line_space=None, GIntBig * buf_band_space=None, GDALRIOResampleAlg resample_alg, GDALProgressFunc callback=0, void * callback_data=None) -> CPLErr"""
         return _gdal.Dataset_ReadRaster1(self, *args, **kwargs)
 
 
@@ -2922,19 +2922,29 @@ class MDArray(_object):
         return _gdal.MDArray_GetOffset(self, *args)
 
 
+    def GetOffsetStorageType(self, *args):
+        """GetOffsetStorageType(MDArray self) -> GDALDataType"""
+        return _gdal.MDArray_GetOffsetStorageType(self, *args)
+
+
     def GetScale(self, *args):
         """GetScale(MDArray self)"""
         return _gdal.MDArray_GetScale(self, *args)
 
 
-    def SetOffset(self, *args):
-        """SetOffset(MDArray self, double val) -> CPLErr"""
-        return _gdal.MDArray_SetOffset(self, *args)
+    def GetScaleStorageType(self, *args):
+        """GetScaleStorageType(MDArray self) -> GDALDataType"""
+        return _gdal.MDArray_GetScaleStorageType(self, *args)
 
 
-    def SetScale(self, *args):
-        """SetScale(MDArray self, double val) -> CPLErr"""
-        return _gdal.MDArray_SetScale(self, *args)
+    def SetOffset(self, *args, **kwargs):
+        """SetOffset(MDArray self, double val, GDALDataType storageType) -> CPLErr"""
+        return _gdal.MDArray_SetOffset(self, *args, **kwargs)
+
+
+    def SetScale(self, *args, **kwargs):
+        """SetScale(MDArray self, double val, GDALDataType storageType) -> CPLErr"""
+        return _gdal.MDArray_SetScale(self, *args, **kwargs)
 
 
     def SetUnit(self, *args):
