@@ -336,12 +336,6 @@ static OGRErr GDALGPKGImportFromEPSG(OGRSpatialReference *poSpatialRef,
 OGRSpatialReference* GDALGeoPackageDataset::GetSpatialRef(int iSrsId,
                                                           bool bFallbackToEPSG)
 {
-    /* Should we do something special with undefined SRS ? */
-    if( iSrsId == 0 || iSrsId == -1 )
-    {
-        return nullptr;
-    }
-
     std::map<int, OGRSpatialReference*>::const_iterator oIter =
                                                 m_oMapSrsIdToSrs.find(iSrsId);
     if( oIter != m_oMapSrsIdToSrs.end() )
@@ -350,6 +344,31 @@ OGRSpatialReference* GDALGeoPackageDataset::GetSpatialRef(int iSrsId,
             return nullptr;
         oIter->second->Reference();
         return oIter->second;
+    }
+
+    if( iSrsId == 0 || iSrsId == -1 )
+    {
+        OGRSpatialReference *poSpatialRef = new OGRSpatialReference();
+        poSpatialRef->SetAxisMappingStrategy( OAMS_TRADITIONAL_GIS_ORDER );
+
+        // See corresponding tests in GDALGeoPackageDataset::GetSrsId
+        if( iSrsId == 0)
+        {
+            poSpatialRef->SetGeogCS("Undefined geographic SRS",
+                                    "unknown",
+                                    "unknown",
+                                    SRS_WGS84_SEMIMAJOR,
+                                    SRS_WGS84_INVFLATTENING);
+        }
+        else if( iSrsId == -1)
+        {
+            poSpatialRef->SetLocalCS("Undefined cartesian SRS");
+            poSpatialRef->SetLinearUnits( SRS_UL_METER, 1.0 );
+        }
+
+        m_oMapSrsIdToSrs[iSrsId] = poSpatialRef;
+        poSpatialRef->Reference();
+        return poSpatialRef;
     }
 
     CPLString oSQL;
@@ -556,6 +575,20 @@ bool GDALGeoPackageDataset::ConvertGpkgSpatialRefSysToExtensionWkt2()
 int GDALGeoPackageDataset::GetSrsId(const OGRSpatialReference& oSRS)
 {
     std::unique_ptr<OGRSpatialReference> poSRS(oSRS.Clone());
+
+    if (poSRS->IsGeographic() || poSRS->IsLocal())
+    {
+        // See corresponding tests in GDALGeoPackageDataset::GetSpatialRef
+        const char* pszName = poSRS->GetName();
+        if ( pszName != nullptr && strlen(pszName) > 0 )
+        {
+            if (EQUAL(pszName, "Undefined geographic SRS"))
+                return 0;
+
+            if (EQUAL(pszName, "Undefined cartesian SRS"))
+                return -1;
+        }
+    }
 
     const char* pszAuthorityName = poSRS->GetAuthorityName( nullptr );
 

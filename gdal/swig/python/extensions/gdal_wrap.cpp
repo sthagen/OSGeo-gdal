@@ -4876,8 +4876,8 @@ SWIGINTERN OSRSpatialReferenceShadow *GDALDatasetShadow_GetSpatialRef(GDALDatase
 SWIGINTERN CPLErr GDALDatasetShadow_SetProjection(GDALDatasetShadow *self,char const *prj){
     return GDALSetProjection( self, prj );
   }
-SWIGINTERN void GDALDatasetShadow_SetSpatialRef(GDALDatasetShadow *self,OSRSpatialReferenceShadow *srs){
-     GDALSetSpatialRef( self, (OGRSpatialReferenceH)srs );
+SWIGINTERN CPLErr GDALDatasetShadow_SetSpatialRef(GDALDatasetShadow *self,OSRSpatialReferenceShadow *srs){
+     return GDALSetSpatialRef( self, (OGRSpatialReferenceH)srs );
   }
 SWIGINTERN void GDALDatasetShadow_GetGeoTransform(GDALDatasetShadow *self,double argout[6],int *isvalid,int *can_return_null=0){
     if (can_return_null && *can_return_null)
@@ -17873,6 +17873,7 @@ SWIGINTERN PyObject *_wrap_Dataset_SetSpatialRef(PyObject *SWIGUNUSEDPARM(self),
   int res2 = 0 ;
   PyObject * obj0 = 0 ;
   PyObject * obj1 = 0 ;
+  CPLErr result;
   
   if (!PyArg_ParseTuple(args,(char *)"OO:Dataset_SetSpatialRef",&obj0,&obj1)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_GDALDatasetShadow, 0 |  0 );
@@ -17891,7 +17892,7 @@ SWIGINTERN PyObject *_wrap_Dataset_SetSpatialRef(PyObject *SWIGUNUSEDPARM(self),
     }
     {
       SWIG_PYTHON_THREAD_BEGIN_ALLOW;
-      GDALDatasetShadow_SetSpatialRef(arg1,arg2);
+      CPL_IGNORE_RET_VAL(result = (CPLErr)GDALDatasetShadow_SetSpatialRef(arg1,arg2));
       SWIG_PYTHON_THREAD_END_ALLOW;
     }
 #ifndef SED_HACKS
@@ -17903,7 +17904,7 @@ SWIGINTERN PyObject *_wrap_Dataset_SetSpatialRef(PyObject *SWIGUNUSEDPARM(self),
     }
 #endif
   }
-  resultobj = SWIG_Py_Void();
+  resultobj = SWIG_From_int(static_cast< int >(result));
   if ( ReturnSame(bLocalUseExceptionsCode) ) { CPLErr eclass = CPLGetLastErrorType(); if ( eclass == CE_Failure || eclass == CE_Fatal ) { Py_XDECREF(resultobj); SWIG_Error( SWIG_RuntimeError, CPLGetLastErrorMsg() ); return NULL; } }
   return resultobj;
 fail:
@@ -21250,8 +21251,8 @@ SWIGINTERN PyObject *_wrap_Dataset_ReadRaster1(PyObject *SWIGUNUSEDPARM(self), P
     // to GDALRIOResampleAlg, so we are a bit in undefined behavior land,
     // but compilers should hopefully do the right thing
     if( static_cast<int>(arg15) < 0 ||
-        ( static_cast<int>(arg15) >= static_cast<int>(GRIORA_RESERVED_START) &&
-          static_cast<int>(arg15) <= static_cast<int>(GRIORA_RESERVED_END) ) ||
+      ( static_cast<int>(arg15) >= static_cast<int>(GRIORA_RESERVED_START) &&
+        static_cast<int>(arg15) <= static_cast<int>(GRIORA_RESERVED_END) ) ||
       static_cast<int>(arg15) > static_cast<int>(GRIORA_LAST) )
     {
       SWIG_exception(SWIG_ValueError, "Invalid value for resample_alg");
@@ -32335,8 +32336,8 @@ SWIGINTERN PyObject *_wrap_Band_ReadRaster1(PyObject *SWIGUNUSEDPARM(self), PyOb
     // to GDALRIOResampleAlg, so we are a bit in undefined behavior land,
     // but compilers should hopefully do the right thing
     if( static_cast<int>(arg12) < 0 ||
-        ( static_cast<int>(arg12) >= static_cast<int>(GRIORA_RESERVED_START) &&
-          static_cast<int>(arg12) <= static_cast<int>(GRIORA_RESERVED_END) ) ||
+      ( static_cast<int>(arg12) >= static_cast<int>(GRIORA_RESERVED_START) &&
+        static_cast<int>(arg12) <= static_cast<int>(GRIORA_RESERVED_END) ) ||
       static_cast<int>(arg12) > static_cast<int>(GRIORA_LAST) )
     {
       SWIG_exception(SWIG_ValueError, "Invalid value for resample_alg");
@@ -43020,7 +43021,7 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"Dataset_GetProjectionRef", _wrap_Dataset_GetProjectionRef, METH_VARARGS, (char *)"Dataset_GetProjectionRef(Dataset self) -> char const *"},
 	 { (char *)"Dataset_GetSpatialRef", _wrap_Dataset_GetSpatialRef, METH_VARARGS, (char *)"Dataset_GetSpatialRef(Dataset self) -> SpatialReference"},
 	 { (char *)"Dataset_SetProjection", _wrap_Dataset_SetProjection, METH_VARARGS, (char *)"Dataset_SetProjection(Dataset self, char const * prj) -> CPLErr"},
-	 { (char *)"Dataset_SetSpatialRef", _wrap_Dataset_SetSpatialRef, METH_VARARGS, (char *)"Dataset_SetSpatialRef(Dataset self, SpatialReference srs)"},
+	 { (char *)"Dataset_SetSpatialRef", _wrap_Dataset_SetSpatialRef, METH_VARARGS, (char *)"Dataset_SetSpatialRef(Dataset self, SpatialReference srs) -> CPLErr"},
 	 { (char *)"Dataset_GetGeoTransform", (PyCFunction) _wrap_Dataset_GetGeoTransform, METH_VARARGS | METH_KEYWORDS, (char *)"Dataset_GetGeoTransform(Dataset self, int * can_return_null=None)"},
 	 { (char *)"Dataset_SetGeoTransform", _wrap_Dataset_SetGeoTransform, METH_VARARGS, (char *)"Dataset_SetGeoTransform(Dataset self, double [6] argin) -> CPLErr"},
 	 { (char *)"Dataset_BuildOverviews", (PyCFunction) _wrap_Dataset_BuildOverviews, METH_VARARGS | METH_KEYWORDS, (char *)"Dataset_BuildOverviews(Dataset self, char const * resampling, int overviewlist=0, GDALProgressFunc callback=0, void * callback_data=None) -> int"},
