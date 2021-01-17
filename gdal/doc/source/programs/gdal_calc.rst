@@ -37,7 +37,7 @@ but no projection checking is performed (unless projectionCheck option is used).
 
 .. option:: --calc=expression
 
-    Calculation in gdalnumeric syntax using ``+``, ``-``, ``/``, ``*``, or any numpy array functions (i.e. ``log10()``).
+    Calculation in numpy syntax using ``+``, ``-``, ``/``, ``*``, or any numpy array functions (i.e. ``log10()`).
     Multiple ``--calc`` options can be listed to produce a multiband file (GDAL >= 3.2).
 
 .. option:: -A <filename>
@@ -88,13 +88,28 @@ but no projection checking is performed (unless projectionCheck option is used).
 
     GDAL format for output file.
 
+.. option:: color-table=<filename>
+
+    Allows to specify a filename of a color table (or a ColorTable object) (with Palette Index interpretation) to be used for the output raster.
+    Supported formats: txt (i.e. like gdaldem, but color names are not supported), qlr, qml (i.e. exported from QGIS)
+
 .. option:: --extent=<option>
 
     ..versionadded:: 3.3
 
     this option determinants how to handle rasters with different extents.
+    this option is mutually exclusive with the `projwin` option, which is used for providing a custom extent.
+    for all the options below the pixel size (resolution) and SRS (Spatial Reference System) of all the input rasters must be the same.
     ``ignore`` (default) - only the dimensions of the rasters are compared. if the dimensions do not agree the operation will fail.
     ``fail`` - the dimensions and the extent (bounds) of the rasters must agree, otherwise the operation will fail.
+    ``union`` - the extent (bounds) of the output will be the minimal rectangle that contains all the input extents.
+    ``intersect`` - the extent (bounds) of the output will be the maximal rectangle that is contained in all the input extents.
+
+.. option:: --projwin <ulx> <uly> <lrx> <lry>
+
+    ..versionadded:: 3.3
+
+    this option provides a custom extent for the output, it is mutually exclusive with the `extent` option.
 
 .. option:: --projectionCheck
 
