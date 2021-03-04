@@ -160,6 +160,19 @@ General creation options
         available if general options (i.e. options which are not creation options,
         like subsetting, etc.) are used.
 
+- **OVERVIEW_COMPRESS=[AUTO/NONE/LZW/JPEG/DEFLATE/ZSTD/WEBP/LERC/LERC_DEFLATE/LERC_ZSTD]**:
+  Set the compression method to use when storing the overviews in the COG.
+
+- **OVERVIEW_QUALITY=integer_value**: JPEG/WEBP quality setting. A value of 100 is best
+  quality (least compression), and 1 is worst quality (best compression).
+  By default the overviews will be created with the same quality as the COG, unless
+  the compression type is different then the default is 75.
+
+- **OVERVIEW_PREDICTOR=[YES/NO/STANDARD/FLOATING_POINT]**: Set the predictor for LZW,
+  DEFLATE and ZSTD overview compression. By default the overviews will be created with the
+  same predictor as the COG, unless the compression type of the overview is different,
+  then the default is NO.
+
 - **GEOTIFF_VERSION=[AUTO/1.0/1.1]**: Select the version of
   the GeoTIFF standard used to encode georeferencing information. ``1.0``
   corresponds to the original
@@ -173,16 +186,16 @@ General creation options
   .. note:: Write support for GeoTIFF 1.1 requires libgeotiff 1.6.0 or later.
 
 - **SPARSE_OK=TRUE/FALSE** ((GDAL >= 3.2): Should empty blocks be
-   omitted on disk? When this option is set, any attempt of writing a
-   block whose all pixels are 0 or the nodata value will cause it not to
-   be written at all (unless there is a corresponding block already
-   allocated in the file). Sparse files have 0 tile/strip offsets for
-   blocks never written and save space; however, most non-GDAL packages
-   cannot read such files.
-   On the reading side, the presence of a omitted tile after a non-empty one
-   may cause optimized readers to have to issue an extra GET request to the
-   TileByteCounts array.
-   The default is FALSE.
+  omitted on disk? When this option is set, any attempt of writing a
+  block whose all pixels are 0 or the nodata value will cause it not to
+  be written at all (unless there is a corresponding block already
+  allocated in the file). Sparse files have 0 tile/strip offsets for
+  blocks never written and save space; however, most non-GDAL packages
+  cannot read such files.
+  On the reading side, the presence of a omitted tile after a non-empty one
+  may cause optimized readers to have to issue an extra GET request to the
+  TileByteCounts array.
+  The default is FALSE.
 
 Reprojection related creation options
 *************************************
@@ -233,6 +246,7 @@ Reprojection related creation options
   
 - **ADD_ALPHA=YES/NO**: Whether an alpha band is added in case of reprojection.
   Defaults to YES.
+
 
 File format details
 -------------------
