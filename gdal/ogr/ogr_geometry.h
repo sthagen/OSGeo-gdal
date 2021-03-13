@@ -37,6 +37,7 @@
 #include "ogr_core.h"
 #include "ogr_spatialref.h"
 
+#include <cmath>
 #include <memory>
 
 /**
@@ -929,21 +930,21 @@ class CPL_DLL OGRPoint : public OGRGeometry
     /** Set x
      * @param xIn x
      */
-    void        setX( double xIn ) { x = xIn; flags |= OGR_G_NOT_EMPTY_POINT; }
+    void        setX( double xIn ) { x = xIn; if( std::isnan(x) || std::isnan(y) ) flags &= ~OGR_G_NOT_EMPTY_POINT; else flags |= OGR_G_NOT_EMPTY_POINT; }
     /** Set y
      * @param yIn y
      */
-    void        setY( double yIn ) { y = yIn; flags |= OGR_G_NOT_EMPTY_POINT; }
+    void        setY( double yIn ) { y = yIn; if( std::isnan(x) || std::isnan(y) ) flags &= ~OGR_G_NOT_EMPTY_POINT; else flags |= OGR_G_NOT_EMPTY_POINT; }
     /** Set z
      * @param zIn z
      */
     void        setZ( double zIn )
-        { z = zIn; flags |= (OGR_G_NOT_EMPTY_POINT | OGR_G_3D); }
+        { z = zIn; flags |= OGR_G_3D; }
     /** Set m
      * @param mIn m
      */
     void        setM( double mIn )
-        { m = mIn; flags |= (OGR_G_NOT_EMPTY_POINT | OGR_G_MEASURED); }
+        { m = mIn; flags |= OGR_G_MEASURED; }
 
     // ISpatialRelation
     virtual OGRBoolean  Equals( const OGRGeometry * ) const override;
@@ -1168,7 +1169,7 @@ class CPL_DLL OGRSimpleCurve: public OGRCurve
     /** Type of child elements. */
     typedef OGRPoint ChildType;
 
-    /** Return begin of point iterator. 
+    /** Return begin of point iterator.
      *
      * Using this iterator for standard range-based loops is safe, but
      * due to implementation limitations, you shouldn't try to access
@@ -3101,7 +3102,7 @@ class CPL_DLL OGRGeometryFactory
                               double dfMaxAngleStepSizeDegrees,
                               const bool bUseMaxGap = false );
 
-    static int GetCurveParmeters( double x0, double y0,
+    static int GetCurveParameters( double x0, double y0,
                                   double x1, double y1,
                                   double x2, double y2,
                                   double& R, double& cx, double& cy,
