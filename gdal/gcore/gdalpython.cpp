@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <mutex>
+#include <set>
 #include <vector>
 
 using namespace GDALPy;
@@ -295,34 +296,63 @@ static bool LoadPythonAPI()
 #endif
                         )
                     {
-                        // If this is a symlink, hopefully the resolved
-                        // name will be like "python2.7"
-                        const int nBufSize = 2048;
-                        std::vector<char> oFilename(nBufSize);
-                        char *szPointerFilename = &oFilename[0];
-                        int nBytes = static_cast<int>(
-                            readlink( osPythonBinary, szPointerFilename,
-                                      nBufSize ) );
-                        if (nBytes != -1)
+                        std::set<std::string> oSetAlreadyTriedLinks;
+                        while( true )
                         {
-                            szPointerFilename[std::min(nBytes,
-                                                       nBufSize - 1)] = 0;
-                            CPLString osFilename(
-                                            CPLGetFilename(szPointerFilename));
-                            CPLDebug("GDAL", "Which is an alias to: %s",
-                                     szPointerFilename);
-                            if( STARTS_WITH(osFilename, "python") )
+                            oSetAlreadyTriedLinks.insert(osPythonBinary);
+
+                            // If this is a symlink, hopefully the resolved
+                            // name will be like "python3.6"
+                            const int nBufSize = 2048;
+                            std::vector<char> oFilename(nBufSize);
+                            char *szPointerFilename = &oFilename[0];
+                            int nBytes = static_cast<int>(
+                                readlink( osPythonBinary, szPointerFilename,
+                                          nBufSize ) );
+                            if (nBytes != -1)
                             {
-                                osVersion = osFilename.substr(strlen("python"));
-                                CPLDebug("GDAL",
-                                         "Python version from binary name: %s",
-                                         osVersion.c_str());
+                                szPointerFilename[std::min(nBytes,
+                                                           nBufSize - 1)] = 0;
+                                CPLString osFilename(
+                                                CPLGetFilename(szPointerFilename));
+                                CPLDebug("GDAL", "Which is an alias to: %s",
+                                         szPointerFilename);
+
+                                if( STARTS_WITH(osFilename, "python") )
+                                {
+                                    CPLString osResolvedFullLink;
+                                    // If the filename is again a symlink,
+                                    // resolve it
+                                    if( CPLIsFilenameRelative(osFilename) )
+                                    {
+                                        osResolvedFullLink = CPLFormFilename(
+                                            CPLGetPath(osPythonBinary), osFilename, nullptr );
+                                    }
+                                    else
+                                    {
+                                        osResolvedFullLink = osFilename;
+                                    }
+                                    if( oSetAlreadyTriedLinks.find(osResolvedFullLink) ==
+                                            oSetAlreadyTriedLinks.end() &&
+                                        lstat(osResolvedFullLink, &sStat) == 0 &&
+                                        S_ISLNK(sStat.st_mode) )
+                                    {
+                                        osPythonBinary = osResolvedFullLink;
+                                        continue;
+                                    }
+
+                                    osVersion = osFilename.substr(strlen("python"));
+                                    CPLDebug("GDAL",
+                                             "Python version from binary name: %s",
+                                             osVersion.c_str());
+                                }
                             }
-                        }
-                        else
-                        {
-                            CPLDebug("GDAL", "realink(%s) failed",
-                                        osPythonBinary.c_str());
+                            else
+                            {
+                                CPLDebug("GDAL", "realink(%s) failed",
+                                            osPythonBinary.c_str());
+                            }
+                            break;
                         }
                     }
 
@@ -387,12 +417,12 @@ static bool LoadPythonAPI()
     // Note: update doc/source/drivers/raster/vrt.rst if change
     if( libHandle == nullptr )
     {
-        const char* const apszPythonSO[] = { "libpython2.7." SO_EXT,
-                                                "libpython3.5m." SO_EXT,
+        const char* const apszPythonSO[] = {
                                                 "libpython3.6m." SO_EXT,
                                                 "libpython3.7m." SO_EXT,
                                                 "libpython3.8m." SO_EXT,
                                                 "libpython3.9m." SO_EXT,
+                                                "libpython3.5m." SO_EXT,
                                                 "libpython3.4m." SO_EXT,
                                                 "libpython3.3." SO_EXT,
                                                 "libpython3.2." SO_EXT };
@@ -592,12 +622,11 @@ static bool LoadPythonAPI()
     // Note: update doc/source/drivers/raster/vrt.rst if change
     if( libHandle == nullptr )
     {
-        const char* const apszPythonSO[] = { "python27.dll",
-                                            "python35.dll",
-                                            "python36.dll",
+        const char* const apszPythonSO[] = {"python36.dll",
                                             "python37.dll",
                                             "python38.dll",
                                             "python39.dll",
+                                            "python35.dll",
                                             "python34.dll",
                                             "python33.dll",
                                             "python32.dll" };
