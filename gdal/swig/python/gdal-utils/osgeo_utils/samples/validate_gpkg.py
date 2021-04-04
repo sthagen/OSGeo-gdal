@@ -39,6 +39,7 @@ import sys
 # If not available, those tests will be skipped
 try:
     from osgeo import gdal
+    from osgeo import ogr
     has_gdal = True
 except ImportError:
     has_gdal = False
@@ -370,8 +371,21 @@ class GPKGChecker(object):
         self._assert(found_geom, 24,
                      'table %s has no %s column' %
                      (table_name, geom_column_name))
-        self._assert(count_pkid == 1, 29,
-                     'table %s has no INTEGER PRIMARY KEY' % table_name)
+
+        c.execute("SELECT 1 FROM sqlite_master WHERE "
+                  "type = 'table' AND name = ?", (table_name,))
+        if c.fetchone():
+            self._assert(count_pkid == 1, 29,
+                         'table %s has no INTEGER PRIMARY KEY' % table_name)
+        else:
+            self._assert(len(cols) > 0 and cols[0][2] == 'INTEGER',
+                         150, 'view %s has no INTEGER first column' % table_name)
+
+            c.execute("SELECT COUNT(*) - COUNT(DISTINCT %s) FROM %s" %
+                      (_esc_id(cols[0][1]), _esc_id(table_name)))
+            self._assert(c.fetchone()[0] == 0, 150,
+                         'First column of view %s should contain '
+                         'unique values' % table_name)
 
         self._assert(z in (0, 1, 2), 27, ("z value of %s is %d. " +
                                           "Expected 0, 1 or 2") % (table_name, z))
@@ -396,6 +410,7 @@ class GPKGChecker(object):
         for (blob,) in c.fetchall():
             if blob is None:
                 continue
+
             self._assert(len(blob) >= 8, 19, 'Invalid geometry')
             max_size_needed = min(len(blob), 8 + 4 * 2 * 8 + 5)
             blob_ar = struct.unpack('B' * max_size_needed,
@@ -404,6 +419,7 @@ class GPKGChecker(object):
             self._assert(blob_ar[1] == ord('P'), 19, 'Invalid geometry')
             self._assert(blob_ar[2] == 0, 19, 'Invalid geometry')
             flags = blob_ar[3]
+            empty_flag = ((flags >> 3) & 1) == 1
             big_endian = (flags & 1) == 0
             env_ind = (flags >> 1) & 7
             self._assert(((flags >> 5) & 1) == 0, 19,
@@ -411,14 +427,16 @@ class GPKGChecker(object):
                          'allowed')
             self._assert(env_ind <= 4, 19,
                          'Invalid geometry: invalid envelope indicator code')
-            if big_endian:
-                geom_srs_id = struct.unpack('>I' * 1, blob[4:8])[0]
-            else:
-                geom_srs_id = struct.unpack('<I' * 1, blob[4:8])[0]
+            endian_prefix = '>' if big_endian else '<'
+            geom_srs_id = struct.unpack((endian_prefix + 'I') * 1, blob[4:8])[0]
             self._assert(srs_id == geom_srs_id, 33,
                          ('table %s has geometries with SRID %d, ' +
                           'whereas only %d is expected') %
                          (table_name, geom_srs_id, srs_id))
+
+            self._assert(not (empty_flag and env_ind != 0), 152,
+                         "Invalid empty geometry")
+
             if env_ind == 0:
                 coord_dim = 0
             elif env_ind == 1:
@@ -439,12 +457,9 @@ class GPKGChecker(object):
             self._assert(len(blob) >= header_len, 19, 'Invalid geometry')
             wkb_endianness = blob_ar[header_len]
             wkb_big_endian = (wkb_endianness == 0)
-            if wkb_big_endian:
-                wkb_geom_type = struct.unpack(
-                    '>I' * 1, blob[header_len + 1:header_len + 5])[0]
-            else:
-                wkb_geom_type = struct.unpack(
-                    '<I' * 1, blob[header_len + 1:header_len + 5])[0]
+            wkb_endian_prefix = '>' if wkb_big_endian else '<'
+            wkb_geom_type = struct.unpack(
+                (wkb_endian_prefix + 'I') * 1, blob[header_len + 1:header_len + 5])[0]
             self._assert(wkb_geom_type >= 0 and
                          (wkb_geom_type % 1000) < len(wkb_geometries),
                          19, 'Invalid WKB geometry type')
@@ -466,6 +481,14 @@ class GPKGChecker(object):
                              'gpkg_geometry_columns')
 
             found_geom_types.add(wkb_geometries[wkb_geom_type % 1000])
+
+            if has_gdal:
+                geom = ogr.CreateGeometryFromWkb(blob[header_len:])
+                self._assert(geom is not None, 19, 'Invalid geometry')
+
+                self._assert((geom.IsEmpty() and empty_flag) or
+                             (not geom.IsEmpty() and not empty_flag), 152,
+                             'Inconsistent empty_flag vs geometry content')
 
         if geometry_type_name in ('POINT', 'LINESTRING', 'POLYGON',
                                   'MULTIPOINT', 'MULTILINESTRING',
@@ -613,6 +636,49 @@ class GPKGChecker(object):
                           "gpkg_geometry_columns which isn't found in " +
                           "gpkg_spatial_ref_sys") % (table_name, srs_id))
 
+        c.execute("SELECT a.table_name, a.srs_id, b.srs_id FROM " +
+                  "gpkg_geometry_columns a, gpkg_contents b " +
+                  "WHERE a.table_name = b.table_name AND a.srs_id != b.srs_id")
+        rows = c.fetchall()
+        for (table_name, a_srs_id, b_srs_id) in rows:
+            self._assert(False, 146,
+                         "Table %s is declared with srs_id %d in "
+                         "gpkg_geometry_columns and %d in gpkg_contents" %
+                         (table_name, a_srs_id, b_srs_id))
+
+    def _check_attribute_user_table(self, c, table_name):
+        self._log('Checking attributes table ' + table_name)
+
+        c.execute('PRAGMA table_info(%s)' % _esc_id(table_name))
+        cols = c.fetchall()
+        count_pkid = 0
+        for (_, name, typ, _, _, pk) in cols:
+            if pk == 1:
+                count_pkid += 1
+                self._assert(typ == 'INTEGER', 119,
+                             ('table %s has a PRIMARY KEY of type %s ' +
+                              'instead of INTEGER') % (table_name, typ))
+
+            else:
+                self._assert(_is_valid_data_type(typ), 5,
+                             'table %s has column %s of unexpected type %s'
+                             % (table_name, name, typ))
+
+        c.execute("SELECT 1 FROM sqlite_master WHERE "
+                  "type = 'table' AND name = ?", (table_name,))
+        if c.fetchone():
+            self._assert(count_pkid == 1, 119,
+                         'table %s has no INTEGER PRIMARY KEY' % table_name)
+        else:
+            self._assert(len(cols) > 0 and cols[0][2] == 'INTEGER',
+                         151, 'view %s has no INTEGER first column' % table_name)
+
+            c.execute("SELECT COUNT(*) - COUNT(DISTINCT %s) FROM %s" %
+                      (_esc_id(cols[0][1]), _esc_id(table_name)))
+            self._assert(c.fetchone()[0] == 0, 151,
+                         'First column of view %s should contain '
+                         'unique values' % table_name)
+
     def _check_attributes(self, c):
 
         self._log('Checking attributes')
@@ -622,25 +688,7 @@ class GPKGChecker(object):
         if not rows:
             self._log('... No attributes table')
         for (table_name,) in rows:
-            self._log('Checking attributes table ' + table_name)
-
-            c.execute('PRAGMA table_info(%s)' % _esc_id(table_name))
-            cols = c.fetchall()
-            count_pkid = 0
-            for (_, name, typ, _, _, pk) in cols:
-                if pk == 1:
-                    count_pkid += 1
-                    self._assert(typ == 'INTEGER', 119,
-                                 ('table %s has a PRIMARY KEY of type %s ' +
-                                  'instead of INTEGER') % (table_name, typ))
-
-                else:
-                    self._assert(_is_valid_data_type(typ), 5,
-                                 'table %s has column %s of unexpected type %s'
-                                 % (table_name, name, typ))
-
-            self._assert(count_pkid == 1, 119,
-                         'table %s has no INTEGER PRIMARY KEY' % table_name)
+            self._check_attribute_user_table(c, table_name)
 
     def _check_tile_user_table(self, c, table_name, data_type):
 
@@ -1487,9 +1535,7 @@ class GPKGChecker(object):
 
     def _check_schema(self, c):
 
-        # Partial: doesn't check gpkg_data_column_constraints
-
-        self._log('Checking gpkg_schema (partial)')
+        self._log('Checking gpkg_schema')
 
         must_have_gpkg_schema = False
         c.execute("SELECT 1 FROM sqlite_master WHERE name = 'gpkg_extensions'")
@@ -1504,10 +1550,28 @@ class GPKGChecker(object):
                              "Wrong scope for gpkg_schema in "
                              "gpkg_extensions")
 
+                self._assert(c.fetchone() is not None, 141,
+                             "There should be exactly 2 rows with " +
+                             "extension_name = " +
+                             "'gpkg_schema' in gpkg_extensions")
+                self._assert(c.fetchone() is None, 141,
+                             "There should be exactly 2 rows with " +
+                             "extension_name = " +
+                             "'gpkg_schema' in gpkg_extensions")
+
+                c.execute("SELECT 1 FROM gpkg_extensions WHERE "
+                          "extension_name = 'gpkg_schema' AND "
+                          "column_name IS NOT NULL")
+                row = c.fetchone()
+                if row is not None:
+                    self._assert(False, 141,
+                                 "gpkg_extensions contains row(s) with " +
+                                 "gpkg_schema and a not-NULL column_name")
+
         c.execute("SELECT 1 FROM sqlite_master WHERE name = 'gpkg_data_columns'")
         if c.fetchone() is None:
             if must_have_gpkg_schema:
-                self._log("gpkg_data_columns table missing. Not forbidden by requirements, but odd")
+                self._assert(False, 141, "gpkg_data_columns table missing.")
             else:
                 self._log('... No schema')
             return
@@ -1523,7 +1587,7 @@ class GPKGChecker(object):
             (5, 'mime_type', 'TEXT', 0, None, 0),
             (6, 'constraint_name', 'TEXT', 0, None, 0)
         ]
-        self._check_structure(columns, expected_columns, 107,
+        self._check_structure(columns, expected_columns, 103,
                               'gpkg_data_columns')
 
         c.execute("SELECT table_name, column_name FROM gpkg_data_columns")
@@ -1531,10 +1595,13 @@ class GPKGChecker(object):
         for (table_name, column_name) in rows:
             c.execute("SELECT 1 FROM gpkg_contents WHERE table_name = ?",
                       (table_name,))
-            self._assert(c.fetchone(), 104,
-                         ("table_name = %s " % table_name +
-                          "in gpkg_data_columns refer to non-existing " +
-                          "table/view in gpkg_contents"))
+            if c.fetchone() is None:
+                c.execute("SELECT 1 FROM gpkg_extensions WHERE table_name = ?",
+                          (table_name,))
+                self._assert(c.fetchone(), 104,
+                             ("table_name = %s " % table_name +
+                              "in gpkg_data_columns refer to non-existing " +
+                              "table/view in gpkg_contents or gpkg_extensions"))
 
             try:
                 c.execute("SELECT %s FROM %s" % (_esc_id(column_name),
@@ -1545,6 +1612,103 @@ class GPKGChecker(object):
                               "column_name = %s " % column_name +
                               "in gpkg_data_columns refer to non-existing " +
                               "column"))
+
+        c.execute("SELECT 1 FROM sqlite_master WHERE name = 'gpkg_data_column_constraints'")
+        if c.fetchone() is None:
+            self._assert(False, 141, "gpkg_data_column_constraints table missing.")
+
+        c.execute("PRAGMA table_info(gpkg_data_column_constraints)")
+        columns = c.fetchall()
+        expected_columns = [
+            (0, 'constraint_name', 'TEXT', 1, None, 0),
+            (1, 'constraint_type', 'TEXT', 1, None, 0),
+            (2, 'value', 'TEXT', 0, None, 0),
+            (3, 'min', 'NUMERIC', 0, None, 0),
+            (4, 'min_is_inclusive', 'BOOLEAN', 0, None, 0),
+            (5, 'max', 'NUMERIC', 0, None, 0),
+            (6, 'max_is_inclusive', 'BOOLEAN', 0, None, 0),
+            (7, 'description', 'TEXT', 0, None, 0),
+        ]
+        self._check_structure(columns, expected_columns, 107,
+                              'gpkg_data_column_constraints')
+
+        c.execute("SELECT DISTINCT constraint_type FROM " +
+                  "gpkg_data_column_constraints WHERE constraint_type " +
+                  "NOT IN ('range', 'enum', 'glob')")
+        if c.fetchone() is not None:
+            self._assert(False, 108,
+                         "gpkg_data_column_constraints.constraint_type " +
+                         "contains value other than range, enum, glob")
+
+        c.execute("SELECT 1 FROM (SELECT COUNT(constraint_name) AS c FROM " +
+                  "gpkg_data_column_constraints WHERE constraint_type " +
+                  "IN ('range', 'glob') GROUP BY constraint_name) u " +
+                  "WHERE u.c != 1")
+        if c.fetchone() is not None:
+            self._assert(False, 109,
+                         "gpkg_data_column_constraints contains non unique " +
+                         "constraint_name for constraints of type range/glob")
+
+        c.execute("SELECT 1 FROM gpkg_data_column_constraints WHERE " +
+                  "constraint_type = 'range' AND value IS NOT NULL")
+        if c.fetchone() is not None:
+            self._assert(False, 110,
+                         "gpkg_data_column_constraints contains constraint " +
+                         "of type range whose 'value' column is not null")
+
+        c.execute("SELECT 1 FROM gpkg_data_column_constraints WHERE " +
+                  "constraint_type = 'range' AND min IS NULL")
+        if c.fetchone() is not None:
+            self._assert(False, 111,
+                         "gpkg_data_column_constraints contains constraint " +
+                         "of type range whose min value is NULL")
+
+        c.execute("SELECT 1 FROM gpkg_data_column_constraints WHERE " +
+                  "constraint_type = 'range' AND max IS NULL")
+        if c.fetchone() is not None:
+            self._assert(False, 111,
+                         "gpkg_data_column_constraints contains constraint " +
+                         "of type range whose max value is NULL")
+
+        c.execute("SELECT 1 FROM gpkg_data_column_constraints WHERE " +
+                  "constraint_type = 'range' AND min >= max")
+        if c.fetchone() is not None:
+            self._assert(False, 111,
+                         "gpkg_data_column_constraints contains constraint " +
+                         "of type range whose min value is not less than max")
+
+        c.execute("SELECT 1 FROM gpkg_data_column_constraints WHERE " +
+                  "constraint_type = 'range' AND min_is_inclusive NOT IN (0,1)")
+        if c.fetchone() is not None:
+            self._assert(False, 112,
+                         "gpkg_data_column_constraints contains constraint " +
+                         "of type range whose min_is_inclusive value is " +
+                         "not 0 or 1")
+
+        c.execute("SELECT 1 FROM gpkg_data_column_constraints WHERE " +
+                  "constraint_type = 'range' AND max_is_inclusive NOT IN (0,1)")
+        if c.fetchone() is not None:
+            self._assert(False, 112,
+                         "gpkg_data_column_constraints contains constraint " +
+                         "of type range whose max_is_inclusive value is " +
+                         "not 0 or 1")
+
+        for col_name in ('min', 'min_is_inclusive', 'max', 'max_is_inclusive'):
+            c.execute("SELECT 1 FROM gpkg_data_column_constraints WHERE " +
+                      "constraint_type IN ('enum', 'glob') AND " +
+                      col_name + " IS NOT NULL")
+            if c.fetchone() is not None:
+                self._assert(False, 113,
+                             "gpkg_data_column_constraints contains constraint " +
+                             "of type enum or glob whose " + col_name +
+                             " column is not NULL")
+
+        c.execute("SELECT 1 FROM gpkg_data_column_constraints WHERE " +
+                  "constraint_type = 'enum' AND value IS NULL")
+        if c.fetchone() is not None:
+            self._assert(False, 114,
+                         "gpkg_data_column_constraints contains constraint " +
+                         "of type enum whose value column is NULL")
 
     def check(self):
         self._assert(os.path.exists(self.filename), None,
@@ -1677,4 +1841,3 @@ def main(argv):
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv))
-
