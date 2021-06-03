@@ -46,7 +46,7 @@ def get_srs(srs_like: AnySRS,
 
     gis_order and axis_order are mutually exclusive
     if gis_order is not None then axis_order is set according to gis_order
-    if axis_order == None -> set axis order to default_axis_order iff the input is not an osr.SpatialRefernce reference,
+    if axis_order == None -> set axis order to default_axis_order iff the input is not an osr.SpatialReference reference,
     otherwise set requested axis_order
     """
     if isinstance(srs_like, osr.SpatialReference):
@@ -125,8 +125,7 @@ def get_transform(src_srs: AnySRS, tgt_srs: AnySRS) -> Optional[osr.CoordinateTr
 
 
 def transform_points(ct: Optional[osr.CoordinateTransformation],
-                     x: ArrayLike, y: ArrayLike, z: Optional[ArrayLike] = None) -> \
-                     Tuple[ArrayLike, ArrayLike, Optional[ArrayLike]]:
+                     x: ArrayLike, y: ArrayLike, z: Optional[ArrayLike] = None) -> None:
     if ct is not None:
         if z is None:
             for idx, (x0, y0) in enumerate(zip(x, y)):
@@ -134,4 +133,3 @@ def transform_points(ct: Optional[osr.CoordinateTransformation],
         else:
             for idx, (x0, y0, z0) in enumerate(zip(x, y, z)):
                 x[idx], y[idx], z[idx] = ct.TransformPoint(x0, y0, z0)
-    return x, y, z

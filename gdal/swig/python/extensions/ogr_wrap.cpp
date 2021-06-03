@@ -3327,7 +3327,10 @@ void DontUseExceptions() {
     }
     char* pszNewValue = CPLStrdup(pszValue + strlen(MODULE_NAME) + 1);
     if( pszNewValue[0] == ' ' && pszNewValue[1] == '\0' )
+    {
+        CPLFree(pszNewValue);
         pszNewValue = NULL;
+    }
     CPLSetConfigOption("__chain_python_error_handlers", pszNewValue);
     CPLFree(pszNewValue);
     bUseExceptions = 0;
@@ -5475,8 +5478,8 @@ SWIGINTERN OGRGeometryShadow *OGRGeometryShadow_GetBoundary(OGRGeometryShadow *s
 SWIGINTERN OGRGeometryShadow *OGRGeometryShadow_ConvexHull(OGRGeometryShadow *self){
     return (OGRGeometryShadow*) OGR_G_ConvexHull(self);
   }
-SWIGINTERN OGRGeometryShadow *OGRGeometryShadow_MakeValid(OGRGeometryShadow *self){
-    return (OGRGeometryShadow*) OGR_G_MakeValid(self);
+SWIGINTERN OGRGeometryShadow *OGRGeometryShadow_MakeValid(OGRGeometryShadow *self,char **options=NULL){
+    return (OGRGeometryShadow*) OGR_G_MakeValidEx(self, options);
   }
 SWIGINTERN OGRGeometryShadow *OGRGeometryShadow_Normalize(OGRGeometryShadow *self){
     return (OGRGeometryShadow*) OGR_G_Normalize(self);
@@ -21723,7 +21726,14 @@ SWIGINTERN PyObject *_wrap_CreateGeometryFromWkb(PyObject *SWIGUNUSEDPARM(self),
     if (PyUnicode_Check(obj0))
     {
       size_t safeLen = 0;
-      int ret = SWIG_AsCharPtrAndSize(obj0, (char**) &arg2, &safeLen, &alloc1);
+      int ret;
+      try {
+        ret = SWIG_AsCharPtrAndSize(obj0, (char**) &arg2, &safeLen, &alloc1);
+      }
+      catch( const std::exception& )
+      {
+        SWIG_exception_fail( SWIG_MemoryError, "out of memory");
+      }
       if (!SWIG_IsOK(ret)) {
         SWIG_exception( SWIG_RuntimeError, "invalid Unicode string" );
       }
@@ -22539,7 +22549,14 @@ SWIGINTERN PyObject *_wrap_new_Geometry(PyObject *SWIGUNUSEDPARM(self), PyObject
       if (PyUnicode_Check(obj2))
       {
         size_t safeLen = 0;
-        int ret = SWIG_AsCharPtrAndSize(obj2, (char**) &arg4, &safeLen, &alloc3);
+        int ret;
+        try {
+          ret = SWIG_AsCharPtrAndSize(obj2, (char**) &arg4, &safeLen, &alloc3);
+        }
+        catch( const std::exception& )
+        {
+          SWIG_exception_fail( SWIG_MemoryError, "out of memory");
+        }
         if (!SWIG_IsOK(ret)) {
           SWIG_exception( SWIG_RuntimeError, "invalid Unicode string" );
         }
@@ -25220,24 +25237,37 @@ fail:
 SWIGINTERN PyObject *_wrap_Geometry_MakeValid(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0; int bLocalUseExceptionsCode = bUseExceptions;
   OGRGeometryShadow *arg1 = (OGRGeometryShadow *) 0 ;
+  char **arg2 = (char **) NULL ;
   void *argp1 = 0 ;
   int res1 = 0 ;
   PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
   OGRGeometryShadow *result = 0 ;
   
-  if (!PyArg_ParseTuple(args,(char *)"O:Geometry_MakeValid",&obj0)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"O|O:Geometry_MakeValid",&obj0,&obj1)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_OGRGeometryShadow, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
     SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "Geometry_MakeValid" "', argument " "1"" of type '" "OGRGeometryShadow *""'"); 
   }
   arg1 = reinterpret_cast< OGRGeometryShadow * >(argp1);
+  if (obj1) {
+    {
+      /* %typemap(in) char **options */
+      int bErr = FALSE;
+      arg2 = CSLFromPySequence(obj1, &bErr);
+      if( bErr )
+      {
+        SWIG_fail;
+      }
+    }
+  }
   {
     if ( bUseExceptions ) {
       ClearErrorState();
     }
     {
       SWIG_PYTHON_THREAD_BEGIN_ALLOW;
-      result = (OGRGeometryShadow *)OGRGeometryShadow_MakeValid(arg1);
+      result = (OGRGeometryShadow *)OGRGeometryShadow_MakeValid(arg1,arg2);
       SWIG_PYTHON_THREAD_END_ALLOW;
     }
 #ifndef SED_HACKS
@@ -25250,9 +25280,17 @@ SWIGINTERN PyObject *_wrap_Geometry_MakeValid(PyObject *SWIGUNUSEDPARM(self), Py
 #endif
   }
   resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_OGRGeometryShadow, SWIG_POINTER_OWN |  0 );
+  {
+    /* %typemap(freearg) char **options */
+    CSLDestroy( arg2 );
+  }
   if ( ReturnSame(bLocalUseExceptionsCode) ) { CPLErr eclass = CPLGetLastErrorType(); if ( eclass == CE_Failure || eclass == CE_Fatal ) { Py_XDECREF(resultobj); SWIG_Error( SWIG_RuntimeError, CPLGetLastErrorMsg() ); return NULL; } }
   return resultobj;
 fail:
+  {
+    /* %typemap(freearg) char **options */
+    CSLDestroy( arg2 );
+  }
   return NULL;
 }
 
@@ -35184,7 +35222,7 @@ static PyMethodDef SwigMethods[] = {
 		"NULL on failure. \n"
 		""},
 	 { (char *)"Geometry_MakeValid", _wrap_Geometry_MakeValid, METH_VARARGS, (char *)"\n"
-		"Geometry_MakeValid(Geometry self) -> Geometry\n"
+		"Geometry_MakeValid(Geometry self, char ** options=None) -> Geometry\n"
 		"\n"
 		"OGRGeometryH\n"
 		"OGR_G_MakeValid(OGRGeometryH hGeom)\n"
@@ -37349,3 +37387,4 @@ SWIG_init(void) {
 #endif
 }
 
+#define POST_PROCESSING_APPLIED

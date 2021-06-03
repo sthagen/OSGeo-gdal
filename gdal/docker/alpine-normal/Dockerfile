@@ -26,7 +26,7 @@ ARG POPPLER_DEV=poppler-dev
 RUN apk add --no-cache \
     linux-headers \
     curl-dev tiff-dev \
-    zlib-dev zstd-dev \
+    zlib-dev zstd-dev xz-dev \
     libjpeg-turbo-dev libpng-dev openjpeg-dev libwebp-dev expat-dev \
     py3-numpy-dev python3-dev py3-numpy \
     ${POPPLER_DEV} postgresql-dev \
@@ -204,8 +204,10 @@ RUN if test "${SPATIALITE_VERSION}" != ""; then ( \
 ARG GDAL_VERSION=master
 ARG GDAL_RELEASE_DATE
 ARG GDAL_BUILD_IS_RELEASE
+ARG GDAL_REPOSITORY=OSGeo/gdal
+
 RUN if test "${GDAL_VERSION}" = "master"; then \
-        export GDAL_VERSION=$(curl -Ls https://api.github.com/repos/OSGeo/gdal/commits/HEAD -H "Accept: application/vnd.github.VERSION.sha"); \
+        export GDAL_VERSION=$(curl -Ls https://api.github.com/repos/${GDAL_REPOSITORY}/commits/HEAD -H "Accept: application/vnd.github.VERSION.sha"); \
         export GDAL_RELEASE_DATE=$(date "+%Y%m%d"); \
     fi \
     && if test "x${GDAL_BUILD_IS_RELEASE}" = "x"; then \
@@ -231,7 +233,7 @@ RUN if test "${GDAL_VERSION}" = "master"; then \
     fi \
     && echo ${GDAL_EXTRA_ARGS} \
     && mkdir gdal \
-    && wget -q https://github.com/OSGeo/gdal/archive/${GDAL_VERSION}.tar.gz -O - \
+    && wget -q https://github.com/${GDAL_REPOSITORY}/archive/${GDAL_VERSION}.tar.gz -O - \
         | tar xz -C gdal --strip-components=1 \
     && cd gdal/gdal \
     && if test "${RSYNC_REMOTE}" != ""; then \
@@ -249,6 +251,7 @@ RUN if test "${GDAL_VERSION}" = "master"; then \
     fi \
     && ./configure --prefix=/usr --without-libtool \
     --with-hide-internal-symbols \
+    --with-liblzma \
     --with-proj=/usr \
     --with-libtiff=internal --with-rename-internal-libtiff-symbols \
     --with-geotiff=internal --with-rename-internal-libgeotiff-symbols \
@@ -298,7 +301,7 @@ RUN apk add --no-cache \
         libstdc++ \
         sqlite-libs \
         libcurl tiff \
-        zlib zstd-libs\
+        zlib zstd-libs xz-libs \
         libjpeg-turbo libpng libwebp expat \
         icu-libs \
         python3 py3-numpy ${POPPLER} pcre libpq libxml2 portablexdr openjpeg \

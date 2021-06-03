@@ -1624,6 +1624,8 @@ void netCDFRasterBand::CheckData( void *pImage, void *pImageNC,
     // Only check first and last block elements since lon must be monotonic.
     const bool bIsSigned = std::numeric_limits<T>::is_signed;
     if( bCheckLongitude && bIsSigned &&
+        !CPLIsEqual((double)((T *)pImage)[0], dfNoDataValue) &&
+        !CPLIsEqual((double)((T *)pImage)[nTmpBlockXSize - 1], dfNoDataValue) &&
         std::min(((T *)pImage)[0], ((T *)pImage)[nTmpBlockXSize - 1]) > 180.0 )
     {
         T *ptrImage = static_cast<T*>(pImage);
@@ -3386,6 +3388,17 @@ void netCDFDataset::SetProjectionFromVar( int nGroupId, int nVarId,
             nc_inq_varndims(nGroupId, nVarDimXID, &ndims);
             if( ndims == 0 || ndims > 2 )
                 nVarDimXID = -1;
+            else
+            {
+                if( !NCDFIsVarLongitude(nGroupId, nVarDimXID, nullptr) &&
+                    !NCDFIsVarProjectionX(nGroupId, nVarDimXID, nullptr) &&
+                    // In case of inversion of X/Y
+                    !NCDFIsVarLatitude(nGroupId, nVarDimXID, nullptr) &&
+                    !NCDFIsVarProjectionY(nGroupId, nVarDimXID, nullptr) )
+                {
+                    nVarDimXID = -1;
+                }
+            }
         }
 
         if( nVarDimYID >= 0 )
@@ -3394,6 +3407,17 @@ void netCDFDataset::SetProjectionFromVar( int nGroupId, int nVarId,
             nc_inq_varndims(nGroupId, nVarDimYID, &ndims);
             if( ndims == 0 || ndims > 2 )
                 nVarDimYID = -1;
+            else
+            {
+                if( !NCDFIsVarLatitude(nGroupId, nVarDimYID, nullptr) &&
+                    !NCDFIsVarProjectionY(nGroupId, nVarDimYID, nullptr) &&
+                    // In case of inversion of X/Y
+                    !NCDFIsVarLongitude(nGroupId, nVarDimYID, nullptr) &&
+                    !NCDFIsVarProjectionX(nGroupId, nVarDimYID, nullptr) )
+                {
+                    nVarDimYID = -1;
+                }
+            }
         }
     }
 
@@ -5752,7 +5776,8 @@ CPL_UNUSED
             const char *pszExtension = CPLGetExtension(poOpenInfo->pszFilename);
             if( !(EQUAL(pszExtension, "nc") || EQUAL(pszExtension, "cdf") ||
                   EQUAL(pszExtension, "nc2") || EQUAL(pszExtension, "nc4") ||
-                  EQUAL(pszExtension, "nc3") || EQUAL(pszExtension, "grd")) )
+                  EQUAL(pszExtension, "nc3") || EQUAL(pszExtension, "grd") ||
+                  EQUAL(pszExtension, "gmac") ) )
                 return NCDF_FORMAT_HDF5;
         }
 #endif
@@ -10888,12 +10913,12 @@ bool NCDFIsVarLongitude( int nCdfId, int nVarId,
     }
     else if ( bVal )
     {
-        // Check that the units is not 'm'. See #6759
+        // Check that the units is not 'm' or '1'. See #6759
         char *pszTemp = nullptr;
         if( NCDFGetAttr(nCdfId, nVarId, "units", &pszTemp) == CE_None &&
             pszTemp != nullptr )
         {
-            if( EQUAL(pszTemp, "m") )
+            if( EQUAL(pszTemp, "m") || EQUAL(pszTemp, "1") )
                 bVal = false;
             CPLFree(pszTemp);
         }
@@ -10918,12 +10943,12 @@ bool NCDFIsVarLatitude( int nCdfId, int nVarId, const char *pszVarName )
     }
     else if ( bVal )
     {
-        // Check that the units is not 'm'. See #6759
+        // Check that the units is not 'm' or '1'. See #6759
         char *pszTemp = nullptr;
         if( NCDFGetAttr(nCdfId, nVarId, "units", &pszTemp) == CE_None &&
             pszTemp != nullptr )
         {
-            if( EQUAL(pszTemp, "m") )
+            if( EQUAL(pszTemp, "m") || EQUAL(pszTemp, "1") )
                 bVal = false;
             CPLFree(pszTemp);
         }
@@ -10947,6 +10972,19 @@ bool NCDFIsVarProjectionX( int nCdfId, int nVarId,
         else
             bVal = FALSE;
     }
+    else if ( bVal )
+    {
+        // Check that the units is not '1'
+        char *pszTemp = nullptr;
+        if( NCDFGetAttr(nCdfId, nVarId, "units", &pszTemp) == CE_None &&
+            pszTemp != nullptr )
+        {
+            if( EQUAL(pszTemp, "1") )
+                bVal = false;
+            CPLFree(pszTemp);
+        }
+    }
+
     return CPL_TO_BOOL(bVal);
 }
 
@@ -10965,6 +11003,19 @@ bool NCDFIsVarProjectionY( int nCdfId, int nVarId,
         else
             bVal = FALSE;
     }
+    else if ( bVal )
+    {
+        // Check that the units is not '1'
+        char *pszTemp = nullptr;
+        if( NCDFGetAttr(nCdfId, nVarId, "units", &pszTemp) == CE_None &&
+            pszTemp != nullptr )
+        {
+            if( EQUAL(pszTemp, "1") )
+                bVal = false;
+            CPLFree(pszTemp);
+        }
+    }
+
     return CPL_TO_BOOL(bVal);
 }
 

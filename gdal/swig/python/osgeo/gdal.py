@@ -1713,6 +1713,10 @@ def Sync(*args, **kwargs):
     """Sync(char const * pszSource, char const * pszTarget, char ** options=None, GDALProgressFunc callback=0, void * callback_data=None) -> bool"""
     return _gdal.Sync(*args, **kwargs)
 
+def AbortPendingUploads(*args):
+    """AbortPendingUploads(char const * utf8_path) -> bool"""
+    return _gdal.AbortPendingUploads(*args)
+
 def GetActualURL(*args):
     """GetActualURL(char const * utf8_path) -> char const *"""
     return _gdal.GetActualURL(*args)
@@ -1915,7 +1919,7 @@ class MajorObject(_object):
 
 
     def GetMetadata(self, domain=''):
-      if domain[:4] == 'xml:':
+      if domain and domain[:4] == 'xml:':
         return self.GetMetadata_List(domain)
       return self.GetMetadata_Dict(domain)
 
@@ -2905,6 +2909,11 @@ class MDArray(_object):
         return _gdal.MDArray_GetDimensions(self, *args)
 
 
+    def GetCoordinateVariables(self, *args):
+        """GetCoordinateVariables(MDArray self)"""
+        return _gdal.MDArray_GetCoordinateVariables(self, *args)
+
+
     def GetBlockSize(self, *args):
         """GetBlockSize(MDArray self)"""
         return _gdal.MDArray_GetBlockSize(self, *args)
@@ -2970,9 +2979,19 @@ class MDArray(_object):
         return _gdal.MDArray_GetNoDataValueAsDouble(self, *args)
 
 
+    def GetNoDataValueAsString(self, *args):
+        """GetNoDataValueAsString(MDArray self) -> retStringAndCPLFree *"""
+        return _gdal.MDArray_GetNoDataValueAsString(self, *args)
+
+
     def SetNoDataValueDouble(self, *args):
         """SetNoDataValueDouble(MDArray self, double d) -> CPLErr"""
         return _gdal.MDArray_SetNoDataValueDouble(self, *args)
+
+
+    def SetNoDataValueString(self, *args):
+        """SetNoDataValueString(MDArray self, char const * nodata) -> CPLErr"""
+        return _gdal.MDArray_SetNoDataValueString(self, *args)
 
 
     def SetNoDataValueRaw(self, *args):
@@ -3068,6 +3087,16 @@ class MDArray(_object):
     def ComputeStatistics(self, *args, **kwargs):
         """ComputeStatistics(MDArray self, Dataset ds=None, bool approx_ok=False, GDALProgressFunc callback=0, void * callback_data=None) -> Statistics"""
         return _gdal.MDArray_ComputeStatistics(self, *args, **kwargs)
+
+
+    def GetResampled(self, *args):
+        """GetResampled(MDArray self, int nDimensions, GDALRIOResampleAlg resample_alg, OSRSpatialReferenceShadow ** srs, char ** options=None) -> MDArray"""
+        return _gdal.MDArray_GetResampled(self, *args)
+
+
+    def Cache(self, *args):
+        """Cache(MDArray self, char ** options=None) -> bool"""
+        return _gdal.MDArray_Cache(self, *args)
 
 
     def Read(self,

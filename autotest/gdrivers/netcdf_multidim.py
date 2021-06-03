@@ -36,6 +36,7 @@ netcdf_setup; # to please pyflakes
 import gdaltest
 import os
 import pytest
+import shutil
 import struct
 import sys
 
@@ -1613,3 +1614,121 @@ def test_netcdf_multidim_group_by_same_dimension(netcdf_setup):  # noqa
         dims = ar.GetDimensions()
         assert len(dims) == 1
         assert dims[0].GetName() == 'time_01'
+
+
+def test_netcdf_multidim_getcoordinatevariables(netcdf_setup):  # noqa
+
+    if not gdaltest.netcdf_drv_has_nc4:
+        pytest.skip()
+
+    ds = gdal.OpenEx('data/netcdf/expanded_form_of_grid_mapping.nc', gdal.OF_MULTIDIM_RASTER)
+    rg = ds.GetRootGroup()
+
+    ar = rg.OpenMDArray('temp')
+    coordinate_vars = ar.GetCoordinateVariables()
+    assert len(coordinate_vars) == 2
+    assert coordinate_vars[0].GetName() == 'lat'
+    assert coordinate_vars[1].GetName() == 'lon'
+
+    assert len(coordinate_vars[0].GetCoordinateVariables()) == 0
+
+
+def test_netcdf_multidim_getresampled_with_geoloc(netcdf_setup):  # noqa
+
+    if not gdaltest.netcdf_drv_has_nc4:
+        pytest.skip()
+
+    ds = gdal.OpenEx('data/netcdf/sentinel5p_fake.nc', gdal.OF_MULTIDIM_RASTER)
+    rg = ds.GetRootGroup()
+
+    ar = rg.OpenMDArray('my_var')
+    coordinate_vars = ar.GetCoordinateVariables()
+    assert len(coordinate_vars) == 2
+    assert coordinate_vars[0].GetName() == 'longitude'
+    assert coordinate_vars[1].GetName() == 'latitude'
+
+    resampled_ar = ar.GetResampled([None] * ar.GetDimensionCount(),
+                                   gdal.GRIORA_NearestNeighbour, None)
+    assert resampled_ar is not None
+
+    # By default, the classic netCDF driver would use bottom-up reordering,
+    # which slightly modifies the output of the geolocation interpolation,
+    # and would not make it possible to compare exactly with the GetResampled()
+    # result
+    with gdaltest.config_option('GDAL_NETCDF_BOTTOMUP', 'NO'):
+        warped_ds = gdal.Warp('', 'data/netcdf/sentinel5p_fake.nc', format='MEM')
+    assert warped_ds.ReadRaster() == resampled_ar.Read()
+
+
+def test_netcdf_multidim_cache(netcdf_setup):  # noqa
+
+    if not gdaltest.netcdf_drv_has_nc4:
+        pytest.skip()
+
+    tmpfilename = 'tmp/test.nc'
+    shutil.copy('data/netcdf/alldatatypes.nc', tmpfilename)
+    gdal.Unlink(tmpfilename + ".gmac")
+
+    def get_transposed_and_cache():
+        ds = gdal.OpenEx(tmpfilename, gdal.OF_MULTIDIM_RASTER)
+        ar = ds.GetRootGroup().OpenMDArray('ubyte_y2_x2_var')
+        assert ar
+        transpose = ar.Transpose([1, 0])
+        assert transpose.Cache( ['BLOCKSIZE=2,1'] )
+        with gdaltest.error_handler():
+            # Cannot cache twice the same array
+            assert transpose.Cache() is False
+
+        ar2 = ds.GetRootGroup().OpenMDArray('ubyte_z2_y2_x2_var')
+        assert ar2
+        assert ar2.Cache()
+
+        return transpose.Read()
+
+    transposed_data = get_transposed_and_cache()
+
+    def check_cache_exists():
+        cache_ds = gdal.OpenEx(tmpfilename + ".gmac", gdal.OF_MULTIDIM_RASTER)
+        assert cache_ds
+        rg = cache_ds.GetRootGroup()
+        cached_ar = rg.OpenMDArray('Transposed_view_of__ubyte_y2_x2_var_along__1_0_')
+        assert cached_ar
+        assert cached_ar.GetBlockSize() == [2, 1]
+        assert cached_ar.Read() == transposed_data
+
+        assert rg.OpenMDArray('_ubyte_z2_y2_x2_var') is not None
+
+    check_cache_exists()
+
+    def check_cache_working():
+        ds = gdal.OpenEx(tmpfilename, gdal.OF_MULTIDIM_RASTER)
+        ar = ds.GetRootGroup().OpenMDArray('ubyte_y2_x2_var')
+        transpose = ar.Transpose([1, 0])
+        assert transpose.Read() == transposed_data
+        # Again
+        assert transpose.Read() == transposed_data
+
+    check_cache_working()
+
+    # Now alter the cache directly
+    def alter_cache():
+        cache_ds = gdal.OpenEx(tmpfilename + ".gmac",
+                               gdal.OF_MULTIDIM_RASTER | gdal.OF_UPDATE)
+        assert cache_ds
+        rg = cache_ds.GetRootGroup()
+        cached_ar = rg.OpenMDArray(rg.GetMDArrayNames()[0])
+        cached_ar.Write(b'\x00' * len(transposed_data))
+
+    alter_cache()
+
+    # And check we get the altered values
+    def check_cache_really_working():
+        ds = gdal.OpenEx(tmpfilename, gdal.OF_MULTIDIM_RASTER)
+        ar = ds.GetRootGroup().OpenMDArray('ubyte_y2_x2_var')
+        transpose = ar.Transpose([1, 0])
+        assert transpose.Read() == b'\x00' * len(transposed_data)
+
+    check_cache_really_working()
+
+    gdal.Unlink(tmpfilename)
+    gdal.Unlink(tmpfilename + ".gmac")

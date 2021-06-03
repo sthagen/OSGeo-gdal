@@ -381,6 +381,12 @@ public:
 #endif
 
 #if defined(SWIGPYTHON)
+  void GetCoordinateVariables( GDALMDArrayHS*** parrays, size_t* pnCount ) {
+    *parrays = GDALMDArrayGetCoordinateVariables(self, pnCount);
+  }
+#endif
+
+#if defined(SWIGPYTHON)
 %apply ( GUIntBig** pvals, size_t* pnCount ) { (GUIntBig** psizes, size_t* pnCount ) };
   void GetBlockSize( GUIntBig** psizes, size_t* pnCount ) {
     *psizes = GDALMDArrayGetBlockSize(self, pnCount);
@@ -505,8 +511,15 @@ public:
         PyObject* obj = PyList_New( nProductCount );
         for( size_t i = 0; i < nProductCount; i++ )
         {
-            PyObject *o = GDALPythonObjectFromCStr( ppszBuffer[i] );
-            PyList_SetItem(obj, i, o );
+            if( !ppszBuffer[i] )
+            {
+                Py_INCREF(Py_None);
+                PyList_SetItem(obj, i, Py_None);
+            }
+            else
+            {
+                PyList_SetItem(obj, i, GDALPythonObjectFromCStr( ppszBuffer[i] ) );
+            }
             VSIFree(ppszBuffer[i]);
         }
         SWIG_PYTHON_THREAD_END_BLOCK;
@@ -792,8 +805,42 @@ public:
     *val = GDALMDArrayGetNoDataValueAsDouble( self, hasval );
   }
 
+  retStringAndCPLFree* GetNoDataValueAsString() {
+    GDALExtendedDataTypeHS* selfType = GDALMDArrayGetDataType(self);
+    const size_t typeClass = GDALExtendedDataTypeGetClass(selfType);
+    GDALExtendedDataTypeRelease(selfType);
+
+    if( typeClass != GEDTC_STRING )
+    {
+        CPLError(CE_Failure, CPLE_IllegalArg, "Data type is not string");
+        return NULL;
+    }
+    const void* pabyBuf = GDALMDArrayGetRawNoDataValue(self);
+    if( pabyBuf == NULL )
+    {
+      return NULL;
+    }
+    const char* ret = *reinterpret_cast<const char* const*>(pabyBuf);
+    if( ret )
+        return CPLStrdup(ret);
+    return NULL;
+  }
+
   CPLErr SetNoDataValueDouble( double d ) {
     return GDALMDArraySetNoDataValueAsDouble( self, d ) ? CE_None : CE_Failure;
+  }
+
+  CPLErr SetNoDataValueString( const char* nodata ) {
+    GDALExtendedDataTypeHS* selfType = GDALMDArrayGetDataType(self);
+    const size_t typeClass = GDALExtendedDataTypeGetClass(selfType);
+    GDALExtendedDataTypeRelease(selfType);
+
+    if( typeClass != GEDTC_STRING )
+    {
+        CPLError(CE_Failure, CPLE_IllegalArg, "Data type is not string");
+        return CE_Failure;
+    }
+    return GDALMDArraySetRawNoDataValue(self, &nodata) ? CE_None : CE_Failure;
   }
 
 #if defined(SWIGPYTHON)
@@ -949,6 +996,28 @@ public:
         return NULL;
   }
 #endif
+
+#if defined(SWIGPYTHON)
+%newobject GetResampled;
+%apply (int object_list_count, GDALDimensionHS **poObjectsItemMaybeNull) {(int nDimensions, GDALDimensionHS **dimensions)};
+%apply (OSRSpatialReferenceShadow **optional_OSRSpatialReferenceShadow) { OSRSpatialReferenceShadow** };
+  GDALMDArrayHS *GetResampled(int nDimensions,
+                              GDALDimensionHS** dimensions,
+                              GDALRIOResampleAlg resample_alg,
+                              OSRSpatialReferenceShadow** srs,
+                              char **options = 0)
+  {
+    return GDALMDArrayGetResampled(self, nDimensions, dimensions,
+                                  resample_alg, srs ? *srs : NULL, options);
+  }
+%clear (int nDimensions, GDALDimensionHS **dimensions);
+%clear OSRSpatialReferenceShadow**;
+#endif
+
+  bool Cache( char** options = NULL )
+  {
+      return GDALMDArrayCache(self, options);
+  }
 
 } /* extend */
 }; /* GDALMDArrayH */

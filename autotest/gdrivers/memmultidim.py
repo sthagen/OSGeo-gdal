@@ -157,6 +157,8 @@ def test_mem_md_array_nodim():
     assert copy_myarray
     assert copy_myarray.Read() == got_data
 
+    assert len(myarray.GetCoordinateVariables()) == 0
+
 
 def test_mem_md_array_single_dim():
 
@@ -273,6 +275,8 @@ def test_mem_md_array_single_dim():
 
     assert myarray.DeleteNoDataValue() == gdal.CE_None
     assert myarray.GetNoDataValueAsDouble() is None
+    with gdaltest.error_handler():
+        assert myarray.GetNoDataValueAsString() is None
 
     assert myarray.SetUnit('foo') == gdal.CE_None
     assert myarray.GetUnit() == 'foo'
@@ -287,7 +291,13 @@ def test_mem_md_array_string():
     dim = rg.CreateDimension("dim0", "unspecified type", "unspecified direction", 2)
     var = rg.CreateMDArray('var', [dim], gdal.ExtendedDataType.CreateString())
     assert var
+    assert var.Read() == [None, None]
     assert var.Write(['', '0123456789']) == gdal.CE_None
+    assert var.GetNoDataValueAsString() is None
+    assert var.SetNoDataValueString(None) == gdal.CE_None
+    assert var.GetNoDataValueAsString() is None
+    assert var.SetNoDataValueString('123') == gdal.CE_None
+    assert var.GetNoDataValueAsString() == '123'
     var = rg.OpenMDArray('var')
     assert var
     assert var.Read() == ['', '0123456789']
@@ -1159,9 +1169,9 @@ def test_mem_md_array_as_classic_dataset():
     data = struct.pack('B' * 3, 0, 1, 2)
     assert ar.Write(data) == gdal.CE_None
     band = ds.GetRasterBand(1)
-    assert len(band.ReadRaster()) == len(data)
-    assert band.ReadRaster() == data
-    assert band.WriteRaster(0, 0, 3, 1, data) == gdal.CE_None
+    assert len(band.ReadRaster(buf_type = gdal.GDT_UInt16)) == len(data) * 2
+    assert band.ReadRaster(buf_type = gdal.GDT_UInt16) == struct.pack('H' * 3, 0, 1, 2)
+    assert band.WriteRaster(0, 0, 3, 1, struct.pack('H' * 3, 0, 1, 2), buf_type = gdal.GDT_UInt16) == gdal.CE_None
     assert band.ReadRaster() == data
 
     ar = rg.CreateMDArray("2d_string", [ dim_y, dim_x ],
