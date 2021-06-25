@@ -233,6 +233,10 @@ bool COGGetWarpingCharacteristics(GDALDataset* poSrcDS,
                 {
                     hTransformArg = GDALCreateGenImgProjTransformer2(
                         GDALDataset::FromHandle(poTmpDS.get()), nullptr, aosTO.List() );
+                    if( hTransformArg == nullptr )
+                    {
+                        return false;
+                    }
                 }
             }
         }
@@ -241,6 +245,10 @@ bool COGGetWarpingCharacteristics(GDALDataset* poSrcDS,
     {
         hTransformArg =
             GDALCreateGenImgProjTransformer2( poSrcDS, nullptr, aosTO.List() );
+        if( hTransformArg == nullptr )
+        {
+            return false;
+        }
     }
 
     GDALTransformerInfo* psInfo = static_cast<GDALTransformerInfo*>(hTransformArg);
@@ -1277,6 +1285,8 @@ void GDALRegister_COG()
                                "Float64 CInt16 CInt32 CFloat32 CFloat64" );
 
     poDriver->SetMetadataItem( GDAL_DCAP_VIRTUALIO, "YES" );
+
+    poDriver->SetMetadataItem( GDAL_DCAP_COORDINATE_EPOCH, "YES" );
 
     poDriver->pfnCreateCopy = COGCreateCopy;
 

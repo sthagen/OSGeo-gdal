@@ -2561,6 +2561,29 @@ yeah: """ not in gmljp2:
     # ds = None
     gdal.Unlink('/vsimem/jp2openjpeg_46.jp2')
 
+
+###############################################################################
+# Test GMLJP2v2 and axis swap (#3866)
+
+
+def test_jp2openjpeg_gmljp2v2_axis_swap():
+
+    # Test GMLJP2V2_DEF=YES
+    src_ds = gdal.Open('data/byte.tif')
+    tmp_ds = gdal.Warp('', src_ds, options='-of MEM -t_srs EPSG:4267')
+    gdaltest.jp2openjpeg_drv.CreateCopy('/vsimem/test_jp2openjpeg_gmljp2v2_axis_swap.jp2', tmp_ds, options=['GMLJP2V2_DEF=YES'])
+
+    ds = gdal.Open('/vsimem/test_jp2openjpeg_gmljp2v2_axis_swap.jp2')
+    gdal.Unlink('/vsimem/test_jp2openjpeg_gmljp2v2_axis_swap.jp2')
+    gmljp2 = ds.GetMetadata_List("xml:gml.root-instance")[0]
+    # print(gmljp2)
+    assert """<gml:boundedBy>
+       <gml:Envelope srsDimension="2" srsName="http://www.opengis.net/def/crs/EPSG/0/4267">
+         <gml:lowerCorner>33.8916535473944 -117.641168620797</gml:lowerCorner>
+         <gml:upperCorner>33.9024195619211 -117.628010158598</gml:upperCorner>
+       </gml:Envelope>
+     </gml:boundedBy>""" in gmljp2
+
 ###############################################################################
 # Test writing & reading RPC in GeoJP2 box
 
@@ -2984,7 +3007,7 @@ def test_jp2openjpeg_tilesize_16():
 
 def test_jp2openjpeg_generate_PLT():
 
-    # Only try the rest with openjpeg > 2.3.1 that supports it
+    # Only try the rest with openjpeg >= 2.4.0 that supports it
     if gdaltest.jp2openjpeg_drv.GetMetadataItem('DMD_CREATIONOPTIONLIST').find('PLT') < 0:
         pytest.skip()
 
@@ -3001,6 +3024,33 @@ def test_jp2openjpeg_generate_PLT():
     # Check presence of a PLT marker
     ret = gdal.GetJPEG2000StructureAsString(filename, ['ALL=YES'])
     assert '<Marker name="PLT"' in ret
+
+    gdaltest.jp2openjpeg_drv.Delete(filename)
+
+
+###############################################################################
+# Test generation of TLM marker segments
+
+
+def test_jp2openjpeg_generate_TLM():
+
+    # Only try the rest with openjpeg >= 2.5.0 that supports it
+    if gdaltest.jp2openjpeg_drv.GetMetadataItem('DMD_CREATIONOPTIONLIST').find('TLM') < 0:
+        pytest.skip()
+
+    filename = '/vsimem/temp.jp2'
+    gdaltest.jp2openjpeg_drv.CreateCopy(filename, gdal.Open('data/byte.tif'),
+                                        options=['TLM=YES',
+                                                 'REVERSIBLE=YES',
+                                                 'QUALITY=100'])
+
+    ds = gdal.Open(filename)
+    assert ds.GetRasterBand(1).Checksum() == 4672
+    ds = None
+
+    # Check presence of a TLM marker
+    ret = gdal.GetJPEG2000StructureAsString(filename, ['ALL=YES'])
+    assert '<Marker name="TLM"' in ret
 
     gdaltest.jp2openjpeg_drv.Delete(filename)
 

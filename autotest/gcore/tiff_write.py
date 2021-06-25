@@ -3202,6 +3202,7 @@ def test_tiff_write_91():
         checksums[quality] = [ ds.GetRasterBand(1).Checksum(),
                                ds.GetRasterBand(1).GetOverview(0).Checksum(),
                                ds.GetRasterBand(1).GetOverview(1).Checksum() ]
+        ds = None
 
 
     gdaltest.tiff_drv.Delete('tmp/tiff_write_91.tif')
@@ -3478,6 +3479,7 @@ def test_tiff_write_96(other_options = [], nbands = 1, nbits = 8):
             [cs, cs_mask, cs_ovr_1, cs_ovr_mask_1, cs_ovr_2, cs_ovr_mask_2], \
             'did not get expected checksums'
         assert ds.GetMetadataItem('HAS_USED_READ_ENCODED_API', '_DEBUG_') == '0'
+        ds = None
 
     _check_cog('tmp/tiff_write_96_dst.tif', check_tiled=False, full_check=True)
 
@@ -7465,6 +7467,28 @@ def test_tiff_write_overviews_nan_nodata():
     assert ds.GetRasterBand(1).GetOverviewCount() == 2
     ds = None
     gdal.Unlink(filename)
+
+
+###############################################################################
+# Test support for coordinate epoch
+
+
+def test_tiff_write_coordinate_epoch():
+
+    ds = gdal.GetDriverByName('GTiff').Create('/vsimem/test_tiff_write_coordinate_epoch.tif', 1, 1)
+    srs = osr.SpatialReference()
+    srs.ImportFromEPSG(4326)
+    srs.SetCoordinateEpoch(2021.3)
+    ds.SetGeoTransform([0, 1, 0, 0, 0, -1])
+    ds.SetSpatialRef(srs)
+    ds = None
+
+    ds = gdal.Open('/vsimem/test_tiff_write_coordinate_epoch.tif')
+    srs = ds.GetSpatialRef()
+    assert srs.GetCoordinateEpoch() == 2021.3
+    ds = None
+
+    gdal.Unlink('/vsimem/test_tiff_write_coordinate_epoch.tif')
 
 
 def test_tiff_write_cleanup():

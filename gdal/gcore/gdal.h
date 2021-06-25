@@ -297,6 +297,16 @@ typedef enum {
     GEDTC_COMPOUND
 } GDALExtendedDataTypeClass;
 
+/** Enumeration giving the subtype of a GDALExtendedDataType.
+ * @since GDAL 3.4
+ */
+typedef enum {
+    /** None. */
+    GEDTST_NONE,
+    /** JSon. Only applies to GEDTC_STRING */
+    GEDTST_JSON
+} GDALExtendedDataTypeSubType;
+
 /** Opaque type for C++ GDALExtendedDataType */
 typedef struct GDALExtendedDataTypeHS* GDALExtendedDataTypeH;
 /** Opaque type for C++ GDALEDTComponent */
@@ -479,6 +489,12 @@ typedef struct GDALDimensionHS* GDALDimensionH;
  * @since GDAL 2.3
  */
 #define GDAL_DCAP_FEATURE_STYLES     "DCAP_FEATURE_STYLES"
+
+/** Capability set by drivers which support storing/retrieving coordinate epoch for dynamic CRS
+ * @since GDAL 3.4
+ */
+#define GDAL_DCAP_COORDINATE_EPOCH   "DCAP_COORDINATE_EPOCH"
+
 
 /** Value for GDALDimension::GetType() specifying the X axis of a horizontal CRS.
  * @since GDAL 3.1
@@ -1500,6 +1516,7 @@ int CPL_DLL GDALExtendedDataTypeCanConvertTo(GDALExtendedDataTypeH hSourceEDT,
                                              GDALExtendedDataTypeH hTargetEDT);
 int CPL_DLL GDALExtendedDataTypeEquals(GDALExtendedDataTypeH hFirstEDT,
                                        GDALExtendedDataTypeH hSecondEDT);
+GDALExtendedDataTypeSubType CPL_DLL GDALExtendedDataTypeGetSubType(GDALExtendedDataTypeH hEDT);
 
 GDALEDTComponentH CPL_DLL GDALEDTComponentCreate(const char* pszName, size_t nOffset, GDALExtendedDataTypeH hType) CPL_WARN_UNUSED_RESULT;
 void CPL_DLL GDALEDTComponentRelease(GDALEDTComponentH hComp);
