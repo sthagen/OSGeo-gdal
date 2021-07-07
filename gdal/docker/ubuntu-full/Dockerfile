@@ -50,7 +50,7 @@ RUN wget -q https://github.com/ubarsc/kealib/archive/kealib-${KEA_VERSION}.zip \
     && cd kealib-kealib-${KEA_VERSION} \
     && cmake . -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr -DHDF5_INCLUDE_DIR=/usr/include/hdf5/serial \
-        -DHDF5_LIB_PATH=/usr/lib/x86_64-linux-gnu/hdf5/serial -DLIBKEA_WITH_GDAL=OFF \
+        -DHDF5_LIB_PATH=/usr/lib/$(uname -m)-linux-gnu/hdf5/serial -DLIBKEA_WITH_GDAL=OFF \
     && make -j$(nproc) \
     && make install DESTDIR="/build_thirdparty" \
     && make install \
@@ -73,8 +73,8 @@ RUN mkdir mongo-c-driver \
     && make install \
     && cd ../.. \
     && rm -rf mongo-c-driver \
-    && rm /build_thirdparty/usr/lib/x86_64-linux-gnu/*.a \
-    && for i in /build_thirdparty/usr/lib/x86_64-linux-gnu/*; do strip -s $i 2>/dev/null || /bin/true; done \
+    && rm /build_thirdparty/usr/lib/$(uname -m)-linux-gnu/*.a \
+    && for i in /build_thirdparty/usr/lib/$(uname -m)-linux-gnu/*; do strip -s $i 2>/dev/null || /bin/true; done \
     && for i in /build_thirdparty/usr/bin/*; do strip -s $i 2>/dev/null || /bin/true; done
 
 # Build mongocxx
@@ -91,12 +91,13 @@ RUN mkdir mongocxx \
     && make install \
     && cd ../.. \
     && rm -rf mongocxx \
-    && for i in /build_thirdparty/usr/lib/x86_64-linux-gnu/*; do strip -s $i 2>/dev/null || /bin/true; done \
+    && for i in /build_thirdparty/usr/lib/$(uname -m)-linux-gnu/*; do strip -s $i 2>/dev/null || /bin/true; done \
     && for i in /build_thirdparty/usr/bin/*; do strip -s $i 2>/dev/null || /bin/true; done
 
 # Build tiledb
 ARG TILEDB_VERSION=2.3.0
-RUN mkdir tiledb \
+RUN if test "$(uname -m)" = "x86_64"; then \
+    mkdir tiledb \
     && wget -q https://github.com/TileDB-Inc/TileDB/archive/${TILEDB_VERSION}.tar.gz -O - \
         | tar xz -C tiledb --strip-components=1 \
     && cd tiledb \
@@ -108,8 +109,9 @@ RUN mkdir tiledb \
     && make install-tiledb \
     && cd ../.. \
     && rm -rf tiledb \
-    && for i in /build_thirdparty/usr/lib/x86_64-linux-gnu/*; do strip -s $i 2>/dev/null || /bin/true; done \
-    && for i in /build_thirdparty/usr/bin/*; do strip -s $i 2>/dev/null || /bin/true; done
+    && for i in /build_thirdparty/usr/lib/$(uname -m)-linux-gnu/*; do strip -s $i 2>/dev/null || /bin/true; done \
+    && for i in /build_thirdparty/usr/bin/*; do strip -s $i 2>/dev/null || /bin/true; done \
+    fi
 
 # Build openjpeg
 ARG OPENJPEG_VERSION=
@@ -122,11 +124,11 @@ RUN if test "${OPENJPEG_VERSION}" != ""; then ( \
         -DCMAKE_INSTALL_PREFIX=/usr \
     && make -j$(nproc) \
     && make install \
-    && mkdir -p /build_thirdparty/usr/lib/x86_64-linux-gnu \
-    && rm -f /usr/lib/x86_64-linux-gnu/libopenjp2.so* \
-    && mv /usr/lib/libopenjp2.so* /usr/lib/x86_64-linux-gnu \
-    && cp -P /usr/lib/x86_64-linux-gnu/libopenjp2.so* /build_thirdparty/usr/lib/x86_64-linux-gnu \
-    && for i in /build_thirdparty/usr/lib/x86_64-linux-gnu/*; do strip -s $i 2>/dev/null || /bin/true; done \
+    && mkdir -p /build_thirdparty/usr/lib/$(uname -m)-linux-gnu \
+    && rm -f /usr/lib/$(uname -m)-linux-gnu/libopenjp2.so* \
+    && mv /usr/lib/libopenjp2.so* /usr/lib/$(uname -m)-linux-gnu \
+    && cp -P /usr/lib/$(uname -m)-linux-gnu/libopenjp2.so* /build_thirdparty/usr/lib/$(uname -m)-linux-gnu \
+    && for i in /build_thirdparty/usr/lib/$(uname -m)-linux-gnu/*; do strip -s $i 2>/dev/null || /bin/true; done \
     && cd .. \
     && rm -rf openjpeg-${OPENJPEG_VERSION} \
     ); fi
@@ -137,6 +139,23 @@ RUN wget -q https://storage.googleapis.com/google-code-archive-downloads/v2/code
   && mkdir -p /build/usr/share/java \
   && cp mdb-sqlite-1.0.2/lib/*.jar /build/usr/share/java \
   && rm -rf mdb-sqlite-1.0.2.tar.bz2 && rm -rf mdb-sqlite-1.0.2
+
+# Build recent mdbtools
+RUN wget -q https://github.com/mdbtools/mdbtools/releases/download/v0.9.3/mdbtools-0.9.3.tar.gz \
+  && tar xzf mdbtools-0.9.3.tar.gz \
+  && apt-get update -y \
+  && apt-get install -y --fix-missing --no-install-recommends bison flex gawk \
+  && rm -rf /var/lib/apt/lists/* \
+  && cd mdbtools-0.9.3 \
+  && ./configure --with-unixodbc=/usr \
+  && make -j$(nproc) \
+  && mkdir -p /build_thirdparty/usr/lib/x86_64-linux-gnu/odbc \
+  && mkdir -p /build_thirdparty/lib/x86_64-linux-gnu \
+  && cp ./src/odbc/.libs/libmdbodbc.so /build_thirdparty/usr/lib/x86_64-linux-gnu/odbc \
+  && cp ./src/libmdb/.libs/libmdb.so.3 /build_thirdparty/lib/x86_64-linux-gnu \
+  && cp ./src/sql/.libs/libmdbsql.so.3 /build_thirdparty/lib/x86_64-linux-gnu \
+  && cd .. \
+  && rm -rf mdbtools-0.9.3*
 
 #Set CLASSPATH so jars are found
 ENV CLASSPATH="/build/usr/share/java/jackcess-1.1.14.jar:/build/usr/share/java/commons-logging-1.1.1.jar:/build/usr/share/java/commons-lang-2.4.jar"
@@ -232,6 +251,7 @@ RUN apt-get update \
 # Attempt to order layers starting with less frequently varying ones
 
 COPY --from=builder  /build_thirdparty/usr/ /usr/
+COPY --from=builder  /build_thirdparty/lib/ /lib/
 
 ARG PROJ_INSTALL_PREFIX=/usr/local
 COPY --from=builder  /tmp/proj_grids/* ${PROJ_INSTALL_PREFIX}/share/proj/
