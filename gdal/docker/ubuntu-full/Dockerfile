@@ -95,23 +95,23 @@ RUN mkdir mongocxx \
     && for i in /build_thirdparty/usr/bin/*; do strip -s $i 2>/dev/null || /bin/true; done
 
 # Build tiledb
-ARG TILEDB_VERSION=2.3.0
-RUN if test "$(uname -m)" = "x86_64"; then \
-    mkdir tiledb \
+COPY ./tiledb-5cad65f4c.patch /buildscripts/tiledb-5cad65f4c.patch
+ARG TILEDB_VERSION=2.3.1
+RUN mkdir tiledb \
     && wget -q https://github.com/TileDB-Inc/TileDB/archive/${TILEDB_VERSION}.tar.gz -O - \
         | tar xz -C tiledb --strip-components=1 \
     && cd tiledb \
+    && patch -p1 < /buildscripts/tiledb-5cad65f4c.patch \
     && mkdir build_cmake \
     && cd build_cmake \
-    && ../bootstrap --prefix=/usr \
+    && ../bootstrap --prefix=/usr --disable-werror \
     && make -j$(nproc) \
     && make install-tiledb DESTDIR="/build_thirdparty" \
     && make install-tiledb \
     && cd ../.. \
     && rm -rf tiledb \
     && for i in /build_thirdparty/usr/lib/$(uname -m)-linux-gnu/*; do strip -s $i 2>/dev/null || /bin/true; done \
-    && for i in /build_thirdparty/usr/bin/*; do strip -s $i 2>/dev/null || /bin/true; done \
-    fi
+    && for i in /build_thirdparty/usr/bin/*; do strip -s $i 2>/dev/null || /bin/true; done
 
 # Build openjpeg
 ARG OPENJPEG_VERSION=
@@ -164,14 +164,14 @@ ENV CLASSPATH="/build/usr/share/java/jackcess-1.1.14.jar:/build/usr/share/java/c
 
 ARG WITH_FILEGDB=
 RUN if echo "$WITH_FILEGDB" | grep -Eiq "^(y(es)?|1|true)$"  ; then ( \
-  wget -q https://github.com/Esri/file-geodatabase-api/raw/master/FileGDB_API_1.5.1/FileGDB_API_1_5_1-64gcc51.tar.gz \
-  && tar -xzf FileGDB_API_1_5_1-64gcc51.tar.gz \
-  && chown -R root:root FileGDB_API-64gcc51 \
-  && mv FileGDB_API-64gcc51 /usr/local/FileGDB_API \
+  wget -q https://github.com/Esri/file-geodatabase-api/raw/master/FileGDB_API_1.5.2/FileGDB_API-RHEL7-64gcc83.tar.gz \
+  && tar -xzf FileGDB_API-RHEL7-64gcc83.tar.gz \
+  && chown -R root:root FileGDB_API-RHEL7-64gcc83 \
+  && mv FileGDB_API-RHEL7-64gcc83 /usr/local/FileGDB_API \
   && rm -rf /usr/local/FileGDB_API/lib/libstdc++* \
   && cp /usr/local/FileGDB_API/lib/* /build_thirdparty/usr/lib \
   && cp /usr/local/FileGDB_API/include/* /usr/include \
-  && rm -rf FileGDB_API_1_5_1-64gcc51.tar.gz \
+  && rm -rf FileGDB_API-RHEL7-64gcc83.tar.gz \
   ) ; fi
 
 

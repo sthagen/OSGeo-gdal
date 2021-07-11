@@ -2379,7 +2379,7 @@ char **netCDFDataset::GetMetadata( const char *pszDomain )
     {
         auto iter = m_oMapDomainToJSon.find(pszDomain + strlen("json:"));
         if( iter != m_oMapDomainToJSon.end() )
-            return iter->second.apszMD;
+            return iter->second.List();
     }
 
     return GDALDataset::GetMetadata(pszDomain);
@@ -3373,8 +3373,12 @@ void netCDFDataset::SetProjectionFromVar( int nGroupId, int nVarId,
         // Dataset from https://github.com/OSGeo/gdal/issues/4075 has a "crs"
         // attribute hold on the variable of interest that contains a PROJ.4 string
         pszValue = FetchAttr(nGroupId, nVarId, "crs");
-        if( pszValue && strstr(pszValue, "+proj=") &&
-            oSRS.importFromProj4(pszValue) == OGRERR_NONE )
+        if( pszValue &&
+            (strstr(pszValue, "+proj=") != nullptr ||
+             strstr(pszValue, "GEOGCS") != nullptr ||
+             strstr(pszValue, "PROJCS") != nullptr ||
+             strstr(pszValue, "EPSG:") != nullptr ) &&
+            oSRS.SetFromUserInput(pszValue) == OGRERR_NONE )
         {
             bGotCfSRS = true;
         }
@@ -5657,10 +5661,9 @@ CPLErr netCDFDataset::ReadAttributes( int cdfidIn, int var)
                 strcmp(pszVarFullName, CPLSPrintf("/METADATA/%s/NC_GLOBAL", key)) == 0 )
             {
                 CPLFree(pszVarFullName);
-                JSonMetadata md;
-                md.osJSon = CPLString(NCDFReadMetadataAsJson(cdfidIn)).replaceAll("\\/", '/');
-                md.apszMD[0] = &md.osJSon[0];
-                m_oMapDomainToJSon[key] = std::move(md);
+                CPLStringList aosList;
+                aosList.AddString(CPLString(NCDFReadMetadataAsJson(cdfidIn)).replaceAll("\\/", '/'));
+                m_oMapDomainToJSon[key] = std::move(aosList);
                 return CE_None;
             }
         }
@@ -5668,10 +5671,9 @@ CPLErr netCDFDataset::ReadAttributes( int cdfidIn, int var)
     if( STARTS_WITH(pszVarFullName, "/PRODUCT/SUPPORT_DATA/") )
     {
         CPLFree(pszVarFullName);
-        JSonMetadata md;
-        md.osJSon = CPLString(NCDFReadMetadataAsJson(cdfidIn)).replaceAll("\\/", '/');
-        md.apszMD[0] = &md.osJSon[0];
-        m_oMapDomainToJSon["SUPPORT_DATA"] = std::move(md);
+        CPLStringList aosList;
+        aosList.AddString(CPLString(NCDFReadMetadataAsJson(cdfidIn)).replaceAll("\\/", '/'));
+        m_oMapDomainToJSon["SUPPORT_DATA"] = std::move(aosList);
         return CE_None;
     }
 #endif
