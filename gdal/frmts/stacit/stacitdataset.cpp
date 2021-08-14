@@ -77,8 +77,6 @@ struct Collection
 
 class STACITDataset final: public VRTDataset
 {
-        STACITDataset();
-
         bool Open(GDALOpenInfo* poOpenInfo);
         bool SetupDataset(GDALOpenInfo* poOpenInfo,
                           std::map<std::string, Collection>& oMapCollection);
@@ -86,6 +84,8 @@ class STACITDataset final: public VRTDataset
                     const std::string& osFilename,
                     const std::map<std::string, Collection>& oMapCollection);
 public:
+        STACITDataset();
+
         static int Identify(GDALOpenInfo* poOpenInfo);
         static GDALDataset* OpenStatic(GDALOpenInfo* poOpenInfo);
 };
@@ -484,7 +484,7 @@ bool STACITDataset::SetupDataset(GDALOpenInfo* poOpenInfo,
 
     // Set SRS
     OGRSpatialReference oSRS;
-    if( oSRS.SetFromUserInput(assetByProj.osProjUserString.c_str()) == OGRERR_NONE )
+    if( oSRS.SetFromUserInput(assetByProj.osProjUserString.c_str(), OGRSpatialReference::SET_FROM_USER_INPUT_LIMITATIONS) == OGRERR_NONE )
     {
         oSRS.SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
         SetSpatialRef(&oSRS);
@@ -878,7 +878,7 @@ GDALDataset* STACITDataset::OpenStatic(GDALOpenInfo* poOpenInfo)
 {
     if( !Identify(poOpenInfo) )
         return nullptr;
-    auto poDS = std::unique_ptr<STACITDataset>(new STACITDataset());
+    auto poDS = cpl::make_unique<STACITDataset>();
     if( !poDS->Open(poOpenInfo) )
         return nullptr;
     return poDS.release();

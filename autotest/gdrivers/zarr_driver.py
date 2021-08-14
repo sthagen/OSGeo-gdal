@@ -549,7 +549,7 @@ def test_zarr_read_array_attributes():
 
     j = gdal.MultiDimInfo(ds)
     assert j['arrays']['array_attrs']['attributes'] == {
-        "bool": "true",
+        "bool": True,
         "double": 1.5,
         "doublearray": [1.5, 2.5],
         "int": 1,
@@ -557,9 +557,9 @@ def test_zarr_read_array_attributes():
         "int64array": [1234567890123, -1234567890123],
         "intarray": [1, 2],
         "intdoublearray": [1, 2.5],
-        "mixedstrintarray": "[ \"foo\", 1 ]",
+        "mixedstrintarray": ["foo", 1],
         "null": "",
-        "obj": "{ }",
+        "obj": {},
         "str": "foo",
         "strarray": ["foo", "bar"]
     }
@@ -1034,13 +1034,16 @@ def test_zarr_read_BLOSC_COMPRESSORS():
         'Zarr').GetMetadataItem('BLOSC_COMPRESSORS')
 
 
-@pytest.mark.parametrize("format", ['ZARR_V2', 'ZARR_V3'])
-def test_zarr_create_group(format):
+@pytest.mark.parametrize("format,create_z_metadata", [('ZARR_V2', 'YES'),
+                                                     ('ZARR_V2', 'NO'),
+                                                     ('ZARR_V3', 'NO')])
+def test_zarr_create_group(format,create_z_metadata):
 
+    filename = 'tmp/test.zarr'
     try:
         def create():
             ds = gdal.GetDriverByName(
-                'ZARR').CreateMultiDimensional('/vsimem/test.zarr', options=['FORMAT='+format])
+                'ZARR').CreateMultiDimensional(filename, options=['FORMAT='+format, 'CREATE_ZMETADATA='+create_z_metadata])
             assert ds is not None
             rg = ds.GetRootGroup()
             assert rg
@@ -1050,6 +1053,11 @@ def test_zarr_create_group(format):
                 'str_attr', [], gdal.ExtendedDataType.CreateString())
             assert attr
             assert attr.Write('my_string') == gdal.CE_None
+
+            attr = rg.CreateAttribute(
+                'json_attr', [], gdal.ExtendedDataType.CreateString(0, gdal.GEDTST_JSON))
+            assert attr
+            assert attr.Write({"foo":"bar"}) == gdal.CE_None
 
             attr = rg.CreateAttribute(
                 'str_array_attr', [2], gdal.ExtendedDataType.CreateString())
@@ -1097,8 +1105,16 @@ def test_zarr_create_group(format):
 
         create()
 
+        if create_z_metadata == 'YES':
+            f = gdal.VSIFOpenL(filename + '/.zmetadata', 'rb')
+            assert f
+            data = gdal.VSIFReadL(1, 10000, f)
+            gdal.VSIFCloseL(f)
+            j = json.loads(data)
+            assert 'foo/.zgroup' in j['metadata']
+
         def update():
-            ds = gdal.OpenEx('/vsimem/test.zarr',
+            ds = gdal.OpenEx(filename,
                              gdal.OF_MULTIDIM_RASTER | gdal.OF_UPDATE)
             assert ds
             rg = ds.GetRootGroup()
@@ -1123,7 +1139,7 @@ def test_zarr_create_group(format):
 
         update()
 
-        ds = gdal.OpenEx('/vsimem/test.zarr', gdal.OF_MULTIDIM_RASTER)
+        ds = gdal.OpenEx(filename, gdal.OF_MULTIDIM_RASTER)
         assert ds
         rg = ds.GetRootGroup()
         assert rg
@@ -1131,6 +1147,11 @@ def test_zarr_create_group(format):
         attr = rg.GetAttribute('str_attr')
         assert attr
         assert attr.Read() == 'my_string_modified'
+
+        attr = rg.GetAttribute('json_attr')
+        assert attr
+        assert attr.GetDataType().GetSubType() == gdal.GEDTST_JSON
+        assert attr.Read() == { "foo": "bar" }
 
         attr = rg.GetAttribute('str_array_attr')
         assert attr
@@ -1173,7 +1194,7 @@ def test_zarr_create_group(format):
         ds = None
 
     finally:
-        gdal.RmdirRecursive('/vsimem/test.zarr')
+        gdal.RmdirRecursive(filename)
 
 
 @pytest.mark.parametrize("group_name", ["foo",  # already existing
@@ -2198,3 +2219,152 @@ def test_zarr_pam_spatial_ref():
     finally:
         gdal.RmdirRecursive('/vsimem/test.zarr')
 
+
+def test_zarr_read_too_large_tile_size():
+
+    j = {
+        "chunks": [
+            1000000,
+            2000
+        ],
+        "compressor": None,
+        "dtype": '!b1',
+        "fill_value": None,
+        "filters": None,
+        "order": "C",
+        "shape": [
+            5,
+            4
+        ],
+        "zarr_format": 2
+    }
+
+    try:
+        gdal.Mkdir('/vsimem/test.zarr', 0)
+        gdal.FileFromMemBuffer('/vsimem/test.zarr/.zarray', json.dumps(j))
+        ds = gdal.OpenEx('/vsimem/test.zarr', gdal.OF_MULTIDIM_RASTER)
+        assert ds is not None
+        with gdaltest.error_handler():
+            assert ds.GetRootGroup().OpenMDArray('test').Read() is None
+    finally:
+        gdal.RmdirRecursive('/vsimem/test.zarr')
+
+
+def test_zarr_read_recursive_array_loading():
+
+    try:
+        gdal.Mkdir('/vsimem/test.zarr', 0)
+
+        j = { "zarr_format": 2 }
+        gdal.FileFromMemBuffer('/vsimem/test.zarr/.zgroup', json.dumps(j))
+
+        j = { "chunks": [1],
+              "compressor": None,
+              "dtype": '!b1',
+              "fill_value": None,
+              "filters": None,
+              "order": "C",
+              "shape": [ 1 ],
+              "zarr_format": 2
+        }
+        gdal.FileFromMemBuffer('/vsimem/test.zarr/a/.zarray', json.dumps(j))
+        gdal.FileFromMemBuffer('/vsimem/test.zarr/b/.zarray', json.dumps(j))
+
+        j = { "_ARRAY_DIMENSIONS": ["b"] }
+        gdal.FileFromMemBuffer('/vsimem/test.zarr/a/.zattrs', json.dumps(j))
+
+        j = { "_ARRAY_DIMENSIONS": ["a"] }
+        gdal.FileFromMemBuffer('/vsimem/test.zarr/b/.zattrs', json.dumps(j))
+
+        ds = gdal.OpenEx('/vsimem/test.zarr', gdal.OF_MULTIDIM_RASTER)
+        assert ds is not None
+        with gdaltest.error_handler():
+            ar = ds.GetRootGroup().OpenMDArray('a')
+            assert ar
+            assert gdal.GetLastErrorMsg() == 'Attempt at recursively loading /vsimem/test.zarr/a/.zarray'
+    finally:
+        gdal.RmdirRecursive('/vsimem/test.zarr')
+
+
+def test_zarr_read_too_deep_array_loading():
+
+    try:
+        gdal.Mkdir('/vsimem/test.zarr', 0)
+
+        j = { "zarr_format": 2 }
+        gdal.FileFromMemBuffer('/vsimem/test.zarr/.zgroup', json.dumps(j))
+
+        j = { "chunks": [1],
+              "compressor": None,
+              "dtype": '!b1',
+              "fill_value": None,
+              "filters": None,
+              "order": "C",
+              "shape": [ 1 ],
+              "zarr_format": 2
+        }
+
+        N = 33
+        for i in range(N):
+            gdal.FileFromMemBuffer('/vsimem/test.zarr/%d/.zarray' % i, json.dumps(j))
+
+        for i in range(N-1):
+            j = { "_ARRAY_DIMENSIONS": ["%d" % (i+1)] }
+            gdal.FileFromMemBuffer('/vsimem/test.zarr/%d/.zattrs' % i, json.dumps(j))
+
+        ds = gdal.OpenEx('/vsimem/test.zarr', gdal.OF_MULTIDIM_RASTER)
+        assert ds is not None
+        with gdaltest.error_handler():
+            ar = ds.GetRootGroup().OpenMDArray('0')
+            assert ar
+            assert gdal.GetLastErrorMsg() == 'Too deep call stack in LoadArray()'
+    finally:
+        gdal.RmdirRecursive('/vsimem/test.zarr')
+
+
+@pytest.mark.parametrize("filename,path",
+                         [('data/zarr/nczarr_v2.zarr', '/MyGroup/Group_A'),
+                          ('data/zarr/nczarr_v2.zarr/MyGroup', '/Group_A'),
+                          ('data/zarr/nczarr_v2.zarr/MyGroup/Group_A', ''),
+                          ('data/zarr/nczarr_v2.zarr/MyGroup/Group_A/dset2', None)])
+def test_zarr_read_nczarr_v2(filename,path):
+
+    with gdaltest.error_handler():
+        assert gdal.OpenEx(filename, gdal.OF_MULTIDIM_RASTER | gdal.OF_UPDATE) is None
+
+    ds = gdal.OpenEx(filename, gdal.OF_MULTIDIM_RASTER)
+    assert ds is not None
+    rg = ds.GetRootGroup()
+
+    ar = rg.OpenMDArrayFromFullname((path if path else '') + '/dset2')
+    assert ar
+    dims = ar.GetDimensions()
+    assert len(dims) == 2
+    assert dims[0].GetSize() == 3
+    assert dims[0].GetName() == 'lat'
+    assert dims[0].GetFullName() == '/MyGroup/lat'
+    assert dims[0].GetIndexingVariable() is not None
+    assert dims[0].GetIndexingVariable().GetName() == 'lat'
+    assert dims[0].GetType() == gdal.DIM_TYPE_HORIZONTAL_Y
+    assert dims[0].GetDirection() == 'NORTH'
+
+    assert dims[1].GetSize() == 3
+    assert dims[1].GetName() == 'lon'
+    assert dims[1].GetFullName() == '/MyGroup/lon'
+    assert dims[1].GetIndexingVariable() is not None
+    assert dims[1].GetIndexingVariable().GetName() == 'lon'
+    assert dims[1].GetType() == gdal.DIM_TYPE_HORIZONTAL_X
+    assert dims[1].GetDirection() == 'EAST'
+
+    if path:
+        ar = rg.OpenMDArrayFromFullname(path + '/dset3')
+        assert ar
+        dims = ar.GetDimensions()
+        assert len(dims) == 2
+        assert dims[0].GetSize() == 2
+        assert dims[0].GetName() == 'lat'
+        assert dims[0].GetFullName() == '/MyGroup/Group_A/lat'
+
+        assert dims[1].GetSize() == 2
+        assert dims[1].GetName() == 'lon'
+        assert dims[1].GetFullName() == '/MyGroup/Group_A/lon'

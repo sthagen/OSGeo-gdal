@@ -1208,7 +1208,7 @@ bool OGCAPIDataset::InitWithCoverageAPI(GDALOpenInfo* poOpenInfo,
             srsName.resize(srsName.find("&2="));
         }
 
-        if( oSRS.SetFromUserInput( srsName.c_str() ) == OGRERR_NONE )
+        if( oSRS.SetFromUserInput( srsName.c_str(), OGRSpatialReference::SET_FROM_USER_INPUT_LIMITATIONS ) == OGRERR_NONE )
         {
             if( oSRS.EPSGTreatsAsLatLong() || oSRS.EPSGTreatsAsNorthingEasting() )
             {
@@ -1429,9 +1429,9 @@ static bool ParseXMLSchema(
             const OGRFieldType eFType = GML_GetOGRFieldType(poProperty->GetType(), eSubType);
 
             const char* pszName = poProperty->GetName();
-            std::unique_ptr<OGRFieldDefn> oField(new OGRFieldDefn( pszName, eFType ));
-            oField->SetSubType(eSubType);
-            apoFields.emplace_back(std::move(oField));
+            auto poField = cpl::make_unique<OGRFieldDefn>( pszName, eFType );
+            poField->SetSubType(eSubType);
+            apoFields.emplace_back(std::move(poField));
         }
         delete poGMLFeatureClass;
         return true;
@@ -1640,7 +1640,7 @@ bool OGCAPIDataset::InitWithTilesAPI(GDALOpenInfo* poOpenInfo,
     if( tms == nullptr )
         return false;
 
-    if( m_oSRS.SetFromUserInput(tms->crs().c_str()) != OGRERR_NONE )
+    if( m_oSRS.SetFromUserInput(tms->crs().c_str(), OGRSpatialReference::SET_FROM_USER_INPUT_LIMITATIONS) != OGRERR_NONE )
         return false;
     const bool bInvertAxis =
             m_oSRS.EPSGTreatsAsLatLong() != FALSE ||
@@ -2544,7 +2544,7 @@ GDALDataset* OGCAPIDataset::Open(GDALOpenInfo* poOpenInfo)
 {
     if( !Identify(poOpenInfo) )
         return nullptr;
-    auto poDS = std::unique_ptr<OGCAPIDataset>(new OGCAPIDataset());
+    auto poDS = cpl::make_unique<OGCAPIDataset>();
     if( STARTS_WITH_CI(poOpenInfo->pszFilename, "OGCAPI:") )
     {
         if( !poDS->InitFromURL(poOpenInfo) )

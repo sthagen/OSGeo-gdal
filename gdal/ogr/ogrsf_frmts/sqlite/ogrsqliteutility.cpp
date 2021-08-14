@@ -102,18 +102,11 @@ std::unique_ptr<SQLResult> SQLQuery(sqlite3 * poDb, const char * pszSQL)
     {
         CPLError( CE_Failure, CPLE_AppDefined,
                   "sqlite3_get_table(%s) failed: %s", pszSQL, pszErrMsg );
+        sqlite3_free(pszErrMsg);
         return nullptr;
     }
 
-    if (pszErrMsg) {
-        sqlite3_free(pszErrMsg);
-    }
-
-    std::unique_ptr<SQLResult> poResult(new SQLResult(
-        papszResult, nRowCount, nColCount
-    ));
-
-    return poResult;
+    return cpl::make_unique<SQLResult>(papszResult, nRowCount, nColCount);
 }
 
 const char* SQLResult::GetValue(int iColNum, int iRowNum) const

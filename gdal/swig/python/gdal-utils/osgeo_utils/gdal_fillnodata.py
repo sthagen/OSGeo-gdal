@@ -81,14 +81,6 @@ def gdal_fillnodata(src_filename: Optional[str] = None, band_number: int = 1,
 
     srcband = src_ds.GetRasterBand(band_number)
 
-    if mask == 'default':
-        maskband = srcband.GetMaskBand()
-    elif mask == 'none':
-        maskband = None
-    else:
-        mask_ds = gdal.Open(mask)
-        maskband = mask_ds.GetRasterBand(1)
-
     # =============================================================================
     #       Create output file if one is specified.
     # =============================================================================
@@ -106,7 +98,6 @@ def gdal_fillnodata(src_filename: Optional[str] = None, band_number: int = 1,
             dst_ds.SetGeoTransform(gt)
 
         dstband = dst_ds.GetRasterBand(1)
-        CopyBand(srcband, dstband)
         ndv = srcband.GetNoDataValue()
         if ndv is not None:
             dstband.SetNoDataValue(ndv)
@@ -116,6 +107,8 @@ def gdal_fillnodata(src_filename: Optional[str] = None, band_number: int = 1,
         if color_interp == gdal.GCI_PaletteIndex:
             color_table = srcband.GetColorTable()
             dstband.SetColorTable(color_table)
+
+        CopyBand(srcband, dstband)
 
     else:
         dstband = srcband
@@ -128,6 +121,12 @@ def gdal_fillnodata(src_filename: Optional[str] = None, band_number: int = 1,
         prog_func = None
     else:
         prog_func = gdal.TermProgress_nocb
+
+    if mask == 'default':
+        maskband = dstband.GetMaskBand()
+    else:
+        mask_ds = gdal.Open(mask)
+        maskband = mask_ds.GetRasterBand(1)
 
     result = gdal.FillNodata(dstband, maskband,
                              max_distance, smoothing_iterations, options,
@@ -161,7 +160,7 @@ class GDALFillNoData(GDALScript):
                                  "that the algorithm will search out for values to interpolate. "
                                  "The default is 100 pixels.")
 
-        parser.add_argument("-si", dest="smoothing_iterations", type=float, default=0, metavar='smoothing_iterations',
+        parser.add_argument("-si", dest="smoothing_iterations", type=int, default=0, metavar='smoothing_iterations',
                             help="The number of 3x3 average filter smoothing iterations to run after the interpolation "
                                  "to dampen artifacts. The default is zero smoothing iterations.")
 
@@ -171,10 +170,6 @@ class GDALFillNoData(GDALScript):
         parser.add_argument("-mask", dest="mask", type=str, metavar='filename', default='default',
                             help="Use the first band of the specified file as a validity mask "
                                  "(zero is invalid, non-zero is valid).")
-
-        parser.add_argument("-nomask", dest="mask", action="store_const", const='none', default='default',
-                            help="Do not use the default validity mask for the input band "
-                                 "(such as nodata, or alpha masks).")
 
         parser.add_argument("-b", "-band", dest="band_number", metavar="band", type=int, default=1,
                             help="The band to operate on, defaults to 1.")

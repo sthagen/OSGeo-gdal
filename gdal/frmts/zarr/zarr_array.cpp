@@ -647,6 +647,16 @@ bool ZarrArray::AllocateWorkingBuffers() const
     {
         nTileSize *= static_cast<size_t>(nBlockSize);
     }
+    if( nTileSize > 1024 * 1024 * 1024 &&
+        !CPLTestBool(CPLGetConfigOption("ZARR_ALLOW_BIG_TILE_SIZE", "NO")) )
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "Zarr tile allocation would require " CPL_FRMT_GUIB " bytes. "
+                 "By default the driver limits to 1 GB. To allow that memory "
+                 "allocation, set the ZARR_ALLOW_BIG_TILE_SIZE configuration "
+                 "option to YES.", static_cast<GUIntBig>(nTileSize));
+        return false;
+    }
     try
     {
         m_abyRawTileData.resize( nTileSize );
@@ -2422,6 +2432,7 @@ static GDALExtendedDataType ParseDtype(bool isZarrV2,
                 const std::string osName = oEltArray[0].ToString();
                 // Add padding for alignment
                 const size_t alignmentSub = GetAlignment(oEltArray[1]);
+                assert(alignmentSub);
                 alignmentMax = std::max(alignmentMax, alignmentSub);
                 offset = AlignOffsetOn(offset, alignmentSub);
                 comps.emplace_back(std::unique_ptr<GDALEDTComponent>(
@@ -2472,8 +2483,46 @@ std::shared_ptr<ZarrArray> ZarrGroupBase::LoadArray(const std::string& osArrayNa
                                                 const std::string& osZarrayFilename,
                                                 const CPLJSONObject& oRoot,
                                                 bool bLoadedFromZMetadata,
-                                                const CPLJSONObject& oAttributesIn) const
+                                                const CPLJSONObject& oAttributesIn,
+                                                std::set<std::string>& oSetFilenamesInLoading) const
 {
+    // Prevent too deep or recursive array loading
+    if( oSetFilenamesInLoading.find(osZarrayFilename) != oSetFilenamesInLoading.end() )
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "Attempt at recursively loading %s", osZarrayFilename.c_str());
+        return nullptr;
+    }
+    if( oSetFilenamesInLoading.size() == 32 )
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "Too deep call stack in LoadArray()");
+        return nullptr;
+    }
+
+    struct SetFilenameAdder
+    {
+        std::set<std::string>& m_oSetFilenames;
+        std::string m_osFilename;
+
+        SetFilenameAdder(std::set<std::string>& oSetFilenamesIn,
+                         const std::string& osFilename):
+             m_oSetFilenames(oSetFilenamesIn),
+             m_osFilename(osFilename)
+        {
+            m_oSetFilenames.insert(osFilename);
+        }
+
+        ~SetFilenameAdder()
+        {
+            m_oSetFilenames.erase(m_osFilename);
+        }
+    };
+
+    // Add osZarrayFilename to oSetFilenamesInLoading during the scope
+    // of this function call.
+    SetFilenameAdder filenameAdder(oSetFilenamesInLoading, osZarrayFilename);
+
     const bool isZarrV2 = dynamic_cast<const ZarrGroupV2*>(this) != nullptr;
 
     if( isZarrV2 )
@@ -2548,7 +2597,7 @@ std::shared_ptr<ZarrArray> ZarrGroupBase::LoadArray(const std::string& osArrayNa
     {
         CPLJSONDocument oTmpDoc;
         oTmpDoc.SetRoot(oAttributes);
-        oTmpDoc.LoadMemory(oTmpDoc.SaveAsString());
+        CPL_IGNORE_RET_VAL(oTmpDoc.LoadMemory(oTmpDoc.SaveAsString()));
         oAttributes = oTmpDoc.GetRoot();
     }
 
@@ -2563,7 +2612,7 @@ std::shared_ptr<ZarrArray> ZarrGroupBase::LoadArray(const std::string& osArrayNa
             {
                 poSRS = std::make_shared<OGRSpatialReference>();
                 poSRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
-                if( poSRS->SetFromUserInput(item.ToString().c_str()) == OGRERR_NONE )
+                if( poSRS->SetFromUserInput(item.ToString().c_str(), OGRSpatialReference::SET_FROM_USER_INPUT_LIMITATIONS) == OGRERR_NONE )
                 {
                     oAttributes.Delete("crs");
                     break;
@@ -2621,12 +2670,66 @@ std::shared_ptr<ZarrArray> ZarrGroupBase::LoadArray(const std::string& osArrayNa
             std::string(), std::string(), nSize));
     }
 
+    const auto GetDimensionTypeDirection = [&oAttributes, &osUnit](
+                                            std::string& osType,
+                                            std::string& osDirection)
+    {
+        const auto oStdName = oAttributes[CF_STD_NAME];
+        if( oStdName.GetType() == CPLJSONObject::Type::String )
+        {
+            const auto osStdName = oStdName.ToString();
+            if( osStdName == CF_PROJ_X_COORD ||
+                osStdName == CF_LONGITUDE_STD_NAME )
+            {
+                osType = GDAL_DIM_TYPE_HORIZONTAL_X;
+                oAttributes.Delete(CF_STD_NAME);
+                if( osUnit == CF_DEGREES_EAST )
+                {
+                    osDirection = "EAST";
+                }
+            }
+            else if( osStdName == CF_PROJ_Y_COORD ||
+                osStdName == CF_LATITUDE_STD_NAME )
+            {
+                osType = GDAL_DIM_TYPE_HORIZONTAL_Y;
+                oAttributes.Delete(CF_STD_NAME);
+                if( osUnit == CF_DEGREES_NORTH )
+                {
+                    osDirection = "NORTH";
+                }
+            }
+            else if( osStdName == "time" )
+            {
+                osType = GDAL_DIM_TYPE_TEMPORAL;
+                oAttributes.Delete(CF_STD_NAME);
+            }
+        }
+
+        const auto osAxis = oAttributes[CF_AXIS].ToString();
+        if( osAxis == "Z" )
+        {
+            osType = GDAL_DIM_TYPE_VERTICAL;
+            const auto osPositive = oAttributes["positive"].ToString();
+            if( osPositive == "up" )
+            {
+                osDirection = "UP";
+                oAttributes.Delete("positive");
+            }
+            else if( osPositive == "down" )
+            {
+                osDirection = "DOWN";
+                oAttributes.Delete("positive");
+            }
+            oAttributes.Delete(CF_AXIS);
+        }
+    };
+
     // XArray extension
     const auto arrayDimensionsObj = oAttributes["_ARRAY_DIMENSIONS"];
 
-    const auto FindDimension = [this, &aoDims, &oAttributes, &osUnit,
+    const auto FindDimension = [this, &aoDims, &GetDimensionTypeDirection,
                                 bLoadedFromZMetadata, &osArrayName,
-                                &osZarrayFilename,
+                                &osZarrayFilename, &oSetFilenamesInLoading,
                                 isZarrV2](
                                         const std::string& osDimName,
                                         std::shared_ptr<GDALDimension>& poDim,
@@ -2702,7 +2805,8 @@ std::shared_ptr<ZarrArray> ZarrGroupBase::LoadArray(const std::string& osArrayNa
                             osArrayFilenameDim,
                             oDoc.GetRoot(),
                             false,
-                            CPLJSONObject());
+                            CPLJSONObject(),
+                            oSetFilenamesInLoading);
                     }
                 }
                 else
@@ -2732,54 +2836,7 @@ std::shared_ptr<ZarrArray> ZarrGroupBase::LoadArray(const std::string& osArrayNa
         std::string osDirection;
         if( aoDims.size() == 1 && osArrayName == osDimName )
         {
-            const auto oStdName = oAttributes[CF_STD_NAME];
-            if( oStdName.GetType() == CPLJSONObject::Type::String )
-            {
-                const auto osStdName = oStdName.ToString();
-                if( osStdName == CF_PROJ_X_COORD ||
-                    osStdName == CF_LONGITUDE_STD_NAME )
-                {
-                    osType = GDAL_DIM_TYPE_HORIZONTAL_X;
-                    oAttributes.Delete(CF_STD_NAME);
-                    if( osUnit == CF_DEGREES_EAST )
-                    {
-                        osDirection = "EAST";
-                    }
-                }
-                else if( osStdName == CF_PROJ_Y_COORD ||
-                    osStdName == CF_LATITUDE_STD_NAME )
-                {
-                    osType = GDAL_DIM_TYPE_HORIZONTAL_Y;
-                    oAttributes.Delete(CF_STD_NAME);
-                    if( osUnit == CF_DEGREES_NORTH )
-                    {
-                        osDirection = "NORTH";
-                    }
-                }
-                else if( osStdName == "time" )
-                {
-                    osType = GDAL_DIM_TYPE_TEMPORAL;
-                    oAttributes.Delete(CF_STD_NAME);
-                }
-            }
-
-            const auto osAxis = oAttributes[CF_AXIS].ToString();
-            if( osAxis == "Z" )
-            {
-                osType = GDAL_DIM_TYPE_VERTICAL;
-                const auto osPositive = oAttributes["positive"].ToString();
-                if( osPositive == "up" )
-                {
-                    osDirection = "UP";
-                    oAttributes.Delete("positive");
-                }
-                else if( osPositive == "down" )
-                {
-                    osDirection = "DOWN";
-                    oAttributes.Delete("positive");
-                }
-                oAttributes.Delete(CF_AXIS);
-            }
+            GetDimensionTypeDirection(osType, osDirection);
         }
 
         auto poDimLocal = std::make_shared<GDALDimensionWeakIndexingVar>(
@@ -2813,6 +2870,75 @@ std::shared_ptr<ZarrArray> ZarrGroupBase::LoadArray(const std::string& osArrayNa
         {
             CPLError(CE_Warning, CPLE_AppDefined,
                      "Size of _ARRAY_DIMENSIONS different from the one of shape");
+        }
+    }
+
+    // _NCZARR_ARRAY extension
+    const auto nczarrArrayDimrefs = oRoot["_NCZARR_ARRAY"]["dimrefs"].ToArray();
+    if( nczarrArrayDimrefs.IsValid() )
+    {
+        const auto arrayDims = nczarrArrayDimrefs.ToArray();
+        if( arrayDims.Size() == oShape.Size() )
+        {
+            auto poRG = m_pSelf.lock();
+            CPLAssert( poRG != nullptr );
+            while(true)
+            {
+                auto poNewRG = poRG->m_poParent.lock();
+                if( poNewRG == nullptr )
+                    break;
+                poRG = poNewRG;
+            }
+
+            for( int i = 0; i < oShape.Size(); ++i )
+            {
+                if( arrayDims[i].GetType() == CPLJSONObject::Type::String )
+                {
+                    const auto osDimFullpath = arrayDims[i].ToString();
+                    auto poDim = poRG->OpenDimensionFromFullname(osDimFullpath);
+                    if( poDim )
+                    {
+                        aoDims[i] = poDim;
+
+                        // If this is an indexing variable, then fetch the
+                        // dimension type and direction, and patch the dimension
+                        const std::string osArrayFullname =
+                            (GetFullName() != "/" ? GetFullName(): std::string()) + '/' + osArrayName;
+                        if( aoDims.size() == 1 && osArrayFullname == poDim->GetFullName() )
+                        {
+                            std::string osType;
+                            std::string osDirection;
+                            GetDimensionTypeDirection(osType, osDirection);
+
+                            std::string osDimParent = osDimFullpath;
+                            const auto nPos = osDimParent.rfind('/');
+                            if( nPos != std::string::npos )
+                            {
+                                if( nPos == 0 )
+                                    osDimParent = '/';
+                                else
+                                    osDimParent.resize(nPos);
+                                auto poDimParentGroup = dynamic_cast<ZarrGroupBase*>(
+                                    poRG->OpenGroupFromFullname(osDimParent).get());
+                                if( poDimParentGroup )
+                                {
+                                    auto poDimLocal = std::make_shared<GDALDimensionWeakIndexingVar>(
+                                        poDimParentGroup->GetFullName(), poDim->GetName(),
+                                        osType, osDirection, poDim->GetSize());
+                                    aoDims[i] = poDimLocal;
+
+                                    poDimParentGroup->m_oMapDimensions[poDim->GetName()] = poDimLocal;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            CPLError(CE_Warning, CPLE_AppDefined,
+                     "Size of _NCZARR_ARRAY.dimrefs different from the one of shape");
         }
     }
 

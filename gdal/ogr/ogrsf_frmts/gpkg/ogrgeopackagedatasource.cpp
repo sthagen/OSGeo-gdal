@@ -137,7 +137,7 @@ static std::unique_ptr<TilingSchemeDefinition> GetTilingScheme(const char* pszNa
                  "Unsupported tiling scheme: some levels have variable matrix width");
         return nullptr;
     }
-    std::unique_ptr<TilingSchemeDefinition> poTilingScheme(new TilingSchemeDefinition);
+    auto poTilingScheme = cpl::make_unique<TilingSchemeDefinition>();
     poTilingScheme->pszName = pszName;
 
     OGRSpatialReference oSRS;
@@ -425,7 +425,7 @@ OGRSpatialReference* GDALGeoPackageDataset::GetSpatialRef(int iSrsId,
           atoi(pszOrganizationCoordsysID) == iSrsId &&
           GDALGPKGImportFromEPSG(poSpatialRef, atoi(pszOrganizationCoordsysID))
           == OGRERR_NONE) &&
-        poSpatialRef->SetFromUserInput(pszWkt) != OGRERR_NONE )
+        poSpatialRef->importFromWkt(pszWkt) != OGRERR_NONE )
     {
         CPLError( CE_Warning, CPLE_AppDefined,
                   "Unable to parse srs_id '%d' well-known text '%s'",

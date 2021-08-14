@@ -30,8 +30,6 @@
  * DEALINGS IN THE SOFTWARE.
  ****************************************************************************/
 
-#undef ENABLE_LIBJPEG_NO_RETURN
-
 #include "cpl_port.h"
 #include "jpgdataset.h"
 
@@ -608,7 +606,7 @@ void JPGDatasetCommon::ReadFLIRMetadata()
         SetMetadataItem("PaletteColors",
                         CPLSPrintf("%d", nPaletteColors), "FLIR");
 
-        const auto SetColorItem = [=](const char* pszItem, std::uint32_t nOffset)
+        const auto SetColorItem = [this, &abyFLIR](const char* pszItem, std::uint32_t nOffset)
         {
             SetMetadataItem(pszItem,
                             CPLSPrintf("%d %d %d",

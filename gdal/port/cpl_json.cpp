@@ -72,6 +72,26 @@ CPLJSONDocument& CPLJSONDocument::operator=(const CPLJSONDocument& other)
 
     return *this;
 }
+
+CPLJSONDocument::CPLJSONDocument(CPLJSONDocument&& other):
+    m_poRootJsonObject(other.m_poRootJsonObject)
+{
+    other.m_poRootJsonObject = nullptr;
+}
+
+CPLJSONDocument& CPLJSONDocument::operator=(CPLJSONDocument&& other)
+{
+    if( this == &other )
+        return *this;
+
+    if( m_poRootJsonObject )
+        json_object_put( TO_JSONOBJ(m_poRootJsonObject) );
+    m_poRootJsonObject = other.m_poRootJsonObject;
+    other.m_poRootJsonObject = nullptr;
+
+    return *this;
+}
+
 /*! @endcond */
 
 /**
@@ -198,6 +218,18 @@ bool CPLJSONDocument::LoadMemory(const GByte *pabyData, int nLength)
 
     if( m_poRootJsonObject )
         json_object_put( TO_JSONOBJ(m_poRootJsonObject) );
+
+    if( nLength == 4 && memcmp(reinterpret_cast<const char*>(pabyData), "true", nLength) == 0 )
+    {
+        m_poRootJsonObject = json_object_new_boolean(true);
+        return true;
+    }
+
+    if( nLength == 5 && memcmp(reinterpret_cast<const char*>(pabyData), "false", nLength) == 0 )
+    {
+        m_poRootJsonObject = json_object_new_boolean(false);
+        return true;
+    }
 
     json_tokener *jstok = json_tokener_new();
     m_poRootJsonObject = json_tokener_parse_ex( jstok,

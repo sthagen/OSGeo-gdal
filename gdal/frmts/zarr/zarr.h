@@ -36,6 +36,8 @@
 #include "memmultidim.h"
 
 #include <array>
+#include <map>
+#include <set>
 
 /************************************************************************/
 /*                            ZarrDataset                               */
@@ -55,6 +57,9 @@ class ZarrDataset final: public GDALDataset
                                      CSLConstList papszOpenOptions);
 
 public:
+
+    explicit ZarrDataset(const std::shared_ptr<GDALGroup>& poRootGroup);
+
     static int Identify( GDALOpenInfo *poOpenInfo );
     static GDALDataset* Open(GDALOpenInfo* poOpenInfo);
     static GDALDataset* CreateMultiDimensional( const char * pszFilename,
@@ -227,7 +232,8 @@ protected:
     // For ZarrV3, this is the root directory of the dataset
     std::shared_ptr<ZarrSharedResource> m_poSharedResource;
     std::string m_osDirectoryName{};
-    std::weak_ptr<ZarrGroupBase> m_poParent{};
+    std::weak_ptr<ZarrGroupBase> m_poParent{}; // weak reference to owning parent
+    std::shared_ptr<ZarrGroupBase> m_poParentStrongRef{}; // strong reference, used only when opening from a subgroup
     mutable std::map<CPLString, std::shared_ptr<GDALGroup>> m_oMapGroups{};
     mutable std::map<CPLString, std::shared_ptr<ZarrArray>> m_oMapMDArrays{};
     mutable std::map<CPLString, std::shared_ptr<GDALDimensionWeakIndexingVar>> m_oMapDimensions{};
@@ -286,7 +292,8 @@ public:
                                          const std::string& osZarrayFilename,
                                          const CPLJSONObject& oRoot,
                                          bool bLoadedFromZMetadata,
-                                         const CPLJSONObject& oAttributes) const;
+                                         const CPLJSONObject& oAttributes,
+                                         std::set<std::string>& oSetFilenamesInLoading) const;
     void RegisterArray(const std::shared_ptr<ZarrArray>& array) const;
 
     void SetUpdatable(bool bUpdatable) { m_bUpdatable = bUpdatable; }
@@ -335,6 +342,7 @@ public:
                                                CSLConstList papszOptions = nullptr) override;
 
     void InitFromZMetadata(const CPLJSONObject& oRoot);
+    bool InitFromZGroup(const CPLJSONObject& oRoot);
 };
 
 /************************************************************************/
