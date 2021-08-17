@@ -3428,6 +3428,25 @@ OGRErr OSRCopyGeogCSFrom( OGRSpatialReferenceH hSRS,
 }
 
 /************************************************************************/
+/*                   SET_FROM_USER_INPUT_LIMITATIONS_get()              */
+/************************************************************************/
+
+/** Limitations for OGRSpatialReference::SetFromUserInput().
+ *
+ * Currently ALLOW_NETWORK_ACCESS=NO and ALLOW_FILE_ACCESS=NO.
+ */
+const char* const OGRSpatialReference::SET_FROM_USER_INPUT_LIMITATIONS[] = {
+    "ALLOW_NETWORK_ACCESS=NO", "ALLOW_FILE_ACCESS=NO", nullptr };
+
+/**
+ * \brief Return OGRSpatialReference::SET_FROM_USER_INPUT_LIMITATIONS
+ */
+CSLConstList OGRSpatialReference::SET_FROM_USER_INPUT_LIMITATIONS_get()
+{
+    return SET_FROM_USER_INPUT_LIMITATIONS;
+}
+
+/************************************************************************/
 /*                          SetFromUserInput()                          */
 /************************************************************************/
 
@@ -3474,13 +3493,6 @@ OGRErr OGRSpatialReference::SetFromUserInput( const char * pszDefinition )
 {
     return SetFromUserInput(pszDefinition, nullptr);
 }
-
-/** Limitations for OGRSpatialReference::SetFromUserInput().
- *
- * Currently ALLOW_NETWORK_ACCESS=NO and ALLOW_FILE_ACCESS=NO.
- */
-const char* const OGRSpatialReference::SET_FROM_USER_INPUT_LIMITATIONS[] = {
-    "ALLOW_NETWORK_ACCESS=NO", "ALLOW_FILE_ACCESS=NO", nullptr };
 
 /**
  * \brief Set spatial reference from various text formats.
@@ -7114,6 +7126,15 @@ OGRErr OSRSetPolyconic( OGRSpatialReferenceH hSRS,
 /*                               SetPS()                                */
 /************************************************************************/
 
+/** Sets a Polar Stereographic projection.
+ *
+ * Two variants are possible:
+ * - Polar Stereographic Variant A: dfCenterLat must be +/- 90° and is
+ *   interpretated as the latitude of origin, combined with the scale factor
+ * - Polar Stereographic Variant B: dfCenterLat is different from +/- 90° and
+ *   is interpretated as the latitude of true scale. In that situation, dfScale
+ *   must be set to 1 (it is ignored in the projection parameters)
+ */
 OGRErr OGRSpatialReference::SetPS(
                                 double dfCenterLat, double dfCenterLong,
                                 double dfScale,
