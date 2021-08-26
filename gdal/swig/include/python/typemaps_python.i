@@ -500,7 +500,13 @@ CreateTupleFromDoubleArray( int *first, unsigned int size ) {
 {
   /* %typemap(argout) (size_t *nLen, char **pBuf ) */
   Py_XDECREF($result);
-  $result = PyByteArray_FromStringAndSize( *$2, *$1 );
+  if( *$2 ) {
+      $result = PyByteArray_FromStringAndSize( *$2, *$1 );
+  }
+  else {
+      $result = Py_None;
+      Py_INCREF(Py_None);
+  }
 }
 %typemap(freearg) (size_t *nLen, char **pBuf )
 {
@@ -960,13 +966,22 @@ CreateTupleFromDoubleArray( int *first, unsigned int size ) {
             SWIG_fail;
         }
 
-        PyObject* vStr = PyObject_Str(v);
-        if( PyErr_Occurred() )
+        PyObject* vStr;
+        if( PyBytes_Check(v) )
         {
-            Py_DECREF(it);
-            Py_DECREF(kStr);
-            Py_DECREF(item_list);
-            SWIG_fail;
+            vStr = v;
+            Py_INCREF(vStr);
+        }
+        else
+        {
+            vStr = PyObject_Str(v);
+            if( PyErr_Occurred() )
+            {
+                Py_DECREF(it);
+                Py_DECREF(kStr);
+                Py_DECREF(item_list);
+                SWIG_fail;
+            }
         }
 
         int bFreeK, bFreeV;

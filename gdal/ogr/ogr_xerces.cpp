@@ -46,6 +46,70 @@ CPL_CVSID("$Id$")
 
 static CPLMutex* hMutex = nullptr;
 static int nCounter = 0;
+static bool bXercesWasAlreadyInitializedBeforeUs = false;
+
+
+/************************************************************************/
+/*                      OGRXercesBinInputStream                         */
+/************************************************************************/
+
+class OGRXercesBinInputStream final: public BinInputStream
+{
+    CPL_DISALLOW_COPY_ASSIGN(OGRXercesBinInputStream)
+
+    VSILFILE* fp = nullptr;
+    bool bOwnFP = false;
+    XMLCh emptyString = 0;
+
+  public:
+    explicit OGRXercesBinInputStream( VSILFILE* fpIn, bool bOwnFPIn );
+    ~OGRXercesBinInputStream() override;
+
+    XMLFilePos curPos() const override;
+    XMLSize_t readBytes(XMLByte* const toFill,
+                                const XMLSize_t maxToRead) override;
+    const XMLCh* getContentType() const override
+        { return &emptyString; }
+};
+
+/************************************************************************/
+/*                      OGRXercesNetAccessor                            */
+/************************************************************************/
+
+class OGRXercesNetAccessor final: public XMLNetAccessor
+{
+public :
+    OGRXercesNetAccessor() = default;
+
+    BinInputStream* makeNew(const XMLURL&  urlSource, const XMLNetHTTPInfo* httpInfo) override;
+    const XMLCh* getId() const override { return fgMyName; }
+
+private :
+    static const XMLCh fgMyName[];
+
+    OGRXercesNetAccessor(const OGRXercesNetAccessor&);
+    OGRXercesNetAccessor& operator=(const OGRXercesNetAccessor&);
+};
+
+
+const XMLCh OGRXercesNetAccessor::fgMyName[] = {
+    chLatin_O, chLatin_G, chLatin_R,
+    chLatin_X, chLatin_e, chLatin_r, chLatin_c, chLatin_e, chLatin_s,
+    chLatin_N, chLatin_e, chLatin_t,
+    chLatin_A, chLatin_c, chLatin_c, chLatin_e, chLatin_s,
+    chLatin_s, chLatin_o, chLatin_r,
+    chNull
+};
+
+BinInputStream* OGRXercesNetAccessor::makeNew(const XMLURL& urlSource,
+                                              const XMLNetHTTPInfo* /*httpInfo*/)
+{
+    const std::string osURL = "/vsicurl_streaming/" + transcode(urlSource.getURLText());
+    VSILFILE* fp = VSIFOpenL(osURL.c_str(), "rb");
+    if( !fp )
+        return nullptr;
+    return new OGRXercesBinInputStream(fp, true);
+}
 
 /************************************************************************/
 /*                        OGRInitializeXerces()                         */
@@ -54,25 +118,46 @@ static int nCounter = 0;
 bool OGRInitializeXerces()
 {
     CPLMutexHolderD(&hMutex);
+
     if( nCounter > 0 )
     {
         nCounter++;
         return true;
     }
 
-    try
+    if( XMLPlatformUtils::fgMemoryManager != nullptr )
     {
-        CPLDebug("OGR", "XMLPlatformUtils::Initialize()");
-        XMLPlatformUtils::Initialize();
-        nCounter ++;
+        CPLDebug("OGR", "Xerces-C already initialized before GDAL");
+        bXercesWasAlreadyInitializedBeforeUs = true;
+        nCounter = 1;
         return true;
     }
-    catch (const XMLException& toCatch)
+    else
     {
-        CPLError( CE_Failure, CPLE_AppDefined,
-                  "Exception initializing Xerces: %s",
-                  transcode(toCatch.getMessage()).c_str() );
-        return false;
+        try
+        {
+            CPLDebug("OGR", "XMLPlatformUtils::Initialize()");
+            XMLPlatformUtils::Initialize();
+
+            // Install our own network accessor instead of the default Xerces-C one
+            // This enables us in particular to honour GDAL_HTTP_TIMEOUT
+            if( CPLTestBool(CPLGetConfigOption("OGR_XERCES_USE_OGR_NET_ACCESSOR", "YES")) )
+            {
+                auto oldNetAccessor = XMLPlatformUtils::fgNetAccessor;
+                XMLPlatformUtils::fgNetAccessor = new OGRXercesNetAccessor();
+                delete oldNetAccessor;
+            }
+
+            nCounter = 1;
+            return true;
+        }
+        catch (const XMLException& toCatch)
+        {
+            CPLError( CE_Failure, CPLE_AppDefined,
+                      "Exception initializing Xerces: %s",
+                      transcode(toCatch.getMessage()).c_str() );
+            return false;
+        }
     }
 }
 
@@ -92,7 +177,8 @@ void OGRDeinitializeXerces()
     nCounter--;
     if( nCounter == 0 )
     {
-        if( CPLTestBool(CPLGetConfigOption("OGR_XERCES_TERMINATE", "YES")) )
+        if( !bXercesWasAlreadyInitializedBeforeUs &&
+            CPLTestBool(CPLGetConfigOption("OGR_XERCES_TERMINATE", "YES")) )
         {
             CPLDebug("OGR", "XMLPlatformUtils::Terminate()");
             XMLPlatformUtils::Terminate();
@@ -179,33 +265,6 @@ CPLString& transcode( const XMLCh *panXMLString, CPLString& osRet,
 }
 
 
-
-#define WORKAROUND_XERCESC_2094
-
-/************************************************************************/
-/*                      OGRXercesBinInputStream                         */
-/************************************************************************/
-class OGRXercesBinInputStream : public BinInputStream
-{
-    CPL_DISALLOW_COPY_ASSIGN(OGRXercesBinInputStream)
-
-    VSILFILE* fp;
-    XMLCh emptyString;
-#ifdef WORKAROUND_XERCESC_2094
-    bool bFirstCallToReadBytes;
-#endif
-
-  public:
-    explicit OGRXercesBinInputStream( VSILFILE* fp );
-    ~OGRXercesBinInputStream() override;
-
-    XMLFilePos curPos() const override;
-    XMLSize_t readBytes(XMLByte* const toFill,
-                                const XMLSize_t maxToRead) override;
-    const XMLCh* getContentType() const override
-        { return &emptyString; }
-};
-
 /************************************************************************/
 /*                       OGRXercesInputSource                           */
 /************************************************************************/
@@ -230,19 +289,20 @@ class OGRXercesInputSource : public InputSource
 /*                      OGRXercesBinInputStream()                       */
 /************************************************************************/
 
-OGRXercesBinInputStream::OGRXercesBinInputStream(VSILFILE *fpIn) :
+OGRXercesBinInputStream::OGRXercesBinInputStream(VSILFILE *fpIn, bool bOwnFPIn) :
     fp(fpIn),
-    emptyString(0)
-#ifdef WORKAROUND_XERCESC_2094
-    ,bFirstCallToReadBytes(true)
-#endif
+    bOwnFP(bOwnFPIn)
 {}
 
 /************************************************************************/
 /*                     ~OGRXercesBinInputStream()                       */
 /************************************************************************/
 
-OGRXercesBinInputStream::~OGRXercesBinInputStream() = default;
+OGRXercesBinInputStream::~OGRXercesBinInputStream()
+{
+    if( bOwnFP )
+        VSIFCloseL(fp);
+}
 
 /************************************************************************/
 /*                              curPos()                                */
@@ -260,33 +320,7 @@ XMLFilePos OGRXercesBinInputStream::curPos() const
 XMLSize_t OGRXercesBinInputStream::readBytes(XMLByte* const toFill,
                                              const XMLSize_t maxToRead)
 {
-    XMLSize_t nRead = static_cast<XMLSize_t>(VSIFReadL(toFill, 1, maxToRead, fp));
-#ifdef WORKAROUND_XERCESC_2094
-    if( bFirstCallToReadBytes && nRead > 10 )
-    {
-        // Workaround leak in Xerces-C when parsing an invalid encoding
-        // attribute and there are newline or tab characters between <?xml and
-        // version="1.0". So replace those newlines by equivalent spaces....
-        // See https://issues.apache.org/jira/browse/XERCESC-2094
-        XMLSize_t nToSkip = 0;
-        if( memcmp(toFill, "<?xml", 5) == 0 )
-            nToSkip = 5;
-        else if( memcmp(toFill, "\xEF\xBB\xBF<?xml", 8) == 0 )
-            nToSkip = 8;
-        if( nToSkip > 0 )
-        {
-            for( XMLSize_t i = nToSkip; i < nRead; i++ )
-            {
-                if( toFill[i] == 0xD || toFill[i] == 0xA || toFill[i] == 0x9 )
-                    toFill[i] = ' ';
-                else
-                    break;
-            }
-        }
-        bFirstCallToReadBytes = false;
-    }
-#endif
-    return nRead;
+    return static_cast<XMLSize_t>(VSIFReadL(toFill, 1, maxToRead, fp));
 }
 
 /************************************************************************/
@@ -296,7 +330,7 @@ XMLSize_t OGRXercesBinInputStream::readBytes(XMLByte* const toFill,
 OGRXercesInputSource::OGRXercesInputSource(VSILFILE *fp,
                                            MemoryManager *const manager) :
     InputSource(manager),
-    pBinInputStream(new OGRXercesBinInputStream(fp))
+    pBinInputStream(new OGRXercesBinInputStream(fp, false))
 {}
 
 /************************************************************************/

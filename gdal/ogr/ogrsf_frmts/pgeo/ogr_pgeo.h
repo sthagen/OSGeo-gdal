@@ -61,6 +61,8 @@ class OGRPGeoLayer CPL_NON_FINAL: public OGRLayer
 
     int                *panFieldOrdinals;
 
+    bool                m_bEOF = false;
+
     CPLErr              BuildFeatureDefn( const char *pszLayerName,
                                           CPLODBCStatement *poStmt );
 
@@ -100,6 +102,8 @@ class OGRPGeoTableLayer final: public OGRPGeoLayer
     virtual CPLODBCStatement *  GetStatement() override;
 
     OGREnvelope         sExtent;
+    std::string         m_osDefinition;
+    std::string         m_osDocumentation;
 
   public:
     explicit            OGRPGeoTableLayer( OGRPGeoDataSource * );
@@ -113,7 +117,8 @@ class OGRPGeoTableLayer final: public OGRPGeoLayer
                                     double dfExtentBottom,
                                     double dfExtentTop,
                                     int nSRID,
-                                    int bHasZ );
+                                    int bHasZ,
+                                    int nHasM );
 
     virtual void        ResetReading() override;
     virtual GIntBig     GetFeatureCount( int ) override;
@@ -126,6 +131,8 @@ class OGRPGeoTableLayer final: public OGRPGeoLayer
     virtual OGRErr      GetExtent(OGREnvelope *psExtent, int bForce = TRUE) override;
     virtual OGRErr      GetExtent(int iGeomField, OGREnvelope *psExtent, int bForce) override
                 { return OGRLayer::GetExtent(iGeomField, psExtent, bForce); }
+    const std::string&  GetXMLDefinition() { return m_osDefinition; }
+    const std::string&  GetXMLDocumentation() { return m_osDocumentation; }
 };
 
 /************************************************************************/
@@ -167,6 +174,9 @@ class OGRPGeoDataSource final: public OGRDataSource
 
     int                 bDSUpdate;
     mutable CPLODBCSession oSession;
+
+    bool                m_bHasGdbItemsTable = false;
+
 #ifndef _WIN32
     mutable bool        m_COUNT_STAR_state_known = false;
     mutable bool        m_COUNT_STAR_working = false;
@@ -195,6 +205,8 @@ class OGRPGeoDataSource final: public OGRDataSource
     CPLODBCSession     *GetSession() { return &oSession; }
 
     bool CountStarWorking() const;
+
+    bool HasGdbItemsTable() const { return m_bHasGdbItemsTable; }
 };
 
 /************************************************************************/

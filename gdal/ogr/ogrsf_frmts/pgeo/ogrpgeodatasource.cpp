@@ -32,6 +32,8 @@
 #include "cpl_string.h"
 #include <vector>
 #include <unordered_set>
+#include "filegdb_fielddomain.h"
+#include "ogr_openfilegdb.h"
 
 #ifdef __linux
 #include <sys/types.h>
@@ -151,7 +153,7 @@ int OGRPGeoDataSource::Open( const char * pszNewName, int bUpdate,
     std::vector<char **> apapszGeomColumns;
     CPLODBCStatement oStmt( &oSession );
 
-    oStmt.Append( "SELECT TableName, FieldName, ShapeType, ExtentLeft, ExtentRight, ExtentBottom, ExtentTop, SRID, HasZ FROM GDB_GeomColumns" );
+    oStmt.Append( "SELECT TableName, FieldName, ShapeType, ExtentLeft, ExtentRight, ExtentBottom, ExtentTop, SRID, HasZ, HasM FROM GDB_GeomColumns" );
 
     if( !oStmt.ExecuteSQL() )
     {
@@ -165,16 +167,42 @@ int OGRPGeoDataSource::Open( const char * pszNewName, int bUpdate,
     {
         int i, iNew = static_cast<int>(apapszGeomColumns.size());
         char **papszRecord = nullptr;
-        for( i = 0; i < 9; i++ )
+        for( i = 0; i < 10; i++ )
             papszRecord = CSLAddString( papszRecord,
                                         oStmt.GetColData(i) );
         apapszGeomColumns.resize(iNew+1);
         apapszGeomColumns[iNew] = papszRecord;
     }
 
-/* -------------------------------------------------------------------- */
-/*      Create a layer for each spatial table.                          */
-/* -------------------------------------------------------------------- */
+    // Collate a list of all tables in the data source, skipping over internal and system tables
+    CPLODBCStatement oTableList( &oSession );
+    std::vector< CPLString > aosTableNames;
+    if( oTableList.GetTables() )
+    {
+        while( oTableList.Fetch() )
+        {
+            const CPLString osTableName = CPLString( oTableList.GetColData(2) );
+            const CPLString osLCTableName(CPLString(osTableName).tolower());
+
+            if( osLCTableName == "gdb_items" )
+            {
+                m_bHasGdbItemsTable = true;
+                continue;
+            }
+
+            // a bunch of internal tables we don't want to expose...
+            if( !osTableName.empty()
+                    && !(osLCTableName.size() >= 4 && osLCTableName.substr(0, 4) == "msys") // MS Access internal tables
+                    && !osLCTableName.endsWith( "_shape_index") // gdb spatial index tables, internal details only
+                    && !(osLCTableName.size() >= 4 && osLCTableName.substr(0, 4) == "gdb_") // gdb private tables
+                    )
+            {
+                aosTableNames.emplace_back( osTableName );
+            }
+        }
+    }
+
+    // Create a layer for each spatial table.
     papoLayers = (OGRPGeoLayer **) CPLCalloc(apapszGeomColumns.size(),
                                              sizeof(void*));
 
@@ -199,7 +227,8 @@ int OGRPGeoDataSource::Open( const char * pszNewName, int bUpdate,
                                  CPLAtof(papszRecord[5]),   // ExtentBottom
                                  CPLAtof(papszRecord[6]),   // ExtentTop
                                  atoi(papszRecord[7]),   // SRID
-                                 atoi(papszRecord[8]))  // HasZ
+                                 atoi(papszRecord[8]),  // HasZ
+                                 atoi(papszRecord[9]))  // HasM
             != CE_None )
         {
             delete poLayer;
@@ -214,67 +243,60 @@ int OGRPGeoDataSource::Open( const char * pszNewName, int bUpdate,
     }
 
 
-    /* -------------------------------------------------------------------- */
-    /*      Add non-spatial tables.                       */
-    /* -------------------------------------------------------------------- */
-        CPLODBCStatement oTableList( &oSession );
-
-        if( oTableList.GetTables() )
+    // Add non-spatial tables.
+    for ( const CPLString &osTableName : aosTableNames )
+    {
+        if( oSetSpatialTableNames.find( osTableName ) != oSetSpatialTableNames.end() )
         {
-            while( oTableList.Fetch() )
-            {
-                CPLString osTableName = CPLString( oTableList.GetColData(2) );
-                // a bunch of internal tables we don't want to expose...
-                if( !osTableName.empty()
-                        && osTableName != "MSysObjects"
-                        && osTableName != "MSysACEs"
-                        && osTableName != "MSysQueries"
-                        && osTableName != "MSysRelationships"
-                        && osTableName != "GDB_ColumnInfo"
-                        && osTableName != "GDB_DatabaseLocks"
-                        && osTableName != "GDB_GeomColumns"
-                        && osTableName != "GDB_ItemRelationships"
-                        && osTableName != "GDB_ItemRelationshipTypes"
-                        && osTableName != "GDB_Items"
-                        && osTableName != "GDB_Items_Shape_Index"
-                        && osTableName != "GDB_ItemTypes"
-                        && osTableName != "GDB_RasterColumns"
-                        && osTableName != "GDB_ReplicaLog"
-                        && osTableName != "GDB_SpatialRefs"
-                        && osTableName != "MSysAccessStorage"
-                        && osTableName != "MSysNavPaneGroupCategories"
-                        && osTableName != "MSysNavPaneGroups"
-                        && osTableName != "MSysNavPaneGroupToObjects"
-                        && osTableName != "MSysNavPaneObjectIDs"
-                        && oSetSpatialTableNames.find( osTableName ) == oSetSpatialTableNames.end()
-                        && !osTableName.endsWith( "_Shape_Index")
-                        )
-                {
-                    OGRPGeoTableLayer  *poLayer = new OGRPGeoTableLayer( this );
+            // a spatial table, already handled above
+            continue;
+        }
 
-                    if( poLayer->Initialize( osTableName.c_str(),         // TableName
-                                             nullptr,         // FieldName
-                                             0,   // ShapeType (ESRI_LAYERGEOMTYPE_NULL)
-                                             0,   // ExtentLeft
-                                             0,   // ExtentRight
-                                             0,   // ExtentBottom
-                                             0,   // ExtentTop
-                                             0,   // SRID
-                                             0)  // HasZ
-                        != CE_None )
+        OGRPGeoTableLayer  *poLayer = new OGRPGeoTableLayer( this );
+
+        if( poLayer->Initialize( osTableName.c_str(),         // TableName
+                                 nullptr,         // FieldName
+                                 0,   // ShapeType (ESRI_LAYERGEOMTYPE_NULL)
+                                 0,   // ExtentLeft
+                                 0,   // ExtentRight
+                                 0,   // ExtentBottom
+                                 0,   // ExtentTop
+                                 0,   // SRID
+                                 0,   // HasZ
+                                 0)   // HasM
+            != CE_None )
+        {
+            delete poLayer;
+        }
+        else
+        {
+            papoLayers = static_cast< OGRPGeoLayer **>( CPLRealloc(papoLayers, sizeof(void*) * ( nLayers+1 ) ) );
+            papoLayers[nLayers++] = poLayer;
+        }
+    }
+
+    // collect domains
+    if ( m_bHasGdbItemsTable )
+    {
+        CPLODBCStatement oItemsStmt( &oSession );
+        oItemsStmt.Append( "SELECT Definition FROM GDB_Items" );
+        if( oItemsStmt.ExecuteSQL() )
+        {
+            while( oItemsStmt.Fetch() )
+            {
+                const CPLString osDefinition = CPLString( oItemsStmt.GetColData(0, "") );
+                if( strstr(osDefinition, "GPCodedValueDomain2") != nullptr ||
+                    strstr(osDefinition, "GPRangeDomain2") != nullptr )
+                {
+                    if( auto poDomain = ParseXMLFieldDomainDef(osDefinition) )
                     {
-                        delete poLayer;
-                    }
-                    else
-                    {
-                        papoLayers = static_cast< OGRPGeoLayer **>( CPLRealloc(papoLayers, sizeof(void*) * ( nLayers+1 ) ) );
-                        papoLayers[nLayers++] = poLayer;
+                        const auto domainName = poDomain->GetName();
+                        m_oMapFieldDomains[domainName] = std::move(poDomain);
                     }
                 }
             }
-
-            return TRUE;
         }
+    }
 
     return TRUE;
 }
@@ -310,6 +332,41 @@ OGRLayer * OGRPGeoDataSource::ExecuteSQL( const char *pszSQLCommand,
                                           const char *pszDialect )
 
 {
+
+/* -------------------------------------------------------------------- */
+/*      Special case GetLayerDefinition                                 */
+/* -------------------------------------------------------------------- */
+    if (STARTS_WITH_CI(pszSQLCommand, "GetLayerDefinition "))
+    {
+        OGRPGeoTableLayer* poLayer = cpl::down_cast<OGRPGeoTableLayer *>(
+            GetLayerByName(pszSQLCommand + strlen("GetLayerDefinition ")) );
+        if (poLayer)
+        {
+            OGRLayer* poRet = new OGROpenFileGDBSingleFeatureLayer(
+                "LayerDefinition", poLayer->GetXMLDefinition().c_str() );
+            return poRet;
+        }
+
+        return nullptr;
+    }
+
+/* -------------------------------------------------------------------- */
+/*      Special case GetLayerMetadata                                   */
+/* -------------------------------------------------------------------- */
+    if (STARTS_WITH_CI(pszSQLCommand, "GetLayerMetadata "))
+    {
+        OGRPGeoTableLayer* poLayer = cpl::down_cast<OGRPGeoTableLayer *>(
+            GetLayerByName(pszSQLCommand + strlen("GetLayerMetadata ")) );
+        if (poLayer)
+        {
+            OGRLayer* poRet = new OGROpenFileGDBSingleFeatureLayer(
+                "LayerMetadata", poLayer->GetXMLDocumentation().c_str() );
+            return poRet;
+        }
+
+        return nullptr;
+    }
+
 /* -------------------------------------------------------------------- */
 /*      Use generic implementation for recognized dialects              */
 /* -------------------------------------------------------------------- */
