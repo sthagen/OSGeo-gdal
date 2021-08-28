@@ -42,9 +42,7 @@ import pytest
 @pytest.fixture(scope="module", autouse=True)
 def setup_driver():
     driver = ogr.GetDriverByName('ODBC')
-    if driver is not None:
-        driver.Register()
-    else:
+    if driver is None:
         pytest.skip("ODBC driver not available", allow_module_level=True)
 
     # we may have the ODBC GDAL driver, but be missing an ODBC driver for MS Access on the test environment
@@ -95,6 +93,12 @@ def ogrsf_path():
 
     return path
 
+
+def recent_enough_mdb_odbc_driver():
+    # At time of writing, mdbtools <= 0.9.4 has some deficiencies
+    # See https://github.com/OSGeo/gdal/pull/4354#issuecomment-907455798 for details
+    # So allow some tests only or Windows, or on a local machine that don't have the CI environment variable set
+    return sys.platform == 'win32' or 'CI' not in os.environ
 
 ###############################################################################
 # Basic testing
@@ -235,15 +239,8 @@ def test_ogr_odbc_list_all_tables():
     if sys.platform == 'win32':
         pytest.skip("MS Access ODBC driver always culls system tables, nothing left to test")
 
-    if ogrtest.odbc_drv is None:
-        pytest.skip()
-
-    ds = ogrtest.odbc_drv.Open('data/mdb/empty.mdb')
-    if ds is None:
-        # likely odbc driver for mdb is not installed (or a broken old version of mdbtools is installed!)
-        pytest.skip()
-
-    ds = ogrtest.odbc_drv.Open('data/mdb/null_memo.mdb')
+    odbc_drv = ogr.GetDriverByName('ODBC')
+    ds = odbc_drv.Open('data/mdb/null_memo.mdb')
     assert ds is not None
 
     assert ds.GetLayerCount() == 1, 'did not get expected layer count'
@@ -274,6 +271,9 @@ def test_ogr_odbc_list_all_tables():
 
 
 def test_ogr_odbc_ogrsf_null_memo(ogrsf_path):
+    if not recent_enough_mdb_odbc_driver():
+        pytest.skip("test skipped because of assumption that a not enough version of MDBTools is available")
+
     ret = gdaltest.runexternal(ogrsf_path + ' data/mdb/null_memo.mdb')
 
     assert ret.find('INFO') != -1 and ret.find('ERROR') == -1
