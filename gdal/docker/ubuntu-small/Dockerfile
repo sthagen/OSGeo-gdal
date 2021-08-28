@@ -49,7 +49,7 @@ RUN . /buildscripts/bh-set-envvars.sh \
 RUN . /buildscripts/bh-set-envvars.sh \
     && apt-get update -y \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --fix-missing --no-install-recommends \
-       python3-dev${APT_ARCH_SUFFIX} python3-numpy${APT_ARCH_SUFFIX} \
+       python3-dev${APT_ARCH_SUFFIX} python3-numpy${APT_ARCH_SUFFIX} python3-setuptools${APT_ARCH_SUFFIX} \
        libjpeg-dev${APT_ARCH_SUFFIX} libgeos-dev${APT_ARCH_SUFFIX} \
        libexpat-dev${APT_ARCH_SUFFIX} libxerces-c-dev${APT_ARCH_SUFFIX} \
        libwebp-dev${APT_ARCH_SUFFIX} libpng-dev${APT_ARCH_SUFFIX} \
@@ -161,7 +161,8 @@ RUN . /buildscripts/bh-set-envvars.sh \
         export CXX=$PWD/ccache_g++.sh; \
         ccache -M 1G; \
     fi \
-    && LDFLAGS="-L/build${PROJ_INSTALL_PREFIX}/lib -linternalproj" ./configure --prefix=/usr "${WITH_HOST}" --without-libtool \
+    && LDFLAGS="-L/build${PROJ_INSTALL_PREFIX}/lib -linternalproj" \
+    ./configure --prefix=/usr --sysconfdir=/etc "${WITH_HOST}" --without-libtool \
     --with-hide-internal-symbols \
     --with-jpeg12 \
     --with-python \
