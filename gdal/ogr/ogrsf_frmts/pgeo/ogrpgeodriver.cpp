@@ -32,6 +32,28 @@
 
 CPL_CVSID("$Id$")
 
+/************************************************************************/
+/*                     OGRPGeoDriverIdentify()                          */
+/************************************************************************/
+
+static int OGRPGeoDriverIdentify( GDALOpenInfo* poOpenInfo )
+
+{
+    if (STARTS_WITH_CI(poOpenInfo->pszFilename, "WALK:")
+        || STARTS_WITH_CI(poOpenInfo->pszFilename, "GEOMEDIA:"))
+    {
+        return FALSE;
+    }
+
+    if( STARTS_WITH_CI(poOpenInfo->pszFilename, "PGEO:") )
+        return TRUE;
+
+    if( !EQUAL(CPLGetExtension(poOpenInfo->pszFilename),"mdb") )
+        return FALSE;
+
+    // Could potentially be a PGeo, Walk, Geomedia or generic ODBC database
+    return -1;
+}
 
 /************************************************************************/
 /*                                OGRPGeoDriverOpen()                   */
@@ -40,51 +62,9 @@ CPL_CVSID("$Id$")
 static GDALDataset * OGRPGeoDriverOpen( GDALOpenInfo* poOpenInfo )
 
 {
-    if( STARTS_WITH_CI(poOpenInfo->pszFilename, "WALK:") )
+    // The method might return -1 when it is undecided
+    if (OGRPGeoDriverIdentify(poOpenInfo) == FALSE)
         return nullptr;
-
-    if( STARTS_WITH_CI(poOpenInfo->pszFilename, "GEOMEDIA:") )
-        return nullptr;
-
-    if( !STARTS_WITH_CI(poOpenInfo->pszFilename, "PGEO:")
-        && !EQUAL(CPLGetExtension(poOpenInfo->pszFilename),"mdb") )
-        return nullptr;
-
-    // Disabling the attempt to guess if a MDB file is a PGeo database
-    // or not. The mention to GDB_GeomColumns might be quite far in
-    // the/ file, which can cause misdetection.  See
-    // http://trac.osgeo.org/gdal/ticket/4498 This was initially meant
-    // to know if a MDB should be opened by the PGeo or the Geomedia
-    // driver.
-#if 0
-    if( !STARTS_WITH_CI(pszFilename, "PGEO:") &&
-        EQUAL(CPLGetExtension(pszFilename),"mdb") )
-    {
-        VSILFILE* fp = VSIFOpenL(pszFilename, "rb");
-        if (!fp)
-            return NULL;
-        GByte* pabyHeader = (GByte*) CPLMalloc(100000);
-        VSIFReadL(pabyHeader, 100000, 1, fp);
-        VSIFCloseL(fp);
-
-        /* Look for GDB_GeomColumns table */
-        const GByte pabyNeedle[] = {
-            'G', 0, 'D', 0, 'B', 0, '_', 0, 'G', 0, 'e', 0, 'o', 0, 'm', 0,
-            'C', 0, 'o', 0, 'l', 0, 'u', 0, 'm', 0, 'n', 0, 's' };
-        int bFound = FALSE;
-        for(int i=0;i<100000 - (int)sizeof(pabyNeedle);i++)
-        {
-            if (memcmp(pabyHeader + i, pabyNeedle, sizeof(pabyNeedle)) == 0)
-            {
-                bFound = TRUE;
-                break;
-            }
-        }
-        CPLFree(pabyHeader);
-        if (!bFound)
-            return NULL;
-    }
-#endif
 
 #ifndef WIN32
     // Try to register MDB Tools driver
@@ -130,6 +110,7 @@ void RegisterOGRPGeo()
 "</OpenOptionList>");
 
     poDriver->pfnOpen = OGRPGeoDriverOpen;
+    poDriver->pfnIdentify = OGRPGeoDriverIdentify;
 
     GetGDALDriverManager()->RegisterDriver( poDriver );
 }
