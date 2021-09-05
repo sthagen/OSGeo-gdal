@@ -1351,15 +1351,15 @@ def test_osr_basic_26():
 def test_osr_basic_setgeogcs():
 
     sr = osr.SpatialReference()
-    sr.SetGeogCS(None, None, None, 0, 0, None, 0, None, 0)
-    assert sr.ExportToWkt() == 'GEOGCS["unnamed",DATUM["unnamed",SPHEROID["unnamed",0,0]],PRIMEM["Reference meridian",0],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AXIS["Latitude",NORTH],AXIS["Longitude",EAST]]'
+    sr.SetGeogCS(None, None, None, 1, 2, None, 0, None, 0)
+    assert sr.ExportToWkt() == 'GEOGCS["unnamed",DATUM["unnamed",SPHEROID["unnamed",1,2]],PRIMEM["Reference meridian",0],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AXIS["Latitude",NORTH],AXIS["Longitude",EAST]]'
 
     sr.SetGeogCS('a', 'b', 'c', 1, 2, 'd', 3, 'e', 4)
     assert sr.ExportToWkt() == 'GEOGCS["a",DATUM["b",SPHEROID["c",1,2]],PRIMEM["d",3],UNIT["e",4],AXIS["Latitude",NORTH],AXIS["Longitude",EAST]]'
 
     sr.SetUTM(31)
-    sr.SetGeogCS(None, None, None, 0, 0, None, 0, None, 0)
-    assert sr.ExportToWkt() == 'PROJCS["unnamed",GEOGCS["unnamed",DATUM["unnamed",SPHEROID["unnamed",0,0]],PRIMEM["Reference meridian",0],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",3],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",500000],PARAMETER["false_northing",0],UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH]]'
+    sr.SetGeogCS(None, None, None, 1, 2, None, 0, None, 0)
+    assert sr.ExportToWkt() == 'PROJCS["unnamed",GEOGCS["unnamed",DATUM["unnamed",SPHEROID["unnamed",1,2]],PRIMEM["Reference meridian",0],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",3],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",500000],PARAMETER["false_northing",0],UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH]]'
 
 ###############################################################################
 # Test other authorities than EPSG, e.g. IGNF:XXXX
@@ -1804,3 +1804,26 @@ def test_osr_basic_set_from_user_input_too_long():
 
     with gdaltest.error_handler():
         assert srs.SetFromUserInput("http://opengis.net/def/crs/" + "x" * 100000) != ogr.OGRERR_NONE
+
+
+###############################################################################
+# Test GetAxesCount()
+
+
+def test_osr_basic_get_axes_count():
+
+    srs = osr.SpatialReference()
+    srs.SetFromUserInput("+proj=tmerc +datum=WGS84")
+    assert srs.GetAxesCount() == 2
+
+    srs = osr.SpatialReference()
+    srs.SetFromUserInput("+proj=tmerc +ellps=GRS80 +towgs84=0,0,0")
+    assert srs.GetAxesCount() == 2
+
+    srs = osr.SpatialReference()
+    srs.ImportFromEPSG(4979)
+    assert srs.GetAxesCount() == 3
+
+    srs = osr.SpatialReference()
+    srs.SetFromUserInput("+proj=tmerc +datum=WGS84 +geoidgrids=foo.gtx")
+    assert srs.GetAxesCount() == 3
