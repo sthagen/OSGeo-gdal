@@ -441,35 +441,40 @@ netCDFRasterBand::netCDFRasterBand( netCDFDataset *poNCDFDS,
     // Look for valid_range or valid_min/valid_max.
 
     // First look for valid_range.
-    status = nc_inq_att(cdfid, nZId, "valid_range", &atttype, &attlen);
-    if( (status == NC_NOERR) && (attlen == 2) &&
-        CPLFetchBool(poNCDFDS->GetOpenOptions(), "HONOUR_VALID_RANGE", true) )
+    if( CPLFetchBool(poNCDFDS->GetOpenOptions(), "HONOUR_VALID_RANGE", true) )
     {
-        int vrange[2] = { 0, 0 };
-        status = nc_get_att_int(cdfid, nZId, "valid_range", vrange);
-        if( status == NC_NOERR )
+        char *pszValidRange = nullptr;
+        if( NCDFGetAttr(cdfid, nZId, "valid_range", &pszValidRange) == CE_None &&
+            pszValidRange[0] == '{' && pszValidRange[strlen(pszValidRange)-1] == '}' )
         {
-            bValidRangeValid = true;
-            adfValidRange[0] = vrange[0];
-            adfValidRange[1] = vrange[1];
-        }
-        // If not found look for valid_min and valid_max.
-        else
-        {
-            int vmin = 0;
-            status = nc_get_att_int(cdfid, nZId, "valid_min", &vmin);
-            if( status == NC_NOERR )
+            const std::string osValidRange = std::string(
+                pszValidRange).substr(1, strlen(pszValidRange)-2);
+            const CPLStringList aosValidRange(
+                CSLTokenizeString2(osValidRange.c_str(), ",", 0));
+            if( aosValidRange.size() == 2 &&
+                CPLGetValueType(aosValidRange[0]) != CPL_VALUE_STRING &&
+                CPLGetValueType(aosValidRange[1]) != CPL_VALUE_STRING )
             {
-                adfValidRange[0] = vmin;
-                int vmax = 0;
-                status = nc_get_att_int(cdfid, nZId, "valid_max", &vmax);
-                if( status == NC_NOERR )
-                {
-                    adfValidRange[1] = vmax;
-                    bValidRangeValid = true;
-                }
+                bValidRangeValid = true;
+                adfValidRange[0] = CPLAtof(aosValidRange[0]);
+                adfValidRange[1] = CPLAtof(aosValidRange[1]);
             }
         }
+
+        // If not found look for valid_min and valid_max.
+        if( !bValidRangeValid )
+        {
+            double dfMin = 0;
+            double dfMax = 0;
+            if( NCDFGetAttr(cdfid, nZId, "valid_min", &dfMin) == CE_None &&
+                NCDFGetAttr(cdfid, nZId, "valid_max", &dfMax) == CE_None )
+            {
+                adfValidRange[0] = dfMin;
+                adfValidRange[1] = dfMax;
+                bValidRangeValid = true;
+            }
+        }
+
         if (bValidRangeValid && adfValidRange[0] > adfValidRange[1])
         {
             CPLError(
@@ -3308,18 +3313,11 @@ void netCDFDataset::SetProjectionFromVar( int nGroupId, int nVarId,
                     poDS->FetchCopyParam(pszGridMappingValue,
                                         CF_PP_NORTH_POLE_GRID_LONGITUDE,0.0);
 
-                // Hack
-                oSRS.SetProjection( "Rotated_pole" );
-                oSRS.SetExtension(oSRS.GetRoot()->GetValue(),
-                    "PROJ4",
-                    CPLSPrintf("+proj=ob_tran +o_proj=longlat +lon_0=%.18g "
-                               "+o_lon_p=%.18g +o_lat_p=%.18g +a=%.18g "
-                               "+b=%.18g +to_meter=0.0174532925199 +wktext",
-                               180.0 + dfGridNorthPoleLong,
-                               dfNorthPoleGridLong,
-                               dfGridNorthPoleLat,
-                               dfEarthRadius,
-                               dfEarthRadius));
+                oSRS.SetDerivedGeogCRSWithPoleRotationNetCDFCFConvention(
+                                                           "Rotated_pole",
+                                                           dfGridNorthPoleLat,
+                                                           dfGridNorthPoleLong,
+                                                           dfNorthPoleGridLong);
                 bRotatedPole = true;
             }
 
@@ -4313,6 +4311,7 @@ CPLErr netCDFDataset::_SetProjection( const char * pszNewProjection )
 
     if( !STARTS_WITH_CI(pszNewProjection, "GEOGCS")
         && !STARTS_WITH_CI(pszNewProjection, "PROJCS")
+        && !STARTS_WITH_CI(pszNewProjection, "GEOGCRS")
         && !EQUAL(pszNewProjection, "") )
     {
         CPLError(CE_Failure, CPLE_AppDefined,
@@ -4510,6 +4509,84 @@ int NCDFWriteSRSVariable(int cdfid, const OGRSpatialReference* poSRS,
             const char *pszSweepAxisAngle =
                 (pszPredefProj4 != nullptr && strstr(pszPredefProj4, "+sweep=x")) ? "x" : "y";
             addParamString(CF_PP_SWEEP_ANGLE_AXIS, pszSweepAxisAngle);
+        }
+    }
+    else if( poSRS->IsDerivedGeographic() )
+    {
+        const OGR_SRSNode *poConversion = poSRS->GetAttrNode("DERIVINGCONVERSION");
+        if( poConversion == nullptr )
+            return -1;
+        const char *pszMethod = poSRS->GetAttrValue("METHOD");
+        if( pszMethod == nullptr )
+            return -1;
+
+        std::map<std::string, double> oValMap;
+        for( int iChild = 0; iChild < poConversion->GetChildCount(); iChild++ )
+        {
+            const OGR_SRSNode *poNode = poConversion->GetChild(iChild);
+            if( !EQUAL(poNode->GetValue(), "PARAMETER") ||
+                poNode->GetChildCount() <= 2 )
+                continue;
+            const char *pszParamStr = poNode->GetChild(0)->GetValue();
+            const char *pszParamVal = poNode->GetChild(1)->GetValue();
+            oValMap[pszParamStr] = CPLAtof(pszParamVal);
+        }
+
+        if( EQUAL(pszMethod, "PROJ ob_tran o_proj=longlat") )
+        {
+            // Not enough interoperable to be written as WKT
+            bWriteGDALTags = false;
+
+            const double dfLon0 = oValMap["lon_0"];
+            const double dfLonp = oValMap["o_lon_p"];
+            const double dfLatp = oValMap["o_lat_p"];
+
+            pszCFProjection = CPLStrdup("rotated_pole");
+            addParamString(CF_GRD_MAPPING_NAME, "rotated_latitude_longitude");
+            addParamDouble(CF_PP_GRID_NORTH_POLE_LONGITUDE, dfLon0 - 180);
+            addParamDouble(CF_PP_GRID_NORTH_POLE_LATITUDE, dfLatp);
+            addParamDouble(CF_PP_NORTH_POLE_GRID_LONGITUDE, dfLonp);
+        }
+        else if( EQUAL(pszMethod, "Pole rotation (netCDF CF convention)") )
+        {
+            // Not enough interoperable to be written as WKT
+            bWriteGDALTags = false;
+
+            const double dfGridNorthPoleLat = oValMap["Grid north pole latitude (netCDF CF convention)"];
+            const double dfGridNorthPoleLong = oValMap["Grid north pole longitude (netCDF CF convention)"];
+            const double dfNorthPoleGridLong = oValMap["North pole grid longitude (netCDF CF convention)"];
+
+            pszCFProjection = CPLStrdup("rotated_pole");
+            addParamString(CF_GRD_MAPPING_NAME, "rotated_latitude_longitude");
+            addParamDouble(CF_PP_GRID_NORTH_POLE_LONGITUDE, dfGridNorthPoleLong);
+            addParamDouble(CF_PP_GRID_NORTH_POLE_LATITUDE, dfGridNorthPoleLat);
+            addParamDouble(CF_PP_NORTH_POLE_GRID_LONGITUDE, dfNorthPoleGridLong);
+        }
+        else if( EQUAL(pszMethod, "Pole rotation (GRIB convention)") )
+        {
+            // Not enough interoperable to be written as WKT
+            bWriteGDALTags = false;
+
+            const double dfLatSouthernPole = oValMap["Latitude of the southern pole (GRIB convention)"];
+            const double dfLonSouthernPole = oValMap["Longitude of the southern pole (GRIB convention)"];
+            const double dfAxisRotation = oValMap["Axis rotation (GRIB convention)"];
+
+            const double dfLon0 = dfLonSouthernPole;
+            const double dfLonp = dfAxisRotation == 0 ? 0 : -dfAxisRotation;
+            const double dfLatp = dfLatSouthernPole == 0 ? 0 : -dfLatSouthernPole;
+
+            pszCFProjection = CPLStrdup("rotated_pole");
+            addParamString(CF_GRD_MAPPING_NAME, "rotated_latitude_longitude");
+            addParamDouble(CF_PP_GRID_NORTH_POLE_LONGITUDE, dfLon0 - 180);
+            addParamDouble(CF_PP_GRID_NORTH_POLE_LATITUDE, dfLatp);
+            addParamDouble(CF_PP_NORTH_POLE_GRID_LONGITUDE, dfLonp);
+        }
+        else
+        {
+            CPLError(CE_Failure, CPLE_NotSupported,
+                     "Unsupported method for DerivedGeographicCRS: %s",
+                     pszMethod);
+            return -1;
         }
     }
     else
