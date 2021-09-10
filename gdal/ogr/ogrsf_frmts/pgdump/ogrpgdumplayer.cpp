@@ -257,7 +257,7 @@ OGRErr OGRPGDumpLayer::CreateFeatureViaInsert( OGRFeature *poFeature )
                 osCommand += ", ";
 
             OGRGeomFieldDefn* poGFldDefn = poFeature->GetGeomFieldDefnRef(i);
-            osCommand = osCommand + OGRPGDumpEscapeColumnName(poGFldDefn->GetNameRef()) + " ";
+            osCommand += OGRPGDumpEscapeColumnName(poGFldDefn->GetNameRef()) + " ";
             bNeedComma = true;
         }
     }
@@ -268,7 +268,7 @@ OGRErr OGRPGDumpLayer::CreateFeatureViaInsert( OGRFeature *poFeature )
         if( bNeedComma )
             osCommand += ", ";
 
-        osCommand = osCommand + OGRPGDumpEscapeColumnName(pszFIDColumn) + " ";
+        osCommand += OGRPGDumpEscapeColumnName(pszFIDColumn) + " ";
         bNeedComma = true;
     }
     else
@@ -288,8 +288,7 @@ OGRErr OGRPGDumpLayer::CreateFeatureViaInsert( OGRFeature *poFeature )
         else
             osCommand += ", ";
 
-        osCommand = osCommand
-            + OGRPGDumpEscapeColumnName(poFeatureDefn->GetFieldDefn(i)->GetNameRef());
+        osCommand += OGRPGDumpEscapeColumnName(poFeatureDefn->GetFieldDefn(i)->GetNameRef());
     }
 
     const bool bEmptyInsert = !bNeedComma;
@@ -1544,6 +1543,13 @@ CPLString OGRPGCommonLayerGetPGDefault(OGRFieldDefn* poFieldDefn)
 OGRErr OGRPGDumpLayer::CreateField( OGRFieldDefn *poFieldIn,
                                     int bApproxOK )
 {
+    if( poFeatureDefn->GetFieldCount() + poFeatureDefn->GetGeomFieldCount() == 1600 )
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "Maximum number of fields supported is 1600.");
+        return OGRERR_FAILURE;
+    }
+
     CPLString osFieldType;
     OGRFieldDefn oField( poFieldIn );
 
@@ -1639,6 +1645,13 @@ OGRErr OGRPGDumpLayer::CreateField( OGRFieldDefn *poFieldIn,
 OGRErr OGRPGDumpLayer::CreateGeomField( OGRGeomFieldDefn *poGeomFieldIn,
                                         int /* bApproxOK */ )
 {
+    if( poFeatureDefn->GetFieldCount() + poFeatureDefn->GetGeomFieldCount() == 1600 )
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "Maximum number of fields supported is 1600.");
+        return OGRERR_FAILURE;
+    }
+
     OGRwkbGeometryType eType = poGeomFieldIn->GetType();
     if( eType == wkbNone )
     {
