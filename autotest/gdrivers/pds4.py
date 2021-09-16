@@ -68,7 +68,6 @@ def validate_xml(filename):
                                   force_download=True):
         pytest.skip()
 
-
     # Needed by PDS4_CART_1D00_1933
     if not gdaltest.download_file('https://pds.nasa.gov/pds4/geom/v1/PDS4_GEOM_1B10_1700.xsd',
                                   'pds.nasa.gov_pds4_geom_v1_PDS4_GEOM_1B10_1700.xsd',
@@ -435,7 +434,7 @@ def test_pds4_9():
 
     template = '/vsimem/template.xml'
 
-    # Empty Special_Constants
+    # Empty Special_Constants + optional Reference_List
     gdal.FileFromMemBuffer(template, """
 <Product_Observational xmlns="http://pds.nasa.gov/pds4/pds/v1"
                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -475,6 +474,15 @@ def test_pds4_9():
         </Internal_Reference>
         </Target_Identification>
     </Observation_Area>
+    <!-- some comments -->
+    <Reference_List>
+        <External_Reference>
+          <doi>doi</doi>
+          <reference_text>ref_text</reference_text>
+          <description>instrument overview</description>
+        </External_Reference>
+    </Reference_List>
+    <!-- other comments -->
     <File_Area_Observational>
         <Array_2D>
             <Special_Constants />
@@ -491,6 +499,14 @@ def test_pds4_9():
     ndv = ds.GetRasterBand(1).GetNoDataValue()
     assert ndv == 10
     ds = None
+
+    f = gdal.VSIFOpenL(filename, 'rb')
+    if f:
+        data = gdal.VSIFReadL(1, 10000, f).decode('ascii')
+        gdal.VSIFCloseL(f)
+    assert 'some comments' in data
+    assert '<Reference_List>' in data
+    assert 'other comments' in data
 
     ret = validate_xml(filename)
     assert ret, 'validation failed'
@@ -1424,4 +1440,76 @@ def test_pds4_createlabelonly_pds3():
     src_ds = gdal.Open('/vsimem/mc02_truncated.img')
     return _test_createlabelonly(src_ds, expected_content = '<parsing_standard_id>PDS3</parsing_standard_id>')
 
+
+
+###############################################################################
+# Test CreateCopy() with a template that has sp:Spectral_Characteristics
+
+
+def test_pds4_spectral_characteristics():
+
+    # Needed by template_with_sp.xml
+    if not gdaltest.download_file('http://pds.nasa.gov/pds4/sp/v1/PDS4_SP_1100.xsd',
+                                  'pds.nasa.gov_pds4_sp_v1_PDS4_SP_1100.xsd',
+                                  force_download=True):
+        pytest.skip()
+
+    # Needed by PDS4_SP_1100.xsd
+    if not gdaltest.download_file('https://pds.nasa.gov/pds4/pds/v1/PDS4_PDS_1100.xsd',
+                                  'pds.nasa.gov_pds4_pds_v1_PDS4_PDS_1100.xsd',
+                                  force_download=True):
+        pytest.skip()
+
+    # Needed by template_with_sp.xml
+    if not gdaltest.download_file('http://pds.nasa.gov/pds4/disp/v1/PDS4_DISP_1600.xsd',
+                                  'pds.nasa.gov_pds4_disp_v1_PDS4_DISP_1600.xsd',
+                                  force_download=True):
+        pytest.skip()
+
+    # Needed by PDS4_DISP_1600.xsd
+    if not gdaltest.download_file('https://pds.nasa.gov/pds4/pds/v1/PDS4_PDS_1600.xsd',
+                                  'pds.nasa.gov_pds4_pds_v1_PDS4_PDS_1600.xsd',
+                                  force_download=True):
+        pytest.skip()
+
+    filename = '/vsimem/out.xml'
+    with hide_substitution_warnings_error_handler():
+        gdal.GetDriverByName('PDS4').Create(filename, 1, 1,
+                                            options=['TEMPLATE=data/pds4/template_with_sp.xml'])
+
+    ret = validate_xml(filename)
+    assert ret, 'validation failed'
+
+    f = gdal.VSIFOpenL(filename, 'rb')
+    if f:
+        data = gdal.VSIFReadL(1, 100000, f).decode('ascii')
+        gdal.VSIFCloseL(f)
+    assert '<Array_3D_Spectrum>' in data
+    assert '<local_identifier>Spectral_Qube_Object</local_identifier>' in data
+
+    gdal.GetDriverByName('PDS4').Delete(filename)
+
+
+
+###############################################################################
+# Test Oblique Cylindrical
+
+
+def check_pds4_oblique_cylindrical(filename):
+    ds = gdal.Open(filename)
+    assert ds.GetSpatialRef().ExportToProj4().startswith('+proj=ob_tran +R=2575000 +o_proj=eqc +o_lon_p=-158.352054 +o_lat_p=191.769776 +lon_0=-163.331591 ')
+    assert ds.GetGeoTransform() == pytest.approx((-3190898.22208, 0, 351.11116, -764017.88416, 351.11116, 0), rel=1e-8)
+
+def test_pds4_oblique_cylindrical_read():
+    check_pds4_oblique_cylindrical('data/pds4/oblique_cylindrical.xml')
+
+
+def test_pds4_oblique_cylindrical_write():
+    src_ds = gdal.Open('data/pds4/oblique_cylindrical.xml')
+    filename = '/vsimem/out.xml'
+
+    gdal.GetDriverByName('PDS4').CreateCopy(filename, src_ds)
+    check_pds4_oblique_cylindrical(filename)
+
+    gdal.GetDriverByName('PDS4').Delete(filename)
 
