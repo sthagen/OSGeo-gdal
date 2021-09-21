@@ -18,12 +18,6 @@
 # This script is meant to be run by
 # https://github.com/google/oss-fuzz/blob/master/projects/gdal/Dockerfile
 
-# See https://github.com/google/oss-fuzz/issues/6427#issuecomment-922504548
-if test -f /usr/local/lib/libc++.a; then
-  echo "Rename /usr/local/lib/libc++.a to /usr/local/lib/libc++.a.disabled"
-  mv /usr/local/lib/libc++.a /usr/local/lib/libc++.a.disabled
-fi
-
 rm -rf proj
 git clone --depth 1 https://github.com/OSGeo/PROJ proj
 
@@ -164,6 +158,7 @@ if [ "$SANITIZER" = "undefined" ]; then
 fi
 
 cd gdal
+./autogen.sh
 export LDFLAGS="${CXXFLAGS}"
 NETCDF_SWITCH=""
 if [ "$ARCHITECTURE" = "x86_64" ]; then
@@ -171,6 +166,7 @@ if [ "$ARCHITECTURE" = "x86_64" ]; then
 fi
 
 PKG_CONFIG_PATH=$SRC/install/lib/pkgconfig ./configure --without-libtool --with-liblzma --with-expat --with-sqlite3=$SRC/install --with-xerces=$SRC/install --with-webp ${NETCDF_SWITCH} --with-curl=$SRC/install/bin/curl-config --without-hdf5 --with-jpeg=internal --with-proj=$SRC/install -with-proj-extra-lib-for-test="-L$SRC/install/lib -lcurl -lssl -lcrypto -lz -ltiff" --with-poppler --with-libtiff=internal --with-rename-internal-libtiff-symbols
+
 make clean -s
 make -j$(nproc) -s static-lib
 
