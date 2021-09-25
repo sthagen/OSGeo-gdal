@@ -590,7 +590,7 @@ def test_zarr_read_crs(crs_member):
     }
 
     zattrs_all = {
-        "crs": {
+        "_CRS": {
             "projjson": {
                 "$schema": "https://proj.org/schemas/v0.2/projjson.schema.json",
                 "type": "GeographicCRS",
@@ -687,7 +687,7 @@ def test_zarr_read_crs(crs_member):
         }
     }
 
-    zattrs = {"crs": {crs_member: zattrs_all["crs"][crs_member]}}
+    zattrs = {"_CRS": {crs_member: zattrs_all["_CRS"][crs_member]}}
 
     try:
         gdal.Mkdir('/vsimem/test.zarr', 0)
@@ -1576,8 +1576,8 @@ def test_zarr_create_array_set_crs():
         data = gdal.VSIFReadL(1, 10000, f)
         gdal.VSIFCloseL(f)
         j = json.loads(data)
-        assert 'crs' in j
-        crs = j['crs']
+        assert '_CRS' in j
+        crs = j['_CRS']
         assert 'wkt' in crs
         assert 'url' in crs
         if 'projjson' in crs:
@@ -2597,6 +2597,68 @@ def test_zarr_read_invalid_nczarr_dim():
             rg = ds.GetRootGroup()
             ar = rg.OpenMDArray('test')
             assert ar
+
+    finally:
+        gdal.RmdirRecursive('/vsimem/test.zarr')
+
+
+def test_zarr_read_test_overflow_in_AllocateWorkingBuffers_due_to_fortran():
+
+    if sys.maxsize < (1 << 32):
+        pytest.skip()
+
+    try:
+        gdal.Mkdir('/vsimem/test.zarr', 0)
+
+        j = { "chunks": [(1 << 32) - 1, (1 << 32) - 1],
+              "compressor": None,
+              "dtype": '!b1',
+              "fill_value": None,
+              "filters": None,
+              "order": "F",
+              "shape": [ 1, 1 ],
+              "zarr_format": 2
+        }
+
+        gdal.FileFromMemBuffer('/vsimem/test.zarr/.zarray', json.dumps(j))
+
+        ds = gdal.OpenEx('/vsimem/test.zarr', gdal.OF_MULTIDIM_RASTER)
+        assert ds
+        rg = ds.GetRootGroup()
+        ar = rg.OpenMDArray('test')
+        with gdaltest.error_handler():
+            assert ar.Read(count = [1,1]) is None
+
+    finally:
+        gdal.RmdirRecursive('/vsimem/test.zarr')
+
+
+def test_zarr_read_test_overflow_in_AllocateWorkingBuffers_due_to_type_change():
+
+    if sys.maxsize < (1 << 32):
+        pytest.skip()
+
+    try:
+        gdal.Mkdir('/vsimem/test.zarr', 0)
+
+        j = { "chunks": [(1 << 32) - 1, ((1 << 32) - 1) / 8],
+              "compressor": None,
+              "dtype": '<u8',
+              "fill_value": None,
+              "filters": None,
+              "order": "C",
+              "shape": [ 1, 1 ],
+              "zarr_format": 2
+        }
+
+        gdal.FileFromMemBuffer('/vsimem/test.zarr/.zarray', json.dumps(j))
+
+        ds = gdal.OpenEx('/vsimem/test.zarr', gdal.OF_MULTIDIM_RASTER)
+        assert ds
+        rg = ds.GetRootGroup()
+        ar = rg.OpenMDArray('test')
+        with gdaltest.error_handler():
+            assert ar.Read(count = [1,1]) is None
 
     finally:
         gdal.RmdirRecursive('/vsimem/test.zarr')
