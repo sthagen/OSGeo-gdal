@@ -1883,6 +1883,7 @@ const GDALExtendedDataType &netCDFVariable::GetDataType() const
 
     if( m_nDims == 2 && m_nVarType == NC_CHAR && m_nTextLength > 0 )
     {
+        m_bPerfectDataTypeMatch = true;
         m_dt.reset(new GDALExtendedDataType(
             GDALExtendedDataType::CreateString(m_nTextLength)));
     }
@@ -3164,11 +3165,14 @@ double netCDFVariable::GetOffset(bool* pbHasOffset, GDALDataType* peStorageType)
 
 std::vector<GUInt64> netCDFVariable::GetBlockSize() const
 {
-    std::vector<GUInt64> res(GetDimensionCount());
+    const auto nDimCount = GetDimensionCount();
+    std::vector<GUInt64> res(nDimCount);
     if( res.empty() )
         return res;
     int nStorageType = 0;
-    std::vector<size_t> anTemp(GetDimensionCount());
+    // We add 1 to the dimension count, for 2D char variables that we
+    // expose as a 1D variable.
+    std::vector<size_t> anTemp(1 + nDimCount);
     nc_inq_var_chunking(m_gid, m_varid, &nStorageType, &anTemp[0]);
     if( nStorageType == NC_CHUNKED )
     {
