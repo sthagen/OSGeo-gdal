@@ -462,9 +462,6 @@ private:
 
     void        LoadMDAreaOrPoint();
     void        LookForProjection();
-#ifdef ESRI_BUILD
-    void        AdjustLinearUnit( short UOMLength );
-#endif
 
     void        Crystalize();  // TODO: Spelling.
     void        RestoreVolatileParameters(TIFF* hTIFF);
@@ -684,7 +681,7 @@ class GTiffJPEGOverviewDS final : public GDALDataset
     CPLString  m_osTmpFilenameJPEGTable{};
 
     CPLString    m_osTmpFilename{};
-    GDALDataset* m_poJPEGDS = nullptr;
+    std::unique_ptr<GDALDataset> m_poJPEGDS{};
     // Valid block id of the parent DS that match poJPEGDS.
     int          m_nBlockId = -1;
 
@@ -770,8 +767,7 @@ GTiffJPEGOverviewDS::GTiffJPEGOverviewDS( GTiffDataset* poParentDSIn,
 
 GTiffJPEGOverviewDS::~GTiffJPEGOverviewDS()
 {
-    if( m_poJPEGDS != nullptr )
-        GDALClose( m_poJPEGDS );
+    m_poJPEGDS.reset();
     VSIUnlink(m_osTmpFilenameJPEGTable);
     if( !m_osTmpFilename.empty() )
         VSIUnlink(m_osTmpFilename);
@@ -890,9 +886,7 @@ CPLErr GTiffJPEGOverviewBand::IReadBlock( int nBlockXOff, int nBlockYOff,
               m_poGDS->m_poJPEGDS->GetRasterYSize() !=
               nBlockYSize * nScaleFactor)) )
         {
-            if( m_poGDS->m_poJPEGDS != nullptr )
-                GDALClose( m_poGDS->m_poJPEGDS );
-            m_poGDS->m_poJPEGDS = nullptr;
+            m_poGDS->m_poJPEGDS.reset();
         }
 
         CPLString osFileToOpen;
@@ -909,8 +903,7 @@ CPLErr GTiffJPEGOverviewBand::IReadBlock( int nBlockXOff, int nBlockYOff,
             if( m_poGDS->m_poJPEGDS != nullptr &&
                 STARTS_WITH(m_poGDS->m_poJPEGDS->GetDescription(), "/vsisparse/") )
             {
-                GDALClose( m_poGDS->m_poJPEGDS );
-                m_poGDS->m_poJPEGDS = nullptr;
+                m_poGDS->m_poJPEGDS.reset();
             }
             osFileToOpen = m_poGDS->m_osTmpFilename;
 
@@ -943,8 +936,7 @@ CPLErr GTiffJPEGOverviewBand::IReadBlock( int nBlockXOff, int nBlockYOff,
             // fake JPEG file.
 
             // Always re-open.
-            GDALClose( m_poGDS->m_poJPEGDS );
-            m_poGDS->m_poJPEGDS = nullptr;
+            m_poGDS->m_poJPEGDS.reset();
 
             osFileToOpen =
                 CPLSPrintf("/vsisparse/%s", m_poGDS->m_osTmpFilename.c_str());
@@ -978,42 +970,28 @@ CPLErr GTiffJPEGOverviewBand::IReadBlock( int nBlockXOff, int nBlockYOff,
 
         if( m_poGDS->m_poJPEGDS == nullptr )
         {
-            const char* apszDrivers[] = { "JPEG", nullptr };
+            const char* const apszDrivers[] = { "JPEG", nullptr };
 
-            CPLString osOldVal;
-            if( m_poGDS->m_poParentDS->m_nPlanarConfig == PLANARCONFIG_CONTIG &&
-                m_poGDS->nBands == 4 )
-            {
-                osOldVal =
-                    CPLGetThreadLocalConfigOption("GDAL_JPEG_TO_RGB", "");
-                CPLSetThreadLocalConfigOption("GDAL_JPEG_TO_RGB", "NO");
-            }
+            CPLConfigOptionSetter oJPEGtoRGBSetter(
+                "GDAL_JPEG_TO_RGB",
+                m_poGDS->m_poParentDS->m_nPlanarConfig == PLANARCONFIG_CONTIG &&
+                m_poGDS->nBands == 4 ? "NO" : "YES",
+                false);
 
-            m_poGDS->m_poJPEGDS =
-                static_cast<GDALDataset *>( GDALOpenEx(
+            m_poGDS->m_poJPEGDS.reset(GDALDataset::Open(
                     osFileToOpen,
                     GDAL_OF_RASTER | GDAL_OF_INTERNAL,
-                    apszDrivers, nullptr, nullptr) );
+                    apszDrivers, nullptr, nullptr));
 
             if( m_poGDS->m_poJPEGDS != nullptr )
             {
                 // Force all implicit overviews to be available, even for
                 // small tiles.
-                CPLSetThreadLocalConfigOption( "JPEG_FORCE_INTERNAL_OVERVIEWS",
-                                               "YES");
-                GDALGetOverviewCount(GDALGetRasterBand(m_poGDS->m_poJPEGDS, 1));
-                CPLSetThreadLocalConfigOption( "JPEG_FORCE_INTERNAL_OVERVIEWS",
-                                               nullptr);
+                CPLConfigOptionSetter oInternalOverviewsSetter(
+                    "JPEG_FORCE_INTERNAL_OVERVIEWS", "YES", false);
+                GDALGetOverviewCount(GDALGetRasterBand(m_poGDS->m_poJPEGDS.get(), 1));
 
                 m_poGDS->m_nBlockId = nBlockId;
-            }
-
-            if( m_poGDS->m_poParentDS->m_nPlanarConfig == PLANARCONFIG_CONTIG &&
-                m_poGDS->nBands == 4 )
-            {
-                CPLSetThreadLocalConfigOption(
-                    "GDAL_JPEG_TO_RGB",
-                    !osOldVal.empty() ? osOldVal.c_str() : nullptr );
             }
         }
         else
@@ -1024,8 +1002,7 @@ CPLErr GTiffJPEGOverviewBand::IReadBlock( int nBlockXOff, int nBlockYOff,
             m_poGDS->m_poJPEGDS->FlushCache();
             if( CPLGetLastErrorNo() != 0 )
             {
-                GDALClose( m_poGDS->m_poJPEGDS );
-                m_poGDS->m_poJPEGDS = nullptr;
+                m_poGDS->m_poJPEGDS.reset();
                 return CE_Failure;
             }
             m_poGDS->m_nBlockId = nBlockId;
@@ -1035,7 +1012,7 @@ CPLErr GTiffJPEGOverviewBand::IReadBlock( int nBlockXOff, int nBlockYOff,
     CPLErr eErr = CE_Failure;
     if( m_poGDS->m_poJPEGDS )
     {
-        GDALDataset* l_poDS = m_poGDS->m_poJPEGDS;
+        GDALDataset* l_poDS = m_poGDS->m_poJPEGDS.get();
 
         int nReqXOff = 0;
         int nReqYOff = 0;
@@ -12839,11 +12816,6 @@ void GTiffDataset::LookForProjection()
             }
         }
 
-        // Check the tif linear unit and the CS linear unit.
-#ifdef ESRI_BUILD
-        AdjustLinearUnit(psGTIFDefn.UOMLength);
-#endif
-
         GTIFFreeDefn(psGTIFDefn);
 
         GTiffDatasetSetAreaOrPointMD( hGTIF, m_oGTiffMDMD );
@@ -12855,47 +12827,6 @@ void GTiffDataset::LookForProjection()
     m_bForceUnsetGTOrGCPs = false;
     m_bForceUnsetProjection = false;
 }
-
-/************************************************************************/
-/*                          AdjustLinearUnit()                          */
-/*                                                                      */
-/*      The following code is only used in ESRI Builds and there is     */
-/*      outstanding discussion on whether it is even appropriate        */
-/*      then.                                                           */
-/************************************************************************/
-#ifdef ESRI_BUILD
-
-void GTiffDataset::AdjustLinearUnit( short UOMLength )
-{
-    if( !pszProjection || strlen(pszProjection) == 0 )
-        return;
-    if( UOMLength == 9001 )
-    {
-        char* pstr = strstr(pszProjection, "PARAMETER");
-        if( !pstr )
-            return;
-        pstr = strstr(pstr, "UNIT[");
-        if( !pstr )
-            return;
-        pstr = strchr(pstr, ',') + 1;
-        if( !pstr )
-            return;
-        char* pstr1 = strchr(pstr, ']');
-        if( !pstr1 || pstr1 - pstr >= 128 )
-            return;
-        char csUnitStr[128];
-        strncpy(csUnitStr, pstr, pstr1 - pstr);
-        csUnitStr[pstr1-pstr] = '\0';
-        const double csUnit = CPLAtof(csUnitStr);
-        if( fabs(csUnit - 1.0) > 0.000001 )
-        {
-            for( long i = 0; i < 6; ++i )
-                adfGeoTransform[i] /= csUnit;
-        }
-    }
-}
-
-#endif  // def ESRI_BUILD
 
 /************************************************************************/
 /*                            ApplyPamInfo()                            */
