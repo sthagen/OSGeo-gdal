@@ -27,14 +27,6 @@
  * DEALINGS IN THE SOFTWARE.
  ****************************************************************************/
 
-// If we use sunpro compiler on linux. Weird idea indeed!
-#if defined(__SUNPRO_CC) && defined(__linux__)
-#define _GNU_SOURCE
-#elif defined(__GNUC__) && !defined(_GNU_SOURCE)
-// Required to use RTLD_DEFAULT of dlfcn.h.
-#define _GNU_SOURCE
-#endif
-
 #include "cpl_port.h"  // Must be first.
 #include "gtiff.h"
 
@@ -18773,6 +18765,12 @@ CPLErr GTiffDataset::SetSpatialRef( const OGRSpatialReference * poSRS )
 
     m_bGeoTIFFInfoChanged = true;
 
+    if( (m_eProfile == GTiffProfile::BASELINE) &&
+        (GetPamFlags() & GPF_DISABLED) == 0 )
+    {
+        GDALPamDataset::SetSpatialRef(poSRS);
+    }
+
     return CE_None;
 }
 
@@ -18855,6 +18853,14 @@ CPLErr GTiffDataset::SetGeoTransform( double * padfTransform )
         memcpy( m_adfGeoTransform, padfTransform, sizeof(double)*6 );
         m_bGeoTransformValid = true;
         m_bGeoTIFFInfoChanged = true;
+
+        if( (m_eProfile == GTiffProfile::BASELINE) &&
+            !CPLFetchBool( m_papszCreationOptions, "TFW", false ) &&
+            !CPLFetchBool( m_papszCreationOptions, "WORLDFILE", false ) &&
+            (GetPamFlags() & GPF_DISABLED) == 0 )
+        {
+            GDALPamDataset::SetGeoTransform(padfTransform);
+        }
 
         return CE_None;
     }
@@ -18964,6 +18970,12 @@ CPLErr GTiffDataset::SetGCPs( int nGCPCountIn, const GDAL_GCP *pasGCPListIn,
         m_pasGCPList = GDALDuplicateGCPs(m_nGCPCount, pasGCPListIn);
 
         m_bGeoTIFFInfoChanged = true;
+
+        if( (m_eProfile == GTiffProfile::BASELINE) &&
+            (GetPamFlags() & GPF_DISABLED) == 0 )
+        {
+            GDALPamDataset::SetGCPs(nGCPCountIn, pasGCPListIn, poGCPSRS);
+        }
 
         return CE_None;
     }
@@ -19834,9 +19846,6 @@ static void GTiffTagExtender(TIFF *tif)
 /*      unnecessary paging in of the library for GDAL apps that         */
 /*      don't use it.                                                   */
 /************************************************************************/
-#if defined(HAVE_DLFCN_H) && !defined(WIN32)
-#include <dlfcn.h>
-#endif
 
 static std::mutex oDeleteMutex;
 #ifdef HAVE_JXL
@@ -19860,38 +19869,6 @@ int GTiffOneTimeInit()
         return TRUE;
 
     bOneTimeInitDone = true;
-
-    // This is a frequent configuration error that is difficult to track down
-    // for people unaware of the issue : GDAL built against internal libtiff
-    // (4.X), but used by an application that links with external libtiff (3.X)
-    // Note: on my conf, the order that cause GDAL to crash - and that is
-    // detected by the following code - is "-ltiff -lgdal". "-lgdal -ltiff"
-    // works for the GTiff driver but probably breaks the application that
-    // believes it uses libtiff 3.X but we cannot detect that.
-#if !defined(RENAME_INTERNAL_LIBTIFF_SYMBOLS)
-#if defined(HAVE_DLFCN_H) && !defined(WIN32)
-    const char* (*pfnVersion)(void);
-#ifdef HAVE_GCC_WARNING_ZERO_AS_NULL_POINTER_CONSTANT
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
-#endif
-    pfnVersion = reinterpret_cast<const char* (*)(void)>(dlsym(RTLD_DEFAULT, "TIFFGetVersion"));
-#ifdef HAVE_GCC_WARNING_ZERO_AS_NULL_POINTER_CONSTANT
-#pragma GCC diagnostic pop
-#endif
-    if( pfnVersion )
-    {
-        const char* pszVersion = pfnVersion();
-        if( pszVersion && strstr(pszVersion, "Version 3.") != nullptr )
-        {
-            CPLError(
-                CE_Warning, CPLE_AppDefined,
-                "libtiff version mismatch: You're linking against libtiff 3.X, "
-                "but GDAL has been compiled against libtiff >= 4.0.0" );
-        }
-    }
-#endif  // HAVE_DLFCN_H
-#endif // !defined(RENAME_INTERNAL_LIBTIFF_SYMBOLS)
 
     _ParentExtender = TIFFSetTagExtender(GTiffTagExtender);
 
