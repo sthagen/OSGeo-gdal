@@ -59,8 +59,12 @@ mkdir tiledb \
 ln -s /usr/lib/ogdi/libvrf.so /usr/lib
 
 # Build libjxl
+# libjxl being still unstable, if the main branch fails to compile/test
+# you can replace JXL_TREEISH=main by JXL_TREEISH=sha1_of_known_working_commit
+JXL_TREEISH=main
 git clone https://github.com/libjxl/libjxl.git --recursive \
     && cd libjxl \
+    && git checkout ${JXL_TREEISH} \
     && mkdir build \
     && cd build \
     && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF .. \

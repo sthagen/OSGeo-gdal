@@ -25,6 +25,7 @@
 
 #include "gdal_unit_test.h"
 
+#include "gdal_alg.h"
 #include "gdal_priv.h"
 #include "gdal_utils.h"
 #include "gdal_priv_templates.hpp"
@@ -281,12 +282,12 @@ namespace tut
             bool bHasFlushCache;
         public:
             DatasetWithErrorInFlushCache() : bHasFlushCache(false) { }
-           ~DatasetWithErrorInFlushCache() { FlushCache(); }
-            virtual void FlushCache(void) override
+           ~DatasetWithErrorInFlushCache() { FlushCache(true); }
+            virtual void FlushCache(bool bAtClosing) override
             {
                 if( !bHasFlushCache)
                     CPLError(CE_Failure, CPLE_AppDefined, "some error");
-                GDALDataset::FlushCache();
+                GDALDataset::FlushCache(bAtClosing);
                 bHasFlushCache = true;
             }
             virtual CPLErr _SetProjection(const char*) override { return CE_None; }
@@ -1631,9 +1632,11 @@ namespace tut
     // Test that PCIDSK GetMetadataItem() return is stable
     template<> template<> void object::test<21>()
     {
+        auto poDrv = GDALDriver::FromHandle(GDALGetDriverByName("PCIDSK"));
+        if( poDrv == nullptr )
+            return;
         GDALDatasetUniquePtr poDS(
-            GDALDriver::FromHandle(
-                GDALGetDriverByName("PCIDSK"))->Create("/vsimem/tmp.pix", 1, 1, 1, GDT_Byte, nullptr));
+            poDrv->Create("/vsimem/tmp.pix", 1, 1, 1, GDT_Byte, nullptr));
         ensure( poDS != nullptr );
         poDS->SetMetadataItem("FOO", "BAR");
         poDS->SetMetadataItem("BAR", "BAZ");
@@ -1844,4 +1847,20 @@ namespace tut
         ensure_equals(static_cast<int>(panTranslationTable[3]), 2); // special nodata mapping
         CPLFree(panTranslationTable);
     }
+
+    // Test effect of MarkSuppressOnClose() with the final FlushCache() at dataset destruction
+    template<> template<> void object::test<24>()
+    {
+        const char* pszFilename = "/vsimem/out.tif";
+        GDALDatasetUniquePtr poDstDS(
+            GDALDriver::FromHandle(
+                GDALGetDriverByName("GTiff"))->Create(pszFilename, 1, 1, 1, GDT_Byte, nullptr));
+        poDstDS->MarkSuppressOnClose();
+        poDstDS->GetRasterBand(1)->Fill(255);
+        poDstDS->FlushCache(true);
+        // All buffers have been flushed, but our dirty block should not have been written
+        // hence the checksum will be 0
+        ensure_equals(GDALChecksumImage(GDALRasterBand::FromHandle(poDstDS->GetRasterBand(1)),0,0,1,1), 0);
+    }
+
 } // namespace tut
