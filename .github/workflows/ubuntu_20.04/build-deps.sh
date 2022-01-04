@@ -15,7 +15,7 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y --fix-missing --no-install-rec
     libnetcdf-dev libpoppler-dev libpoppler-private-dev \
     libspatialite-dev swig libhdf4-alt-dev libhdf5-serial-dev \
     libfreexl-dev unixodbc-dev libwebp-dev libepsilon-dev \
-    liblcms2-2 libpcre3-dev libcrypto++-dev libdap-dev libfyba-dev \
+    liblcms2-2 libpcre2-dev libcrypto++-dev libdap-dev libfyba-dev \
     libkml-dev libmysqlclient-dev libogdi-dev \
     libcfitsio-dev openjdk-8-jdk libzstd-dev \
     libpq-dev libssl-dev libboost-dev \
@@ -62,6 +62,7 @@ ln -s /usr/lib/ogdi/libvrf.so /usr/lib
 # libjxl being still unstable, if the main branch fails to compile/test
 # you can replace JXL_TREEISH=main by JXL_TREEISH=sha1_of_known_working_commit
 JXL_TREEISH=main
+# Mention commit ea2612d6df99e9878b51e315935f9d6201f5fe47 to force rebuild of dep
 git clone https://github.com/libjxl/libjxl.git --recursive \
     && cd libjxl \
     && git checkout ${JXL_TREEISH} \

@@ -193,17 +193,28 @@ if (Python_Interpreter_FOUND)
   endif ()
 
   # Generate extension
+
+  # setup.py build_ext --inplace doesn't refresh the .so files if the source files haven't changed, which may cause the
+  # add_custom_command(OUTPUT ${PY_SO_LIST} ...) to be re-run, even when not needed.
+  set(BUILD_EXT_EXTRA_CONTENT)
+  if (CMAKE_VERSION VERSION_GREATER 3.12)
+    foreach (f IN LISTS PY_SO_LIST)
+      string(APPEND BUILD_EXT_EXTRA_CONTENT "file(TOUCH_NOCREATE ${f})\n")
+    endforeach ()
+  endif ()
+
   if (ONLY_GENERATE_FOR_RELEASE)
     set(BUILD_EXT_FILENAME ${CMAKE_CURRENT_BINARY_DIR}/build_ext_$<CONFIG>.cmake)
     file(
       GENERATE
       OUTPUT ${BUILD_EXT_FILENAME}
       CONTENT
-        "execute_process(COMMAND $<IF:$<CONFIG:Release>,${Python_EXECUTABLE} setup.py build_ext --inplace,${CMAKE_COMMAND} -E echo \"setup.py build_ext only run in Release configuration\">)"
+        "execute_process(COMMAND $<IF:$<CONFIG:Release>,${Python_EXECUTABLE} setup.py build_ext --inplace,${CMAKE_COMMAND} -E echo \"setup.py build_ext only run in Release configuration\">)\n${BUILD_EXT_EXTRA_CONTENT}"
       )
   else ()
     set(BUILD_EXT_FILENAME ${CMAKE_CURRENT_BINARY_DIR}/build_ext.cmake)
-    file(WRITE ${BUILD_EXT_FILENAME} "execute_process(COMMAND ${Python_EXECUTABLE} setup.py build_ext --inplace)\n")
+    file(WRITE ${BUILD_EXT_FILENAME}
+         "execute_process(COMMAND ${Python_EXECUTABLE} setup.py build_ext --inplace)\n${BUILD_EXT_EXTRA_CONTENT}")
   endif ()
   add_custom_command(
     OUTPUT ${PY_SO_LIST}
@@ -264,10 +275,14 @@ if (Python_Interpreter_FOUND)
     endif ()
   endif ()
 
+  # setuptools 60.0 defaults to SETUPTOOLS_USE_DISTUTILS=local, and thus Debian's specific --install-layout distutils
+  # option cannot be used
   if (DEFINED GDAL_PYTHON_INSTALL_LAYOUT)
     set(INSTALL_ARGS "${INSTALL_ARGS} --install-layout=${GDAL_PYTHON_INSTALL_LAYOUT}")
+    set(SETUPTOOLS_USE_DISTUTILS stdlib)
   elseif ("${SITE_PACKAGE_DIR}" MATCHES "dist-packages")
     set(INSTALL_ARGS "${INSTALL_ARGS} --install-layout=deb")
+    set(SETUPTOOLS_USE_DISTUTILS stdlib)
   endif ()
 
   configure_file(${GDAL_CMAKE_TEMPLATE_PATH}/install_python.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/install_python.cmake
