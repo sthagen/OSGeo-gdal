@@ -294,7 +294,7 @@ case "${host_os}" in
 esac
 
 dnl Checks for header files.
-AC_CHECK_HEADERS(assert.h fcntl.h unistd.h dlfcn.h stdint.h limits.h locale.h values.h float.h errno.h direct.h)
+AC_CHECK_HEADERS(fcntl.h unistd.h dlfcn.h locale.h direct.h)
 
 dnl Check for userfaultfd support
 AC_CHECK_HEADERS([linux/userfaultfd.h], [ENABLE_UFFD="yes"], [ENABLE_UFFD="no"], [])
@@ -313,38 +313,15 @@ esac
 AC_C_BIGENDIAN
 
 dnl Check for 64 bit file API
-AC_CHECK_TYPES([long long])
 AC_UNIX_STDIO_64
 
 AC_CHECK_SIZEOF(int)
 AC_CHECK_SIZEOF(unsigned long)
 AC_CHECK_SIZEOF(void*)
-dnl Some compilers (IBM VisualAge) has these types defined, so check it here.
-dnl These types are used in internal libtiff.
-AC_CHECK_TYPES([int8, int16, int32],,,
-[
-#if HAVE_INTTYPES_H
-# include <inttypes.h>
-#endif
-])
-AC_CHECK_TYPES(uintptr_t)
-
-dnl We need the following lines for libtiff too.
-HAVE_IEEEFP=1
-AC_DEFINE_UNQUOTED(HAVE_IEEEFP, $HAVE_IEEEFP, [Define as 0 or 1 according to the floating point format supported by the machine])
 
 dnl Checks for library functions.
-AC_FUNC_VPRINTF
-AC_CHECK_FUNCS(snprintf vsnprintf)
-AC_CHECK_FUNCS(atoll)
-AC_CHECK_FUNCS(strtoll)
-AC_CHECK_FUNCS(strtoull)
-AC_CHECK_FUNCS(strtof)
+AC_CHECK_FUNCS(vsnprintf)
 AC_CHECK_FUNCS(getcwd)
-
-dnl Check for declarations
-AC_CHECK_DECLS(strtof)
-
 AC_CHECK_FUNCS(readlink)
 AC_CHECK_FUNCS(lstat)
 AC_CHECK_FUNCS(posix_spawnp)
@@ -1761,7 +1738,7 @@ OGRFORMATS_DISABLED=
 AC_DEFUN([INTERNAL_FORMATS],[aaigrid adrg aigrid airsar arg blx bmp bsb cals ceos ceos2 coasp cosar ctg dimap dted elas envisat ers esric fit gff gsg gxf hf2 idrisi ilwis ingr iris iso8211 jaxapalsar jdem kmlsuperoverlay l1b leveller map mrf msgn ngsgeoid nitf northwood pds prf r raw rmf rs2 safe saga sdts sentinel2 sgi sigdem srtmhgt stacit stacta terragen tga til tsx usgsdem xpm xyz zarr zmap])
 AC_DEFUN([INTERNAL_OPT_FORMATS],[grib ozi pdf rik])
 AC_DEFUN([INTERNAL_DRIVERS],[arcgen avc cad csv dgn dxf edigeo flatgeobuf geoconcept georss gml gmt gpsbabel gpx gtm jml mapml mvt ntf openfilegdb pgdump rec s57 selafin shape svg sxf tiger vdv wasp])dnl
-AC_DEFUN([CURL_FORMATS],[eeda plmosaic rda wcs wms wmts daas ogcapi])dnl
+AC_DEFUN([CURL_FORMATS],[eeda plmosaic wcs wms wmts daas ogcapi])dnl
 AC_DEFUN([CURL_DRIVERS],[amigocloud carto cloudant couchdb csw elastic ngw plscenes wfs])dnl
 AC_DEFUN([SQLITE_FORMATS],[rasterlite mbtiles])dnl
 AC_DEFUN([SQLITE_DRIVERS],[gpkg vfk osm])dnl
@@ -2261,6 +2238,19 @@ if test "$PNG_SETTING" != "no" ; then
   	GDALFORMATS_ENABLED="$GDALFORMATS_ENABLED grib"
   fi
 fi
+
+dnl ---------------------------------------------------------------------------
+dnl Check if user requests renaming internal libpng symbols
+dnl ---------------------------------------------------------------------------
+
+AC_ARG_WITH(rename_internal_libpng_symbols,[  --with-rename-internal-libpng-symbols[=ARG] Prefix internal libpng symbols with gdal_ (ARG=yes/no)],,)
+
+RENAME_INTERNAL_PNG_SYMBOLS=no
+if test "x$with_rename_internal_libpng_symbols" = "xyes" -o "x$with_rename_internal_libpng_symbols" = "x"; then
+    RENAME_INTERNAL_PNG_SYMBOLS=yes
+fi
+
+AC_SUBST(RENAME_INTERNAL_PNG_SYMBOLS,$RENAME_INTERNAL_PNG_SYMBOLS)
 
 dnl ---------------------------------------------------------------------------
 dnl Enable DDS driver.
@@ -4677,21 +4667,36 @@ if test "$with_qhull" = "no" ; then
 
 elif test "$with_qhull" = "yes" -o "$with_qhull" = "" ; then
 
-  AC_CHECK_HEADERS([libqhull_r/libqhull_r.h])
-  if test "$ac_cv_header_libqhull_r_libqhull_r_h" = "yes"; then
-    AC_CHECK_LIB(qhull_r,qh_new_qhull,QHULL_SETTING=yes,QHULL_SETTING=no,)
-    if test "$QHULL_SETTING" = "yes"; then
-        QHULL_SETTING=external
-        LIBS="-lqhull_r $LIBS"
-    fi
+  AC_ARG_WITH(qhull_pkgname,[  --with-qhull-pkgname[=ARG]     pkg-config name of the reentrant qhull library, typically qhull_r (default) or qhullstatic_r],,)
+
+  if test "x$with_qhull_pkgname" = "x" ; then
+    with_qhull_pkgname=qhull_r
   fi
 
-  if test "$QHULL_SETTING" = "no" ; then
-    if test "$with_qhull" = "yes"; then
+  PKG_PROG_PKG_CONFIG([0.21])
+  PKG_CHECK_MODULES([QHULL],[$with_qhull_pkgname], [HAVE_QHULL=yes], [HAVE_QHULL=no])
+
+  dnl First try with pkg-config
+  if test "$HAVE_QHULL" = "yes" ; then
+    QHULL_SETTING=external
+    CFLAGS="$CFLAGS $QHULL_CFLAGS"
+    LIBS="$LIBS $QHULL_LIBS"
+  else
+    AC_CHECK_HEADERS([libqhull_r/libqhull_r.h])
+    if test "$ac_cv_header_libqhull_r_libqhull_r_h" = "yes"; then
+      AC_CHECK_LIB(qhull_r,qh_new_qhull,QHULL_SETTING=yes,QHULL_SETTING=no,)
+      if test "$QHULL_SETTING" = "yes"; then
+        QHULL_SETTING=external
+        LIBS="-lqhull_r $LIBS"
+      fi
+    fi
+
+    if test "$QHULL_SETTING" = "no" ; then
+      if test "$with_qhull" = "yes"; then
         AC_MSG_ERROR([--with-qhull requested, but library not found!])
-    else
+      else
         QHULL_SETTING=internal
-        QHULL_INCLUDE_SUBDIR_IS_LIBQHULL=1
+      fi
     fi
   fi
 else
@@ -5478,6 +5483,7 @@ dnl ---------------------------------------------------------------------------
 AC_ARG_WITH(tiledb,[  --with-tiledb[=ARG]    Include TileDB support (ARG=no, yes or tiledb install root path)],,)
 
 TILEDB_SETTING=no
+TILEDB_CFLAGS=
 
 if test "$with_tiledb" = "yes" -o "$with_tiledb" = "" ; then
 
@@ -5495,18 +5501,51 @@ elif test "$with_tiledb" != "no" -a "$with_tiledb" != ""; then
 
   if test "$TILEDB_SETTING" = "yes" ; then
     LIBS="-L$with_tiledb/lib -ltiledb $LIBS"
-    EXTRA_INCLUDES="-I$with_tiledb/include $EXTRA_INCLUDES"
+    TILEDB_CFLAGS="-I$with_tiledb/include"
   else
     echo "libtiledb not found - TileDB support disabled"
   fi
+fi
 
+if test "$TILEDB_SETTING" != "no" ; then
+
+  AC_LANG_PUSH([C++])
+  SAVED_CXXFLAGS=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS $TILEDB_CFLAGS"
+  AC_MSG_CHECKING([if tiledb/tiledb can be included without additional flags])
+  AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
+    [[#include "tiledb/tiledb"]])],
+    [TILEDB_CAN_BE_INCLUDED="yes"]
+    [AC_MSG_RESULT([yes])],
+    [TILEDB_CAN_BE_INCLUDED="no"]
+    [AC_MSG_RESULT([no])])
+  CXXFLAGS=$SAVED_CXXFLAGS
+  AC_LANG_POP([C++])
+
+  if test "$TILEDB_CAN_BE_INCLUDED" = "no"; then
+    AC_LANG_PUSH([C++])
+    SAVED_CXXFLAGS=$CXXFLAGS
+    CXXFLAGS="$CXXFLAGS $TILEDB_CFLAGS -std=c++17"
+    AC_MSG_CHECKING([if tiledb/tiledb can be included with -std=c++17])
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
+      [[#include "tiledb/tiledb"]])],
+      [TILEDB_CAN_BE_INCLUDED="yes"]
+      [AC_MSG_RESULT([yes])],
+      [TILEDB_CAN_BE_INCLUDED="no"]
+      [AC_MSG_RESULT([no])])
+    CXXFLAGS=$SAVED_CXXFLAGS
+    AC_LANG_POP([C++])
+
+    if test "$TILEDB_CAN_BE_INCLUDED" = "yes"; then
+      TILEDB_CFLAGS="$TILEDB_CFLAGS -std=c++17"
+    fi
+  fi
+
+  OPT_GDAL_FORMATS="tiledb $OPT_GDAL_FORMATS"
 fi
 
 AC_SUBST(TILEDB_SETTING,$TILEDB_SETTING)
-
-if test "$TILEDB_SETTING" != "no" ; then
-  OPT_GDAL_FORMATS="tiledb $OPT_GDAL_FORMATS"
-fi
+AC_SUBST(TILEDB_CFLAGS,$TILEDB_CFLAGS)
 
 dnl ---------------------------------------------------------------------------
 dnl MDB driver
@@ -5696,7 +5735,7 @@ if test "$with_brunsli" != "" -a "$with_brunsli" != "no" ; then
   BRUNSLI_ENABLED="yes"
   AC_SUBST(BRUNSLI_ENABLED, $BRUNSLI_ENABLED)
   AC_SUBST(BRUNSLI_INCLUDE, -I$prefix/include)
-  AC_SUBST(BRUNSLI_LIB, "-lbrunslicommon -lbrunslienc -lbrunslidec -lbrotlicommon -lbrotlienc -lbrotlidec")
+  AC_SUBST(BRUNSLI_LIB, "-lbrunslienc-c -lbrunslidec-c")
 fi
 
 dnl ---------------------------------------------------------------------------
@@ -5941,7 +5980,7 @@ dnl Whether to include LERC in the build
 dnl ---------------------------------------------------------------------------
 
 AC_ARG_WITH(lerc,
-    [  --with-lerc[=ARG]         Include libLerc support(ARG=yes/no/internal/path). Internal liblerc is required for MRF Lerc support. Internal or external libLerc may be used for internal libtiff Lerc support.],,,)
+    [  --with-lerc[=ARG]         Include libLerc support(ARG=yes/no/internal/path). Used by internal libtiff and MRF.],,,)
 
 HAVE_LERC=no
 AC_MSG_CHECKING([for LERC])
@@ -6130,6 +6169,11 @@ else
 
     if test "$HAVE_JXL" = "yes"; then
         LIBS="$JXL_LIBS $LIBS"
+
+        AC_CHECK_LIB(jxl,JxlEncoderFrameSettingsSetOption, [HAVE_JxlEncoderFrameSettingsSetOption=yes], [HAVE_JxlEncoderFrameSettingsSetOption=no])
+        if test "$HAVE_JxlEncoderFrameSettingsSetOption" = "yes"; then
+            JXL_CFLAGS="$JXL_CFLAGS -DHAVE_JxlEncoderFrameSettingsSetOption"
+        fi
     fi
   fi
 fi
@@ -6338,3 +6382,7 @@ fi
 if test "$HAVE_TEIGHA" = "yes" -a "$ECW_54" = "yes"; then
     AC_MSG_WARN([Both Teigha SDK and ECW SDK >= 5.4 found. This was found to cause crashes in ECW driver.])
 fi
+
+AC_MSG_NOTICE([])
+AC_MSG_NOTICE([])
+AC_MSG_WARN([Starting with GDAL 3.5, the autoconf build system is deprecated in favor of the CMake build system. The autoconf build system will be completely removed in GDAL 3.6])

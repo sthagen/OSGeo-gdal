@@ -36,6 +36,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cmath>
 #include <ctime>
 
 #include <limits>
@@ -550,7 +551,8 @@ OGRGeometry *OGRFeature::StealGeometry( int iGeomField )
  *
  * After this call the OGRFeature will have a NULL geometry.
  *
- * @return the pointer to the geometry.
+ * @param hFeat feature from which to steal the first geometry.
+ * @return the pointer to the stolen geometry.
  */
 
 OGRGeometryH OGR_F_StealGeometry( OGRFeatureH hFeat )
@@ -560,6 +562,36 @@ OGRGeometryH OGR_F_StealGeometry( OGRFeatureH hFeat )
 
     return OGRGeometry::ToHandle(
         OGRFeature::FromHandle(hFeat)->StealGeometry());
+}
+
+/************************************************************************/
+/*                       OGR_F_StealGeometryEx()                        */
+/************************************************************************/
+
+/**
+ * \brief Take away ownership of geometry.
+ *
+ * Fetch the geometry from this feature, and clear the reference to the
+ * geometry on the feature.  This is a mechanism for the application to
+ * take over ownership of the geometry from the feature without copying.
+ * This is the functional opposite of OGR_F_SetGeomFieldDirectly.
+ *
+ * After this call the OGRFeature will have a NULL geometry for the
+ * geometry field of index iGeomField.
+ *
+ * @param hFeat feature from which to steal a geometry.
+ * @param iGeomField index of the geometry field to steal.
+ * @return the pointer to the stolen geometry.
+ * @since GDAL 3.5
+ */
+
+OGRGeometryH OGR_F_StealGeometryEx( OGRFeatureH hFeat, int iGeomField )
+
+{
+    VALIDATE_POINTER1( hFeat, "OGR_F_StealGeometryEx", nullptr );
+
+    return OGRGeometry::ToHandle(
+        OGRFeature::FromHandle(hFeat)->StealGeometry( iGeomField ));
 }
 
 /************************************************************************/
@@ -5508,10 +5540,25 @@ OGRBoolean OGRFeature::Equal( const OGRFeature * poFeature ) const
                 break;
 
             case OFTReal:
-                if( GetFieldAsDouble(i) !=
-                       poFeature->GetFieldAsDouble(i) )
+            {
+                const double dfVal1 = GetFieldAsDouble(i);
+                const double dfVal2 = poFeature->GetFieldAsDouble(i);
+                if( std::isnan(dfVal1) )
+                {
+                    if( !std::isnan(dfVal2) )
+                        return FALSE;
+                }
+                else if( std::isnan(dfVal2) )
+                {
+                    if( !std::isnan(dfVal1) )
+                        return FALSE;
+                }
+                else if ( dfVal1 != dfVal2 )
+                {
                     return FALSE;
+                }
                 break;
+            }
 
             case OFTString:
                 if( strcmp(GetFieldAsString(i),
@@ -5564,8 +5611,22 @@ OGRBoolean OGRFeature::Equal( const OGRFeature * poFeature ) const
                     return FALSE;
                 for( int j = 0; j < nCount1; j++ )
                 {
-                    if( padfList1[j] != padfList2[j] )
+                    const double dfVal1 = padfList1[j];
+                    const double dfVal2 = padfList2[j];
+                    if( std::isnan(dfVal1) )
+                    {
+                        if( !std::isnan(dfVal2) )
+                            return FALSE;
+                    }
+                    else if( std::isnan(dfVal2) )
+                    {
+                        if( !std::isnan(dfVal1) )
+                            return FALSE;
+                    }
+                    else if ( dfVal1 != dfVal2 )
+                    {
                         return FALSE;
+                    }
                 }
                 break;
             }

@@ -1,6 +1,8 @@
-# CMake4GDAL project is distributed under X/MIT license. See accompanying file LICENSE.txt.
+# CMake4GDAL project is distributed under MIT license. See accompanying file LICENSE.txt.
 
 include(TargetPublicHeader)
+include(GdalDriverHelper)
+
 target_public_header(
   TARGET
   gdal
@@ -135,42 +137,39 @@ if (HAVE_AVX_AT_COMPILE_TIME)
   target_compile_definitions(cpl PRIVATE -DHAVE_AVX_AT_COMPILE_TIME)
 endif ()
 
-if (NOT WIN32)
-  gdal_add_private_link_libraries(${CMAKE_DL_LIBS})
+if (NOT WIN32 AND CMAKE_DL_LIBS)
+  gdal_target_link_libraries(cpl PRIVATE ${CMAKE_DL_LIBS})
 endif ()
 
 # Internal libraries first
-if (GDAL_USE_LIBJSONC_INTERNAL)
-  target_include_directories(cpl PRIVATE $<TARGET_PROPERTY:libjson,SOURCE_DIR>)
+if (GDAL_USE_JSONC_INTERNAL)
+  gdal_add_vendored_lib(cpl libjson)
 endif ()
 
 target_compile_definitions(cpl PRIVATE -DHAVE_LIBZ -DZIP_SUPPORT)
 target_public_header(TARGET gdal HEADERS cpl_minizip_ioapi.h cpl_minizip_unzip.h cpl_minizip_zip.h)
 target_sources(cpl PRIVATE cpl_vsil_gzip.cpp cpl_minizip_ioapi.cpp cpl_minizip_unzip.cpp cpl_minizip_zip.cpp)
 
-if (GDAL_USE_LIBZ_INTERNAL)
-  target_include_directories(cpl PRIVATE $<TARGET_PROPERTY:libz,SOURCE_DIR>)
+if (GDAL_USE_ZLIB_INTERNAL)
+  gdal_add_vendored_lib(cpl libz)
 endif ()
 
 # Now external libraries
-if (NOT GDAL_USE_LIBJSONC_INTERNAL)
-  target_include_directories(cpl PRIVATE $<TARGET_PROPERTY:JSONC::JSONC,INTERFACE_INCLUDE_DIRECTORIES>)
-  gdal_add_private_link_libraries(JSONC::JSONC)
+if (NOT GDAL_USE_JSONC_INTERNAL)
+  gdal_target_link_libraries(cpl PRIVATE ${JSONC_LIBRARIES})
 endif ()
 
-if (NOT GDAL_USE_LIBZ_INTERNAL)
+if (NOT GDAL_USE_ZLIB_INTERNAL)
   target_compile_definitions(cpl PRIVATE -DHAVE_ZLIB_H -DHAVE_ZLIB)
   if (MSVC)
     target_compile_definitions(cpl PRIVATE -DZLIB_DLL)
   endif (MSVC)
-  target_include_directories(cpl PRIVATE $<TARGET_PROPERTY:ZLIB::ZLIB,INTERFACE_INCLUDE_DIRECTORIES>)
-  gdal_add_private_link_libraries(ZLIB::ZLIB)
+  gdal_target_link_libraries(cpl PRIVATE ZLIB::ZLIB)
 endif ()
 
 if (GDAL_USE_CURL)
   target_compile_definitions(cpl PRIVATE -DHAVE_CURL)
-  target_include_directories(cpl PRIVATE $<TARGET_PROPERTY:CURL::libcurl,INTERFACE_INCLUDE_DIRECTORIES>)
-  gdal_add_private_link_libraries(CURL::libcurl)
+  gdal_target_link_libraries(cpl PRIVATE CURL::libcurl)
 endif ()
 
 if (GDAL_USE_ICONV)
@@ -196,19 +195,16 @@ if (GDAL_USE_ICONV)
         target_compile_definitions(cpl_iconv PRIVATE -DLIBICONV_PLUG)
       endif (HAVE_ICONV_CLOSE)
     endif (APPLE)
-    target_include_directories(cpl_iconv PRIVATE $<TARGET_PROPERTY:Iconv::Iconv,INTERFACE_INCLUDE_DIRECTORIES>)
-    gdal_add_private_link_libraries(Iconv::Iconv)
+    gdal_target_link_libraries(cpl_iconv PRIVATE Iconv::Iconv)
   endif ()
 endif ()
 
 if (GDAL_USE_ODBC)
   target_sources(cpl PRIVATE cpl_odbc.cpp)
   target_public_header(TARGET gdal HEADERS cpl_odbc.h)
-  target_include_directories(cpl PRIVATE $<TARGET_PROPERTY:ODBC::ODBC,INTERFACE_INCLUDE_DIRECTORIES>)
-  gdal_add_private_link_libraries(ODBC::ODBC)
+  gdal_target_link_libraries(cpl PRIVATE ODBC::ODBC)
   if (TARGET ODBC::ODBCINST)
-    target_include_directories(cpl PRIVATE $<TARGET_PROPERTY:ODBC::ODBCINST,INTERFACE_INCLUDE_DIRECTORIES>)
-    gdal_add_private_link_libraries(ODBC::ODBCINST)
+    gdal_target_link_libraries(cpl PRIVATE ODBC::ODBCINST)
   endif ()
 endif ()
 
@@ -218,7 +214,7 @@ if (MSVC)
   endif ()
 else ()
   if (Threads_FOUND)
-    gdal_add_private_link_libraries(Threads::Threads)
+    gdal_target_link_libraries(cpl PRIVATE Threads::Threads)
   endif ()
 endif ()
 
@@ -236,58 +232,63 @@ endif ()
 
 if (GDAL_USE_LIBXML2)
   target_compile_definitions(cpl PRIVATE -DHAVE_LIBXML2)
-  target_include_directories(cpl PRIVATE ${LIBXML2_INCLUDE_DIRS})
-  gdal_add_private_link_libraries(LibXml2::LibXml2)
+  gdal_target_link_libraries(cpl PRIVATE LibXml2::LibXml2)
 endif ()
 
 if (GDAL_USE_CRYPTOPP)
   target_compile_definitions(cpl PRIVATE -DHAVE_CRYPTOPP)
-  target_include_directories(cpl PRIVATE $<TARGET_PROPERTY:CRYPTOPP::CRYPTOPP,INTERFACE_INCLUDE_DIRECTORIES>)
-  gdal_add_private_link_libraries(CRYPTOPP::CRYPTOPP)
+  gdal_target_link_libraries(cpl PRIVATE CRYPTOPP::CRYPTOPP)
 endif ()
 
-if (TARGET OpenSSL::Crypto)
-  target_compile_definitions(cpl PRIVATE -DUSE_OPENSSL_CRYPTO)
-  target_include_directories(cpl PRIVATE $<TARGET_PROPERTY:OpenSSL::Crypto,INTERFACE_INCLUDE_DIRECTORIES>)
-  gdal_add_private_link_libraries(OpenSSL::Crypto)
+if (GDAL_USE_OPENSSL
+    AND TARGET OpenSSL::Crypto
+    AND TARGET OpenSSL::SSL)
+  target_compile_definitions(cpl PRIVATE -DHAVE_OPENSSL_CRYPTO)
+  gdal_target_link_libraries(cpl PRIVATE OpenSSL::Crypto OpenSSL::SSL)
+  if (WIN32)
+    gdal_target_link_libraries(cpl PRIVATE crypt32)
+  endif ()
 endif ()
 
-if (CRYPTOPP_USE_ONLY_CRYPTODLL_ALG AND NOT BUILD_SHARED_LIBS)
+if (CRYPTOPP_USE_ONLY_CRYPTODLL_ALG)
   # Define USE_ONLY_CRYPTODLL_ALG is running against cryptopp.dll, but not if statically linking
-  # USE_ONLY_CRYPTODLL_ALG=YES
-  #
-  # When linking against the DLL: CRYPTOPP_LIB = c:/install-cryptopp-x64/lib/cryptopp.lib
-  #
-  # When linking against the static lib: CRYPTOPP_LIB = c:/install-cryptopp-x64/lib/cryptlib.lib
   target_compile_definitions(cpl PRIVATE -DUSE_ONLY_CRYPTODLL_ALG)
 endif ()
 
 if (GDAL_USE_ZSTD)
   target_compile_definitions(cpl PRIVATE -DHAVE_ZSTD)
-  target_include_directories(cpl PRIVATE $<TARGET_PROPERTY:ZSTD::zstd,INTERFACE_INCLUDE_DIRECTORIES>)
-  gdal_add_private_link_libraries(ZSTD::zstd)
+  gdal_target_link_libraries(cpl PRIVATE ${ZSTD_LIBRARIES})
 endif ()
 
 if (GDAL_USE_LIBLZMA)
   target_compile_definitions(cpl PRIVATE -DHAVE_LZMA)
-  target_include_directories(cpl PRIVATE $<TARGET_PROPERTY:LibLZMA::LibLZMA,INTERFACE_INCLUDE_DIRECTORIES>)
-  gdal_add_private_link_libraries(LibLZMA::LibLZMA)
+  gdal_target_link_libraries(cpl PRIVATE LibLZMA::LibLZMA)
 endif ()
 
 if (GDAL_USE_DEFLATE)
   target_compile_definitions(cpl PRIVATE -DHAVE_LIBDEFLATE)
-  target_include_directories(cpl PRIVATE $<TARGET_PROPERTY:Deflate::Deflate,INTERFACE_INCLUDE_DIRECTORIES>)
-  gdal_add_private_link_libraries(Deflate::Deflate)
+  gdal_target_link_libraries(cpl PRIVATE Deflate::Deflate)
 endif ()
 
 if (GDAL_USE_LZ4)
   target_compile_definitions(cpl PRIVATE -DHAVE_LZ4)
-  target_include_directories(cpl PRIVATE $<TARGET_PROPERTY:LZ4::LZ4,INTERFACE_INCLUDE_DIRECTORIES>)
-  gdal_add_private_link_libraries(LZ4::LZ4)
+  gdal_target_link_libraries(cpl PRIVATE LZ4::LZ4)
 endif ()
 
 if (GDAL_USE_BLOSC)
   target_compile_definitions(cpl PRIVATE -DHAVE_BLOSC)
-  target_include_directories(cpl PRIVATE $<TARGET_PROPERTY:Blosc::Blosc,INTERFACE_INCLUDE_DIRECTORIES>)
-  gdal_add_private_link_libraries(Blosc::Blosc)
+  gdal_target_link_libraries(cpl PRIVATE Blosc::Blosc)
+endif ()
+
+if (GDAL_USE_HDFS)
+  target_compile_definitions(cpl PRIVATE -DHDFS_ENABLED)
+  gdal_target_link_libraries(cpl PRIVATE HDFS::HDFS)
+  if (JNI_FOUND)
+    gdal_target_link_libraries(cpl PRIVATE HDFS::JVM)
+  endif ()
+endif ()
+
+if (MSVC)
+  # needed for cpl_aws_win32
+  gdal_target_link_libraries(cpl PRIVATE wbemuuid)
 endif ()

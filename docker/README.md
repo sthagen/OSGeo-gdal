@@ -17,8 +17,8 @@ best of our knowledge and not guaranteed. Users should check by themselves.
 * Using internal libtiff and libgeotiff
 * External libraries enabled: ultrasmall + libexpat, libpq, libssl
 * No GDAL Python
-* Base PROJ grid package
-* Overall licensing terms of the GDAL build: permissive (X/MIT, BSD style, Apache, etc..)
+* Base PROJ grid package (http://download.osgeo.org/proj/proj-datumgrid-1.8.zip)
+* Overall licensing terms of the GDAL build: permissive (MIT, BSD style, Apache, etc..)
 
 See [alpine-small/Dockerfile](alpine-small/Dockerfile)
 
@@ -31,7 +31,7 @@ See [alpine-small/Dockerfile](alpine-small/Dockerfile)
 * External libraries enabled: small + libgeos, libhdf5, libhdf5, libkea, libnetcdf, libfreexl,
   libspatialite, libxml2, libpoppler, openexr, libheif, libdeflate
 * GDAL Python (Python 3.9)
-* Base PROJ grid package
+* Base PROJ grid package (http://download.osgeo.org/proj/proj-datumgrid-1.8.zip)
 * Overall licensing terms of the GDAL build: copy-left (GPL) + LGPL + permissive
 
 See [alpine-normal/Dockerfile](alpine-normal/Dockerfile)
@@ -47,8 +47,8 @@ See [alpine-normal/Dockerfile](alpine-normal/Dockerfile)
 * External libraries enabled: libsqlite3, libproj, libcurl, libjpeg, libpng, libwebp,
   libzstd, libexpat, libxerces-c, libpq, libssl, libgeos
 * GDAL Python (Python 3.8)
-* Base PROJ grid package
-* Overall licensing terms of the GDAL build: LGPL + permissive (X/MIT, BSD style, Apache, etc..)
+* Base PROJ grid package (http://download.osgeo.org/proj/proj-datumgrid-1.8.zip)
+* Overall licensing terms of the GDAL build: LGPL + permissive (MIT, BSD style, Apache, etc..)
 
 See [ubuntu-small/Dockerfile](ubuntu-small/Dockerfile)
 
@@ -62,7 +62,7 @@ See [ubuntu-small/Dockerfile](ubuntu-small/Dockerfile)
   mongocxx 3.4, libspatialite, unixodbc, libxml2, libcfitsio, libmysqlclient,
   libkml, libpoppler, pdfium, openexr, libheif, libdeflate
 * GDAL Python (Python 3.8)
-* *All* PROJ grid packages
+* *All* PROJ grid packages (equivalent of latest of proj-data-X.zip from http://download.osgeo.org/proj/ at time of generation, > 500 MB)
 * Overall licensing terms of the GDAL build: copy-left (GPL) + LGPL + permissive
 
 See [ubuntu-full/Dockerfile](ubuntu-full/Dockerfile)
@@ -81,12 +81,11 @@ docker run --rm -v /home:/home osgeo/gdal:alpine-small-latest gdalinfo $PWD/my.t
 
 # Images of releases
 
-Tagged images of recent past releases are available. The last ones (at time of writing) are for GDAL 3.3.1 and PROJ 8.1.0, for linux/amd64 and linux/arm64:
-* osgeo/gdal:alpine-ultrasmall-3.3.1
-* osgeo/gdal:alpine-small-3.3.1
-* osgeo/gdal:alpine-normal-3.3.1
-* osgeo/gdal:ubuntu-small-3.3.1
-* osgeo/gdal:ubuntu-full-3.3.1
+Tagged images of recent past releases are available. The last ones (at time of writing) are for GDAL 3.4.1 and PROJ 8.2.1, for linux/amd64 and linux/arm64:
+* osgeo/gdal:alpine-small-3.4.1
+* osgeo/gdal:alpine-normal-3.4.1
+* osgeo/gdal:ubuntu-small-3.4.1
+* osgeo/gdal:ubuntu-full-3.4.1
 
 ## Multi-arch Images
 

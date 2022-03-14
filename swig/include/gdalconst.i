@@ -58,6 +58,8 @@
 %constant GDT_Int16     = GDT_Int16;
 %constant GDT_UInt32    = GDT_UInt32;
 %constant GDT_Int32     = GDT_Int32;
+%constant GDT_UInt64    = GDT_UInt64;
+%constant GDT_Int64     = GDT_Int64;
 %constant GDT_Float32   = GDT_Float32;
 %constant GDT_Float64   = GDT_Float64;
 %constant GDT_CInt16    = GDT_CInt16;
@@ -211,6 +213,8 @@
 %constant char *DCAP_FEATURE_STYLES  = GDAL_DCAP_FEATURE_STYLES;
 %constant char *DCAP_COORDINATE_EPOCH    = GDAL_DCAP_COORDINATE_EPOCH;
 %constant char *DCAP_MULTIPLE_VECTOR_LAYERS    = GDAL_DCAP_MULTIPLE_VECTOR_LAYERS;
+%constant char *DCAP_FIELD_DOMAINS    = GDAL_DCAP_FIELD_DOMAINS;
+%constant char *DMD_CREATION_FIELD_DOMAIN_TYPES    = GDAL_DMD_CREATION_FIELD_DOMAIN_TYPES;
 
 %constant char *DIM_TYPE_HORIZONTAL_X       = GDAL_DIM_TYPE_HORIZONTAL_X;
 %constant char *DIM_TYPE_HORIZONTAL_Y       = GDAL_DIM_TYPE_HORIZONTAL_Y;

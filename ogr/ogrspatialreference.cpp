@@ -38,6 +38,7 @@
 #include <limits>
 #include <string>
 #include <mutex>
+#include <set>
 #include <vector>
 
 #include "cpl_atomic_ops.h"
@@ -165,9 +166,34 @@ struct OGRSpatialReference::Private
     void                refreshAxisMapping();
 };
 
+static OSRAxisMappingStrategy GetDefaultAxisMappingStrategy()
+{
+    const char* pszDefaultAMS = CPLGetConfigOption(
+        "OSR_DEFAULT_AXIS_MAPPING_STRATEGY", nullptr);
+    if( pszDefaultAMS )
+    {
+        if( EQUAL(pszDefaultAMS, "AUTHORITY_COMPLIANT") )
+            return OAMS_AUTHORITY_COMPLIANT;
+        else if( EQUAL(pszDefaultAMS, "TRADITIONAL_GIS_ORDER") )
+            return OAMS_TRADITIONAL_GIS_ORDER;
+        else
+        {
+            CPLError(CE_Failure, CPLE_AppDefined,
+                     "Illegal value for OSR_DEFAULT_AXIS_MAPPING_STRATEGY = %s",
+                     pszDefaultAMS);
+        }
+    }
+    return OAMS_AUTHORITY_COMPLIANT;
+}
+
 OGRSpatialReference::Private::Private():
     m_poListener(std::shared_ptr<Listener>(new Listener(this)))
 {
+    // Get the default value for m_axisMappingStrategy from the
+    // OSR_DEFAULT_AXIS_MAPPING_STRATEGY configuration option, if set.
+    static const OSRAxisMappingStrategy defaultAxisMappingStrategy = GetDefaultAxisMappingStrategy();
+
+    m_axisMappingStrategy = defaultAxisMappingStrategy;
 }
 
 OGRSpatialReference::Private::~Private()
@@ -707,6 +733,18 @@ void OGRsnPrintDouble( char * pszStrBuf, size_t size, double dfValue )
  *
  * Note that newly created objects are given a reference count of one.
  *
+ * Starting with GDAL 3.0, coordinates associated with a OGRSpatialReference
+ * object are assumed to be in the order of the axis of the CRS definition (which
+ * for example means latitude first, longitude second for geographic CRS belonging
+ * to the EPSG authority). It is possible to define a data axis to CRS axis
+ * mapping strategy with the SetAxisMappingStrategy() method.
+ *
+ * Starting with GDAL 3.5, the OSR_DEFAULT_AXIS_MAPPING_STRATEGY configuration
+ * option can be set to "TRADITIONAL_GIS_ORDER" / "AUTHORITY_COMPLIANT" (the later
+ * being the default value when the option is not set) to control the value of the
+ * data axis to CRS axis mapping strategy when a OSRSpatialReference object is
+ * created. Calling SetAxisMappingStrategy() will override this default value.
+
  * The C function OSRNewSpatialReference() does the same thing as this
  * constructor.
  *
@@ -727,6 +765,18 @@ OGRSpatialReference::OGRSpatialReference( const char * pszWKT ) :
 
 /**
  * \brief Constructor.
+ *
+ * Starting with GDAL 3.0, coordinates associated with a OGRSpatialReference
+ * object are assumed to be in the order of the axis of the CRS definition (which
+ * for example means latitude first, longitude second for geographic CRS belonging
+ * to the EPSG authority). It is possible to define a data axis to CRS axis
+ * mapping strategy with the SetAxisMappingStrategy() method.
+ *
+ * Starting with GDAL 3.5, the OSR_DEFAULT_AXIS_MAPPING_STRATEGY configuration
+ * option can be set to "TRADITIONAL_GIS_ORDER" / "AUTHORITY_COMPLIANT" (the later
+ * being the default value when the option is not set) to control the value of the
+ * data axis to CRS axis mapping strategy when a OSRSpatialReference object is
+ * created. Calling SetAxisMappingStrategy() will override this default value.
  *
  * This function is the same as OGRSpatialReference::OGRSpatialReference()
  */
@@ -3715,32 +3765,55 @@ OGRErr OGRSpatialReference::SetFromUserInput( const char * pszDefinition,
     }
 
     // Deal with IGNF:xxx, ESRI:xxx, etc from the PROJ database
-    const char* pszDot = strchr(pszDefinition, ':');
+    const char* pszDot = strrchr(pszDefinition, ':');
     if( pszDot )
     {
         CPLString osPrefix(pszDefinition, pszDot - pszDefinition);
         auto authorities = proj_get_authorities_from_database(d->getPROJContext());
         if( authorities )
         {
+            std::set<std::string> aosCandidateAuthorities;
             for( auto iter = authorities; *iter; ++iter )
             {
                 if( *iter == osPrefix )
                 {
-                    proj_string_list_destroy(authorities);
-
-                    auto obj = proj_create_from_database(d->getPROJContext(),
-                        osPrefix, pszDot + 1, PJ_CATEGORY_CRS,
-                        false, nullptr);
-                    if( !obj )
-                    {
-                        return OGRERR_FAILURE;
-                    }
-                    Clear();
-                    d->setPjCRS(obj);
-                    return OGRERR_NONE;
+                    aosCandidateAuthorities.clear();
+                    aosCandidateAuthorities.insert(*iter);
+                    break;
+                }
+                // Deal with "IAU_2015" as authority in the list and input "IAU:code"
+                else if( strncmp(*iter, osPrefix.c_str(), osPrefix.size()) == 0 &&
+                         (*iter)[osPrefix.size()] == '_' )
+                {
+                    aosCandidateAuthorities.insert(*iter);
+                }
+                // Deal with "IAU_2015" as authority in the list and input "IAU:2015:code"
+                else if( osPrefix.find(':') != std::string::npos &&
+                         osPrefix.size() == strlen(*iter) &&
+                         CPLString(osPrefix).replaceAll(':', '_') == *iter )
+                {
+                    aosCandidateAuthorities.clear();
+                    aosCandidateAuthorities.insert(*iter);
+                    break;
                 }
             }
+
             proj_string_list_destroy(authorities);
+
+            if( !aosCandidateAuthorities.empty() )
+            {
+                auto obj = proj_create_from_database(d->getPROJContext(),
+                    aosCandidateAuthorities.rbegin()->c_str(),
+                    pszDot + 1, PJ_CATEGORY_CRS,
+                    false, nullptr);
+                if( !obj )
+                {
+                    return OGRERR_FAILURE;
+                }
+                Clear();
+                d->setPjCRS(obj);
+                return OGRERR_NONE;
+            }
         }
     }
 
@@ -3749,10 +3822,18 @@ OGRErr OGRSpatialReference::SetFromUserInput( const char * pszDefinition,
 /* -------------------------------------------------------------------- */
     if( !CPLTestBool(CSLFetchNameValueDef(papszOptions, "ALLOW_FILE_ACCESS", "YES")) )
     {
-        CPLError(CE_Failure, CPLE_AppDefined,
-                 "Cannot import %s due to ALLOW_FILE_ACCESS=NO",
-                 pszDefinition);
-        return OGRERR_FAILURE;
+        VSIStatBufL sStat;
+        if( STARTS_WITH(pszDefinition, "/vsi") ||
+            VSIStatExL(pszDefinition, &sStat, VSI_STAT_EXISTS_FLAG) == 0 )
+        {
+            CPLError(CE_Failure, CPLE_AppDefined,
+                     "Cannot import %s due to ALLOW_FILE_ACCESS=NO",
+                     pszDefinition);
+            return OGRERR_FAILURE;
+        }
+        // We used to silently return an error without a CE_Failure message
+        // Cf https://github.com/Toblerity/Fiona/issues/1063
+        return OGRERR_CORRUPT_DATA;
     }
 
     CPLConfigOptionSetter oSetter("CPL_ALLOW_VSISTDIN", "NO", true);
@@ -11000,6 +11081,10 @@ OGRSpatialReferenceH* OGRSpatialReference::FindMatches(
  * configuration option can be set to YES to enable past behavior.
  * The AddGuessedTOWGS84() method can also be used for that purpose.
  *
+ * The method will also by default substitute a deprecated EPSG code by its
+ * non-deprecated replacement. If this behavior is not desired, the
+ * OSR_USE_NON_DEPRECATED configuration option can be set to NO.
+ *
  * This method is the same as the C function OSRImportFromEPSGA().
  *
  * @param nCode a CRS code.
@@ -11040,9 +11125,9 @@ OGRErr OGRSpatialReference::importFromEPSGA( int nCode )
         return OGRERR_FAILURE;
     }
 
-    if( proj_is_deprecated(obj) ) {
+    if( bUseNonDeprecated && proj_is_deprecated(obj) ) {
         auto list = proj_get_non_deprecated(d->getPROJContext(), obj);
-        if( list && bUseNonDeprecated ) {
+        if( list ) {
             const auto count = proj_list_get_count(list);
             if( count == 1 ) {
                 auto nonDeprecated =
@@ -11592,6 +11677,12 @@ OSRAxisMappingStrategy OSRGetAxisMappingStrategy( OGRSpatialReferenceH hSRS )
 /************************************************************************/
 
 /** \brief Set the data axis to CRS axis mapping strategy.
+ *
+ * Starting with GDAL 3.5, the OSR_DEFAULT_AXIS_MAPPING_STRATEGY configuration
+ * option can be set to "TRADITIONAL_GIS_ORDER" / "AUTHORITY_COMPLIANT" (the later
+ * being the default value when the option is not set) to control the value of the
+ * data axis to CRS axis mapping strategy when a OSRSpatialReference object is
+ * created. Calling SetAxisMappingStrategy() will override this default value.
  *
  * See OGRSpatialReference::GetAxisMappingStrategy()
  * @since GDAL 3.0

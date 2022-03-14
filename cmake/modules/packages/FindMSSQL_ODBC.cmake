@@ -28,9 +28,13 @@ This module defines the following variables:
   MSSQL_ODBC_INCLUDE_DIRS   - where to find msodbcsql.h, etc.
   MSSQL_ODBC_LIBRARIES      - List of libraries when using MSSQL_ODBC.
   MSSQL_ODBC_FOUND          - True if MSSQL_ODBC found.
-  MSSQL_ODBC_VERSION		- Major Version (17, 13, ...). Can be a input variable too
+  MSSQL_ODBC_VERSION        - Major Version (17, 13, ...). Can be a input variable too
 
 #]=======================================================================]
+
+if(NOT DEFINED MSSQL_ODBC_ROOT AND DEFINED CMAKE_FIND_USE_CMAKE_SYSTEM_PATH AND NOT CMAKE_FIND_USE_CMAKE_SYSTEM_PATH)
+    return()
+endif()
 
 if(WIN32)
     if(NOT DEFINED MSSQL_ODBC_VERSION)
@@ -52,7 +56,7 @@ if(WIN32)
               PATHS "${MSSQL_ODBC_ROOT}/Include")
     mark_as_advanced(MSSQL_ODBC_INCLUDE_DIR)
 
-    if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "AMD64")
+    if("${CMAKE_SIZEOF_VOID_P}" EQUAL "8")
         set(MSSQL_ODBC_DIR_ARCH x64)
     else()
         set(MSSQL_ODBC_DIR_ARCH x86)

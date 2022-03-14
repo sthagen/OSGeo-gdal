@@ -66,6 +66,8 @@ void VSIInstallS3FileHandler( void )
 
 constexpr int knMAX_PART_NUMBER = 10000; // Limitation from S3
 
+#define unchecked_curl_easy_setopt(handle,opt,param) CPL_IGNORE_RET_VAL(curl_easy_setopt(handle,opt,param))
+
 namespace cpl {
 
 /************************************************************************/
@@ -104,7 +106,7 @@ struct VSIDIRS3: public VSIDIR
     bool IssueListDir();
     bool AnalyseS3FileList( const CPLString& osBaseURL,
                             const char* pszXML,
-                            bool bIgnoreGlacierStorageClass,
+                            const std::set<std::string>& oSetIgnoredStorageClasses,
                             bool& bIsTruncated );
     void clear();
 };
@@ -127,7 +129,7 @@ void VSIDIRS3::clear()
 bool VSIDIRS3::AnalyseS3FileList(
     const CPLString& osBaseURL,
     const char* pszXML,
-    bool bIgnoreGlacierStorageClass,
+    const std::set<std::string>& oSetIgnoredStorageClasses,
     bool &bIsTruncated)
 {
 #if DEBUG_VERBOSE
@@ -213,8 +215,8 @@ bool VSIDIRS3::AnalyseS3FileList(
                 {
                     const char* pszStorageClass = CPLGetXMLValue(psIter,
                         "StorageClass", "");
-                    if( bIgnoreGlacierStorageClass &&
-                        EQUAL(pszStorageClass, "GLACIER") )
+                    if( oSetIgnoredStorageClasses.find(pszStorageClass) !=
+                            oSetIgnoredStorageClasses.end() )
                     {
                         continue;
                     }
@@ -438,9 +440,9 @@ bool VSIDIRS3::IssueListDir()
         headers = VSICurlMergeHeaders(headers,
                                poS3HandleHelper->GetCurlHeaders("GET", headers));
         // Disable automatic redirection
-        curl_easy_setopt(hCurlHandle, CURLOPT_FOLLOWLOCATION, 0 );
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_FOLLOWLOCATION, 0 );
 
-        curl_easy_setopt(hCurlHandle, CURLOPT_RANGE, nullptr);
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_RANGE, nullptr);
 
         CurlRequestHelper requestHelper;
         const long response_code =
@@ -472,12 +474,10 @@ bool VSIDIRS3::IssueListDir()
         }
         else
         {
-            const bool bIgnoreGlacier = CPLTestBool(
-                CPLGetConfigOption("CPL_VSIL_CURL_IGNORE_GLACIER_STORAGE", "YES"));
             bool bIsTruncated;
             bool ret = AnalyseS3FileList( osBaseURL,
                                           requestHelper.sWriteFuncData.pBuffer,
-                                          bIgnoreGlacier,
+                                          VSICurlFilesystemHandlerBase::GetS3IgnoredStorageClasses(),
                                           bIsTruncated );
 
             curl_easy_cleanup(hCurlHandle);
@@ -522,14 +522,14 @@ bool VSICurlFilesystemHandlerBase::AnalyseS3FileList(
     const char* pszXML,
     CPLStringList& osFileList,
     int nMaxFiles,
-    bool bIgnoreGlacierStorageClass,
+    const std::set<std::string>& oSetIgnoredStorageClasses,
     bool& bIsTruncated )
 {
     VSIDIRS3 oDir(this);
     oDir.nMaxFiles = nMaxFiles;
     bool ret =
         oDir.AnalyseS3FileList(osBaseURL, pszXML,
-                               bIgnoreGlacierStorageClass, bIsTruncated);
+                               oSetIgnoredStorageClasses, bIsTruncated);
     for(const auto &entry: oDir.aoEntries )
     {
         osFileList.AddString(entry->pszName);
@@ -559,6 +559,8 @@ class VSIS3FSHandler final : public IVSIS3LikeFSHandler
     CPLString GetFSPrefix() const override { return "/vsis3/"; }
 
     void ClearCache() override;
+
+    bool IsAllowedHeaderForObjectCreation( const char* pszHeaderName ) override { return STARTS_WITH(pszHeaderName, "x-amz-"); }
 
   public:
     VSIS3FSHandler() = default;
@@ -760,7 +762,7 @@ CPLString IVSIS3LikeFSHandler::InitiateMultipartUpload(
         bRetry = false;
         CURL* hCurlHandle = curl_easy_init();
         poS3HandleHelper->AddQueryParameter("uploads", "");
-        curl_easy_setopt(hCurlHandle, CURLOPT_CUSTOMREQUEST, "POST");
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_CUSTOMREQUEST, "POST");
 
         struct curl_slist* headers = static_cast<struct curl_slist*>(
             CPLHTTPSetOptions(hCurlHandle,
@@ -771,6 +773,7 @@ CPLString IVSIS3LikeFSHandler::InitiateMultipartUpload(
                                                        osFilename.c_str());
         headers = VSICurlMergeHeaders(headers,
                         poS3HandleHelper->GetCurlHeaders("POST", headers));
+        headers = curl_slist_append(headers, "Content-Length: 0"); // Required by GCS in HTTP 1.1
 
         CurlRequestHelper requestHelper;
         const long response_code =
@@ -873,7 +876,7 @@ bool VSIS3WriteHandle::UploadPart()
                            static_cast<vsi_l_offset>(m_nBufferSize) * (m_nPartNumber-1),
                            m_pabyBuffer, m_nBufferOff,
                            m_poS3HandleHelper,
-                           m_nMaxRetry, m_dfRetryDelay);
+                           m_nMaxRetry, m_dfRetryDelay, nullptr);
     m_nBufferOff = 0;
     if( !osEtag.empty() )
     {
@@ -890,7 +893,8 @@ CPLString IVSIS3LikeFSHandler::UploadPart(const CPLString& osFilename,
                                           size_t nBufferSize,
                                           IVSIS3LikeHandleHelper *poS3HandleHelper,
                                           int nMaxRetry,
-                                          double dfRetryDelay)
+                                          double dfRetryDelay,
+                                          CSLConstList /* papszOptions */)
 {
     NetworkStatisticsFileSystem oContextFS(GetFSPrefix());
     NetworkStatisticsFile oContextFile(osFilename);
@@ -908,15 +912,15 @@ CPLString IVSIS3LikeFSHandler::UploadPart(const CPLString& osFilename,
         poS3HandleHelper->AddQueryParameter("partNumber",
                                             CPLSPrintf("%d", nPartNumber));
         poS3HandleHelper->AddQueryParameter("uploadId", osUploadID);
-        curl_easy_setopt(hCurlHandle, CURLOPT_UPLOAD, 1L);
-        curl_easy_setopt(hCurlHandle, CURLOPT_READFUNCTION,
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_UPLOAD, 1L);
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_READFUNCTION,
                          PutData::ReadCallBackBuffer);
         PutData putData;
         putData.pabyData = static_cast<const GByte*>(pabyBuffer);
         putData.nOff = 0;
         putData.nTotalSize = nBufferSize;
-        curl_easy_setopt(hCurlHandle, CURLOPT_READDATA, &putData);
-        curl_easy_setopt(hCurlHandle, CURLOPT_INFILESIZE, nBufferSize);
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_READDATA, &putData);
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_INFILESIZE, nBufferSize);
 
         struct curl_slist* headers = static_cast<struct curl_slist*>(
             CPLHTTPSetOptions(hCurlHandle,
@@ -1052,19 +1056,19 @@ VSIS3WriteHandle::WriteChunked( const void *pBuffer, size_t nSize, size_t nMemb 
         if( m_hCurl == nullptr )
         {
             CURL* hCurlHandle = curl_easy_init();
-            curl_easy_setopt(hCurlHandle, CURLOPT_UPLOAD, 1L);
-            curl_easy_setopt(hCurlHandle, CURLOPT_READFUNCTION,
+            unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_UPLOAD, 1L);
+            unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_READFUNCTION,
                             ReadCallBackBufferChunked);
-            curl_easy_setopt(hCurlHandle, CURLOPT_READDATA, this);
+            unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_READDATA, this);
 
             VSICURLInitWriteFuncStruct(&sWriteFuncData, nullptr, nullptr, nullptr);
-            curl_easy_setopt(hCurlHandle, CURLOPT_WRITEDATA, &sWriteFuncData);
-            curl_easy_setopt(hCurlHandle, CURLOPT_WRITEFUNCTION,
+            unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_WRITEDATA, &sWriteFuncData);
+            unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_WRITEFUNCTION,
                             VSICurlHandleWriteFunc);
 
             VSICURLInitWriteFuncStruct(&m_sWriteFuncHeaderData, nullptr, nullptr, nullptr);
-            curl_easy_setopt(hCurlHandle, CURLOPT_HEADERDATA, &m_sWriteFuncHeaderData);
-            curl_easy_setopt(hCurlHandle, CURLOPT_HEADERFUNCTION,
+            unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_HEADERDATA, &m_sWriteFuncHeaderData);
+            unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_HEADERFUNCTION,
                             VSICurlHandleWriteFunc);
 
             headers = static_cast<struct curl_slist*>(
@@ -1076,10 +1080,10 @@ VSIS3WriteHandle::WriteChunked( const void *pBuffer, size_t nSize, size_t nMemb 
                                                        m_osFilename.c_str());
             headers = VSICurlMergeHeaders(headers,
                             m_poS3HandleHelper->GetCurlHeaders("PUT", headers));
-            curl_easy_setopt(hCurlHandle, CURLOPT_HTTPHEADER, headers);
+            unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_HTTPHEADER, headers);
 
             m_osCurlErrBuf.resize(CURL_ERROR_SIZE+1);
-            curl_easy_setopt(hCurlHandle, CURLOPT_ERRORBUFFER, &m_osCurlErrBuf[0] );
+            unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_ERRORBUFFER, &m_osCurlErrBuf[0] );
 
             curl_multi_add_handle(m_hCurlMulti, hCurlHandle);
             m_hCurl = hCurlHandle;
@@ -1389,10 +1393,10 @@ bool VSIS3WriteHandle::DoSinglePartPUT()
         putData.nTotalSize = m_nBufferOff;
 
         CURL* hCurlHandle = curl_easy_init();
-        curl_easy_setopt(hCurlHandle, CURLOPT_UPLOAD, 1L);
-        curl_easy_setopt(hCurlHandle, CURLOPT_READFUNCTION, PutData::ReadCallBackBuffer);
-        curl_easy_setopt(hCurlHandle, CURLOPT_READDATA, &putData);
-        curl_easy_setopt(hCurlHandle, CURLOPT_INFILESIZE, m_nBufferOff);
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_UPLOAD, 1L);
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_READFUNCTION, PutData::ReadCallBackBuffer);
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_READDATA, &putData);
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_INFILESIZE, m_nBufferOff);
 
         struct curl_slist* headers = static_cast<struct curl_slist*>(
             CPLHTTPSetOptions(hCurlHandle,
@@ -1531,13 +1535,13 @@ bool IVSIS3LikeFSHandler::CompleteMultipart(const CPLString& osFilename,
 
         CURL* hCurlHandle = curl_easy_init();
         poS3HandleHelper->AddQueryParameter("uploadId", osUploadID);
-        curl_easy_setopt(hCurlHandle, CURLOPT_UPLOAD, 1L);
-        curl_easy_setopt(hCurlHandle, CURLOPT_READFUNCTION,
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_UPLOAD, 1L);
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_READFUNCTION,
                          PutData::ReadCallBackBuffer);
-        curl_easy_setopt(hCurlHandle, CURLOPT_READDATA, &putData);
-        curl_easy_setopt(hCurlHandle, CURLOPT_INFILESIZE,
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_READDATA, &putData);
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_INFILESIZE,
                         static_cast<int>(osXML.size()));
-        curl_easy_setopt(hCurlHandle, CURLOPT_CUSTOMREQUEST, "POST");
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_CUSTOMREQUEST, "POST");
 
         struct curl_slist* headers = static_cast<struct curl_slist*>(
             CPLHTTPSetOptions(hCurlHandle,
@@ -1624,7 +1628,7 @@ bool IVSIS3LikeFSHandler::AbortMultipart(const CPLString& osFilename,
         bRetry = false;
         CURL* hCurlHandle = curl_easy_init();
         poS3HandleHelper->AddQueryParameter("uploadId", osUploadID);
-        curl_easy_setopt(hCurlHandle, CURLOPT_CUSTOMREQUEST, "DELETE");
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_CUSTOMREQUEST, "DELETE");
 
         struct curl_slist* headers = static_cast<struct curl_slist*>(
             CPLHTTPSetOptions(hCurlHandle,
@@ -2302,8 +2306,8 @@ std::set<CPLString> VSIS3FSHandler::DeleteObjects(const char* pszBucket,
         bRetry = false;
         CURL* hCurlHandle = curl_easy_init();
         poS3HandleHelper->AddQueryParameter("delete", "");
-        curl_easy_setopt(hCurlHandle, CURLOPT_CUSTOMREQUEST, "POST");
-        curl_easy_setopt(hCurlHandle, CURLOPT_POSTFIELDS, pszXML );
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_CUSTOMREQUEST, "POST");
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_POSTFIELDS, pszXML );
 
         struct curl_slist* headers = static_cast<struct curl_slist*>(
             CPLHTTPSetOptions(hCurlHandle,
@@ -2614,10 +2618,10 @@ bool VSIS3FSHandler::SetFileMetadata( const char * pszFilename,
         bRetry = false;
         CURL* hCurlHandle = curl_easy_init();
         poS3HandleHelper->AddQueryParameter("tagging", "");
-        curl_easy_setopt(hCurlHandle, CURLOPT_CUSTOMREQUEST, osXML.empty() ? "DELETE" : "PUT");
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_CUSTOMREQUEST, osXML.empty() ? "DELETE" : "PUT");
         if( !osXML.empty() )
         {
-            curl_easy_setopt(hCurlHandle, CURLOPT_POSTFIELDS, osXML.c_str() );
+            unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_POSTFIELDS, osXML.c_str() );
         }
 
         struct curl_slist* headers = static_cast<struct curl_slist*>(
@@ -3103,7 +3107,7 @@ int IVSIS3LikeFSHandler::CopyObject( const char *oldpath, const char *newpath,
     {
         bRetry = false;
         CURL* hCurlHandle = curl_easy_init();
-        curl_easy_setopt(hCurlHandle, CURLOPT_CUSTOMREQUEST, "PUT");
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_CUSTOMREQUEST, "PUT");
 
         struct curl_slist* headers = static_cast<struct curl_slist*>(
             CPLHTTPSetOptions(hCurlHandle,
@@ -3227,7 +3231,7 @@ int IVSIS3LikeFSHandler::DeleteObject( const char *pszFilename )
     {
         bRetry = false;
         CURL* hCurlHandle = curl_easy_init();
-        curl_easy_setopt(hCurlHandle, CURLOPT_CUSTOMREQUEST, "DELETE");
+        unchecked_curl_easy_setopt(hCurlHandle, CURLOPT_CUSTOMREQUEST, "DELETE");
 
         struct curl_slist* headers = static_cast<struct curl_slist*>(
             CPLHTTPSetOptions(hCurlHandle,
@@ -3449,6 +3453,7 @@ bool IVSIS3LikeFSHandler::CopyFile(VSILFILE* fpIn,
                      vsi_l_offset nSourceSize,
                      const char* pszSource,
                      const char* pszTarget,
+                     CSLConstList papszOptions,
                      GDALProgressFunc pProgressFunc,
                      void *pProgressData)
 {
@@ -3462,7 +3467,7 @@ bool IVSIS3LikeFSHandler::CopyFile(VSILFILE* fpIn,
     if( STARTS_WITH(pszSource, osPrefix) &&
         STARTS_WITH(pszTarget, osPrefix) )
     {
-        bool bRet = CopyObject(pszSource, pszTarget, nullptr) == 0;
+        bool bRet = CopyObject(pszSource, pszTarget, papszOptions) == 0;
         if( bRet && pProgressFunc )
         {
             bRet = pProgressFunc(1.0, osMsg.c_str(), pProgressData) != 0;
@@ -3500,7 +3505,7 @@ bool IVSIS3LikeFSHandler::CopyFile(VSILFILE* fpIn,
         return false;
     }
 
-    VSILFILE* fpOut = VSIFOpenExL(pszTarget, "wb", TRUE);
+    VSILFILE* fpOut = VSIFOpenEx2L(pszTarget, "wb", TRUE, papszOptions);
     if( fpOut == nullptr )
     {
         CPLError(CE_Failure, CPLE_FileIO, "Cannot create %s", pszTarget);
@@ -3819,6 +3824,23 @@ bool IVSIS3LikeFSHandler::Sync( const char* pszSource, const char* pszTarget,
                                 std::max(nMinSizeChunk,
                                             atoi(pszChunkSize)))): 0;
 
+    // Filter x-amz- options when outputting to /vsis3/
+    CPLStringList aosObjectCreationOptions;
+    if( poTargetFSHandler != nullptr && papszOptions != nullptr )
+    {
+        for( auto papszIter = papszOptions; *papszIter != nullptr; ++papszIter )
+        {
+            char* pszKey = nullptr;
+            const char* pszValue = CPLParseNameValue(*papszIter, &pszKey);
+            if( pszKey && pszValue &&
+                poTargetFSHandler->IsAllowedHeaderForObjectCreation(pszKey) )
+            {
+                aosObjectCreationOptions.SetNameValue(pszKey, pszValue);
+            }
+            CPLFree(pszKey);
+        }
+    }
+
     uint64_t nTotalSize = 0;
     std::vector<size_t> anIndexToCopy; // points to aoChunksToCopy
 
@@ -4071,7 +4093,7 @@ bool IVSIS3LikeFSHandler::Sync( const char* pszSource, const char* pszTarget,
                                                     poS3HandleHelper.get(),
                                                     nMaxRetry,
                                                     dfRetryDelay,
-                                                    nullptr);
+                                                    aosObjectCreationOptions.List());
                         if( osUploadID.empty() )
                         {
                             return false;
@@ -4120,6 +4142,7 @@ bool IVSIS3LikeFSHandler::Sync( const char* pszSource, const char* pszTarget,
                     pProgressFunc, pProgressData);
                 ret = CopyFile(nullptr, chunk.nSize,
                                 osSubSource, osSubTarget,
+                                aosObjectCreationOptions.List(),
                                 GDALScaledProgress, pScaledProgress);
                 GDALDestroyScaledProgress(pScaledProgress);
                 if( !ret )
@@ -4254,7 +4277,7 @@ bool IVSIS3LikeFSHandler::Sync( const char* pszSource, const char* pszTarget,
                                                     poS3HandleHelper.get(),
                                                     nMaxRetry,
                                                     dfRetryDelay,
-                                                    nullptr);
+                                                    aosObjectCreationOptions.List());
                         if( osUploadID.empty() )
                         {
                             return false;
@@ -4281,6 +4304,7 @@ bool IVSIS3LikeFSHandler::Sync( const char* pszSource, const char* pszTarget,
             return CopyFile(fpIn, sSource.st_size,
                             osSourceWithoutSlash,
                             osTarget,
+                            aosObjectCreationOptions.List(),
                             pProgressFunc,
                             pProgressData);
         }
@@ -4313,6 +4337,7 @@ bool IVSIS3LikeFSHandler::Sync( const char* pszSource, const char* pszTarget,
         size_t nMaxChunkSize = 0;
         int nMaxRetry = 0;
         double dfRetryDelay = 0.0;
+        const CPLStringList& aosObjectCreationOptions;
 
         JobQueue(IVSIS3LikeFSHandler* poFSIn,
                     const std::vector<ChunkToCopy>& aoChunksToCopyIn,
@@ -4325,7 +4350,8 @@ bool IVSIS3LikeFSHandler::Sync( const char* pszSource, const char* pszTarget,
                     bool bSupportsParallelMultipartUploadIn,
                     size_t nMaxChunkSizeIn,
                     int nMaxRetryIn,
-                    double dfRetryDelayIn):
+                    double dfRetryDelayIn,
+                    const CPLStringList& aosObjectCreationOptionsIn):
             poFS(poFSIn),
             aoChunksToCopy(aoChunksToCopyIn),
             anIndexToCopy(anIndexToCopyIn),
@@ -4337,7 +4363,8 @@ bool IVSIS3LikeFSHandler::Sync( const char* pszSource, const char* pszTarget,
             bSupportsParallelMultipartUpload(bSupportsParallelMultipartUploadIn),
             nMaxChunkSize(nMaxChunkSizeIn),
             nMaxRetry(nMaxRetryIn),
-            dfRetryDelay(dfRetryDelayIn)
+            dfRetryDelay(dfRetryDelayIn),
+            aosObjectCreationOptions(aosObjectCreationOptionsIn)
         {}
 
         JobQueue(const JobQueue&) = delete;
@@ -4413,7 +4440,8 @@ bool IVSIS3LikeFSHandler::Sync( const char* pszSource, const char* pszTarget,
                             pBuffer, nSizeToRead,
                             poS3HandleHelper.get(),
                             queue->nMaxRetry,
-                            queue->dfRetryDelay);
+                            queue->dfRetryDelay,
+                            queue->aosObjectCreationOptions.List());
                         if( !osEtag.empty() )
                         {
                             std::lock_guard<std::mutex> lock(queue->sMutex);
@@ -4450,6 +4478,7 @@ bool IVSIS3LikeFSHandler::Sync( const char* pszSource, const char* pszTarget,
                 CPLAssert( chunk.nStartOffset == 0 );
                 if( !queue->poFS->CopyFile(nullptr, chunk.nTotalSize,
                             osSubSource, osSubTarget,
+                            queue->aosObjectCreationOptions.List(),
                             progressFunc, &progressData) )
                 {
                     queue->ret = false;
@@ -4464,7 +4493,7 @@ bool IVSIS3LikeFSHandler::Sync( const char* pszSource, const char* pszTarget,
                         osSourceWithoutSlash, osTargetDir,
                         osSourceWithoutSlash, osTarget,
                         bSupportsParallelMultipartUpload, nMaxChunkSize,
-                        nMaxRetry, dfRetryDelay);
+                        nMaxRetry, dfRetryDelay, aosObjectCreationOptions);
 
     if( CPLTestBool(CPLGetConfigOption("VSIS3_SYNC_MULTITHREADING", "YES")) )
     {

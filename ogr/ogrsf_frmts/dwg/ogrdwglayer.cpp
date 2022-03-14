@@ -59,6 +59,15 @@ OGRDWGLayer::OGRDWGLayer( OGRDWGDataSource *poDSIn )
         poFeatureDefn->AddFieldDefn( &oBlockAngleField );
     }
 
+    if (!poDS->GetAttributes().empty()) {
+        std::set<CPLString>::iterator it;
+        for (it = poDS->GetAttributes().begin(); it != poDS->GetAttributes().end(); ++it) {
+            OGRFieldDefn  oAttField(*it, OFTString);
+            poFeatureDefn->AddFieldDefn(&oAttField);
+        }
+      
+    }
+
 /* -------------------------------------------------------------------- */
 /*      Find the *Paper_Space block, which seems to contain all the     */
 /*      regular entities.                                               */
@@ -1221,9 +1230,17 @@ OGRFeature *OGRDWGLayer::TranslateINSERT( OdDbEntityPtr poEntity )
             openAttr = pEntIter->entity()->objectId().safeOpenObject(OdDb::kForRead);
             
             CPLString attrText = TextUnescape( openAttr->textString(), false );
+            
+            const char* fieldName = CPLSPrintf("%ls", openAttr->tag().c_str());
+            if (poDS->AllAttributes() || (!openAttr->isInvisible() && openAttr->visibility() != OdDb::kInvisible)) {
+                uAttrData.Add(fieldName, attrText );
+            }
 
-            if ( !openAttr->isInvisible() && openAttr->visibility() != OdDb::kInvisible)
-                uAttrData.Add( CPLSPrintf("%ls", openAttr->tag().c_str()), attrText );
+            if (poDS->Attributes() && poFeatureDefn->GetFieldIndex(fieldName) != -1)
+            {
+                poFeature->SetField(fieldName, attrText);
+            }
+
         }
 
         poFeature->SetField( "BlockAttributes", uAttrData.ToString().c_str() );
@@ -1298,7 +1315,14 @@ OGRFeature *OGRDWGLayer::TranslateINSERT( OdDbEntityPtr poEntity )
             oStyleProperties.clear();
 
             OGRFeature *poAttrFeat = TranslateTEXT( pAttr );
-
+            const char* fieldName = CPLSPrintf("%ls", pAttr->tag().c_str());
+            if( poDS->Attributes() && poFeatureDefn->GetFieldIndex(fieldName) != -1)
+            {
+                CPLString attrText = TextUnescape(pAttr->textString(), false);
+                poFeature->SetField(fieldName, attrText);
+                if (poAttrFeat)
+                    poAttrFeat->SetField(fieldName, attrText);
+            }
             if( poAttrFeat )
                 apoPendingFeatures.push( poAttrFeat );
         }

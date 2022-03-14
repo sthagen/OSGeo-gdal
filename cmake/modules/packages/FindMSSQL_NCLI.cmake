@@ -28,7 +28,7 @@ This module defines the following variables:
   MSSQL_NCLI_INCLUDE_DIRS   - where to find sqlncli.h, etc.
   MSSQL_NCLI_LIBRARIES      - List of libraries when using MSSQL_NCLI.
   MSSQL_NCLI_FOUND          - True if MSSQL_NCLI found.
-  MSSQL_NCLI_VERSION		- Major Version (11, 10, ...). Can be a input variable too
+  MSSQL_NCLI_VERSION        - Major Version (11, 10, ...). Can be a input variable too
 
 #]=======================================================================]
 
@@ -55,7 +55,7 @@ find_path(MSSQL_NCLI_INCLUDE_DIR NAMES sqlncli.h
           PATHS "${MSSQL_NCLI_ROOT}/Include")
 mark_as_advanced(MSSQL_NCLI_INCLUDE_DIR)
 
-if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "AMD64")
+if("${CMAKE_SIZEOF_VOID_P}" EQUAL "8")
     set(MSSQL_NCLI_DIR_ARCH x64)
 else()
     set(MSSQL_NCLI_DIR_ARCH x86)

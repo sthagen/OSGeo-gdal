@@ -52,11 +52,12 @@ class VSIAzureBlobHandleHelper final: public IVSIS3LikeHandleHelper
 
         enum class Service
         {
-            BLOB,
-            ADLS,
+            SERVICE_BLOB,
+            SERVICE_ADLS,
         };
 
-        static bool     GetConfiguration(CSLConstList papszOptions,
+        static bool     GetConfiguration(const std::string& osPathForOption,
+                                         CSLConstList papszOptions,
                                          Service eService,
                                          bool& bUseHTTPS,
                                          CPLString& osEndpoint,

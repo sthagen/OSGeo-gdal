@@ -2971,7 +2971,6 @@ PythonBindingErrorHandler(CPLErr eclass, int code, const char *msg )
 
 static
 int GetUseExceptions() {
-  CPLErrorReset();
   return bUseExceptions;
 }
 
@@ -5035,14 +5034,14 @@ SWIGINTERN OGRErr OGRGeometryShadow_ExportToWkt(OGRGeometryShadow *self,char **a
 SWIGINTERN OGRErr OGRGeometryShadow_ExportToIsoWkt(OGRGeometryShadow *self,char **argout){
     return OGR_G_ExportToIsoWkt(self, argout);
   }
-SWIGINTERN OGRErr OGRGeometryShadow_ExportToWkb(OGRGeometryShadow *self,size_t *nLen,char **pBuf,OGRwkbByteOrder byte_order=wkbXDR){
+SWIGINTERN OGRErr OGRGeometryShadow_ExportToWkb(OGRGeometryShadow *self,size_t *nLen,char **pBuf,OGRwkbByteOrder byte_order=wkbNDR){
     *nLen = OGR_G_WkbSizeEx( self );
     *pBuf = (char *) VSI_MALLOC_VERBOSE( *nLen );
     if( *pBuf == NULL )
         return 6;
     return OGR_G_ExportToWkb(self, byte_order, (unsigned char*) *pBuf );
   }
-SWIGINTERN OGRErr OGRGeometryShadow_ExportToIsoWkb(OGRGeometryShadow *self,size_t *nLen,char **pBuf,OGRwkbByteOrder byte_order=wkbXDR){
+SWIGINTERN OGRErr OGRGeometryShadow_ExportToIsoWkb(OGRGeometryShadow *self,size_t *nLen,char **pBuf,OGRwkbByteOrder byte_order=wkbNDR){
     *nLen = OGR_G_WkbSizeEx( self );
     *pBuf = (char *) VSI_MALLOC_VERBOSE( *nLen );
     if( *pBuf == NULL )
@@ -5681,7 +5680,12 @@ SWIGINTERN PyObject *_wrap_GetUseExceptions(PyObject *SWIGUNUSEDPARM(self), PyOb
   int result;
   
   if (!SWIG_Python_UnpackTuple(args, "GetUseExceptions", 0, 0, 0)) SWIG_fail;
-  result = (int)GetUseExceptions();
+  {
+#ifdef SED_HACKS
+    if( bUseExceptions ) bLocalUseExceptionsCode = FALSE;
+#endif
+    result = GetUseExceptions();
+  }
   resultobj = SWIG_From_int(static_cast< int >(result));
   if ( ReturnSame(bLocalUseExceptionsCode) ) { CPLErr eclass = CPLGetLastErrorType(); if ( eclass == CE_Failure || eclass == CE_Fatal ) { Py_XDECREF(resultobj); SWIG_Error( SWIG_RuntimeError, CPLGetLastErrorMsg() ); return NULL; } }
   return resultobj;
@@ -9527,12 +9531,7 @@ SWIGINTERN PyObject *_wrap_Layer_GetFeature(PyObject *SWIGUNUSEDPARM(self), PyOb
   }
   arg1 = reinterpret_cast< OGRLayerShadow * >(argp1);
   {
-    PY_LONG_LONG val;
-    if ( !PyArg_Parse(swig_obj[1],"L",&val) ) {
-      PyErr_SetString(PyExc_TypeError, "not an integer");
-      SWIG_fail;
-    }
-    arg2 = (GIntBig)val;
+    arg2 = (GIntBig)PyLong_AsLongLong(swig_obj[1]);
   }
   {
     if ( bUseExceptions ) {
@@ -9617,12 +9616,7 @@ SWIGINTERN PyObject *_wrap_Layer_SetNextByIndex(PyObject *SWIGUNUSEDPARM(self), 
   }
   arg1 = reinterpret_cast< OGRLayerShadow * >(argp1);
   {
-    PY_LONG_LONG val;
-    if ( !PyArg_Parse(swig_obj[1],"L",&val) ) {
-      PyErr_SetString(PyExc_TypeError, "not an integer");
-      SWIG_fail;
-    }
-    arg2 = (GIntBig)val;
+    arg2 = (GIntBig)PyLong_AsLongLong(swig_obj[1]);
   }
   {
     if ( bUseExceptions ) {
@@ -9820,12 +9814,7 @@ SWIGINTERN PyObject *_wrap_Layer_DeleteFeature(PyObject *SWIGUNUSEDPARM(self), P
   }
   arg1 = reinterpret_cast< OGRLayerShadow * >(argp1);
   {
-    PY_LONG_LONG val;
-    if ( !PyArg_Parse(swig_obj[1],"L",&val) ) {
-      PyErr_SetString(PyExc_TypeError, "not an integer");
-      SWIG_fail;
-    }
-    arg2 = (GIntBig)val;
+    arg2 = (GIntBig)PyLong_AsLongLong(swig_obj[1]);
   }
   {
     if ( bUseExceptions ) {
@@ -10014,9 +10003,7 @@ SWIGINTERN PyObject *_wrap_Layer_GetFeatureCount(PyObject *SWIGUNUSEDPARM(self),
 #endif
   }
   {
-    char szTmp[32];
-    sprintf(szTmp, CPL_FRMT_GIB, result);
-    resultobj = PyLong_FromString(szTmp, NULL, 10);
+    resultobj = PyLong_FromLongLong(result);
   }
   if ( ReturnSame(bLocalUseExceptionsCode) ) { CPLErr eclass = CPLGetLastErrorType(); if ( eclass == CE_Failure || eclass == CE_Fatal ) { Py_XDECREF(resultobj); SWIG_Error( SWIG_RuntimeError, CPLGetLastErrorMsg() ); return NULL; } }
   return resultobj;
@@ -10944,9 +10931,7 @@ SWIGINTERN PyObject *_wrap_Layer_GetFeaturesRead(PyObject *SWIGUNUSEDPARM(self),
 #endif
   }
   {
-    char szTmp[32];
-    sprintf(szTmp, CPL_FRMT_GIB, result);
-    resultobj = PyLong_FromString(szTmp, NULL, 10);
+    resultobj = PyLong_FromLongLong(result);
   }
   if ( ReturnSame(bLocalUseExceptionsCode) ) { CPLErr eclass = CPLGetLastErrorType(); if ( eclass == CE_Failure || eclass == CE_Fatal ) { Py_XDECREF(resultobj); SWIG_Error( SWIG_RuntimeError, CPLGetLastErrorMsg() ); return NULL; } }
   return resultobj;
@@ -13960,9 +13945,7 @@ SWIGINTERN PyObject *_wrap_Feature_GetFieldAsInteger64__SWIG_0(PyObject *SWIGUNU
 #endif
   }
   {
-    char szTmp[32];
-    sprintf(szTmp, CPL_FRMT_GIB, result);
-    resultobj = PyLong_FromString(szTmp, NULL, 10);
+    resultobj = PyLong_FromLongLong(result);
   }
   if ( ReturnSame(bLocalUseExceptionsCode) ) { CPLErr eclass = CPLGetLastErrorType(); if ( eclass == CE_Failure || eclass == CE_Fatal ) { Py_XDECREF(resultobj); SWIG_Error( SWIG_RuntimeError, CPLGetLastErrorMsg() ); return NULL; } }
   return resultobj;
@@ -14014,9 +13997,7 @@ SWIGINTERN PyObject *_wrap_Feature_GetFieldAsInteger64__SWIG_1(PyObject *SWIGUNU
 #endif
   }
   {
-    char szTmp[32];
-    sprintf(szTmp, CPL_FRMT_GIB, result);
-    resultobj = PyLong_FromString(szTmp, NULL, 10);
+    resultobj = PyLong_FromLongLong(result);
   }
   {
     /* %typemap(freearg) (const char *utf8_path) */
@@ -15865,9 +15846,7 @@ SWIGINTERN PyObject *_wrap_Feature_GetFID(PyObject *SWIGUNUSEDPARM(self), PyObje
 #endif
   }
   {
-    char szTmp[32];
-    sprintf(szTmp, CPL_FRMT_GIB, result);
-    resultobj = PyLong_FromString(szTmp, NULL, 10);
+    resultobj = PyLong_FromLongLong(result);
   }
   if ( ReturnSame(bLocalUseExceptionsCode) ) { CPLErr eclass = CPLGetLastErrorType(); if ( eclass == CE_Failure || eclass == CE_Fatal ) { Py_XDECREF(resultobj); SWIG_Error( SWIG_RuntimeError, CPLGetLastErrorMsg() ); return NULL; } }
   return resultobj;
@@ -15892,12 +15871,7 @@ SWIGINTERN PyObject *_wrap_Feature_SetFID(PyObject *SWIGUNUSEDPARM(self), PyObje
   }
   arg1 = reinterpret_cast< OGRFeatureShadow * >(argp1);
   {
-    PY_LONG_LONG val;
-    if ( !PyArg_Parse(swig_obj[1],"L",&val) ) {
-      PyErr_SetString(PyExc_TypeError, "not an integer");
-      SWIG_fail;
-    }
-    arg2 = (GIntBig)val;
+    arg2 = (GIntBig)PyLong_AsLongLong(swig_obj[1]);
   }
   {
     if ( bUseExceptions ) {
@@ -16463,12 +16437,7 @@ SWIGINTERN PyObject *_wrap_Feature_SetFieldInteger64(PyObject *SWIGUNUSEDPARM(se
   } 
   arg2 = static_cast< int >(val2);
   {
-    PY_LONG_LONG val;
-    if ( !PyArg_Parse(swig_obj[2],"L",&val) ) {
-      PyErr_SetString(PyExc_TypeError, "not an integer");
-      SWIG_fail;
-    }
-    arg3 = (GIntBig)val;
+    arg3 = (GIntBig)PyLong_AsLongLong(swig_obj[2]);
   }
   {
     if ( bUseExceptions ) {
@@ -22407,7 +22376,7 @@ SWIGINTERN PyObject *_wrap_Geometry_ExportToWkb(PyObject *SWIGUNUSEDPARM(self), 
   OGRGeometryShadow *arg1 = (OGRGeometryShadow *) 0 ;
   size_t *arg2 = (size_t *) 0 ;
   char **arg3 = (char **) 0 ;
-  OGRwkbByteOrder arg4 = (OGRwkbByteOrder) wkbXDR ;
+  OGRwkbByteOrder arg4 = (OGRwkbByteOrder) wkbNDR ;
   void *argp1 = 0 ;
   int res1 = 0 ;
   size_t nLen2 = 0 ;
@@ -22509,7 +22478,7 @@ SWIGINTERN PyObject *_wrap_Geometry_ExportToIsoWkb(PyObject *SWIGUNUSEDPARM(self
   OGRGeometryShadow *arg1 = (OGRGeometryShadow *) 0 ;
   size_t *arg2 = (size_t *) 0 ;
   char **arg3 = (char **) 0 ;
-  OGRwkbByteOrder arg4 = (OGRwkbByteOrder) wkbXDR ;
+  OGRwkbByteOrder arg4 = (OGRwkbByteOrder) wkbNDR ;
   void *argp1 = 0 ;
   int res1 = 0 ;
   size_t nLen2 = 0 ;
@@ -30419,7 +30388,7 @@ static PyMethodDef SwigMethods[] = {
 	 { "DataSource_GetLayerByName", _wrap_DataSource_GetLayerByName, METH_VARARGS, "\n"
 		"DataSource_GetLayerByName(DataSource self, char const * layer_name) -> Layer\n"
 		"OGRLayerH\n"
-		"OGR_DS_GetLayerByName(OGRDataSourceH hDS, const char *pszName)\n"
+		"OGR_DS_GetLayerByName(OGRDataSourceH hDS, const char *pszLayerName)\n"
 		"\n"
 		"Fetch a layer by name.\n"
 		"\n"
@@ -30441,7 +30410,7 @@ static PyMethodDef SwigMethods[] = {
 	 { "DataSource_TestCapability", _wrap_DataSource_TestCapability, METH_VARARGS, "\n"
 		"DataSource_TestCapability(DataSource self, char const * cap) -> bool\n"
 		"int\n"
-		"OGR_DS_TestCapability(OGRDataSourceH hDS, const char *pszCap)\n"
+		"OGR_DS_TestCapability(OGRDataSourceH hDS, const char *pszCapability)\n"
 		"\n"
 		"Test if capability is available.\n"
 		"\n"
@@ -30493,7 +30462,7 @@ static PyMethodDef SwigMethods[] = {
 		"review theOGR SQL document. Some drivers (i.e. Oracle and PostGIS)\n"
 		"pass the SQL directly through to the underlying RDBMS.\n"
 		"\n"
-		"Starting with OGR 1.10, theSQLITE dialect can also be used.\n"
+		"TheSQLITE dialect can also be used.\n"
 		"\n"
 		"Deprecated Use GDALDatasetExecuteSQL() in GDAL 2.0\n"
 		"\n"
@@ -30502,7 +30471,7 @@ static PyMethodDef SwigMethods[] = {
 		"\n"
 		"hDS:  handle to the data source on which the SQL query is executed.\n"
 		"\n"
-		"pszSQLCommand:  the SQL statement to execute.\n"
+		"pszStatement:  the SQL statement to execute.\n"
 		"\n"
 		"hSpatialFilter:  handle to a geometry which represents a spatial\n"
 		"filter. Can be NULL.\n"
@@ -30510,11 +30479,10 @@ static PyMethodDef SwigMethods[] = {
 		"pszDialect:  allows control of the statement dialect. If set to NULL,\n"
 		"the OGR SQL engine will be used, except for RDBMS drivers that will\n"
 		"use their dedicated SQL engine, unless OGRSQL is explicitly passed as\n"
-		"the dialect. Starting with OGR 1.10, the SQLITE dialect can also be\n"
-		"used.\n"
+		"the dialect. The SQLITE dialect can also be used.\n"
 		"\n"
-		"a handle to a OGRLayer containing the results of the query.\n"
-		"Deallocate with OGR_DS_ReleaseResultSet(). \n"
+		"a handle to a OGRLayer containing the results of the query. Deallocate\n"
+		"with OGR_DS_ReleaseResultSet(). \n"
 		""},
 	 { "DataSource_AbortSQL", _wrap_DataSource_AbortSQL, METH_O, "DataSource_AbortSQL(DataSource self) -> OGRErr"},
 	 { "DataSource_ReleaseResultSet", _wrap_DataSource_ReleaseResultSet, METH_VARARGS, "\n"
@@ -31607,6 +31575,8 @@ static PyMethodDef SwigMethods[] = {
 		"Parameters:\n"
 		"-----------\n"
 		"\n"
+		"hLayer:  handle to the layer\n"
+		"\n"
 		"papszFields:  an array of field names terminated by NULL item. If NULL\n"
 		"is passed, the ignored list is cleared.\n"
 		"\n"
@@ -32121,8 +32091,7 @@ static PyMethodDef SwigMethods[] = {
 		"\n"
 		"hFeat:  handle to the feature to get the feature definition from.\n"
 		"\n"
-		"a handle to the feature definition object on which feature depends.\n"
-		"\n"
+		"a handle to the feature definition object on which feature depends. \n"
 		""},
 	 { "Feature_SetGeometry", _wrap_Feature_SetGeometry, METH_VARARGS, "\n"
 		"Feature_SetGeometry(Feature self, Geometry geom) -> OGRErr\n"
@@ -32362,8 +32331,8 @@ static PyMethodDef SwigMethods[] = {
 		"\n"
 		"i:  the field to fetch, from 0 to GetFieldCount()-1.\n"
 		"\n"
-		"a handle to the field definition (from the OGRFeatureDefn). This is\n"
-		"an internal reference, and should not be deleted or modified. \n"
+		"a handle to the field definition (from the OGRFeatureDefn). This is an\n"
+		"internal reference, and should not be deleted or modified. \n"
 		""},
 	 { "Feature_GetGeomFieldCount", _wrap_Feature_GetGeomFieldCount, METH_O, "\n"
 		"Feature_GetGeomFieldCount(Feature self) -> int\n"
@@ -32403,8 +32372,8 @@ static PyMethodDef SwigMethods[] = {
 		"\n"
 		"i:  the field to fetch, from 0 to GetGeomFieldCount()-1.\n"
 		"\n"
-		"a handle to the field definition (from the OGRFeatureDefn). This is\n"
-		"an internal reference, and should not be deleted or modified.\n"
+		"a handle to the field definition (from the OGRFeatureDefn). This is an\n"
+		"internal reference, and should not be deleted or modified.\n"
 		"\n"
 		"GDAL 1.11 \n"
 		""},
@@ -34096,7 +34065,7 @@ static PyMethodDef SwigMethods[] = {
 		"\n"
 		"Even if this method returns FALSE (i.e not-nullable field), it doesn't\n"
 		"mean that OGRFeature::IsFieldSet() will necessary return TRUE, as\n"
-		"fields can be temporary unset and null /not-null validation is usually\n"
+		"fields can be temporary unset and null/not-null validation is usually\n"
 		"done when OGRLayer::CreateFeature()/SetFeature() is called.\n"
 		"\n"
 		"This method is the same as the C++ method OGRFieldDefn::IsNullable().\n"
@@ -34259,8 +34228,51 @@ static PyMethodDef SwigMethods[] = {
 		"\n"
 		"GDAL 2.0 \n"
 		""},
-	 { "FieldDefn_GetDomainName", _wrap_FieldDefn_GetDomainName, METH_O, "FieldDefn_GetDomainName(FieldDefn self) -> char const *"},
-	 { "FieldDefn_SetDomainName", _wrap_FieldDefn_SetDomainName, METH_VARARGS, "FieldDefn_SetDomainName(FieldDefn self, char const * name)"},
+	 { "FieldDefn_GetDomainName", _wrap_FieldDefn_GetDomainName, METH_O, "\n"
+		"FieldDefn_GetDomainName(FieldDefn self) -> char const *\n"
+		"const char*\n"
+		"OGR_Fld_GetDomainName(OGRFieldDefnH hDefn)\n"
+		"\n"
+		"Return the name of the field domain for this field.\n"
+		"\n"
+		"By default, none (empty string) is returned.\n"
+		"\n"
+		"Field domains ( OGRFieldDomain class) are attached at the GDALDataset\n"
+		"level and should be retrieved with GDALDatasetGetFieldDomain().\n"
+		"\n"
+		"This method is the same as the C++ method\n"
+		"OGRFieldDefn::GetDomainName().\n"
+		"\n"
+		"Parameters:\n"
+		"-----------\n"
+		"\n"
+		"hDefn:  handle to the field definition\n"
+		"\n"
+		"the field domain name, or an empty string if there is none.\n"
+		"\n"
+		"GDAL 3.3 \n"
+		""},
+	 { "FieldDefn_SetDomainName", _wrap_FieldDefn_SetDomainName, METH_VARARGS, "\n"
+		"FieldDefn_SetDomainName(FieldDefn self, char const * name)\n"
+		"void\n"
+		"OGR_Fld_SetDomainName(OGRFieldDefnH hDefn, const char *pszFieldName)\n"
+		"\n"
+		"Set the name of the field domain for this field.\n"
+		"\n"
+		"Field domains ( OGRFieldDomain) are attached at the GDALDataset level.\n"
+		"\n"
+		"This method is the same as the C++ method\n"
+		"OGRFieldDefn::SetDomainName().\n"
+		"\n"
+		"Parameters:\n"
+		"-----------\n"
+		"\n"
+		"hDefn:  handle to the field definition\n"
+		"\n"
+		"pszFieldName:  Field domain name.\n"
+		"\n"
+		"GDAL 3.3 \n"
+		""},
 	 { "FieldDefn_swigregister", FieldDefn_swigregister, METH_O, NULL},
 	 { "FieldDefn_swiginit", FieldDefn_swiginit, METH_VARARGS, NULL},
 	 { "delete_GeomFieldDefn", _wrap_delete_GeomFieldDefn, METH_O, "delete_GeomFieldDefn(GeomFieldDefn self)"},
@@ -34350,7 +34362,7 @@ static PyMethodDef SwigMethods[] = {
 		"GDAL 2.0 \n"
 		""},
 	 { "Geometry_ExportToWkb", (PyCFunction)(void(*)(void))_wrap_Geometry_ExportToWkb, METH_VARARGS|METH_KEYWORDS, "\n"
-		"Geometry_ExportToWkb(Geometry self, OGRwkbByteOrder byte_order=wkbXDR) -> OGRErr\n"
+		"Geometry_ExportToWkb(Geometry self, OGRwkbByteOrder byte_order=wkbNDR) -> OGRErr\n"
 		"OGRErr\n"
 		"OGR_G_ExportToWkb(OGRGeometryH hGeom, OGRwkbByteOrder eOrder, unsigned\n"
 		"char *pabyDstBuffer)\n"
@@ -34383,7 +34395,7 @@ static PyMethodDef SwigMethods[] = {
 		"Currently OGRERR_NONE is always returned. \n"
 		""},
 	 { "Geometry_ExportToIsoWkb", (PyCFunction)(void(*)(void))_wrap_Geometry_ExportToIsoWkb, METH_VARARGS|METH_KEYWORDS, "\n"
-		"Geometry_ExportToIsoWkb(Geometry self, OGRwkbByteOrder byte_order=wkbXDR) -> OGRErr\n"
+		"Geometry_ExportToIsoWkb(Geometry self, OGRwkbByteOrder byte_order=wkbNDR) -> OGRErr\n"
 		"OGRErr\n"
 		"OGR_G_ExportToIsoWkb(OGRGeometryH hGeom, OGRwkbByteOrder eOrder,\n"
 		"unsigned char *pabyDstBuffer)\n"
@@ -34441,8 +34453,8 @@ static PyMethodDef SwigMethods[] = {
 		"\n"
 		"hGeom:  handle on the geometry to clone from.\n"
 		"\n"
-		"a handle on the copy of the geometry with the spatial reference\n"
-		"system as the original. \n"
+		"a handle on the copy of the geometry with the spatial reference system\n"
+		"as the original. \n"
 		""},
 	 { "Geometry_GetGeometryType", _wrap_Geometry_GetGeometryType, METH_O, "\n"
 		"Geometry_GetGeometryType(Geometry self) -> OGRwkbGeometryType\n"
@@ -34715,7 +34727,30 @@ static PyMethodDef SwigMethods[] = {
 		"\n"
 		"GDAL 3.0 \n"
 		""},
-	 { "Geometry_Normalize", _wrap_Geometry_Normalize, METH_O, "Geometry_Normalize(Geometry self) -> Geometry"},
+	 { "Geometry_Normalize", _wrap_Geometry_Normalize, METH_O, "\n"
+		"Geometry_Normalize(Geometry self) -> Geometry\n"
+		"OGRGeometryH\n"
+		"OGR_G_Normalize(OGRGeometryH hGeom)\n"
+		"\n"
+		"Attempts to bring geometry into normalized/canonical form.\n"
+		"\n"
+		"This function is the same as the C++ method OGRGeometry::Normalize().\n"
+		"\n"
+		"This function is built on the GEOS library; check it for the\n"
+		"definition of the geometry operation. If OGR is built without the GEOS\n"
+		"library, this function will always fail, issuing a CPLE_NotSupported\n"
+		"error.\n"
+		"\n"
+		"Parameters:\n"
+		"-----------\n"
+		"\n"
+		"hGeom:  The Geometry to normalize.\n"
+		"\n"
+		"a newly allocated geometry now owned by the caller, or NULL on\n"
+		"failure.\n"
+		"\n"
+		"GDAL 3.3 \n"
+		""},
 	 { "Geometry_RemoveLowerDimensionSubGeoms", _wrap_Geometry_RemoveLowerDimensionSubGeoms, METH_O, "Geometry_RemoveLowerDimensionSubGeoms(Geometry self) -> Geometry"},
 	 { "Geometry_Buffer", (PyCFunction)(void(*)(void))_wrap_Geometry_Buffer, METH_VARARGS|METH_KEYWORDS, "\n"
 		"Geometry_Buffer(Geometry self, double distance, int quadsecs=30) -> Geometry\n"
@@ -35540,6 +35575,8 @@ static PyMethodDef SwigMethods[] = {
 		"This function relates to the SFCOM IWks::WkbSize() method.\n"
 		"\n"
 		"This function is the same as the CPP method OGRGeometry::WkbSize().\n"
+		"\n"
+		"Use OGR_G_WkbSizeEx() if called on huge geometries (> 2 GB serialized)\n"
 		"\n"
 		"Parameters:\n"
 		"-----------\n"
@@ -36832,6 +36869,8 @@ SWIG_init(void) {
   SWIG_Python_SetConstant(d, "ODsCRandomLayerRead",SWIG_FromCharPtr("RandomLayerRead"));
   SWIG_Python_SetConstant(d, "ODsCRandomLayerWrite",SWIG_FromCharPtr("RandomLayerWrite "));
   SWIG_Python_SetConstant(d, "ODsCAddFieldDomain",SWIG_FromCharPtr("AddFieldDomain"));
+  SWIG_Python_SetConstant(d, "ODsCDeleteFieldDomain",SWIG_FromCharPtr("DeleteFieldDomain"));
+  SWIG_Python_SetConstant(d, "ODsCUpdateFieldDomain",SWIG_FromCharPtr("UpdateFieldDomain"));
   SWIG_Python_SetConstant(d, "ODrCCreateDataSource",SWIG_FromCharPtr("CreateDataSource"));
   SWIG_Python_SetConstant(d, "ODrCDeleteDataSource",SWIG_FromCharPtr("DeleteDataSource"));
   SWIG_Python_SetConstant(d, "OLMD_FID64",SWIG_FromCharPtr("OLMD_FID64"));

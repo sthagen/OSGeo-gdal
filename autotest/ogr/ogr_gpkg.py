@@ -1062,6 +1062,24 @@ def test_ogr_gpkg_15():
     feat = None
     gpkg_ds.ReleaseResultSet(sql_lyr)
 
+    if ogr.GetGEOSVersionMajor() * 10000 + ogr.GetGEOSVersionMinor() * 100 + ogr.GetGEOSVersionMicro() >= 30800:
+        sql_lyr = gpkg_ds.ExecuteSQL("SELECT ST_MakeValid(NULL)")
+        feat = sql_lyr.GetNextFeature()
+        assert feat.GetGeometryRef() is None
+        gpkg_ds.ReleaseResultSet(sql_lyr)
+
+        sql_lyr = gpkg_ds.ExecuteSQL("SELECT ST_MakeValid('invalid')")
+        feat = sql_lyr.GetNextFeature()
+        assert feat.GetGeometryRef() is None
+        gpkg_ds.ReleaseResultSet(sql_lyr)
+
+        sql_lyr = gpkg_ds.ExecuteSQL("SELECT ST_MakeValid(geom) FROM tbl_linestring_renamed")
+        feat = sql_lyr.GetNextFeature()
+        if feat.GetGeometryRef().ExportToWkt() != 'LINESTRING (5 5,10 5,10 10,5 10)':
+            feat.DumpReadable()
+            pytest.fail()
+        gpkg_ds.ReleaseResultSet(sql_lyr)
+
     if _has_spatialite_4_3_or_later(gpkg_ds):
         sql_lyr = gpkg_ds.ExecuteSQL(
             "SELECT ST_Buffer(geom, 1e-10) FROM tbl_linestring_renamed")
@@ -2569,6 +2587,18 @@ def test_ogr_gpkg_34():
     assert gdal.GetLastErrorMsg() != ''
     gdal.ErrorReset()
     ds.ExecuteSQL('ALTER TABLE "weird\'layer""name" RENAME TO "weird2\'layer""name"')
+    ds = None
+
+    ds = ogr.Open(dbname, update=1)
+    ds.ExecuteSQL('ALTER TABLE "weird2\'layer""name" RENAME COLUMN "foo" TO "bar"')
+    assert gdal.GetLastErrorMsg() == ''
+    lyr = ds.GetLayerByName(new_layer_name)
+    assert lyr.GetLayerDefn().GetFieldIndex('bar') >= 0
+
+    ds.ExecuteSQL('ALTER TABLE "weird2\'layer""name" DROP COLUMN "bar"')
+    assert gdal.GetLastErrorMsg() == ''
+    assert lyr.GetLayerDefn().GetFieldIndex('bar') < 0
+
     ds.ExecuteSQL('VACUUM')
     ds = None
 
@@ -2832,7 +2862,25 @@ def test_ogr_gpkg_36():
 
     new_field_defn = ogr.FieldDefn('bar', ogr.OFTReal)
     new_field_defn.SetSubType(ogr.OFSTFloat32)
+    new_field_defn.SetWidth(10)
+    new_field_defn.SetDefault('5')
+
+    # Schema only change
     assert lyr.AlterFieldDefn(0, new_field_defn, ogr.ALTER_ALL_FLAG) == 0
+
+    # Full table rewrite
+    new_field_defn.SetNullable(False)
+    assert lyr.AlterFieldDefn(0, new_field_defn, ogr.ALTER_ALL_FLAG) == 0
+
+    # Full table rewrite
+    new_field_defn.SetUnique(True)
+    assert lyr.AlterFieldDefn(0, new_field_defn, ogr.ALTER_ALL_FLAG) == 0
+
+    # Violation of not-null constraint
+    new_field_defn = ogr.FieldDefn('baz', ogr.OFTString)
+    new_field_defn.SetNullable(False)
+    with gdaltest.error_handler():
+        assert lyr.AlterFieldDefn(1 , new_field_defn, ogr.ALTER_ALL_FLAG) != 0
 
     lyr.ResetReading()
     f = lyr.GetNextFeature()
@@ -2842,6 +2890,13 @@ def test_ogr_gpkg_36():
         pytest.fail()
     f = None
 
+    # Just change the name, and run it outside an existing transaction
+    lyr.StartTransaction()
+    new_field_defn = ogr.FieldDefn('baw2', ogr.OFTString)
+    assert lyr.AlterFieldDefn(0, new_field_defn, ogr.ALTER_ALL_FLAG) == 0
+    lyr.CommitTransaction()
+
+    # Just change the name, and run it under an existing transaction
     lyr.StartTransaction()
     new_field_defn = ogr.FieldDefn('baw', ogr.OFTString)
     assert lyr.AlterFieldDefn(0, new_field_defn, ogr.ALTER_ALL_FLAG) == 0
@@ -2902,7 +2957,9 @@ def test_ogr_gpkg_36():
     # Unlink before AlterFieldDefn
     gdal.Unlink(dbname)
     with gdaltest.error_handler():
-        ret = lyr.AlterFieldDefn(0, ogr.FieldDefn('bar'), ogr.ALTER_ALL_FLAG)
+        new_field_defn = ogr.FieldDefn('bar')
+        new_field_defn.SetNullable(False)
+        ret = lyr.AlterFieldDefn(0, new_field_defn, ogr.ALTER_ALL_FLAG)
     assert ret != 0
     with gdaltest.error_handler():
         ds = None
@@ -4115,6 +4172,64 @@ def test_ogr_gpkg_wal():
     gdal.Unlink(filename + '-wal')
     gdal.Unlink(filename + '-shm')
 
+###############################################################################
+# Test NOLOCK open option
+
+
+def test_ogr_gpkg_nolock():
+
+    def get_nolock(ds):
+        sql_lyr = ds.ExecuteSQL('SELECT nolock', dialect='DEBUG')
+        f = sql_lyr.GetNextFeature()
+        res = True if f[0] == 1 else False
+        ds.ReleaseResultSet(sql_lyr)
+        return res
+
+    # needs to be a real file
+    filename = 'tmp/test_ogr_gpkg_nolock.gpkg'
+
+    ds = gdaltest.gpkg_dr.CreateDataSource(filename)
+    lyr = ds.CreateLayer('foo')
+    f = ogr.Feature(lyr.GetLayerDefn())
+    lyr.CreateFeature(f)
+    f = None
+    ds = None
+
+    ds = gdal.OpenEx(filename, gdal.OF_VECTOR, open_options=['NOLOCK=YES'])
+    assert ds
+    assert get_nolock(ds)
+
+    lyr = ds.GetLayer(0)
+    f = lyr.GetNextFeature()
+    ds2 = ogr.Open(filename, update = 1)
+    lyr2 = ds2.GetLayer(0)
+    f = ogr.Feature(lyr2.GetLayerDefn())
+    # Without lockless mode on ds, this would timeout and fail
+    assert lyr2.CreateFeature(f) == ogr.OGRERR_NONE
+    f = None
+    ds2 = None
+    ds = None
+
+    # Lockless mode should NOT be honored by GDAL in update mode
+    ds = gdal.OpenEx(filename, gdal.OF_VECTOR | gdal.OF_UPDATE, open_options=['NOLOCK=YES'])
+    assert ds
+    assert not get_nolock(ds)
+    ds = None
+
+    # Now turn on WAL
+    ds = ogr.Open(filename, update = 1)
+    ds.ExecuteSQL('PRAGMA journal_mode = WAL')
+    ds = None
+
+    # Lockless mode should NOT be honored by GDAL on a WAL enabled file
+    ds = gdal.OpenEx(filename, gdal.OF_VECTOR, open_options=['NOLOCK=YES'])
+    assert ds
+    assert not get_nolock(ds)
+    ds = None
+
+    gdal.Unlink(filename)
+    gdal.Unlink(filename + '-wal')
+    gdal.Unlink(filename + '-shm')
 
 ###############################################################################
 # Run test_ogrsf
@@ -4692,10 +4807,15 @@ def test_ogr_gpkg_field_domains():
 
     assert ds.TestCapability(ogr.ODsCAddFieldDomain)
 
+    assert ds.GetFieldDomainNames() is None
+
     assert ds.GetFieldDomain('does_not_exist') is None
 
     assert ds.AddFieldDomain(ogr.CreateRangeFieldDomain('range_domain_int', 'my desc', ogr.OFTInteger, ogr.OFSTNone, 1, True, 2, False))
     assert ds.GetFieldDomain('range_domain_int') is not None
+
+    assert set(ds.GetFieldDomainNames()) == {'range_domain_int'}
+
     assert not ds.AddFieldDomain(ogr.CreateRangeFieldDomain('range_domain_int', 'my desc', ogr.OFTInteger, ogr.OFSTNone, 1, True, 2, True))
 
     assert ds.AddFieldDomain(ogr.CreateRangeFieldDomain('range_domain_int64', '', ogr.OFTInteger64, ogr.OFSTNone, -1234567890123, False, 1234567890123, True))
@@ -4722,6 +4842,23 @@ def test_ogr_gpkg_field_domains():
     assert ds.AddFieldDomain(ogr.CreateCodedFieldDomain('enum_domain_guess_real', '', ogr.OFTReal, ogr.OFSTNone, {1: "one", 1.5: "one dot five", 1234567890123: "1234567890123", 3: "three"}))
     assert ds.AddFieldDomain(ogr.CreateCodedFieldDomain('enum_domain_guess_string_single', '', ogr.OFTString, ogr.OFSTNone, {"three": "three"}))
     assert ds.AddFieldDomain(ogr.CreateCodedFieldDomain('enum_domain_guess_string', '', ogr.OFTString, ogr.OFSTNone, {1: "one", 1.5: "one dot five", "three": "three", 4: "four"}))
+
+    assert len(ds.GetFieldDomainNames()) == len(set(ds.GetFieldDomainNames()))
+    assert set(ds.GetFieldDomainNames()) == {'enum_domain',
+                                             'enum_domain_guess_int',
+                                             'enum_domain_guess_int64',
+                                             'enum_domain_guess_int64_single_1',
+                                             'enum_domain_guess_int64_single_2',
+                                             'enum_domain_guess_int_single',
+                                             'enum_domain_guess_real',
+                                             'enum_domain_guess_real_single',
+                                             'enum_domain_guess_string',
+                                             'enum_domain_guess_string_single',
+                                             'glob_domain',
+                                             'range_domain_int',
+                                             'range_domain_int64',
+                                             'range_domain_real',
+                                             'range_domain_real_inf'}
 
     lyr = ds.CreateLayer('test')
 
@@ -4758,6 +4895,22 @@ def test_ogr_gpkg_field_domains():
     sql_lyr = ds.ExecuteSQL('SELECT * FROM gpkg_data_column_constraints')
     assert sql_lyr is not None
     ds.ReleaseResultSet(sql_lyr)
+
+    assert set(ds.GetFieldDomainNames()) == {'enum_domain',
+                                             'enum_domain_guess_int',
+                                             'enum_domain_guess_int64',
+                                             'enum_domain_guess_int64_single_1',
+                                             'enum_domain_guess_int64_single_2',
+                                             'enum_domain_guess_int_single',
+                                             'enum_domain_guess_real',
+                                             'enum_domain_guess_real_single',
+                                             'enum_domain_guess_string',
+                                             'enum_domain_guess_string_single',
+                                             'glob_domain',
+                                             'range_domain_int',
+                                             'range_domain_int64',
+                                             'range_domain_real',
+                                             'range_domain_real_inf'}
 
     domain = ds.GetFieldDomain('range_domain_int')
     assert domain is not None
@@ -4909,6 +5062,22 @@ def test_ogr_gpkg_field_domains():
     idx = lyr_defn.GetFieldIndex('with_glob_domain')
     fld_defn = lyr_defn.GetFieldDefn(idx)
     assert fld_defn.GetDomainName() == 'glob_domain'
+
+    assert set(ds.GetFieldDomainNames()) == {'enum_domain',
+                                             'enum_domain_guess_int',
+                                             'enum_domain_guess_int64',
+                                             'enum_domain_guess_int64_single_1',
+                                             'enum_domain_guess_int64_single_2',
+                                             'enum_domain_guess_int_single',
+                                             'enum_domain_guess_real',
+                                             'enum_domain_guess_real_single',
+                                             'enum_domain_guess_string',
+                                             'enum_domain_guess_string_single',
+                                             'glob_domain',
+                                             'range_domain_int',
+                                             'range_domain_int64',
+                                             'range_domain_real',
+                                             'range_domain_real_inf'}
 
     ds = None
 
@@ -5181,4 +5350,31 @@ def test_ogr_gpkg_crs_coordinate_epoch():
 
     ds = None
 
+    gdal.Unlink(filename)
+
+
+###############################################################################
+# Test CPL_VSIL_USE_TEMP_FILE_FOR_RANDOM_WRITE
+
+
+def test_ogr_gpkg_CPL_VSIL_USE_TEMP_FILE_FOR_RANDOM_WRITE():
+
+    # First check that CPL_TMPDIR is ignored for regular files
+    filename = '/vsimem/test_ogr_gpkg_CPL_VSIL_USE_TEMP_FILE_FOR_RANDOM_WRITE.gpkg'
+    with gdaltest.config_option('CPL_TMPDIR', '/i_do/not/exist'):
+        ds = gdaltest.gpkg_dr.CreateDataSource(filename)
+    assert ds is not None
+    ds = None
+    gdal.Unlink(filename)
+
+    # Now check that CPL_TMPDIR is honored for CPL_VSIL_USE_TEMP_FILE_FOR_RANDOM_WRITE=FORCED
+    with gdaltest.config_options({'CPL_TMPDIR': '/vsimem/temporary_location',
+                                  'CPL_VSIL_USE_TEMP_FILE_FOR_RANDOM_WRITE': 'FORCED'}):
+        ds = gdaltest.gpkg_dr.CreateDataSource(filename)
+    assert ds is not None
+    assert gdal.VSIStatL(filename) is None
+    assert len(gdal.ReadDir('/vsimem/temporary_location')) != 0
+    ds = None
+    assert gdal.VSIStatL(filename) is not None
+    assert gdal.ReadDir('/vsimem/temporary_location') is None
     gdal.Unlink(filename)

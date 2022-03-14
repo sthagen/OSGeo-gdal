@@ -3,7 +3,6 @@ add_gdal_driver(
   SOURCES BitMask2D.h
           JPEG_band.cpp
           PNG_band.cpp
-          LERC_band.cpp
           marfa.h
           marfa_dataset.cpp
           mrf_band.cpp
@@ -18,53 +17,54 @@ add_gdal_driver(
 gdal_standard_includes(gdal_MRF)
 
 # Internal libs first
-if (GDAL_JPEG12_SUPPORTED)
+if (GDAL_USE_JPEG12_INTERNAL)
   target_sources(gdal_MRF PRIVATE JPEG12_band.cpp)
   target_compile_definitions(gdal_MRF PRIVATE -DJPEG12_SUPPORTED)
   target_include_directories(gdal_MRF PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 endif ()
 
-if (GDAL_USE_LIBJPEG_INTERNAL)
-  target_include_directories(gdal_MRF PRIVATE $<TARGET_PROPERTY:libjpeg,SOURCE_DIR>)
-  if (RENAME_INTERNAL_LIBJPEG_SYMBOLS)
-    target_compile_definitions(gdal_MRF PRIVATE -DRENAME_INTERNAL_LIBJPEG_SYMBOLS)
-  endif ()
+if (GDAL_USE_JPEG_INTERNAL)
+  gdal_add_vendored_lib(gdal_MRF libjpeg)
 endif ()
 
-if (GDAL_USE_LIBPNG_INTERNAL)
-  target_include_directories(gdal_MRF PRIVATE $<TARGET_PROPERTY:libpng,SOURCE_DIR>)
-  target_compile_definitions(gdal_MRF PRIVATE -DINTERNAL_PNG)
+if (GDAL_USE_PNG_INTERNAL)
+  gdal_add_vendored_lib(gdal_MRF libpng)
 endif ()
 
-if (GDAL_USE_LIBZ_INTERNAL)
-  target_include_directories(gdal_MRF PRIVATE $<TARGET_PROPERTY:libz,SOURCE_DIR>)
+if (GDAL_USE_ZLIB_INTERNAL)
+  gdal_add_vendored_lib(gdal_MRF libz)
 endif ()
 
-if (GDAL_USE_LIBLERC_INTERNAL)
+if (GDAL_USE_LERC OR GDAL_USE_LERC_INTERNAL)
   target_sources(gdal_MRF PRIVATE LERC_band.cpp)
-  target_include_directories(gdal_MRF PRIVATE $<TARGET_PROPERTY:liblerc,SOURCE_DIR> $<TARGET_PROPERTY:lerc,SOURCE_DIR>)
+  gdal_add_vendored_lib(gdal_MRF PRIVATE liblercv1)
   target_compile_definitions(gdal_MRF PRIVATE -DLERC)
+  add_subdirectory(LERCV1)
 endif ()
 
-if (GDAL_USE_LIBLERC_INTERNAL)
-  add_subdirectory(LERCV1)
+if (GDAL_USE_LERC_INTERNAL)
+  gdal_add_vendored_lib(gdal_MRF lerc)
 endif ()
 
 # Now external libs
 
-if (NOT GDAL_USE_LIBJPEG_INTERNAL)
-  gdal_target_link_libraries(TARGET gdal_MRF LIBRARIES JPEG::JPEG)
+if (NOT GDAL_USE_JPEG_INTERNAL)
+  gdal_target_link_libraries(gdal_MRF PRIVATE JPEG::JPEG)
 endif ()
 
-if (NOT GDAL_USE_LIBPNG_INTERNAL)
-  gdal_target_link_libraries(TARGET gdal_MRF LIBRARIES PNG::PNG)
+if (NOT GDAL_USE_PNG_INTERNAL)
+  gdal_target_link_libraries(gdal_MRF PRIVATE PNG::PNG)
 endif ()
 
-if (NOT GDAL_USE_LIBZ_INTERNAL)
-  gdal_target_link_libraries(TARGET gdal_MRF LIBRARIES ZLIB::ZLIB)
+if (NOT GDAL_USE_ZLIB_INTERNAL)
+  gdal_target_link_libraries(gdal_MRF PRIVATE ZLIB::ZLIB)
+endif ()
+
+if (NOT GDAL_USE_LERC_INTERNAL AND GDAL_USE_LERC)
+  gdal_target_link_libraries(gdal_MRF PRIVATE LERC::LERC)
 endif ()
 
 if (GDAL_USE_ZSTD)
   target_compile_definitions(gdal_MRF PRIVATE -DZSTD_SUPPORT)
-  gdal_target_link_libraries(TARGET gdal_MRF LIBRARIES ZSTD::zstd)
+  gdal_target_link_libraries(gdal_MRF PRIVATE ${ZSTD_LIBRARIES})
 endif ()

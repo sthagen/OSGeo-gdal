@@ -329,6 +329,15 @@ char** GDALMDReaderPleiades::LoadRPCXmlFile()
     {
         papszRawRPCList = ReadXMLToList(pGRFMNode->psChild, papszRawRPCList);
     }
+    else
+    {
+        pGRFMNode = CPLSearchXMLNode(pNode, "=Rational_Function_Model");
+
+        if(pGRFMNode != nullptr)
+        {
+            papszRawRPCList = ReadXMLToList(pGRFMNode->psChild, papszRawRPCList);
+        }
+    }
 
     if( nullptr == papszRawRPCList )
     {
@@ -408,8 +417,16 @@ char** GDALMDReaderPleiades::LoadRPCXmlFile()
             // supplies geographic coordinates (lon, lat) and an altitude (alt)"""
             const char* pszValue = CSLFetchNameValue(papszRawRPCList,
                  CPLSPrintf("Inverse_Model.%s_%d", apszRPCTXT20ValItems[i], j));
-            if(nullptr != pszValue)
+            if(nullptr != pszValue){
                 value = value + " " + CPLString(pszValue);
+            }
+            else {
+                 pszValue = CSLFetchNameValue(papszRawRPCList,
+                 CPLSPrintf("GroundtoImage_Values.%s_%d", apszRPCTXT20ValItems[i], j));
+                 if(nullptr != pszValue){
+                    value = value + " " + CPLString(pszValue);
+                 }
+            }
         }
         papszRPB = CSLAddNameValue(papszRPB, apszRPCTXT20ValItems[i], value);
     }

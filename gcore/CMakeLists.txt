@@ -1,4 +1,4 @@
-# CMake4GDAL project is distributed under X/MIT license. See accompanying file LICENSE.txt.
+# CMake4GDAL project is distributed under MIT license. See accompanying file LICENSE.txt.
 add_library(
   gcore OBJECT
   gdalopeninfo.cpp
@@ -52,8 +52,8 @@ target_compile_options(gcore PRIVATE ${GDAL_CXX_WARNING_FLAGS} ${WFLAG_OLD_STYLE
 target_include_directories(
   gcore
   PRIVATE $<TARGET_PROPERTY:ogrsf_generic,SOURCE_DIR> $<TARGET_PROPERTY:ogr_geojson,SOURCE_DIR>
-          $<TARGET_PROPERTY:gnm_frmts,SOURCE_DIR> $<TARGET_PROPERTY:gdal_GTIFF,SOURCE_DIR>
-          $<TARGET_PROPERTY:gdal_MEM,SOURCE_DIR> $<TARGET_PROPERTY:gdal_vrt,SOURCE_DIR>)
+          $<TARGET_PROPERTY:gdal_GTIFF,SOURCE_DIR> $<TARGET_PROPERTY:gdal_MEM,SOURCE_DIR>
+          $<TARGET_PROPERTY:gdal_vrt,SOURCE_DIR>)
 set_property(TARGET gcore PROPERTY POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
 
 if (NOT DEFINED GDAL_RESOURCE_PATH)
@@ -72,6 +72,15 @@ if (GDAL_USE_XERCESC)
     PROPERTY COMPILE_DEFINITIONS HAVE_XERCES)
 endif ()
 
+option(GDAL_AUTOLOAD_PLUGINS "Set to OFF to prevent any attempt at loading plugins" ON)
+mark_as_advanced(GDAL_AUTOLOAD_PLUGINS)
+if (NOT GDAL_AUTOLOAD_PLUGINS)
+  set_property(
+    SOURCE gdaldrivermanager.cpp
+    APPEND
+    PROPERTY COMPILE_DEFINITIONS GDAL_NO_AUTOLOAD)
+endif ()
+
 if (HAVE_SSSE3_AT_COMPILE_TIME)
   target_compile_definitions(gcore PRIVATE -DHAVE_SSSE3_AT_COMPILE_TIME)
   target_sources(gcore PRIVATE rasterio_ssse3.cpp)
@@ -83,7 +92,7 @@ endif ()
 
 target_sources(${GDAL_LIB_TARGET_NAME} PRIVATE $<TARGET_OBJECTS:gcore>)
 
-if (GDAL_USE_LIBJSONC_INTERNAL)
+if (GDAL_USE_JSONC_INTERNAL)
   target_include_directories(gcore PRIVATE $<TARGET_PROPERTY:libjson,SOURCE_DIR>)
 endif ()
 
@@ -94,30 +103,41 @@ endif ()
 add_subdirectory(mdreader)
 
 # External libs now
-if (NOT GDAL_USE_LIBJSONC_INTERNAL)
-  target_include_directories(gcore PRIVATE ${JSONC_INCLUDE_DIRS})
-  gdal_add_private_link_libraries(JSONC::JSONC)
+if (NOT GDAL_USE_JSONC_INTERNAL)
+  gdal_target_link_libraries(gcore PRIVATE ${JSONC_LIBRARIES})
 endif ()
 
-if (NOT DEFINED OGR_ENABLE_SQLITE)
-  message(FATAL_ERROR "OGR_ENABLE_SQLITE should be set to ON or OFF")
+if (NOT DEFINED OGR_ENABLE_DRIVER_SQLITE)
+  message(FATAL_ERROR "OGR_ENABLE_DRIVER_SQLITE should be set to ON or OFF")
 endif ()
-if (OGR_ENABLE_SQLITE)
+if (OGR_ENABLE_DRIVER_SQLITE)
   target_compile_definitions(gcore PRIVATE -DSQLITE_ENABLED)
 endif ()
 if (GDAL_USE_LIBXML2)
   target_compile_definitions(gcore PRIVATE -DHAVE_LIBXML2)
-  target_include_directories(gcore PRIVATE ${LIBXML2_INCLUDE_DIRS})
-  gdal_add_private_link_libraries(LibXml2::LibXml2)
+  gdal_target_link_libraries(gcore PRIVATE LibXml2::LibXml2)
+
+  # Some libxml2 builds may require Iconv (libxml2/libxml/encoding.h includes iconv.h if LIBXML_ICONV_ENABLED is
+  # defined)
+  if (GDAL_USE_ICONV)
+    if (NOT Iconv_IS_BUILT_IN)
+      target_include_directories(gcore PRIVATE $<TARGET_PROPERTY:Iconv::Iconv,INTERFACE_INCLUDE_DIRECTORIES>)
+    endif ()
+  endif ()
+
 endif ()
 if (GDAL_USE_GEOS)
   target_compile_definitions(gcore PRIVATE -DHAVE_GEOS)
-  target_include_directories(gcore PRIVATE ${GEOS_INCLUDE_DIRS})
-  gdal_add_private_link_libraries(GEOS::GEOS)
+  gdal_target_link_libraries(gcore PRIVATE ${GEOS_LIBRARIES})
 endif ()
 
-target_include_directories(gcore PRIVATE ${PROJ_INCLUDE_DIRS})
-gdal_add_private_link_libraries(PROJ::PROJ)
+gdal_target_link_libraries(gcore PRIVATE PROJ::proj)
+
+# Windows(Mingw/MSVC) link libraries
+if (CMAKE_SYSTEM_NAME MATCHES "Windows")
+  # psapi needed for gdalpython.cpp (EnumProcessModules)
+  gdal_target_link_libraries(gcore PRIVATE psapi)
+endif ()
 
 include(TargetPublicHeader)
 target_public_header(

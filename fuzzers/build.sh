@@ -83,14 +83,29 @@ make install
 cd ..
 
 # build poppler
+
+# We *need* to build with the sanitize flags for the address sanitizer,
+# because the C++ library is built with
+# https://github.com/google/sanitizers/wiki/AddressSanitizerContainerOverflow enabled
+# and we'd get false-positives (https://github.com/google/sanitizers/wiki/AddressSanitizerContainerOverflow#false-positives)
+# as https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=43668 if we don't
+# build GDAL's dependencies with different flags
+if [ "$SANITIZER" = "address" ]; then
+  POPPLER_C_FLAGS=$CFLAGS
+  POPPLER_CXX_FLAGS=$CXXFLAGS
+else
+  POPPLER_C_FLAGS=$NON_FUZZING_CFLAGS
+  POPPLER_CXX_FLAGS=$NON_FUZZING_CXXFLAGS
+fi
+
 cd poppler
 mkdir -p build
 cd build
 cmake .. \
   -DCMAKE_INSTALL_PREFIX=$SRC/install \
   -DCMAKE_BUILD_TYPE=debug \
-  -DCMAKE_C_FLAGS="$NON_FUZZING_CFLAGS" \
-  -DCMAKE_CXX_FLAGS="$NON_FUZZING_CXXFLAGS" \
+  -DCMAKE_C_FLAGS="$POPPLER_C_FLAGS" \
+  -DCMAKE_CXX_FLAGS="$POPPLER_CXX_FLAGS" \
   -DENABLE_UNSTABLE_API_ABI_HEADERS=ON \
   -DBUILD_SHARED_LIBS=OFF \
   -DFONT_CONFIGURATION=generic \
@@ -104,7 +119,11 @@ cmake .. \
   -DENABLE_QT5=OFF \
   -DENABLE_UTILS=OFF \
   -DWITH_Cairo=OFF \
-  -DWITH_NSS3=OFF
+  -DWITH_NSS3=OFF \
+  -DBUILD_CPP_TESTS=OFF \
+  -DBUILD_GTK_TESTS=OFF \
+  -DBUILD_MANUAL_TESTS=OFF \
+  -DBUILD_QT5_TESTS=OFF
 
 make clean -s
 make -j$(nproc) -s
@@ -173,7 +192,8 @@ if [ "$ARCHITECTURE" = "x86_64" ]; then
 fi
 
 PKG_CONFIG_PATH=$SRC/install/lib/pkgconfig ./configure --without-libtool --with-liblzma --with-expat --with-sqlite3=$SRC/install --with-xerces=$SRC/install --with-webp ${NETCDF_SWITCH} --with-curl=$SRC/install/bin/curl-config --without-hdf5 --with-proj=$SRC/install -with-proj-extra-lib-for-test="-L$SRC/install/lib -lcurl -lssl -lcrypto -lz -ltiff -lzstd" --with-poppler --with-libtiff=internal --with-rename-internal-libtiff-symbols
-# sed -i "s/POPPLER_MINOR_VERSION = 9/POPPLER_MINOR_VERSION = 10/" GDALmake.opt # temporary hack until poppler > 21.9 is released
+
+sed -i "s/POPPLER_MINOR_VERSION = 2/POPPLER_MINOR_VERSION = 3/" GDALmake.opt # temporary hack until poppler > 22.2 is released
 
 make clean -s
 make -j$(nproc) -s static-lib

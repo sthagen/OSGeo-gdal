@@ -11,6 +11,12 @@ LD_SHARED = $(LD) -bundle
 endif
 
 ifeq ($(HAVE_POPPLER),yes)
+# Poppler 2022.1 requires c++17
+ifeq ($(shell test $(POPPLER_MAJOR_VERSION) -gt 21; echo $$?),0)
+CXX := $(subst -std=c++11,,${CXX})
+CXX := $(subst -std=c++14,,${CXX})
+CXX := ${CXX} -std=c++17
+endif
 CPPFLAGS +=  -DHAVE_POPPLER -DPOPPLER_MAJOR_VERSION=$(POPPLER_MAJOR_VERSION) -DPOPPLER_MINOR_VERSION=$(POPPLER_MINOR_VERSION)
 endif
 
@@ -31,7 +37,7 @@ endif
 
 $(O_OBJ):       pdfobject.h pdfio.h pdfcreatecopy.h pdfcreatefromcomposition.h gdal_pdf.h ../../ogr/ogrsf_frmts/mem/ogr_mem.h
 
-CPPFLAGS	:=	 -iquote ../vrt -iquote ../mem -iquote ../../ogr/ogrsf_frmts/mem $(CPPFLAGS) $(POPPLER_INC) $(PODOFO_INC) $(PDFIUM_INC) -DDO_NOT_USE_DEBUG_BOOL
+CPPFLAGS	:=	 -iquote ../vrt -iquote ../mem -iquote ../../ogr/ogrsf_frmts/mem $(CPPFLAGS) $(POPPLER_INC) $(PODOFO_INC) $(PDFIUM_INC)
 
 default:	$(OBJ:.o=.$(OBJ_EXT))
 

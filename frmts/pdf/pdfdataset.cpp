@@ -1410,26 +1410,25 @@ public:
 
     virtual void SetBaseClip(const FX_RECT& rect) override { m_poParent->SetBaseClip(rect); }
 
-    virtual bool SetClip_PathFill(const CFX_Path* pPath,
+    virtual bool SetClip_PathFill(const CFX_Path& path,
                                 const CFX_Matrix* pObject2Device,
                                 const CFX_FillRenderOptions& fill_options) override
     {
         if( !bEnableVector && !bTemporaryEnableVectorForTextStroking )
             return true;
-        return m_poParent->SetClip_PathFill(pPath, pObject2Device, fill_options);
+        return m_poParent->SetClip_PathFill(path, pObject2Device, fill_options);
     }
 
-    virtual bool     SetClip_PathStroke(const CFX_Path* pPath,
+    virtual bool     SetClip_PathStroke(const CFX_Path& path,
                                   const CFX_Matrix* pObject2Device,
-                                  const CFX_GraphStateData* pGraphState
-                                      ) override
+                                  const CFX_GraphStateData* pGraphState) override
     {
         if( !bEnableVector && !bTemporaryEnableVectorForTextStroking )
             return true;
-        return m_poParent->SetClip_PathStroke(pPath, pObject2Device, pGraphState);
+        return m_poParent->SetClip_PathStroke(path, pObject2Device, pGraphState);
     }
 
-    virtual bool DrawPath(const CFX_Path* pPath,
+    virtual bool DrawPath(const CFX_Path& path,
                         const CFX_Matrix* pObject2Device,
                         const CFX_GraphStateData* pGraphState,
                         uint32_t fill_color,
@@ -1439,7 +1438,7 @@ public:
     {
         if( !bEnableVector && !bTemporaryEnableVectorForTextStroking )
             return true;
-        return m_poParent->DrawPath(pPath, pObject2Device, pGraphState ,
+        return m_poParent->DrawPath(path, pObject2Device, pGraphState ,
                                     fill_color, stroke_color, fill_options,
                                     blend_type);
     }
@@ -1528,8 +1527,7 @@ public:
         return m_poParent->ContinueDIBits(handle, pPause);
     }
 
-    virtual bool DrawDeviceText(int nChars,
-                              const TextCharPos* pCharPos,
+    virtual bool DrawDeviceText(pdfium::span<const TextCharPos> pCharPos,
                               CFX_Font* pFont,
                               const CFX_Matrix& mtObject2Device,
                               float font_size,
@@ -1544,7 +1542,7 @@ public:
             if( bTemporaryEnableVectorForTextStroking )
                 return FALSE; // this is the default behavior of the parent
             bTemporaryEnableVectorForTextStroking = true;
-            bool bRet = m_pDevice->DrawNormalText(nChars, pCharPos,
+            bool bRet = m_pDevice->DrawNormalText(pCharPos,
                                                      pFont,
                                                      font_size, mtObject2Device,
                                                      color, options);
@@ -1676,9 +1674,12 @@ void myRenderPageImpl(PDFDataset* poDS,
     pContext->m_pAnnots = std::move(pOwnedList);
     bool bPrinting =
         pContext->m_pDevice->GetDeviceType() != DeviceType::kDisplay;
+
+    // TODO(https://crbug.com/pdfium/993) - maybe pass true here.
+    const bool bShowWidget = false;
     pList->DisplayAnnots(pPage, pContext->m_pDevice.get(),
                          pContext->m_pContext.get(), bPrinting, matrix,
-                         false, nullptr);
+                         bShowWidget);
   }
 
   pContext->m_pRenderer = std::make_unique<CPDF_ProgressiveRenderer>(
@@ -3467,7 +3468,7 @@ void PDFDataset::AddLayer(const char* pszLayerName)
             osNewLayerList.AddNameValue(CPLSPrintf("LAYER_%03d_NAME", i),
                                         osLayerList[/*2 * */ i] + strlen("LAYER_00_NAME="));
         }
-        osLayerList = osNewLayerList;
+        osLayerList = std::move(osNewLayerList);
     }
 
     char szFormatName[64];
@@ -4209,9 +4210,7 @@ PDFDataset *PDFDataset::Open( GDALOpenInfo * poOpenInfo )
     GDALPDFObject* poPageObj = nullptr;
 #ifdef HAVE_POPPLER
     PDFDoc* poDocPoppler = nullptr;
-#if POPPLER_MAJOR_VERSION >= 1 || POPPLER_MINOR_VERSION >= 58
-    Object oObj;
-#else
+#if !(POPPLER_MAJOR_VERSION >= 1 || POPPLER_MINOR_VERSION >= 58)
     ObjectAutoFree oObj;
 #endif
     Page* poPagePoppler = nullptr;
@@ -4241,8 +4240,6 @@ PDFDataset *PDFDataset::Open( GDALOpenInfo * poOpenInfo )
 #ifdef HAVE_POPPLER
   if(bUseLib.test(PDFLIB_POPPLER))
   {
-    GooString* poUserPwd = nullptr;
-
     static bool globalParamsCreatedByGDAL = false;
     {
         CPLMutexHolderD(&hGlobalParamsMutex);
@@ -4306,26 +4303,33 @@ PDFDataset *PDFDataset::Open( GDALOpenInfo * poOpenInfo )
 
     fp = (VSILFILE*)VSICreateBufferedReaderHandle((VSIVirtualHandle*)fp);
     fpKeeper.reset(fp);
-
     while( true )
     {
         VSIFSeekL(fp, 0, SEEK_SET);
-        if (pszUserPwd)
-            poUserPwd = new GooString(pszUserPwd);
-
         g_nPopplerErrors = 0;
         if( globalParamsCreatedByGDAL )
             registerErrorCallback();
 #if POPPLER_MAJOR_VERSION >= 1 || POPPLER_MINOR_VERSION >= 58
+        Object oObj;
         auto poStream = new VSIPDFFileStream(fp, pszFilename, std::move(oObj));
 #else
         oObj.getObj()->initNull();
         auto poStream = new VSIPDFFileStream(fp, pszFilename, oObj.getObj());
 #endif
+#if POPPLER_MAJOR_VERSION > 22 || (POPPLER_MAJOR_VERSION == 22 && POPPLER_MINOR_VERSION > 2)
+        std::optional<GooString> osUserPwd;
+        if (pszUserPwd)
+            osUserPwd = std::optional<GooString>(pszUserPwd);
+        poDocPoppler = new PDFDoc(poStream, std::optional<GooString>(), osUserPwd);
+#else
+        GooString* poUserPwd = nullptr;
+        if (pszUserPwd)
+            poUserPwd = new GooString(pszUserPwd);
         poDocPoppler = new PDFDoc(poStream, nullptr, poUserPwd);
+        delete poUserPwd;
+#endif
         if( globalParamsCreatedByGDAL )
             registerErrorCallback();
-        delete poUserPwd;
         if( g_nPopplerErrors >= MAX_POPPLER_ERRORS )
         {
             PDFFreeDoc(poDocPoppler);
