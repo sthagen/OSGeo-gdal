@@ -683,7 +683,7 @@ netCDFRasterBand::netCDFRasterBand( const netCDFRasterBand::CONSTRUCTOR_OPEN&,
             {
                 SetNoDataValueNoUpdate(nNoDataAsUInt64);
             }
-            else if (eDataType == GDT_UInt64 &&
+            else if (eDataType == GDT_Int64 &&
                      nNoDataAsUInt64 <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max()) )
             {
                 SetNoDataValueNoUpdate(static_cast<int64_t>(nNoDataAsUInt64));
@@ -3339,10 +3339,11 @@ void netCDFDataset::SetProjectionFromVar( int nGroupId, int nVarId,
             const double dfLonPrimeMeridian = poDS->FetchCopyParam(
                 pszGridMappingValue, CF_PP_LONG_PRIME_MERIDIAN, 0.0);
 
-            const char *pszPMName = nullptr;
+            const char *pszPMName = FetchAttr(pszGridMappingValue,
+                                              CF_PRIME_MERIDIAN_NAME);
 
             // Should try to find PM name from its value if not Greenwich.
-            if( !CPLIsEqual(dfLonPrimeMeridian, 0.0) )
+            if( pszPMName == nullptr && !CPLIsEqual(dfLonPrimeMeridian, 0.0) )
                 pszPMName = "unknown";
 
             double dfInverseFlattening = poDS->FetchCopyParam(
@@ -3363,6 +3364,17 @@ void netCDFDataset::SetProjectionFromVar( int nGroupId, int nVarId,
                 dfEarthRadius = poDS->FetchCopyParam(
                     pszGridMappingValue, CF_PP_EARTH_RADIUS_OLD, -1.0);
 
+            const char* pszEllipsoidName = FetchAttr(pszGridMappingValue,
+                                                     CF_REFERENCE_ELLIPSOID_NAME);
+
+            const char* pszDatumName = FetchAttr(pszGridMappingValue,
+                                                 CF_HORIZONTAL_DATUM_NAME);
+
+            const char* pszGeogName = FetchAttr(pszGridMappingValue,
+                                                CF_GEOGRAPHIC_CRS_NAME);
+            if( pszGeogName == nullptr )
+                pszGeogName = "unknown";
+
             // Has radius value.
             if( dfEarthRadius > 0.0 )
             {
@@ -3373,9 +3385,9 @@ void netCDFDataset::SetProjectionFromVar( int nGroupId, int nVarId,
                     if( dfSemiMinorAxis < 0.0 )
                     {
                         // No way to get inv_flat, use sphere.
-                        oSRS.SetGeogCS("unknown",
-                                        nullptr,
-                                        "Sphere",
+                        oSRS.SetGeogCS(pszGeogName,
+                                        pszDatumName,
+                                        pszEllipsoidName ? pszEllipsoidName : "Sphere",
                                         dfEarthRadius, 0.0,
                                         pszPMName, dfLonPrimeMeridian);
                         bGotGeogCS = true;
@@ -3387,9 +3399,9 @@ void netCDFDataset::SetProjectionFromVar( int nGroupId, int nVarId,
                         //set inv_flat using semi_minor/major
                         dfInverseFlattening = OSRCalcInvFlattening(dfSemiMajorAxis, dfSemiMinorAxis);
 
-                        oSRS.SetGeogCS("unknown",
-                                        nullptr,
-                                        "Spheroid",
+                        oSRS.SetGeogCS(pszGeogName,
+                                        pszDatumName,
+                                        pszEllipsoidName ? pszEllipsoidName : "Spheroid",
                                         dfEarthRadius, dfInverseFlattening,
                                         pszPMName, dfLonPrimeMeridian);
                         bGotGeogCS = true;
@@ -3397,11 +3409,11 @@ void netCDFDataset::SetProjectionFromVar( int nGroupId, int nVarId,
                 }
                 else
                 {
-                    oSRS.SetGeogCS("unknown",
-                                    nullptr,
-                                    "Spheroid",
+                    oSRS.SetGeogCS(pszGeogName,
+                                    pszDatumName,
+                                    pszEllipsoidName ? pszEllipsoidName : "Spheroid",
                                     dfEarthRadius, dfInverseFlattening,
-                                        pszPMName, dfLonPrimeMeridian);
+                                    pszPMName, dfLonPrimeMeridian);
                     bGotGeogCS = true;
                 }
 
@@ -3913,6 +3925,14 @@ void netCDFDataset::SetProjectionFromVar( int nGroupId, int nVarId,
                                                            dfGridNorthPoleLong,
                                                            dfNorthPoleGridLong);
                 bRotatedPole = true;
+            }
+
+            if( oSRS.IsProjected() )
+            {
+                const char* pszProjectedCRSName = FetchAttr(pszGridMappingValue,
+                                                            CF_PROJECTED_CRS_NAME);
+                if( pszProjectedCRSName )
+                    oSRS.SetProjCS(pszProjectedCRSName);
             }
 
         // Is this Latitude/Longitude Grid, default?
@@ -6527,10 +6547,7 @@ void netCDFDataset::CreateSubDatasetList( int nGroupId )
 /************************************************************************/
 
 NetCDFFormatEnum netCDFDataset::IdentifyFormat( GDALOpenInfo *poOpenInfo,
-#ifndef HAVE_HDF5
-CPL_UNUSED
-#endif
-                                   bool bCheckExt = true )
+                                                bool bCheckExt )
 {
     // Does this appear to be a netcdf file? If so, which format?
     // http://www.unidata.ucar.edu/software/netcdf/docs/faq.html#fv1_5
@@ -6599,7 +6616,9 @@ CPL_UNUSED
     {
         return NCDF_FORMAT_NC2;
     }
-    else if( STARTS_WITH_CI(pszHeader, achHDF5Signature) )
+    else if( STARTS_WITH_CI(pszHeader, achHDF5Signature) ||
+             (poOpenInfo->nHeaderBytes > 512 + 8 &&
+              memcmp(pszHeader + 512, achHDF5Signature, 8) == 0) )
     {
         // Requires netCDF-4/HDF5 support in libnetcdf (not just libnetcdf-v4).
         // If HDF5 is not supported in GDAL, this driver will try to open the
@@ -6663,7 +6682,8 @@ CPL_UNUSED
     // etc.
     const char *pszExtension = CPLGetExtension(poOpenInfo->pszFilename);
     if( poOpenInfo->fpL != nullptr &&
-        (EQUAL(pszExtension, "nc") || EQUAL(pszExtension, "cdf") ||
+        (!bCheckExt ||
+         EQUAL(pszExtension, "nc") || EQUAL(pszExtension, "cdf") ||
          EQUAL(pszExtension, "nc4")) )
     {
         vsi_l_offset nOffset = 512;
@@ -7420,7 +7440,8 @@ int netCDFDataset::Identify( GDALOpenInfo *poOpenInfo )
     {
         return TRUE;
     }
-    const NetCDFFormatEnum eTmpFormat = IdentifyFormat(poOpenInfo);
+    const NetCDFFormatEnum eTmpFormat = IdentifyFormat(poOpenInfo,
+                                                       /* bCheckExt = */ true);
     if( NCDF_FORMAT_NC == eTmpFormat ||
         NCDF_FORMAT_NC2 == eTmpFormat ||
         NCDF_FORMAT_NC4 == eTmpFormat ||
@@ -8134,7 +8155,7 @@ GDALDataset *netCDFDataset::Open( GDALOpenInfo *poOpenInfo )
     NetCDFFormatEnum eTmpFormat = NCDF_FORMAT_NONE;
     if( !STARTS_WITH_CI(poOpenInfo->pszFilename, "NETCDF:") )
     {
-        eTmpFormat = IdentifyFormat(poOpenInfo);
+        eTmpFormat = IdentifyFormat(poOpenInfo, /* bCheckExt = */ true);
 #ifdef NCDF_DEBUG
         CPLDebug("GDAL_netCDF", "identified format %d", eTmpFormat);
 #endif
@@ -8267,7 +8288,7 @@ GDALDataset *netCDFDataset::Open( GDALOpenInfo *poOpenInfo )
             // Identify Format from real file, with bCheckExt=FALSE.
             GDALOpenInfo *poOpenInfo2 =
                 new GDALOpenInfo(poDS->osFilename.c_str(), GA_ReadOnly);
-            poDS->eFormat = IdentifyFormat(poOpenInfo2, FALSE);
+            poDS->eFormat = IdentifyFormat(poOpenInfo2, /* bCheckExt = */ false);
             delete poOpenInfo2;
             if( NCDF_FORMAT_NONE == poDS->eFormat ||
                 NCDF_FORMAT_UNKNOWN == poDS->eFormat )
@@ -9184,11 +9205,11 @@ static void CopyMetadata( GDALDataset* poSrcDS,
 
 netCDFDataset *
 netCDFDataset::CreateLL( const char *pszFilename,
-                         int nXSize, int nYSize, int nBands,
+                         int nXSize, int nYSize, int nBandsIn,
                          char **papszOptions )
 {
-    if( !((nXSize == 0 && nYSize == 0 && nBands == 0) ||
-          (nXSize > 0 && nYSize > 0 && nBands > 0)) )
+    if( !((nXSize == 0 && nYSize == 0 && nBandsIn == 0) ||
+          (nXSize > 0 && nYSize > 0 && nBandsIn > 0)) )
     {
         return nullptr;
     }
@@ -9303,7 +9324,7 @@ netCDFDataset::CreateLL( const char *pszFilename,
 
 GDALDataset *
 netCDFDataset::Create( const char *pszFilename,
-                       int nXSize, int nYSize, int nBands,
+                       int nXSize, int nYSize, int nBandsIn,
                        GDALDataType eType,
                        char **papszOptions )
 {
@@ -9318,7 +9339,7 @@ netCDFDataset::Create( const char *pszFilename,
 
     bool legacyCreateMode = false;
 
-    if (nXSize != 0 || nYSize != 0 || nBands != 0 )
+    if (nXSize != 0 || nYSize != 0 || nBandsIn != 0 )
     {
         legacyCreateMode = true;
     }
@@ -9351,7 +9372,7 @@ netCDFDataset::Create( const char *pszFilename,
     }
 #endif
     netCDFDataset *poDS = netCDFDataset::CreateLL(pszFilename,
-                                                  nXSize, nYSize, nBands,
+                                                  nXSize, nYSize, nBandsIn,
                                                   aosOptions.List());
 
     if( !poDS )
@@ -9387,12 +9408,12 @@ netCDFDataset::Create( const char *pszFilename,
                            poDS->bWriteGDALVersion,
                            poDS->bWriteGDALHistory,
                            "", "Create",
-                           (nBands == 0) ? CF_Vector_Conv
+                           (nBandsIn == 0) ? CF_Vector_Conv
                                          : GDAL_DEFAULT_NCDF_CONVENTIONS);
     }
 
     // Define bands.
-    for( int iBand = 1; iBand <= nBands; iBand++ )
+    for( int iBand = 1; iBand <= nBandsIn; iBand++ )
     {
         poDS->SetBand(
             iBand, new netCDFRasterBand(netCDFRasterBand::CONSTRUCTOR_CREATE(),
@@ -10364,10 +10385,6 @@ void GDALRegister_netCDF()
     poDriver->pfnUnloadDriver = NCDFUnloadDriver;
 
     GetGDALDriverManager()->RegisterDriver(poDriver);
-
-#ifdef NETCDF_PLUGIN
-    GDALRegister_GMT();
-#endif
 }
 
 /************************************************************************/

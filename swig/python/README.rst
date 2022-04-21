@@ -35,7 +35,7 @@ By the conda-forge project:
 
 https://conda-forge.org/
 
-Once you have Anaconda ot Miniconda installed, you should be able to install GDAL with:
+Once you have Anaconda or Miniconda installed, you should be able to install GDAL with:
 
 ``conda install -c conda-forge gdal``
 
@@ -198,7 +198,7 @@ Numpy
 -----
 
 One advanced feature of the GDAL Python bindings not found in the other
-language bindings (C#, Perl) is integration with the Python numerical array
+language bindings is integration with the Python numerical array
 facilities. The gdal.Dataset.ReadAsArray() method can be used to read raster
 data as numerical arrays, ready to use with the Python numerical array
 capabilities.

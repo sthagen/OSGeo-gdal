@@ -2849,10 +2849,8 @@ typedef void GDALMajorObjectShadow;
 
 #ifdef DEBUG
 typedef struct OGRSpatialReferenceHS OSRSpatialReferenceShadow;
-#ifndef SWIGPERL
 typedef struct OGRDriverHS OGRDriverShadow;
 typedef struct OGRDataSourceHS OGRDataSourceShadow;
-#endif
 typedef struct OGRLayerHS OGRLayerShadow;
 typedef struct OGRFeatureHS OGRFeatureShadow;
 typedef struct OGRFeatureDefnHS OGRFeatureDefnShadow;
@@ -2861,10 +2859,8 @@ typedef struct OGRCoordinateTransformationHS OSRCoordinateTransformationShadow;
 typedef struct OGRFieldDefnHS OGRFieldDefnShadow;
 #else
 typedef void OSRSpatialReferenceShadow;
-#ifndef SWIGPERL
 typedef void OGRDriverShadow;
 typedef void OGRDataSourceShadow;
-#endif
 typedef void OGRLayerShadow;
 typedef void OGRFeatureShadow;
 typedef void OGRFeatureDefnShadow;
@@ -4764,10 +4760,10 @@ SWIGINTERN void OGRGeomFieldDefnShadow_SetNullable(OGRGeomFieldDefnShadow *self,
   OGRGeometryShadow* CreateGeometryFromWkb( size_t len, char *bin_string,
                                             OSRSpatialReferenceShadow *reference=NULL ) {
     OGRGeometryH geom = NULL;
-    OGRErr err = OGR_G_CreateFromWkb( (unsigned char *) bin_string,
-                                      reference,
-                                      &geom,
-                                      len );
+    OGRErr err = OGR_G_CreateFromWkbEx( (unsigned char *) bin_string,
+                                        reference,
+                                        &geom,
+                                        len );
     if (err != 0 ) {
        CPLError(CE_Failure, err, "%s", OGRErrMessages(err));
        return NULL;
@@ -5460,7 +5456,7 @@ SWIGINTERN double OGRFieldDomainShadow_GetMinAsDouble(OGRFieldDomainShadow *self
       if( eType == OFTInteger )
           return psVal->Integer;
       if( eType == OFTInteger64 )
-          return psVal->Integer64;
+          return (double)psVal->Integer64;
       if( eType == OFTReal )
           return psVal->Real;
       return CPLAtof("-inf");
@@ -5478,7 +5474,7 @@ SWIGINTERN double OGRFieldDomainShadow_GetMaxAsDouble(OGRFieldDomainShadow *self
       if( eType == OFTInteger )
           return psVal->Integer;
       if( eType == OFTInteger64 )
-          return psVal->Integer64;
+          return (double)psVal->Integer64;
       if( eType == OFTReal )
           return psVal->Real;
       return CPLAtof("inf");
