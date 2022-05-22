@@ -148,6 +148,9 @@ public:
 
         void               ResetReading() override;
         GIntBig            GetFeatureCount(int bForce) override;
+        OGRErr             GetExtent(OGREnvelope *psExtent, int bForce = TRUE) override;
+        OGRErr             GetExtent(int iGeomField, OGREnvelope *psExtent,
+                                     int bForce = TRUE) override;
 
         // TODO
         std::unique_ptr<OGRFieldDomain> BuildDomain(const std::string& /*osDomainName*/,
@@ -201,6 +204,8 @@ class OGRParquetWriterLayer final: public OGRArrowWriterLayer
 
         virtual void            FixupGeometryBeforeWriting(OGRGeometry* poGeom) override;
         virtual bool            IsSRSRequired() const override { return false; }
+
+        std::string             GetGeoMetadata() const;
 
 public:
         OGRParquetWriterLayer( arrow::MemoryPool* poMemoryPool,
