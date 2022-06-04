@@ -1422,6 +1422,13 @@ FileGDBIterator* OGROpenFileGDBLayer::BuildIteratorFromExprNode(swq_expr_node* p
                     if( poField->GetType() == FGFT_STRING &&
                         poFieldDefn->GetType() == OFTString )
                     {
+                        // As the index use ' ' as padding value, we cannot
+                        // fully trust the index.
+                        if( (eOp == FGSO_EQ && poNode->nOperation != SWQ_NE) || eOp == FGSO_GE )
+                            bIteratorSufficient = false;
+                        else
+                            return nullptr;
+
                         const int nMaxWidthIndexedStr =
                             poField->GetIndex()->GetMaxWidthInBytes(m_poLyrTable);
                         if( nMaxWidthIndexedStr > 0 )
@@ -1436,32 +1443,15 @@ FileGDBIterator* OGROpenFileGDBLayer::BuildIteratorFromExprNode(swq_expr_node* p
                                 {
                                     pWide[nMaxWidthIndexedStr / sizeof(uint16_t)] = 0;
                                     char* pszTruncated = CPLRecodeFromWChar( pWide, CPL_ENC_UCS2, CPL_ENC_UTF8 );
-                                    CPLFree(pWide);
-                                    pWide = nullptr;
                                     if( pszTruncated )
                                     {
                                         osTruncatedStr = pszTruncated;
                                         sValue.String = &osTruncatedStr[0];
                                         CPLFree(pszTruncated);
-                                        if( (eOp == FGSO_EQ && poNode->nOperation != SWQ_NE) || eOp == FGSO_GE )
-                                            bIteratorSufficient = false;
-                                        else
-                                            return nullptr;
                                     }
                                 }
                                 CPLFree(pWide);
                             }
-                        }
-
-                        // As the index use ' ' as padding value, we cannot
-                        // trust a searched key ending with a space
-                        const size_t nLen = strlen(sValue.String);
-                        if( nLen > 0 && sValue.String[nLen-1] == ' ' )
-                        {
-                            if( (eOp == FGSO_EQ && poNode->nOperation != SWQ_NE) || eOp == FGSO_GE )
-                                bIteratorSufficient = false;
-                            else
-                                return nullptr;
                         }
                     }
 
@@ -1581,14 +1571,11 @@ FileGDBIterator* OGROpenFileGDBLayer::BuildIteratorFromExprNode(swq_expr_node* p
                                 {
                                     pWide[nMaxWidthIndexedStr / sizeof(uint16_t)] = 0;
                                     char* pszTruncated = CPLRecodeFromWChar( pWide, CPL_ENC_UCS2, CPL_ENC_UTF8 );
-                                    CPLFree(pWide);
-                                    pWide = nullptr;
                                     if( pszTruncated )
                                     {
                                         osTruncatedStr = pszTruncated;
                                         sValue.String = &osTruncatedStr[0];
                                         CPLFree(pszTruncated);
-                                        bIteratorSufficient = false;
                                     }
                                 }
                                 CPLFree(pWide);
@@ -1596,10 +1583,8 @@ FileGDBIterator* OGROpenFileGDBLayer::BuildIteratorFromExprNode(swq_expr_node* p
                         }
 
                         // As the index use ' ' as padding value, we cannot
-                        // trust a searched key ending with a space
-                        const size_t nLen = strlen(sValue.String);
-                        if( nLen > 0 && sValue.String[nLen-1] == ' ' )
-                            bIteratorSufficient = false;
+                        // fully trust the index.
+                        bIteratorSufficient = false;
                     }
 
                     FileGDBIterator* poIter = FileGDBIterator::Build(
