@@ -622,6 +622,54 @@ def test_ogr_openfilegdb_4():
     ds = None
 
 ###############################################################################
+# Test use of attribute indexes on truncated strings
+
+
+def test_ogr_openfilegdb_str_indexed_truncated():
+
+    ds = ogr.Open('data/filegdb/test_str_indexed_truncated.gdb')
+
+    lyr = ds.GetLayerByName('test')
+
+    IDX_NOT_USED = 0
+    IDX_USED = 1
+    IDX_USED_AND_ITER_SUFFICIENT = 2
+
+    tests = [("str = 'a'", [1], IDX_USED_AND_ITER_SUFFICIENT),
+             ("str = 'aa'", [2], IDX_USED_AND_ITER_SUFFICIENT),
+             ("str != 'aa'", [1, 3], IDX_USED_AND_ITER_SUFFICIENT),
+             ("str = 'aaa'", [3], IDX_USED_AND_ITER_SUFFICIENT),
+             ("str >= 'aaa'", [3], IDX_USED_AND_ITER_SUFFICIENT),
+             ("str > 'aaa'", [], IDX_USED_AND_ITER_SUFFICIENT),
+             ("str > 'aa_'", [3], IDX_USED_AND_ITER_SUFFICIENT),
+             ("str <= 'aab'", [1, 2, 3], IDX_USED_AND_ITER_SUFFICIENT),
+             ("str = 'aaa '", [], IDX_USED),
+             ("str != 'aaa '", [1, 2, 3], IDX_NOT_USED),
+             ("str <= 'aaa '", [1, 2, 3], IDX_NOT_USED),
+             ("str <= 'aaaX'", [1, 2, 3], IDX_USED_AND_ITER_SUFFICIENT),
+             ("str >= 'aaa '", [], IDX_USED),
+             ("str = 'aaaX'", [], IDX_USED_AND_ITER_SUFFICIENT),
+             ("str = 'aaaXX'", [], IDX_USED),
+             ("str = 'aaa  '", [], IDX_USED),
+             ("str IN ('a', 'b')", [1], IDX_USED_AND_ITER_SUFFICIENT),
+             ("str IN ('aaa')", [3], IDX_USED_AND_ITER_SUFFICIENT),
+             ("str IN ('aaa', 'aaa ')", [3], IDX_USED),
+             ("str IN ('aaa ')", [], IDX_USED),
+             ("str IN ('aaaX')", [], IDX_USED_AND_ITER_SUFFICIENT),
+             ("str IN ('aaaXX')", [], IDX_USED),
+            ]
+    for where_clause, fids, expected_attr_index_use in tests:
+
+        lyr.SetAttributeFilter(where_clause)
+        sql_lyr = ds.ExecuteSQL('GetLayerAttrIndexUse %s' % lyr.GetName())
+        attr_index_use = int(sql_lyr.GetNextFeature().GetField(0))
+        ds.ReleaseResultSet(sql_lyr)
+        assert attr_index_use == expected_attr_index_use, \
+            (where_clause, fids, expected_attr_index_use)
+        assert [f.GetFID() for f in lyr] == fids, (where_clause, fids)
+
+
+###############################################################################
 # Test opening an unzipped dataset
 
 
@@ -701,6 +749,14 @@ def test_ogr_openfilegdb_7():
         ("select id, str from point order by id desc", 5, 5, 1),
         ("select * from point where id = 1 order by id", 1, 1, 1),
         ("select * from big_layer order by real", 86 + 3 * 85, 1, 1),
+        ("select * from big_layer order by real limit 0", 0, None, 1),
+        ("select * from big_layer order by real offset 10000", 0, None, 1),
+        ("select * from big_layer order by real limit 1", 1, 1, 1),
+        ("select * from big_layer order by real limit 1 offset 0", 1, 1, 1),
+        ("select * from big_layer order by real limit 1 offset 1", 1, 5, 1),
+        ("select * from big_layer order by real limit 2", 2, 1, 1),
+        ("select * from big_layer order by real limit 100000", 86 + 3 * 85, 1, 1),
+        ("select * from big_layer order by real limit 100000 offset 1", 86 + 3 * 85 - 1, 5, 1),
         ("select * from big_layer order by real desc", 86 + 3 * 85, 4 * 85, 1),
         # Invalid :
         ("select foo from", None, None, None),
@@ -736,10 +792,14 @@ def test_ogr_openfilegdb_7():
                 ds.ReleaseResultSet(sql_lyr)
                 pytest.fail(sql, feat_count, first_fid)
             feat = sql_lyr.GetNextFeature()
-            if feat.GetFID() != first_fid:
-                ds.ReleaseResultSet(sql_lyr)
-                feat.DumpReadable()
-                pytest.fail(sql, feat_count, first_fid)
+            if feat_count > 0:
+                if feat.GetFID() != first_fid:
+                    ds.ReleaseResultSet(sql_lyr)
+                    feat.DumpReadable()
+                    pytest.fail(sql, feat_count, first_fid)
+            else:
+                assert first_fid is None
+                assert feat is None
         ds.ReleaseResultSet(sql_lyr)
 
         sql_lyr = ds.ExecuteSQL('GetLastSQLUsedOptimizedImplementation')
