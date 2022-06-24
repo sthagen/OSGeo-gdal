@@ -1,11 +1,11 @@
-name: Android CMake build
+name: Intel C++ Compiler
 
 on:
     push:
         paths-ignore:
             - 'doc/**'
-        branches-ignore:
-            - 'backport**'
+        branches:
+            - '!backport**'
     pull_request:
         paths-ignore:
             - 'doc/**'
@@ -19,21 +19,12 @@ permissions:
 
 jobs:
 
-  android_cmake_build:
+  icc:
     runs-on: ubuntu-latest
     if: "!contains(github.event.head_commit.message, '[ci skip]') && !contains(github.event.head_commit.message, '[skip ci]')"
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Cache
-        uses: actions/cache@v3
-        id: cache
-        with:
-          path: |
-                ${{ github.workspace }}/ccache.tar.gz
-          key: ${{ runner.os }}-cache-android-cmake-${{ github.run_id }}
-          restore-keys: ${{ runner.os }}-cache-android-cmake-
-
       - name: Build
-        run: docker run -e WORK_DIR="$PWD" -v $PWD:$PWD ubuntu:20.04 $PWD/.github/workflows/android_cmake/start.sh
+        run: docker run -e CI -e WORK_DIR="$PWD" -v $PWD:$PWD -v /var/run/docker.sock:/var/run/docker.sock ubuntu:20.04 $PWD/.github/workflows/icc/start.sh
