@@ -1,5 +1,14 @@
 # CMake4GDAL project is distributed under MIT license. See accompanying file LICENSE.txt.
 
+# Increment the below number each time an ABI incompatible change is done,
+# e.g removing a public function/method, changing its prototype (including
+# adding a default value to a parameter of a C++ method), adding
+# a new member or virtual function in a public C++ class, etc.
+# This will typically happen for each GDAL feature release (change of X or Y in
+# a X.Y.Z numbering scheme), but should not happen for a bugfix release (change of Z)
+# Previous value: 31 for GDAL 3.5
+set(GDAL_SOVERSION 31)
+
 # Switches to control build targets(cached)
 option(ENABLE_GNM "Build GNM (Geography Network Model) component" ON)
 option(ENABLE_PAM "Set ON to enable Persistent Auxiliary Metadata (.aux.xml)" ON)
@@ -269,7 +278,7 @@ endif ()
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   include(CheckLinkerFlag)
   check_linker_flag(C "-Wl,--no-undefined" HAS_NO_UNDEFINED)
-  if (HAS_NO_UNDEFINED AND NOT CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
+  if (HAS_NO_UNDEFINED AND (NOT "${CMAKE_CXX_FLAGS}" MATCHES "-fsanitize") AND NOT CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
     string(APPEND CMAKE_SHARED_LINKER_FLAGS " -Wl,--no-undefined")
     string(APPEND CMAKE_MODULE_LINKER_FLAGS " -Wl,--no-undefined")
   endif ()
@@ -571,10 +580,6 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/doc" AND BUILD_DOCS)
 endif ()
 add_subdirectory(man)
 
-# GDAL 4.0 ? Install headers in ${CMAKE_INSTALL_INCLUDEDIR}/gdal ?
-set(GDAL_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR})
-set(GDAL_INSTALL_FULL_INCLUDEDIR ${CMAKE_INSTALL_FULL_INCLUDEDIR})
-
 # So that GDAL can be used as a add_subdirectory() of another project
 target_include_directories(
   ${GDAL_LIB_TARGET_NAME}
@@ -586,7 +591,7 @@ target_include_directories(
          $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/port>
          $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/ogr>
          $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/ogr/ogrsf_frmts>
-         $<INSTALL_INTERFACE:${GDAL_INSTALL_INCLUDEDIR}>)
+         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 # MSVC specific resource preparation
 if (MSVC)
@@ -797,7 +802,7 @@ install(
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   RESOURCE DESTINATION ${GDAL_RESOURCE_PATH}
-  PUBLIC_HEADER DESTINATION ${GDAL_INSTALL_INCLUDEDIR}
+  PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   FRAMEWORK DESTINATION "${FRAMEWORK_DESTINATION}")
 
 if (NOT GDAL_ENABLE_MACOSX_FRAMEWORK)
