@@ -5050,7 +5050,9 @@ CPLErr GTiffRasterBand::IReadBlock( int nBlockXOff, int nBlockYOff,
         if( nBand == 1 && !m_poGDS->m_bLoadingOtherBands &&
             eAccess == GA_ReadOnly &&
             (m_poGDS->nBands == 3 || m_poGDS->nBands == 4) &&
-            (eDataType == GDT_Byte || eDataType == GDT_UInt16) &&
+            ((eDataType == GDT_Byte && m_poGDS->m_nBitsPerSample == 8) ||
+             (eDataType == GDT_Int16 && m_poGDS->m_nBitsPerSample == 16) ||
+             (eDataType == GDT_UInt16 && m_poGDS->m_nBitsPerSample == 16)) &&
             static_cast<GPtrDiff_t>(nBlockXSize) * nBlockYSize * GDALGetDataTypeSizeBytes(eDataType) <
                 GDALGetCacheMax64() / m_poGDS->nBands )
         {
@@ -15154,6 +15156,13 @@ CPLErr GTiffDataset::OpenOffset( TIFF *hTIFFIn,
     {
         if( m_nBitsPerSample == 16 || m_nBitsPerSample == 24 )
             bTreatAsOdd = true;
+        else if( m_nBitsPerSample != 32 && m_nBitsPerSample != 64 )
+        {
+            ReportError( CE_Failure, CPLE_AppDefined,
+                      "Cannot open TIFF file with SampleFormat=IEEEFP "
+                      "and BitsPerSample=%d", m_nBitsPerSample );
+            return CE_Failure;
+        }
     }
     else if( !bTreatAsRGBA && !bTreatAsBitmap
              && m_nBitsPerSample != 8
