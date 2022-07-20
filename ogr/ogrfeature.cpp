@@ -4005,13 +4005,14 @@ void OGRFeature::SetField( int iField, const char * pszValue )
         // As allowed by C standard, some systems like MSVC do not reset errno.
         errno = 0;
 
-        long nVal = strtol(pszValue, &pszLast, 10);
-        nVal = OGRFeatureGetIntegerValue(poFDefn, static_cast<int>(nVal));
-        pauFields[iField].Integer =
-            nVal > INT_MAX ? INT_MAX :
-            nVal < INT_MIN ? INT_MIN : static_cast<int>(nVal);
-        if( bWarn && (errno == ERANGE ||
-                      nVal != static_cast<long>(pauFields[iField].Integer) ||
+        long long nVal64 = std::strtoll(pszValue, &pszLast, 10);
+        int nVal32 =
+             nVal64 > INT_MAX ? INT_MAX :
+             nVal64 < INT_MIN ? INT_MIN : static_cast<int>(nVal64);
+        pauFields[iField].Integer = OGRFeatureGetIntegerValue(poFDefn, nVal32);
+        if( bWarn && pauFields[iField].Integer == nVal32 &&
+                     (errno == ERANGE ||
+                      nVal32 != nVal64 ||
                       !pszLast || *pszLast ) )
             CPLError(
                 CE_Warning, CPLE_AppDefined,
@@ -7302,7 +7303,7 @@ OGRFeature::FieldValue::FieldValue(OGRFeature* poFeature,
 {
 }
 
-OGRFeature::FieldValue& OGRFeature::FieldValue::operator=
+OGRFeature::FieldValue& OGRFeature::FieldValue::Assign
                                                     (const FieldValue& oOther)
 {
     if( &oOther != this &&
@@ -7351,19 +7352,33 @@ OGRFeature::FieldValue& OGRFeature::FieldValue::operator=
         }
         else if( eOtherType == OFTIntegerList )
         {
-            return operator= (oOther.GetAsIntegerList());
+            operator= (oOther.GetAsIntegerList());
         }
         else if( eOtherType == OFTInteger64List )
         {
-            return operator= (oOther.GetAsInteger64List());
+            operator= (oOther.GetAsInteger64List());
         }
         else if( eOtherType == OFTRealList )
         {
-            return operator= (oOther.GetAsDoubleList());
+            operator= (oOther.GetAsDoubleList());
         }
     }
     return *this;
 }
+
+OGRFeature::FieldValue& OGRFeature::FieldValue::operator=
+                                                    (const FieldValue& oOther)
+{
+    return Assign(oOther);
+}
+
+//! @cond Doxygen_Suppress
+OGRFeature::FieldValue& OGRFeature::FieldValue::operator=
+                                                    (FieldValue&& oOther)
+{
+    return Assign(oOther);
+}
+//! @endcond
 
 OGRFeature::FieldValue& OGRFeature::FieldValue::operator= (int nVal)
 {
