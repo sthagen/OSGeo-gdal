@@ -147,6 +147,7 @@ typedef struct
     int    fd;
 } VSIDIRPreload;
 
+thread_local std::set<std::string> oSetFilesToPreventRecursion;
 std::set<VSILFILE*> oSetFiles;
 std::map<int, VSILFILE*> oMapfdToVSI;
 std::map<VSILFILE*, int> oMapVSITofd;
@@ -161,7 +162,7 @@ std::string osCurDir;
 /************************************************************************/
 
 #define LOAD_SYMBOL(x) \
-    pfn ## x = (fn ## x ## Type) dlsym(RTLD_NEXT, #x); \
+    pfn ## x = reinterpret_cast<fn ## x ## Type>(dlsym(RTLD_NEXT, #x)); \
     assert(pfn ## x)
 
 static void myinit()
@@ -227,7 +228,7 @@ static void myinit()
 static VSILFILE* getVSILFILE( FILE* stream )
 {
     CPLLockHolderD(&hLock, LOCK_RECURSIVE_MUTEX);
-    std::set<VSILFILE*>::iterator oIter = oSetFiles.find((VSILFILE*)stream);
+    std::set<VSILFILE*>::iterator oIter = oSetFiles.find(reinterpret_cast<VSILFILE*>(stream));
     VSILFILE* ret = nullptr;
     if( oIter != oSetFiles.end() )
         ret = *oIter;
@@ -429,8 +430,13 @@ FILE CPL_DLL *fopen( const char *path, const char *mode )
     int DEBUG_VSIPRELOAD_COND = GET_DEBUG_VSIPRELOAD_COND(path);
     if( DEBUG_VSIPRELOAD_COND ) fprintf(stderr, "fopen(%s, %s)\n", path, mode);
     FILE* ret;
-    if( STARTS_WITH(path, "/vsi") )
-        ret = (FILE*) VSIFfopenHelper(path, mode);
+    if( STARTS_WITH(path, "/vsi") &&
+        oSetFilesToPreventRecursion.find(path) == oSetFilesToPreventRecursion.end() )
+    {
+        auto oIter = oSetFilesToPreventRecursion.insert(path);
+        ret = reinterpret_cast<FILE*>(VSIFfopenHelper(path, mode));
+        oSetFilesToPreventRecursion.erase(oIter.first);
+    }
     else
         ret = pfnfopen(path, mode);
     if( DEBUG_VSIPRELOAD_COND ) fprintf(stderr, "fopen() = %p\n", ret);
@@ -448,8 +454,13 @@ FILE CPL_DLL *fopen64( const char *path, const char *mode )
     if( DEBUG_VSIPRELOAD_COND )
         fprintf(stderr, "fopen64(%s, %s)\n", path, mode);
     FILE* ret;
-    if( STARTS_WITH(path, "/vsi") )
-        ret = (FILE*) VSIFfopenHelper(path, mode);
+    if( STARTS_WITH(path, "/vsi") &&
+        oSetFilesToPreventRecursion.find(path) == oSetFilesToPreventRecursion.end() )
+    {
+        auto oIter = oSetFilesToPreventRecursion.insert(path);
+        ret = reinterpret_cast<FILE*>(VSIFfopenHelper(path, mode));
+        oSetFilesToPreventRecursion.erase(oIter.first);
+    }
     else
         ret = pfnfopen64(path, mode);
     if( DEBUG_VSIPRELOAD_COND ) fprintf(stderr, "fopen64() = %p\n", ret);
@@ -638,7 +649,9 @@ int CPL_DLL __xstat64( int ver, const char *path, struct stat64 *buf )
     if( DEBUG_VSIPRELOAD && (!osCurDir.empty() && path[0] != '/') )
         DEBUG_VSIPRELOAD_COND = 1;
     if( DEBUG_VSIPRELOAD_COND ) fprintf(stderr, "__xstat64(%s)\n", path);
-    if( (!osCurDir.empty() && path[0] != '/') || STARTS_WITH(path, "/vsi") )
+    if( ((!osCurDir.empty() && path[0] != '/') ||
+        STARTS_WITH(path, "/vsi")) &&
+        oSetFilesToPreventRecursion.find(path) == oSetFilesToPreventRecursion.end() )
     {
         VSIStatBufL sStatBufL;
         std::string newpath;
@@ -647,7 +660,9 @@ int CPL_DLL __xstat64( int ver, const char *path, struct stat64 *buf )
             newpath = CPLFormFilename(osCurDir.c_str(), path, nullptr);
             path = newpath.c_str();
         }
+        auto oIter = oSetFilesToPreventRecursion.insert(path);
         const int ret = VSIStatL(path, &sStatBufL);
+        oSetFilesToPreventRecursion.erase(oIter.first);
         sStatBufL.st_ino = static_cast<int>(CPLHashSetHashStr(path));
         if( ret == 0 )
         {
@@ -947,7 +962,7 @@ FILE CPL_DLL *freopen( const char *path, const char *mode, FILE *stream )
 /*                              open()                                  */
 /************************************************************************/
 
-int CPL_DLL open( const char *path, int flags, ... )
+static int myopen( const char *path, int flags, ... )
 {
     myinit();
     int DEBUG_VSIPRELOAD_COND = GET_DEBUG_VSIPRELOAD_COND(path);
@@ -986,7 +1001,7 @@ int CPL_DLL open( const char *path, int flags, ... )
         if( VSIStatL(newname, &sStatBufL) == 0 &&
             S_ISDIR(sStatBufL.st_mode) )
         {
-            fd = open("/dev/zero", O_RDONLY);
+            fd = myopen("/dev/zero", O_RDONLY);
             CPLLockHolderD(&hLock, LOCK_RECURSIVE_MUTEX)
             oMapDirFdToName[fd] = newname;
         }
@@ -999,6 +1014,16 @@ int CPL_DLL open( const char *path, int flags, ... )
         fd = pfnopen(path, flags, mode);
     va_end(args);
     if( DEBUG_VSIPRELOAD_COND ) fprintf(stderr, "open(%s) = %d\n", path, fd);
+    return fd;
+}
+
+int CPL_DLL open( const char *path, int flags, ... )
+{
+    va_list args;
+    va_start(args, flags);
+    mode_t mode = va_arg(args, mode_t);
+    int fd = myopen(path, flags, mode);
+    va_end(args);
     return fd;
 }
 
@@ -1129,11 +1154,11 @@ ssize_t CPL_DLL read( int fd, void *buf, size_t count )
         fprintf(stderr, "read() : ");
         for( int i = 0; i < ret; i++ )
         {
-            if( ((unsigned char*)buf)[i] >= 'A' &&
-                ((unsigned char*)buf)[i] <= 'Z' )
-                fprintf(stderr, "%c ", ((unsigned char*)buf)[i]);
+            if( static_cast<unsigned char*>(buf)[i] >= 'A' &&
+                static_cast<unsigned char*>(buf)[i] <= 'Z' )
+                fprintf(stderr, "%c ", static_cast<unsigned char*>(buf)[i]);
             else
-                fprintf(stderr, "\\%02X ", ((unsigned char*)buf)[i]);
+                fprintf(stderr, "\\%02X ", static_cast<unsigned char*>(buf)[i]);
         }
         fprintf(stderr, "\n");
     }
@@ -1461,7 +1486,7 @@ DIR CPL_DLL *opendir( const char *name )
             mydir->papszDir = papszDir;
             mydir->nIter = 0;
             mydir->fd = -1;
-            ret = (DIR*)mydir;
+            ret = reinterpret_cast<DIR*>(mydir);
             CPLLockHolderD(&hLock, LOCK_RECURSIVE_MUTEX);
             oSetVSIDIRPreload.insert(mydir);
         }
@@ -1515,11 +1540,11 @@ static bool filldir( VSIDIRPreload* mydir )
 struct dirent CPL_DLL *readdir( DIR *dirp )
 {
     myinit();
-    int DEBUG_VSIPRELOAD_COND = GET_DEBUG_VSIPRELOAD_COND((VSIDIRPreload*)dirp);
+    VSIDIRPreload* mydir = reinterpret_cast<VSIDIRPreload*>(dirp);
+    int DEBUG_VSIPRELOAD_COND = GET_DEBUG_VSIPRELOAD_COND(mydir);
     if( DEBUG_VSIPRELOAD_COND ) fprintf(stderr, "readdir(%p)\n", dirp);
-    if( oSetVSIDIRPreload.find((VSIDIRPreload*)dirp) != oSetVSIDIRPreload.end() )
+    if( oSetVSIDIRPreload.find(mydir) != oSetVSIDIRPreload.end() )
     {
-        VSIDIRPreload* mydir = (VSIDIRPreload*)dirp;
         if( !filldir(mydir) )
             return nullptr;
 
@@ -1536,11 +1561,11 @@ struct dirent CPL_DLL *readdir( DIR *dirp )
 struct dirent64 CPL_DLL *readdir64( DIR *dirp )
 {
     myinit();
-    int DEBUG_VSIPRELOAD_COND = GET_DEBUG_VSIPRELOAD_COND((VSIDIRPreload*)dirp);
+    VSIDIRPreload* mydir = reinterpret_cast<VSIDIRPreload*>(dirp);
+    int DEBUG_VSIPRELOAD_COND = GET_DEBUG_VSIPRELOAD_COND(mydir);
     if( DEBUG_VSIPRELOAD_COND ) fprintf(stderr, "readdir64(%p)\n", dirp);
-    if( oSetVSIDIRPreload.find((VSIDIRPreload*)dirp) != oSetVSIDIRPreload.end() )
+    if( oSetVSIDIRPreload.find(mydir) != oSetVSIDIRPreload.end() )
     {
-        VSIDIRPreload* mydir = (VSIDIRPreload*)dirp;
         if( !filldir(mydir) )
             return nullptr;
 
@@ -1557,11 +1582,11 @@ struct dirent64 CPL_DLL *readdir64( DIR *dirp )
 int CPL_DLL closedir( DIR *dirp )
 {
     myinit();
-    int DEBUG_VSIPRELOAD_COND = GET_DEBUG_VSIPRELOAD_COND((VSIDIRPreload*)dirp);
+    VSIDIRPreload* mydir = reinterpret_cast<VSIDIRPreload*>(dirp);
+    int DEBUG_VSIPRELOAD_COND = GET_DEBUG_VSIPRELOAD_COND(mydir);
     if( DEBUG_VSIPRELOAD_COND ) fprintf(stderr, "closedir(%p)\n", dirp);
-    if( oSetVSIDIRPreload.find((VSIDIRPreload*)dirp) != oSetVSIDIRPreload.end() )
+    if( oSetVSIDIRPreload.find(mydir) != oSetVSIDIRPreload.end() )
     {
-        VSIDIRPreload* mydir = (VSIDIRPreload*)dirp;
         CPLFree(mydir->pszDirname);
         CSLDestroy(mydir->papszDir);
         CPLLockHolderD(&hLock, LOCK_RECURSIVE_MUTEX);
@@ -1585,12 +1610,12 @@ int CPL_DLL closedir( DIR *dirp )
 int CPL_DLL dirfd( DIR *dirp )
 {
     myinit();
-    int DEBUG_VSIPRELOAD_COND = GET_DEBUG_VSIPRELOAD_COND((VSIDIRPreload*)dirp);
+    VSIDIRPreload* mydir = reinterpret_cast<VSIDIRPreload*>(dirp);
+    int DEBUG_VSIPRELOAD_COND = GET_DEBUG_VSIPRELOAD_COND(mydir);
     if( DEBUG_VSIPRELOAD_COND ) fprintf(stderr, "dirfd(%p)\n", dirp);
     int ret = 0;
-    if( oSetVSIDIRPreload.find((VSIDIRPreload*)dirp) != oSetVSIDIRPreload.end() )
+    if( oSetVSIDIRPreload.find(mydir) != oSetVSIDIRPreload.end() )
     {
-        VSIDIRPreload* mydir = (VSIDIRPreload*)dirp;
         if( mydir->fd < 0 )
         {
             mydir->fd = open("/dev/zero", O_RDONLY);
@@ -1673,7 +1698,7 @@ int acl_extended_file( const char *path )
     {
         if( pfnacl_extended_file == nullptr )
             pfnacl_extended_file =
-                (fnacl_extended_fileType) dlsym(RTLD_NEXT, "acl_extended_file");
+                reinterpret_cast<fnacl_extended_fileType>(dlsym(RTLD_NEXT, "acl_extended_file"));
         if( pfnacl_extended_file == nullptr )
             ret = -1;
         else
@@ -1704,7 +1729,7 @@ int getfilecon( const char *path, /*security_context_t **/ void* con )
     else
     {
         if( pfngetfilecon == nullptr )
-            pfngetfilecon = (fngetfileconType) dlsym(RTLD_NEXT, "getfilecon");
+            pfngetfilecon = reinterpret_cast<fngetfileconType>(dlsym(RTLD_NEXT, "getfilecon"));
         if( pfngetfilecon == nullptr )
             ret = -1;
         else
@@ -1736,7 +1761,7 @@ int lgetfilecon(const char *path, /*security_context_t **/ void* con)
     {
         if( pfnlgetfilecon == nullptr )
             pfnlgetfilecon =
-                (fnlgetfileconType) dlsym(RTLD_NEXT, "lgetfilecon");
+                reinterpret_cast<fnlgetfileconType>(dlsym(RTLD_NEXT, "lgetfilecon"));
         if( pfnlgetfilecon == nullptr )
             ret = -1;
         else
