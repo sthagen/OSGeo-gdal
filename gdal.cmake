@@ -329,7 +329,7 @@ if( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" ST
 endif()
 
 # Default definitions during build
-add_definitions(-DGDAL_COMPILATION -DGDAL_CMAKE_BUILD)
+add_definitions(-DGDAL_COMPILATION)
 
 if (ENABLE_IPO)
   if (POLICY CMP0069)
@@ -387,11 +387,6 @@ if (MSVC)
 endif ()
 if (MINGW AND BUILD_SHARED_LIBS)
     set_target_properties(${GDAL_LIB_TARGET_NAME} PROPERTIES SUFFIX "-${GDAL_SOVERSION}${CMAKE_SHARED_LIBRARY_SUFFIX}")
-endif ()
-
-
-if (MSVC AND NOT BUILD_SHARED_LIBS)
-  target_compile_definitions(${GDAL_LIB_TARGET_NAME} PUBLIC CPL_DISABLE_DLL=)
 endif ()
 
 if (MINGW)
@@ -964,7 +959,7 @@ endif ()
 
 if (NOT GDAL_CMAKE_QUIET AND
     "${CMAKE_BINARY_DIR}" STREQUAL "${CMAKE_SOURCE_DIR}")
-  message(WARNING "In-tree builds, that is running cmake from the top of the source tree are not recommended. You are advised instead to 'mkdir build; cd build; cmake ..'. Using 'make' with the Makefile generator will not work, as it will try the GNUmakefile of autoconf builds. Use 'make -f Makefile' instead.")
+  message(WARNING "In-tree builds, that is running cmake from the top of the source tree are not recommended. You are advised instead to 'mkdir build; cd build; cmake ..'.")
 endif()
 
 if (NOT GDAL_CMAKE_QUIET
