@@ -3301,7 +3301,7 @@ CPLErr GDALRasterBand::GetHistogram( double dfMin, double dfMax,
     INIT_RASTERIO_EXTRA_ARG(sExtraArg);
 
     const double dfScale = nBuckets / (dfMax - dfMin);
-    if( dfScale == 0 )
+    if( dfScale == 0 || !std::isfinite(dfScale) )
     {
         ReportError( CE_Failure, CPLE_IllegalArg,
                      "dfMin and dfMax should be finite values such that "
@@ -3466,7 +3466,7 @@ CPLErr GDALRasterBand::GetHistogram( double dfMin, double dfMax,
                     bGotNoDataValue && ARE_REAL_EQUAL(dfValue, dfNoDataValue) )
                     continue;
 
-                // Given that dfValue and dfMin are not NaN, and dfScale > 0,
+                // Given that dfValue and dfMin are not NaN, and dfScale > 0 and finite,
                 // the result of the multiplication cannot be NaN
                 const double dfIndex = floor((dfValue - dfMin) * dfScale);
 
@@ -3658,7 +3658,7 @@ CPLErr GDALRasterBand::GetHistogram( double dfMin, double dfMax,
                         ARE_REAL_EQUAL(dfValue, dfNoDataValue) )
                         continue;
 
-                    // Given that dfValue and dfMin are not NaN, and dfScale > 0,
+                    // Given that dfValue and dfMin are not NaN, and dfScale > 0 and finite,
                     // the result of the multiplication cannot be NaN
                     const double dfIndex = floor((dfValue - dfMin) * dfScale);
 
@@ -6455,17 +6455,19 @@ CPLErr GDALRasterBand::ComputeRasterMinMax( int bApproxOK,
  * \brief Compute the min/max values for a band.
  *
  * @see GDALRasterBand::ComputeRasterMinMax()
+ *
+ * @note Prior to GDAL 3.6, this function returned void
  */
 
-void CPL_STDCALL
+CPLErr CPL_STDCALL
 GDALComputeRasterMinMax( GDALRasterBandH hBand, int bApproxOK,
                          double adfMinMax[2] )
 
 {
-    VALIDATE_POINTER0( hBand, "GDALComputeRasterMinMax" );
+    VALIDATE_POINTER1( hBand, "GDALComputeRasterMinMax", CE_Failure );
 
     GDALRasterBand *poBand = GDALRasterBand::FromHandle(hBand);
-    poBand->ComputeRasterMinMax( bApproxOK, adfMinMax );
+    return poBand->ComputeRasterMinMax( bApproxOK, adfMinMax );
 }
 
 /************************************************************************/
@@ -8105,13 +8107,13 @@ protected:
         if( m_poDS->GetGeoTransform(adfGeoTransform) == CE_None &&
             adfGeoTransform[2] == 0 && adfGeoTransform[4] == 0 )
         {
-            m_varX = std::make_shared<GDALMDArrayRegularlySpaced>(
+            m_varX = GDALMDArrayRegularlySpaced::Create(
                 "/", "X", m_dims[1],
                 adfGeoTransform[0],
                 adfGeoTransform[1], 0.5);
             m_dims[1]->SetIndexingVariable(m_varX);
 
-            m_varY = std::make_shared<GDALMDArrayRegularlySpaced>(
+            m_varY = GDALMDArrayRegularlySpaced::Create(
                 "/", "Y", m_dims[0],
                 adfGeoTransform[3],
                 adfGeoTransform[5], 0.5);

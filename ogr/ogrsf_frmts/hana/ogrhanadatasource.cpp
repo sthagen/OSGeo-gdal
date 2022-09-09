@@ -166,19 +166,19 @@ CPLString BuildConnectionString(char** openOptions)
     const char* paramDSN =
         CSLFetchNameValueDef(openOptions, OpenOptionsConstants::DSN, nullptr);
     const char* paramDriver =
-        CSLFetchNameValueDef(openOptions, OpenOptionsConstants::DRIVER, "");
+        CSLFetchNameValueDef(openOptions, OpenOptionsConstants::DRIVER, nullptr);
     const char* paramHost =
-        CSLFetchNameValueDef(openOptions, OpenOptionsConstants::HOST, "");
+        CSLFetchNameValueDef(openOptions, OpenOptionsConstants::HOST, nullptr);
     const char* paramPort =
-        CSLFetchNameValueDef(openOptions, OpenOptionsConstants::PORT, "");
+        CSLFetchNameValueDef(openOptions, OpenOptionsConstants::PORT, nullptr);
     const char* paramDatabase =
         CSLFetchNameValueDef(openOptions, OpenOptionsConstants::DATABASE, "");
     const char* paramUser =
-        CSLFetchNameValueDef(openOptions, OpenOptionsConstants::USER, "");
+        CSLFetchNameValueDef(openOptions, OpenOptionsConstants::USER, nullptr);
     const char* paramPassword =
-        CSLFetchNameValueDef(openOptions, OpenOptionsConstants::PASSWORD, "");
+        CSLFetchNameValueDef(openOptions, OpenOptionsConstants::PASSWORD, nullptr);
     const char* paramSchema =
-        CSLFetchNameValueDef(openOptions, OpenOptionsConstants::SCHEMA, "");
+        CSLFetchNameValueDef(openOptions, OpenOptionsConstants::SCHEMA, nullptr);
 
     if (CPLFetchBool(openOptions, OpenOptionsConstants::ENCRYPT, false))
     {
@@ -198,6 +198,33 @@ CPLString BuildConnectionString(char** openOptions)
     addParameter(OpenOptionsConstants::PACKET_SIZE, "PACKETSIZE");
     addParameter(
         OpenOptionsConstants::SPLIT_BATCH_COMMANDS, "SPLITBATCHCOMMANDS");
+
+    bool isValid = true;
+    auto checkMandatoryParameter = [&isValid](const char* paramName, const char* paramValue)
+    {
+        if (paramValue != nullptr)
+            return;
+
+        isValid = false;
+        CPLError(
+            CE_Failure, CPLE_AppDefined,
+            "Mandatory connection parameter '%s' is missing.", paramName);
+    };
+
+    // Check all mandatory parameters
+    if (paramDSN == nullptr)
+    {
+        checkMandatoryParameter(OpenOptionsConstants::DRIVER, paramDriver);
+        checkMandatoryParameter(OpenOptionsConstants::HOST, paramHost);
+        checkMandatoryParameter(OpenOptionsConstants::PORT, paramPort);
+    }
+
+    checkMandatoryParameter(OpenOptionsConstants::USER, paramUser);
+    checkMandatoryParameter(OpenOptionsConstants::PASSWORD, paramPassword);
+    checkMandatoryParameter(OpenOptionsConstants::SCHEMA, paramSchema);
+
+    if (!isValid)
+        return "";
 
     // For more details on how to escape special characters in passwords,
     // see
@@ -647,20 +674,17 @@ int OGRHanaDataSource::Open(const char* newName, char** openOptions, int update)
     std::size_t prefixLength = strlen(GetPrefix());
     char** connOptions = CSLTokenizeStringComplex(newName + prefixLength, ";", TRUE, FALSE);
 
-    int ret = FALSE;
-
     const char* paramSchema = CSLFetchNameValueDef(
         connOptions, OpenOptionsConstants::SCHEMA, nullptr);
-    if (paramSchema == nullptr)
-    {
-        CPLError(
-            CE_Failure, CPLE_AppDefined,
-            "HANA parameter '%s' is missing:\n", "SCHEMA");
-    }
-    else
-    {
+    if (paramSchema != nullptr)
         schemaName_ = paramSchema;
 
+    int ret = FALSE;
+
+    CPLString connectionStr = BuildConnectionString(connOptions);
+
+    if (!connectionStr.empty())
+    {
         connEnv_ = odbc::Environment::create();
         conn_ = connEnv_->createConnection();
         conn_->setAutoCommit(false);
@@ -673,7 +697,6 @@ int OGRHanaDataSource::Open(const char* newName, char** openOptions, int update)
 
         try
         {
-            CPLString connectionStr = BuildConnectionString(connOptions);
             conn_->connect(connectionStr.c_str());
         }
         catch (const odbc::Exception& ex)
@@ -804,7 +827,7 @@ int OGRHanaDataSource::FindLayerByName(const char* name)
 CPLString OGRHanaDataSource::FindSchemaName(const char* objectName)
 {
     auto getSchemaName = [&](const char* sql) {
-        odbc::PreparedStatementRef stmt = conn_->prepareStatement(sql);
+        odbc::PreparedStatementRef stmt = PrepareStatement(sql);
         stmt->setString(1, odbc::String(objectName));
         odbc::ResultSetRef rsEntries = stmt->executeQuery();
         CPLString ret;
@@ -847,10 +870,14 @@ odbc::StatementRef OGRHanaDataSource::CreateStatement()
 
 odbc::PreparedStatementRef OGRHanaDataSource::PrepareStatement(const char* sql)
 {
+    CPLAssert(sql != nullptr);
+
     try
     {
         CPLDebug("HANA", "Prepare statement %s.", sql);
-        return conn_->prepareStatement(sql);
+
+        std::u16string sqlUtf16 = odbc::StringConverter::utf8ToUtf16(sql);
+        return conn_->prepareStatement(sqlUtf16.c_str());
     }
     catch (const odbc::Exception& ex)
     {
@@ -1043,7 +1070,7 @@ bool OGRHanaDataSource::IsSrsRoundEarth(int srid)
     const char* sql =
         "SELECT ROUND_EARTH FROM SYS.ST_SPATIAL_REFERENCE_SYSTEMS "
         "WHERE SRS_ID = ?";
-    odbc::PreparedStatementRef stmt = conn_->prepareStatement(sql);
+    odbc::PreparedStatementRef stmt = PrepareStatement(sql);
     stmt->setInt(1, odbc::Int(srid));
     odbc::ResultSetRef rs = stmt->executeQuery();
     bool ret = false;
@@ -1061,7 +1088,7 @@ bool OGRHanaDataSource::HasSrsPlanarEquivalent(int srid)
 {
     const char* sql = "SELECT COUNT(*) FROM SYS.ST_SPATIAL_REFERENCE_SYSTEMS "
                       "WHERE SRS_ID = ?";
-    odbc::PreparedStatementRef stmt = conn_->prepareStatement(sql);
+    odbc::PreparedStatementRef stmt = PrepareStatement(sql);
     stmt->setInt(1, ToPlanarSRID(srid));
     odbc::ResultSetRef rs = stmt->executeQuery();
     std::int64_t count = 0;
@@ -1082,19 +1109,10 @@ OGRErr OGRHanaDataSource::GetQueryColumns(
 {
     columnDescriptions.clear();
 
-    odbc::PreparedStatementRef stmtQuery;
+    odbc::PreparedStatementRef stmtQuery = PrepareStatement(query);
 
-    try
-    {
-        stmtQuery = conn_->prepareStatement(query);
-    }
-    catch (const odbc::Exception& ex)
-    {
-        CPLError(
-            CE_Failure, CPLE_AppDefined, "Unable to prepare statement: %s",
-            ex.what());
+    if (stmtQuery.isNull())
         return OGRERR_FAILURE;
-    }
 
     odbc::ResultSetMetaDataRef rsmd = stmtQuery->getMetaData();
     std::size_t numColumns = rsmd->getColumnCount();
@@ -1106,10 +1124,10 @@ OGRErr OGRHanaDataSource::GetQueryColumns(
     CPLString tableName = rsmd->getTableName(1);
     odbc::DatabaseMetaDataRef dmd = conn_->getDatabaseMetaData();
     odbc::PreparedStatementRef stmtArrayTypeInfo =
-        conn_->prepareStatement("SELECT DATA_TYPE_NAME FROM "
-                                "SYS.TABLE_COLUMNS_ODBC WHERE SCHEMA_NAME = ? "
-                                "AND TABLE_NAME = ? AND COLUMN_NAME = ? AND "
-                                "DATA_TYPE_NAME LIKE '% ARRAY'");
+        PrepareStatement("SELECT DATA_TYPE_NAME FROM "
+                         "SYS.TABLE_COLUMNS_ODBC WHERE SCHEMA_NAME = ? "
+                         "AND TABLE_NAME = ? AND COLUMN_NAME = ? AND "
+                         "DATA_TYPE_NAME LIKE '% ARRAY'");
 
     for (unsigned short clmIndex = 1; clmIndex <= numColumns; ++clmIndex)
     {
@@ -1256,7 +1274,7 @@ void OGRHanaDataSource::InitializeLayers(
     std::vector<CPLString> tables = SplitStrings(tableNames, ",");
 
     auto addLayersFromQuery = [&](const char* query, bool updatable) {
-        odbc::PreparedStatementRef stmt = conn_->prepareStatement(query);
+        odbc::PreparedStatementRef stmt = PrepareStatement(query);
         stmt->setString(1, odbc::String(schemaName));
         odbc::ResultSetRef rsTables = stmt->executeQuery();
         while (rsTables->next())
@@ -1303,6 +1321,80 @@ void OGRHanaDataSource::InitializeLayers(
                 "have any geometry column.",
                 layerName);
     }
+}
+
+/************************************************************************/
+/*                          LaunderName()                               */
+/************************************************************************/
+
+std::pair<OGRErr, CPLString> OGRHanaDataSource::LaunderName(const char* name)
+{
+    CPLAssert(name != nullptr);
+
+    if (!CPLIsUTF8(name, -1))
+    {
+       CPLError(
+            CE_Failure, CPLE_AppDefined,
+            "%s is not a valid UTF-8 string.", name);
+        return {OGRERR_FAILURE, ""};
+    }
+
+    auto getUTF8SequenceLength = [](char c)
+    {
+        if ((c & 0x80) == 0x00)
+            return 1;
+        if ((c & 0xE0) == 0xC0)
+            return 2;
+        if ((c & 0xF0) == 0xE0)
+            return 3;
+        if ((c & 0xF8) == 0xF0)
+            return 4;
+
+        throw std::runtime_error("Invalid UTF-8 sequence");
+    };
+
+    CPLString newName(name);
+    bool hasNonASCII = false;
+    size_t i = 0;
+
+    while(name[i] != '\0')
+    {
+        char c = name[i];
+        int len = getUTF8SequenceLength(c);
+        if (len == 1)
+        {
+            if (c == '-' || c == '#')
+                newName[i] = '_';
+            else
+                newName[i] = static_cast<char>(toupper(c));
+        }
+        else
+        {
+            hasNonASCII = true;
+        }
+
+        i += len;
+    }
+
+    if (!hasNonASCII)
+        return {OGRERR_NONE, newName};
+
+    const char* sql = "SELECT UPPER(?) FROM DUMMY";
+    odbc::PreparedStatementRef stmt = PrepareStatement(sql);
+    stmt->setString(1, odbc::String(newName.c_str()));
+    odbc::ResultSetRef rsName = stmt->executeQuery();
+    OGRErr err = OGRERR_NONE;
+    if (rsName->next())
+    {
+        newName.swap(*rsName->getString(1));
+    }
+    else
+    {
+        err = OGRERR_FAILURE;
+        newName.clear();
+    }
+    rsName->close();
+    return {err, newName};
 }
 
 /************************************************************************/
@@ -1494,7 +1586,7 @@ bool OGRHanaDataSource::ParseArrayFunctionsExist(const char* schemaName)
     const char* sql =
         "SELECT COUNT(*) FROM FUNCTIONS WHERE SCHEMA_NAME = ? AND "
         "FUNCTION_NAME LIKE 'OGR_PARSE_%_ARRAY'";
-    odbc::PreparedStatementRef stmt = conn_->prepareStatement(sql);
+    odbc::PreparedStatementRef stmt = PrepareStatement(sql);
     stmt->setString(1, odbc::String(schemaName));
     odbc::ResultSetRef rsFunctions = stmt->executeQuery();
     auto numFunctions = rsFunctions->next() ? *rsFunctions->getLong(1) : 0;
@@ -1551,8 +1643,14 @@ OGRLayer* OGRHanaDataSource::ICreateLayer(
 
     bool launderNames =
         CPLFetchBool(options, LayerCreationOptionsConstants::LAUNDER, true);
-    CPLString layerName =
-        launderNames ? LaunderName(layerNameIn) : CPLString(layerNameIn);
+    CPLString layerName(layerNameIn);
+    if (launderNames)
+    {
+        auto nameRes = LaunderName(layerNameIn);
+        if (nameRes.first != OGRERR_NONE)
+            return nullptr;
+        layerName.swap(nameRes.second);
+    }
 
     CPLDebug("HANA", "Creating layer %s.", layerName.c_str());
 
@@ -1600,11 +1698,27 @@ OGRLayer* OGRHanaDataSource::ICreateLayer(
     }
 
     CPLString geomColumnName(CSLFetchNameValueDef(options, LayerCreationOptionsConstants::GEOMETRY_NAME, "OGR_GEOMETRY"));
+    if (launderNames)
+    {
+        auto nameRes = LaunderName(geomColumnName.c_str());
+        if (nameRes.first != OGRERR_NONE)
+            return nullptr;
+        geomColumnName.swap(nameRes.second);
+    }
+
     const bool geomColumnNullable = CPLFetchBool(options, LayerCreationOptionsConstants::GEOMETRY_NULLABLE, true);
     CPLString geomColumnIndexType(CSLFetchNameValueDef(options, LayerCreationOptionsConstants::GEOMETRY_INDEX, "DEFAULT"));
 
     const char* paramFidName = CSLFetchNameValueDef(options, LayerCreationOptionsConstants::FID, "OGR_FID");
-    CPLString fidName(launderNames ? LaunderName(paramFidName).c_str() : paramFidName);
+    CPLString fidName(paramFidName);
+    if (launderNames)
+    {
+        auto nameRes = LaunderName(paramFidName);
+        if (nameRes.first != OGRERR_NONE)
+            return nullptr;
+        fidName.swap(nameRes.second);
+    }
+
     CPLString fidType = CPLFetchBool(options, LayerCreationOptionsConstants::FID64, false) ? "BIGINT" : "INTEGER";
 
     CPLDebug("HANA", "Geometry Column Name %s.", geomColumnName.c_str());

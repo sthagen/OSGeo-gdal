@@ -981,6 +981,83 @@ def test_ogr_hana_32():
 
 
 ###############################################################################
+# Test LAUNDER option on non-ASCII characters
+
+
+def test_ogr_hana_33():
+    ds = open_datasource(1)
+
+    def launder_name(s):
+        return s.upper().replace("-", "_").replace("#", "_")
+
+    # Test layer name
+    layer_name = get_test_name() + "_table_-#äöü#\U0001f608"
+    layer = ds.CreateLayer(
+        layer_name, geom_type=ogr.wkbNone, options=["FID=fid", "LAUNDER=YES"]
+    )
+    expected_layer_name = launder_name(layer_name)
+    assert layer.GetName() == expected_layer_name, pytest.fail(
+        "GetName() returned %s instead of %s" % (layer.GetName(), expected_layer_name)
+    )
+
+    # Test field name
+    field_defn = ogr.FieldDefn("field_-#äöü#\U0001f608", ogr.OFTInteger)
+
+    assert layer.CreateField(field_defn) == ogr.OGRERR_NONE, (
+        "CreateField failed for %s" % field_defn.GetNameRef()
+    )
+    new_field_defn = layer.GetLayerDefn().GetFieldDefn(1)
+    expected_field_name = launder_name(field_defn.GetNameRef())
+    assert new_field_defn.GetNameRef() == expected_field_name, pytest.fail(
+        "GetNameRef() returned %s instead of %s"
+        % (new_field_defn.GetNameRef(), expected_field_name)
+    )
+
+
+###############################################################################
+# Test mandatory connection parameters
+
+
+def test_ogr_hana_34():
+    def test_connection(conn_str, expected_param):
+        with gdaltest.error_handler():
+            ds = ogr.Open("HANA:" + conn_str, update=1)
+        assert ds is None
+        expected_msg = (
+            "Mandatory connection parameter '%s' is missing." % expected_param
+        )
+        assert gdal.GetLastErrorMsg() == expected_msg, pytest.fail(
+            "Missing connection parameter %s is not reported" % expected_param
+        )
+
+    test_connection("DSN=DB1;PASSWORD=p1;SCHEMA=A", "USER")
+    test_connection("DSN=DB1;USER=u1;PxSSWORD=p1;SCHEMA=A", "PASSWORD")
+    test_connection("DSN=DB1;USER=u1;PASSWORD=p1;SCjHEMA=A", "SCHEMA")
+
+    test_connection(
+        "DRRIVER=libodbcHDB.so;HOST=host1;PORT=305;USER=u1;PASSWORD=p1;SCHEMA=A",
+        "DRIVER",
+    )
+    test_connection(
+        "DRIVER=libodbcHDB.so;DDOST=host1;PORT=305;USER=u1;PASSWORD=p1;SCHEMA=A", "HOST"
+    )
+    test_connection(
+        "DRIVER=libodbcHDB.so;HOST=host1;P9ORT=305;USER=u1;PASSWORD=p1;SCHEMA=A", "PORT"
+    )
+    test_connection(
+        "DRIVER=libodbcHDB.so;HOST=host1;PORT=305;USSTR=u1;PASSWORD=p1;SCHEMA=A", "USER"
+    )
+    test_connection(
+        "DRIVER=libodbcHDB.so;HOST=host1;PORT=305;USER=u1;PHASSWORD=p1;SCHEMA=A",
+        "PASSWORD",
+    )
+    test_connection(
+        "DRIVER=libodbcHDB.so;HOST=host1;PORT=305;USER=u1;PASSWORD=p1;SCHEM_A=A",
+        "SCHEMA",
+    )
+
+
+###############################################################################
 #  Create a table from data/poly.shp
 
 

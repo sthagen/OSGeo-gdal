@@ -325,6 +325,7 @@ def TranslateOptions(options=None, format=None,
               outputSRS=None, nogcp=False, GCPs=None,
               noData=None, rgbExpand=None,
               stats = False, rat = True, xmp = True, resampleAlg=None,
+              overviewLevel = 'AUTO',
               callback=None, callback_data=None):
     """Create a TranslateOptions() object that can be passed to gdal.Translate()
 
@@ -390,6 +391,8 @@ def TranslateOptions(options=None, format=None,
         whether to copy XMP metadata
     resampleAlg:
         resampling mode
+    overviewLevel:
+        To specify which overview level of source files must be used
     callback:
         callback method
     callback_data:
@@ -476,6 +479,19 @@ def TranslateOptions(options=None, format=None,
                 new_options += ['-r', str(resampleAlg)]
         if xRes != 0 and yRes != 0:
             new_options += ['-tr', _strHighPrec(xRes), _strHighPrec(yRes)]
+
+        if overviewLevel is None or isinstance(overviewLevel, str):
+            pass
+        elif isinstance(overviewLevel, int):
+            if overviewLevel < 0:
+                overviewLevel = 'AUTO' + str(overviewLevel)
+            else:
+                overviewLevel = str(overviewLevel)
+        else:
+            overviewLevel = None
+
+        if overviewLevel is not None and overviewLevel != 'AUTO':
+            new_options += ['-ovr', overviewLevel]
 
     if return_option_list:
         return new_options
@@ -3395,6 +3411,7 @@ class MDArray(object):
 
     shape = property(fget=GetShape, doc='Returns the shape of the array.')
 
+
     def GetNoDataValue(self):
       """GetNoDataValue(MDArray self) -> value """
 
@@ -3419,7 +3436,6 @@ class MDArray(object):
           return _gdal.MDArray_SetNoDataValueUInt64(self, value)
 
       return _gdal.MDArray_SetNoDataValueDouble(self, value)
-
 
 
 # Register MDArray in _gdal:
@@ -3779,9 +3795,18 @@ class Band(MajorObject):
         r"""SetRasterColorInterpretation(Band self, GDALColorInterp val) -> CPLErr"""
         return _gdal.Band_SetRasterColorInterpretation(self, *args)
 
-    def GetNoDataValue(self, *args) -> "void":
-        r"""GetNoDataValue(Band self)"""
-        return _gdal.Band_GetNoDataValue(self, *args)
+    def GetNoDataValue(self):
+        """GetNoDataValue(Band self) -> value """
+
+        if self.DataType == gdalconst.GDT_Int64:
+            return _gdal.Band_GetNoDataValueAsInt64(self)
+
+        if self.DataType == gdalconst.GDT_UInt64:
+            return _gdal.Band_GetNoDataValueAsUInt64(self)
+
+        return _gdal.Band_GetNoDataValue(self)
+
+
 
     def GetNoDataValueAsInt64(self, *args) -> "void":
         r"""GetNoDataValueAsInt64(Band self)"""
@@ -3791,9 +3816,18 @@ class Band(MajorObject):
         r"""GetNoDataValueAsUInt64(Band self)"""
         return _gdal.Band_GetNoDataValueAsUInt64(self, *args)
 
-    def SetNoDataValue(self, *args) -> "CPLErr":
-        r"""SetNoDataValue(Band self, double d) -> CPLErr"""
-        return _gdal.Band_SetNoDataValue(self, *args)
+    def SetNoDataValue(self, value) -> "CPLErr":
+        """SetNoDataValue(Band self, value) -> CPLErr"""
+
+        if self.DataType == gdalconst.GDT_Int64:
+            return _gdal.Band_SetNoDataValueAsInt64(self, value)
+
+        if self.DataType == gdalconst.GDT_UInt64:
+            return _gdal.Band_SetNoDataValueAsUInt64(self, value)
+
+        return _gdal.Band_SetNoDataValue(self, value)
+
+
 
     def SetNoDataValueAsInt64(self, *args) -> "CPLErr":
         r"""SetNoDataValueAsInt64(Band self, GIntBig v) -> CPLErr"""
@@ -3852,8 +3886,22 @@ class Band(MajorObject):
         return _gdal.Band_GetStatistics(self, *args)
 
     def ComputeStatistics(self, *args) -> "CPLErr":
-        r"""ComputeStatistics(Band self, bool approx_ok, GDALProgressFunc callback=0, void * callback_data=None) -> CPLErr"""
-        return _gdal.Band_ComputeStatistics(self, *args)
+        """ComputeStatistics(Band self, bool approx_ok, callback=None) -> CPLErr"""
+
+    # For backward compatibility. New SWIG has stricter typing and really
+    # enforces bool
+        approx_ok = args[0]
+        if approx_ok == 0:
+            approx_ok = False
+        elif approx_ok == 1:
+            approx_ok = True
+        new_args = [approx_ok]
+        for arg in args[1:]:
+            new_args.append( arg )
+
+        return _gdal.Band_ComputeStatistics(self, *new_args)
+
+
 
     def SetStatistics(self, *args) -> "CPLErr":
         r"""SetStatistics(Band self, double min, double max, double mean, double stddev) -> CPLErr"""
@@ -3871,9 +3919,30 @@ class Band(MajorObject):
         r"""Checksum(Band self, int xoff=0, int yoff=0, int * xsize=None, int * ysize=None) -> int"""
         return _gdal.Band_Checksum(self, *args, **kwargs)
 
-    def ComputeRasterMinMax(self, *args) -> "void":
-        r"""ComputeRasterMinMax(Band self, int approx_ok=0)"""
-        return _gdal.Band_ComputeRasterMinMax(self, *args)
+    def ComputeRasterMinMax(self, *args, **kwargs):
+        """ComputeRasterMinMax(Band self, bool approx_ok=False, bool can_return_none=False) -> (min, max) or None"""
+
+        if len(args) == 1:
+            kwargs["approx_ok"] = args[0]
+            args = ()
+
+        if "approx_ok" in kwargs:
+    # Compatibility with older signature that used int for approx_ok
+            if kwargs["approx_ok"] == 0:
+                kwargs["approx_ok"] = False
+            elif kwargs["approx_ok"] == 1:
+                kwargs["approx_ok"] = True
+            elif isinstance(kwargs["approx_ok"], int):
+                raise Exception("approx_ok value should be 0/1/False/True")
+
+    # can_return_null is used in other methods
+        if "can_return_null" in kwargs:
+            kwargs["can_return_none"] = kwargs["can_return_null"];
+            del kwargs["can_return_null"]
+
+        return _gdal.Band_ComputeRasterMinMax(self, *args, **kwargs)
+
+
 
     def ComputeBandStats(self, *args) -> "void":
         r"""ComputeBandStats(Band self, int samplestep=1)"""
@@ -3986,23 +4055,6 @@ class Band(MajorObject):
     def ReadBlock(self, *args, **kwargs) -> "CPLErr":
         r"""ReadBlock(Band self, int xoff, int yoff, void * buf_obj=None) -> CPLErr"""
         return _gdal.Band_ReadBlock(self, *args, **kwargs)
-
-
-    def ComputeStatistics(self, *args):
-      """ComputeStatistics(Band self, bool approx_ok, GDALProgressFunc callback=0, void * callback_data=None) -> CPLErr"""
-
-    # For backward compatibility. New SWIG has stricter typing and really
-    # enforces bool
-      approx_ok = args[0]
-      if approx_ok == 0:
-          approx_ok = False
-      elif approx_ok == 1:
-          approx_ok = True
-      new_args = [approx_ok]
-      for arg in args[1:]:
-          new_args.append( arg )
-
-      return _gdal.Band_ComputeStatistics(self, *new_args)
 
 
     def ReadRaster(self, xoff=0, yoff=0, xsize=None, ysize=None,
@@ -4139,29 +4191,6 @@ class Band(MajorObject):
           else:
               virtualmem = self.GetTiledVirtualMem(eAccess, xoff, yoff, xsize, ysize, tilexsize, tileysize, datatype, cache_size, options)
           return gdal_array.VirtualMemGetArray( virtualmem )
-
-    def GetNoDataValue(self):
-      """GetNoDataValue(Band self) -> value """
-
-      if self.DataType == gdalconst.GDT_Int64:
-          return _gdal.Band_GetNoDataValueAsInt64(self)
-
-      if self.DataType == gdalconst.GDT_UInt64:
-          return _gdal.Band_GetNoDataValueAsUInt64(self)
-
-      return _gdal.Band_GetNoDataValue(self)
-
-
-    def SetNoDataValue(self, value):
-      """SetNoDataValue(Band self, value) -> CPLErr"""
-
-      if self.DataType == gdalconst.GDT_Int64:
-          return _gdal.Band_SetNoDataValueAsInt64(self, value)
-
-      if self.DataType == gdalconst.GDT_UInt64:
-          return _gdal.Band_SetNoDataValueAsUInt64(self, value)
-
-      return _gdal.Band_SetNoDataValue(self, value)
 
 
 

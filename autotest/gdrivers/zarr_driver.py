@@ -1012,6 +1012,52 @@ def test_zarr_read_half_float(endianness):
     assert ar.Read() == array.array("f", [1.5, float("nan")])
 
 
+def test_zarr_read_mdim_zarr_non_existing():
+
+    with gdaltest.error_handler():
+        assert (
+            gdal.OpenEx('ZARR:"data/zarr/not_existing.zarr"', gdal.OF_MULTIDIM_RASTER)
+            is None
+        )
+
+    with gdaltest.error_handler():
+        assert (
+            gdal.OpenEx(
+                'ZARR:"https://example.org/not_existing.zarr"', gdal.OF_MULTIDIM_RASTER
+            )
+            is None
+        )
+    assert (
+        "The filename should likely be prefixed with /vsicurl/"
+        in gdal.GetLastErrorMsg()
+    )
+
+    with gdaltest.error_handler():
+        assert (
+            gdal.OpenEx(
+                "ZARR:https://example.org/not_existing.zarr", gdal.OF_MULTIDIM_RASTER
+            )
+            is None
+        )
+    assert (
+        "There is likely a quoting error of the whole connection string, and the filename should likely be prefixed with /vsicurl/"
+        in gdal.GetLastErrorMsg()
+    )
+
+    with gdaltest.error_handler():
+        assert (
+            gdal.OpenEx(
+                "ZARR:/vsicurl/https://example.org/not_existing.zarr",
+                gdal.OF_MULTIDIM_RASTER,
+            )
+            is None
+        )
+    assert (
+        "There is likely a quoting error of the whole connection string."
+        in gdal.GetLastErrorMsg()
+    )
+
+
 def test_zarr_read_classic():
 
     ds = gdal.Open("data/zarr/zlib.zarr")
@@ -3119,6 +3165,33 @@ def test_zarr_read_test_overflow_in_AllocateWorkingBuffers_due_to_type_change():
         ar = rg.OpenMDArray("test")
         with gdaltest.error_handler():
             assert ar.Read(count=[1, 1]) is None
+
+    finally:
+        gdal.RmdirRecursive("/vsimem/test.zarr")
+
+
+def test_zarr_read_do_not_crash_on_invalid_byteswap_on_ascii_string():
+
+    try:
+        gdal.Mkdir("/vsimem/test.zarr", 0)
+
+        j = {
+            "chunks": [1],
+            "compressor": None,
+            "dtype": [["x", ">S2"]],  # byteswap here is not really valid...
+            "fill_value": base64.b64encode(b"XX").decode("utf-8"),
+            "filters": None,
+            "order": "C",
+            "shape": [1],
+            "zarr_format": 2,
+        }
+
+        gdal.FileFromMemBuffer("/vsimem/test.zarr/.zarray", json.dumps(j))
+
+        ds = gdal.OpenEx("/vsimem/test.zarr", gdal.OF_MULTIDIM_RASTER)
+        assert ds
+        rg = ds.GetRootGroup()
+        rg.OpenMDArray("test")
 
     finally:
         gdal.RmdirRecursive("/vsimem/test.zarr")
