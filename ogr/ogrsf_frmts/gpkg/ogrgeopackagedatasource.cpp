@@ -3145,9 +3145,10 @@ OGRErr GDALGeoPackageDataset::UpdateGpkgContentsLastChange(
 
 CPLErr GDALGeoPackageDataset::IBuildOverviews(
                         const char * pszResampling,
-                        int nOverviews, int * panOverviewList,
-                        int nBandsIn, int * /*panBandList*/,
-                        GDALProgressFunc pfnProgress, void * pProgressData )
+                        int nOverviews, const int * panOverviewList,
+                        int nBandsIn, const int * /*panBandList*/,
+                        GDALProgressFunc pfnProgress, void * pProgressData,
+                        CSLConstList papszOptions )
 {
     if( GetAccess() != GA_Update )
     {
@@ -3416,7 +3417,8 @@ CPLErr GDALGeoPackageDataset::IBuildOverviews(
     if( eErr == CE_None )
         eErr = GDALRegenerateOverviewsMultiBand(nBands, papoBands,
                                      nOverviews, papapoOverviewBands,
-                                     pszResampling, pfnProgress, pProgressData );
+                                     pszResampling, pfnProgress, pProgressData,
+                                     papszOptions);
 
     for( int iBand = 0; iBand < nBands; iBand++ )
     {
@@ -5504,6 +5506,17 @@ GDALDataset* GDALGeoPackageDataset::CreateCopy( const char *pszFilename,
         return nullptr;
     }
 
+    // Assign nodata values before the SetGeoTransform call.
+    // SetGeoTransform will trigger creation of the overview datasets for each zoom level
+    // and at that point the nodata value needs to be known.
+    int bHasNoData = FALSE;
+    double dfNoDataValue =
+            poSrcDS->GetRasterBand(1)->GetNoDataValue(&bHasNoData);
+    if( eDT != GDT_Byte && bHasNoData )
+    {
+        poDS->GetRasterBand(1)->SetNoDataValue(dfNoDataValue);
+    }
+
     poDS->SetGeoTransform(adfGeoTransform);
     poDS->SetProjection(pszWKT);
     CPLFree(pszWKT);
@@ -5511,14 +5524,6 @@ GDALDataset* GDALGeoPackageDataset::CreateCopy( const char *pszFilename,
     if( nTargetBands == 1 && nBands == 1 && poSrcDS->GetRasterBand(1)->GetColorTable() != nullptr )
     {
         poDS->GetRasterBand(1)->SetColorTable( poSrcDS->GetRasterBand(1)->GetColorTable() );
-    }
-
-    int bHasNoData = FALSE;
-    double dfNoDataValue =
-            poSrcDS->GetRasterBand(1)->GetNoDataValue(&bHasNoData);
-    if( eDT != GDT_Byte && bHasNoData )
-    {
-        poDS->GetRasterBand(1)->SetNoDataValue(dfNoDataValue);
     }
 
     hTransformArg =
