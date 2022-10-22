@@ -34,7 +34,6 @@
 #include "ogr_recordbatch.h"
 #include "ograrrowarrayhelper.h"
 
-CPL_CVSID("$Id$")
 
 /************************************************************************/
 /*                      OGRGeoPackageLayer()                            */
@@ -489,6 +488,7 @@ int OGRGeoPackageLayer::GetNextArrowArray(struct ArrowArrayStream* stream,
 
     if( m_poQueryStatement == nullptr )
     {
+        GetLayerDefn();
         ResetStatement();
         if (m_poQueryStatement == nullptr)
             return 0;
@@ -1072,4 +1072,19 @@ void OGRGeoPackageLayer::BuildFeatureDefn( const char *pszLayerName,
         m_poFeatureDefn->AddFieldDefn( &oField );
         panFieldOrdinals[m_poFeatureDefn->GetFieldCount() - 1] = iCol;
     }
+}
+
+/************************************************************************/
+/*                          SetIgnoredFields()                          */
+/************************************************************************/
+
+OGRErr OGRGeoPackageLayer::SetIgnoredFields( const char **papszFields )
+{
+    OGRErr eErr = OGRLayer::SetIgnoredFields(papszFields);
+    if( eErr == OGRERR_NONE )
+    {
+        // So that OGRGeoPackageTableLayer::BuildColumns() is called
+        ResetReading();
+    }
+    return eErr;
 }

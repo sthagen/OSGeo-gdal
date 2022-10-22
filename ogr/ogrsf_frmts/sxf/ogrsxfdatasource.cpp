@@ -40,7 +40,6 @@
 #include <map>
 #include <string>
 
-CPL_CVSID("$Id$")
 
 // EPSG code range http://gis.stackexchange.com/a/18676/9904
 constexpr int MIN_EPSG = 1000;
@@ -442,8 +441,30 @@ OGRErr OGRSXFDataSource::ReadSXFInformationFlags(VSILFILE* fpSXFIn, SXFPassport&
     }
     else if (passport.version == 4)
     {
-        passport.informationFlags.stEnc = (SXFTextEncoding)val[1];
-        passport.informationFlags.stCoordAcc = (SXFCoordinatesAccuracy)val[2];
+        if( val[1] <= SXF_ENC_LAST )
+        {
+            passport.informationFlags.stEnc = static_cast<SXFTextEncoding>(val[1]);
+        }
+        else
+        {
+            CPLDebug("SXF",
+                     "Invalid passport.informationFlags.stEnc = %d. "
+                     "Defaulting to SXF_ENC_DOS", val[1]);
+            passport.informationFlags.stEnc = SXF_ENC_DOS;
+        }
+
+        if( val[2] <= SXF_COORD_ACC_LAST )
+        {
+            passport.informationFlags.stCoordAcc = static_cast<SXFCoordinatesAccuracy>(val[2]);
+        }
+        else
+        {
+            CPLDebug("SXF",
+                     "Invalid passport.informationFlags.stCoordAcc = %d. "
+                     "Defaulting to SXF_COORD_ACC_UNDEFINED", val[1]);
+            passport.informationFlags.stCoordAcc = SXF_COORD_ACC_UNDEFINED;
+        }
+
         if (CHECK_BIT(val[3], 0))
         {
             passport.informationFlags.bSort = true;
@@ -724,7 +745,11 @@ OGRErr OGRSXFDataSource::ReadSXFMapDescription(VSILFILE* fpSXFIn, SXFPassport& p
 
     passport.stMapDescription.dfScale = passport.nScale;
 
-    const double dfCoeff = passport.stMapDescription.nResolution == 0 ? 0 :
+    if( passport.stMapDescription.nResolution == 0 )
+    {
+        return OGRERR_FAILURE;
+    }
+    const double dfCoeff =
         double(passport.stMapDescription.dfScale) / passport.stMapDescription.nResolution;
     passport.stMapDescription.bIsRealCoordinates = passport.informationFlags.bRealCoordinatesCompliance;
     passport.stMapDescription.stCoordAcc = passport.informationFlags.stCoordAcc;

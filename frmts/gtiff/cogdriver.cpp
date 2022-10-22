@@ -1053,7 +1053,8 @@ GDALDataset* GDALCOGCreator::Create(const char * pszFilename,
     {
         if( pszQuality && atoi(pszQuality) == 100 )
             aosOptions.SetNameValue("WEBP_LOSSLESS", "YES");
-        aosOptions.SetNameValue("WEBP_LEVEL", pszQuality);
+        else
+            aosOptions.SetNameValue("WEBP_LEVEL", pszQuality);
     }
     else if( EQUAL(osCompress, "DEFLATE") || EQUAL(osCompress, "LERC_DEFLATE") )
     {
@@ -1131,12 +1132,23 @@ GDALDataset* GDALCOGCreator::Create(const char * pszFilename,
     CPLConfigOptionSetter ovrCompressSetter("COMPRESS_OVERVIEW", pszOverviewCompress, true);
     const char* pszOverviewQuality = CSLFetchNameValue(papszOptions, "OVERVIEW_QUALITY");
     CPLConfigOptionSetter ovrQualityJpegSetter("JPEG_QUALITY_OVERVIEW", pszOverviewQuality, true);
-    CPLConfigOptionSetter ovrQualityWebpSetter("WEBP_LEVEL_OVERVIEW", pszOverviewQuality, true);
 
     std::unique_ptr<CPLConfigOptionSetter> poWebpLosslessSetter;
-    if( pszOverviewQuality && CPLAtof(pszOverviewQuality) == 100.0 )
+    std::unique_ptr<CPLConfigOptionSetter> poWebpLevelSetter;
+    if( EQUAL(pszOverviewCompress, "WEBP") )
     {
-        poWebpLosslessSetter.reset(new CPLConfigOptionSetter("WEBP_LOSSLESS_OVERVIEW", "TRUE", true));
+        if( pszOverviewQuality && CPLAtof(pszOverviewQuality) == 100.0 )
+        {
+            poWebpLosslessSetter.reset(new CPLConfigOptionSetter(
+                "WEBP_LOSSLESS_OVERVIEW", "TRUE", true));
+        }
+        else
+        {
+            poWebpLosslessSetter.reset(new CPLConfigOptionSetter(
+                "WEBP_LOSSLESS_OVERVIEW", "FALSE", true));
+            poWebpLevelSetter.reset(new CPLConfigOptionSetter(
+                "WEBP_LEVEL_OVERVIEW", pszOverviewQuality, true));
+        }
     }
 
     std::unique_ptr<CPLConfigOptionSetter> poPhotometricSetter;
@@ -1277,10 +1289,19 @@ void GDALCOGDriver::InitializeCreationOptionList()
     }
     if( bHasJPEG || bHasWebP )
     {
+        std::string osJPEG_WEBP;
+        if( bHasJPEG )
+            osJPEG_WEBP = "JPEG";
+        if( bHasWebP )
+        {
+            if( !osJPEG_WEBP.empty() )
+                osJPEG_WEBP += '/';
+            osJPEG_WEBP += "WEBP";
+        }
         osOptions += "   <Option name='QUALITY' type='int' "
-                     "description='JPEG/WEBP quality 1-100' default='75'/>"
+                     "description='" + osJPEG_WEBP + " quality 1-100' default='75'/>"
                      "   <Option name='OVERVIEW_QUALITY' type='int' "
-                     "description='Overview JPEG/WEBP quality 1-100' default='75'/>";
+                     "description='Overview " + osJPEG_WEBP + " quality 1-100' default='75'/>";
     }
     if( bHasLERC )
     {
