@@ -34,9 +34,11 @@
 #include "ogrsqlitebase.h"
 #include "gpkgmbtilescommon.h"
 #include "ogrsqliteutility.h"
+#include "cpl_threadsafe_queue.hpp"
 
 #include <vector>
 #include <set>
+#include <thread>
 
 #define UNKNOWN_SRID   -2
 #define DEFAULT_SRID    0
@@ -234,6 +236,9 @@ class GDALGeoPackageDataset final : public OGRSQLiteBaseDataSource, public GDALG
         void                LoadRelationships() const;
         void                LoadRelationshipsUsingRelatedTablesExtension() const;
 
+        bool                m_bIsGeometryTypeAggregateInterrupted = false;
+        std::string         m_osGeometryTypeAggregateResult{};
+
         CPL_DISALLOW_COPY_ASSIGN(GDALGeoPackageDataset)
 
     public:
@@ -311,6 +316,7 @@ class GDALGeoPackageDataset final : public OGRSQLiteBaseDataSource, public GDALG
         bool                    HasDataColumnConstraintsTable() const;
         bool                CreateColumnsTableAndColumnConstraintsTablesIfNecessary();
         bool                HasGpkgextRelationsTable() const;
+        bool                HasQGISLayerStyles() const;
 
         const char*         GetGeometryTypeString(OGRwkbGeometryType eType);
 
@@ -326,6 +332,16 @@ class GDALGeoPackageDataset final : public OGRSQLiteBaseDataSource, public GDALG
                                                    void * pProgressData );
 
         static std::string GetCurrentDateEscapedSQL();
+
+        bool                IsGeometryTypeAggregateInterrupted() const { return m_bIsGeometryTypeAggregateInterrupted; }
+        void                SetGeometryTypeAggregateInterrupted(bool b)
+        {
+            m_bIsGeometryTypeAggregateInterrupted = b;
+            if( b )
+                sqlite3_interrupt(hDB);
+        }
+        void                SetGeometryTypeAggregateResult(const std::string& s) { m_osGeometryTypeAggregateResult = s; }
+        const std::string&  GetGeometryTypeAggregateResult() const { return m_osGeometryTypeAggregateResult; }
 
     protected:
 
@@ -385,10 +401,12 @@ class GDALGeoPackageRasterBand final: public GDALGPKGMBTilesLikeRasterBand
 class OGRGeoPackageLayer CPL_NON_FINAL: public OGRLayer, public IOGRSQLiteGetSpatialWhere
 {
   protected:
+    friend void OGR_GPKG_FillArrowArray_Step(sqlite3_context* pContext, int /*argc*/, sqlite3_value** argv);
+
     GDALGeoPackageDataset *m_poDS;
 
     OGRFeatureDefn*      m_poFeatureDefn;
-    int                  iNextShapeId;
+    GIntBig              iNextShapeId;
 
     sqlite3_stmt        *m_poQueryStatement;
     bool                 bDoStep;
@@ -407,12 +425,20 @@ class OGRGeoPackageLayer CPL_NON_FINAL: public OGRLayer, public IOGRSQLiteGetSpa
                                            sqlite3_stmt *hStmt );
 
     OGRFeature*         TranslateFeature(sqlite3_stmt* hStmt);
+    bool                ParseDateField(const char* pszTxt,
+                                       OGRField* psField,
+                                       const OGRFieldDefn* poFieldDefn,
+                                       GIntBig nFID);
     bool                ParseDateField(sqlite3_stmt* hStmt,
                                         int iRawField,
                                         int nSqlite3ColType,
                                         OGRField* psField,
                                         const OGRFieldDefn* poFieldDefn,
                                         GIntBig nFID);
+    bool                ParseDateTimeField(const char* pszTxt,
+                                       OGRField* psField,
+                                       const OGRFieldDefn* poFieldDefn,
+                                       GIntBig nFID);
     bool                ParseDateTimeField(sqlite3_stmt* hStmt,
                                         int iRawField,
                                         int nSqlite3ColType,
@@ -487,6 +513,7 @@ class OGRGeoPackageTableLayer final : public OGRGeoPackageLayer
     bool                        m_bPreservePrecision = true;
     bool                        m_bTruncateFields = false;
     bool                        m_bDeferredCreation = false;
+    bool                        m_bTableCreatedInTransaction = false;
     int                         m_iFIDAsRegularColumnIndex = -1;
 
     CPLString                   m_osIdentifierLCO{};
@@ -495,6 +522,8 @@ class OGRGeoPackageTableLayer final : public OGRGeoPackageLayer
     bool                        m_bHasTriedDetectingFID64 = false;
     GPKGASpatialVariant         m_eASpatialVariant = GPKG_ATTRIBUTES;
     std::set<OGRwkbGeometryType> m_eSetBadGeomTypeWarned{};
+
+    int                         m_nIsCompatOfOptimizedGetNextArrowArray = -1;
 
     int                         m_nCountInsertInTransactionThreshold = -1;
     GIntBig                     m_nCountInsertInTransaction = 0;
@@ -511,6 +540,20 @@ class OGRGeoPackageTableLayer final : public OGRGeoPackageLayer
     } GPKGRTreeEntry;
     std::vector<GPKGRTreeEntry>  m_aoRTreeEntries{};
 
+    // Variables used for background RTree building
+    std::string                          m_osAsyncDBName{};
+    sqlite3*                             m_hAsyncDBHandle = nullptr;
+    cpl::ThreadSafeQueue<std::vector<GPKGRTreeEntry>> m_oQueueRTreeEntries{};
+    bool                                 m_bAllowedRTreeThread = false;
+    bool                                 m_bThreadRTreeStarted = false;
+    bool                                 m_bErrorDuringRTreeThread = false;
+    size_t                               m_nRTreeBatchSize = 10 * 1000;  // maximum size of a std::vector<GPKGRTreeEntry> item in m_oQueueRTreeEntries
+    size_t                               m_nRTreeBatchesBeforeStart = 10; // number of items in m_oQueueRTreeEntries before starting the thread
+    std::thread                          m_oThreadRTree{};
+
+    void                StartAsyncRTree();
+    void                CancelAsyncRTree();
+    void                AsyncRTreeThreadFunction();
 
     virtual OGRErr      ResetStatement() override;
 
@@ -543,7 +586,16 @@ class OGRGeoPackageTableLayer final : public OGRGeoPackageLayer
 
     OGRErr              CreateOrUpsertFeature( OGRFeature *poFeature, bool bUpsert );
 
+    GIntBig             GetTotalFeatureCount();
+
     CPL_DISALLOW_COPY_ASSIGN(OGRGeoPackageTableLayer)
+
+    std::thread         m_oThreadNextArrowArray{};
+    std::unique_ptr<GDALGeoPackageDataset> m_poOtherDS{};
+    struct ArrowArray*  m_psNextArrayArray = nullptr;
+    virtual int GetNextArrowArray(struct ArrowArrayStream*,
+                                   struct ArrowArray* out_array) override;
+    int                 GetNextArrowArrayInternal(struct ArrowArray* out_array);
 
     public:
                         OGRGeoPackageTableLayer( GDALGeoPackageDataset *poDS,
@@ -589,6 +641,9 @@ class OGRGeoPackageTableLayer final : public OGRGeoPackageLayer
     virtual OGRErr      GetExtent(int iGeomField, OGREnvelope *psExtent, int bForce) override
                 { return OGRGeoPackageLayer::GetExtent(iGeomField, psExtent, bForce); }
 
+    OGRGeometryTypeCounter* GetGeometryTypes(int iGeomField, int nFlagsGGT, int& nEntryCountOut,
+                                             GDALProgressFunc pfnProgress, void* pProgressData) override;
+
     void                RecomputeExtent();
 
     void                SetOpeningParameters(const char* pszObjectType,
@@ -605,8 +660,7 @@ class OGRGeoPackageTableLayer final : public OGRGeoPackageLayer
                                                const char* pszFIDColumnName,
                                                const char* pszIdentifier,
                                                const char* pszDescription );
-    void                SetDeferredSpatialIndexCreation( bool bFlag )
-                                { m_bDeferredSpatialIndexCreation = bFlag; }
+    void                SetDeferredSpatialIndexCreation( bool bFlag );
     void                SetASpatialVariant( GPKGASpatialVariant eASpatialVariant )
                                 { m_eASpatialVariant = eASpatialVariant; }
 
