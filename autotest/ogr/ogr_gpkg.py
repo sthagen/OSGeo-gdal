@@ -6064,6 +6064,54 @@ def test_ogr_gpkg_field_domains_errors():
 
 
 ###############################################################################
+# Test gpkg_data_column_constraints of GPKG 1.0
+
+
+def test_ogr_gpkg_field_domain_gpkg_1_0():
+
+    filename = "/vsimem/test.gpkg"
+
+    ds = gdal.GetDriverByName("GPKG").Create(
+        filename, 0, 0, 0, gdal.GDT_Unknown, options=["VERSION=1.0"]
+    )
+    ds.CreateLayer("test")
+    assert ds.AddFieldDomain(
+        ogr.CreateRangeFieldDomain(
+            "range_domain_int",
+            "my desc",
+            ogr.OFTReal,
+            ogr.OFSTNone,
+            1.5,
+            True,
+            2.5,
+            False,
+        )
+    )
+    ds = None
+
+    assert validate(filename)
+
+    ds = gdal.OpenEx(filename, gdal.OF_VECTOR)
+
+    gdal.ErrorReset()
+    domain = ds.GetFieldDomain("range_domain_int")
+    assert gdal.GetLastErrorMsg() == ""
+    assert domain is not None
+    assert domain.GetName() == "range_domain_int"
+    assert domain.GetDescription() == "my desc"
+    assert domain.GetDomainType() == ogr.OFDT_RANGE
+    assert domain.GetFieldType() == ogr.OFTReal
+    assert domain.GetMinAsDouble() == 1.5
+    assert domain.IsMinInclusive()
+    assert domain.GetMaxAsDouble() == 2.5
+    assert not domain.IsMaxInclusive()
+
+    ds = None
+
+    gdal.Unlink(filename)
+
+
+###############################################################################
 # Test attribute and spatial views
 
 
@@ -6746,61 +6794,65 @@ def test_ogr_gpkg_arrow_stream_numpy():
         batches = [batch for batch in stream]
         # print(batches)
 
-    stream = lyr.GetArrowStreamAsNumPy(
-        options=["USE_MASKED_ARRAYS=NO", "MAX_FEATURES_IN_BATCH=2"]
-    )
-    batches = [batch for batch in stream]
-    assert len(batches) == 2
-    batch = batches[0]
+    for i in range(2):
+        with gdaltest.config_options(
+            {"OGR_GPKG_STREAM_BASE_IMPL": "YES"} if i == 1 else {}
+        ):
+            stream = lyr.GetArrowStreamAsNumPy(
+                options=["USE_MASKED_ARRAYS=NO", "MAX_FEATURES_IN_BATCH=2"]
+            )
+            batches = [batch for batch in stream]
+            assert len(batches) == 2
+            batch = batches[0]
 
-    assert batch.keys() == {
-        "fid",
-        "str",
-        "bool",
-        "int16",
-        "int32",
-        "int64",
-        "float32",
-        "float64",
-        "date",
-        "datetime",
-        "binary",
-        "geom",
-    }
+            assert batch.keys() == {
+                "fid",
+                "str",
+                "bool",
+                "int16",
+                "int32",
+                "int64",
+                "float32",
+                "float64",
+                "date",
+                "datetime",
+                "binary",
+                "geom",
+            }
 
-    assert batch["fid"][0] == 1
-    assert len(batch["fid"]) == 2
-    for fieldname in ("bool", "int16", "int32", "int64", "float32", "float64"):
-        assert batch[fieldname][0] == f.GetField(fieldname)
-    assert batch["str"][0] == f.GetField("str").encode("utf-8")
-    assert batch["date"][0] == numpy.datetime64("2022-05-31")
-    assert batch["datetime"][0] == numpy.datetime64("2022-05-31T12:34:56.789")
-    assert bytes(batch["binary"][0]) == b"\xDE\xAD"
-    assert len(bytes(batch["geom"][0])) == 21
+            assert batch["fid"][0] == 1
+            assert len(batch["fid"]) == 2
+            for fieldname in ("bool", "int16", "int32", "int64", "float32", "float64"):
+                assert batch[fieldname][0] == f.GetField(fieldname)
+            assert batch["str"][0] == f.GetField("str").encode("utf-8")
+            assert batch["date"][0] == numpy.datetime64("2022-05-31")
+            assert batch["datetime"][0] == numpy.datetime64("2022-05-31T12:34:56.789")
+            assert bytes(batch["binary"][0]) == b"\xDE\xAD"
+            assert len(bytes(batch["geom"][0])) == 21
 
-    assert batch["fid"][1] == 2
-    assert batch["bool"][1] == False
-    assert batch["geom"][1] is None
+            assert batch["fid"][1] == 2
+            assert batch["bool"][1] == False
+            assert batch["geom"][1] is None
 
-    batch = batches[1]
-    assert batch.keys() == {
-        "fid",
-        "str",
-        "bool",
-        "int16",
-        "int32",
-        "int64",
-        "float32",
-        "float64",
-        "date",
-        "datetime",
-        "binary",
-        "geom",
-    }
+            batch = batches[1]
+            assert batch.keys() == {
+                "fid",
+                "str",
+                "bool",
+                "int16",
+                "int32",
+                "int64",
+                "float32",
+                "float64",
+                "date",
+                "datetime",
+                "binary",
+                "geom",
+            }
 
-    assert batch["fid"][0] == 3
-    assert batch["int16"][0] == 123
-    assert len(batch["fid"]) == 1
+            assert batch["fid"][0] == 3
+            assert batch["int16"][0] == 123
+            assert len(batch["fid"]) == 1
 
     with lyr.GetArrowStreamAsNumPy(options=["MAX_FEATURES_IN_BATCH=1"]) as stream:
         batches = [batch for batch in stream]
@@ -6826,6 +6878,17 @@ def test_ogr_gpkg_arrow_stream_numpy():
     assert len(batches) == 1
     assert len(batches[0]["fid"]) == 1
     assert batches[0]["fid"][0] == 3
+
+    for i in range(2):
+        lyr.SetAttributeFilter("1 = 1")
+        with lyr.GetArrowStreamAsNumPy(options=["MAX_FEATURES_IN_BATCH=1"]) as stream:
+            batch = stream.GetNextRecordBatch()
+            assert len(batch["fid"]) == 1, i
+            assert batch["fid"][0] == 1, i
+            batch = stream.GetNextRecordBatch()
+            assert len(batch["fid"]) == 1, i
+            assert batch["fid"][0] == 2, i
+        lyr.SetAttributeFilter(None)
 
     # Test spatial filter
     lyr.SetSpatialFilterRect(0, 0, 10, 10)
