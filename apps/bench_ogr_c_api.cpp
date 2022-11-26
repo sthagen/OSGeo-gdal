@@ -37,7 +37,7 @@
 static void Usage()
 {
     printf("Usage: bench_ogr_c_api [-where filter] [-spat xmin ymin xmax ymax]\n");
-    printf("                       filename\n");
+    printf("                       filename [layer_name]\n");
     exit(1);
 }
 
@@ -57,6 +57,7 @@ int main(int argc, char* argv[])
     const char* pszWhere = nullptr;
     const char* pszDataset = nullptr;
     std::unique_ptr<OGRPolygon> poSpatialFilter;
+    const char* pszLayerName = nullptr;
     for( int iArg = 1; iArg < argc; ++iArg )
     {
         if( iArg + 1 < argc && strcmp(argv[iArg], "-where") == 0 )
@@ -87,9 +88,17 @@ int main(int argc, char* argv[])
         {
             Usage();
         }
-        else
+        else if( pszDataset == nullptr )
         {
             pszDataset = argv[iArg];
+        }
+        else if( pszLayerName == nullptr )
+        {
+            pszLayerName = argv[iArg];
+        }
+        else
+        {
+            Usage();
         }
     }
     if( pszDataset == nullptr )
@@ -99,15 +108,22 @@ int main(int argc, char* argv[])
 
     GDALAllRegister();
 
-    auto poDS = std::unique_ptr<GDALDataset>(GDALDataset::Open(pszDataset));
+    auto poDS = std::unique_ptr<GDALDataset>(
+        GDALDataset::Open(pszDataset, GDAL_OF_VECTOR | GDAL_OF_VERBOSE_ERROR));
     if( poDS == nullptr)
     {
-        fprintf(stderr, "Cannot open %s\n", pszDataset);
         CSLDestroy(argv);
         exit(1);
     }
 
-    OGRLayer* poLayer = poDS->GetLayer(0);
+    if( pszLayerName == nullptr && poDS->GetLayerCount() > 1 )
+    {
+        fprintf(stderr, "A layer name must be specified because the dataset has several layers.\n");
+        CSLDestroy(argv);
+        exit(1);
+    }
+    OGRLayer* poLayer = pszLayerName ?
+        poDS->GetLayerByName(pszLayerName) : poDS->GetLayer(0);
     if( poLayer == nullptr )
     {
         fprintf(stderr, "Cannot find layer\n");
@@ -126,6 +142,7 @@ int main(int argc, char* argv[])
     for( int i = 0; i < nFields; i++ )
         aeTypes.push_back(OGR_Fld_GetType(OGR_FD_GetFieldDefn(hFDefn, i)));
     int nYear, nMonth, nDay, nHour, nMin, nSecond, nTZ;
+    std::vector<GByte> abyWKB;
     while( true )
     {
         OGRFeatureH hFeat = OGR_L_GetNextFeature(hLayer);
@@ -150,9 +167,8 @@ int main(int argc, char* argv[])
         if( hGeom )
         {
             int size = OGR_G_WkbSize(hGeom);
-            GByte* pabyWKB = static_cast<GByte*>(malloc(size));
-            OGR_G_ExportToIsoWkb( hGeom, wkbNDR, pabyWKB);
-            CPLFree(pabyWKB);
+            abyWKB.resize(size);
+            OGR_G_ExportToIsoWkb(hGeom, wkbNDR, abyWKB.data());
         }
         OGR_F_Destroy(hFeat);
     }

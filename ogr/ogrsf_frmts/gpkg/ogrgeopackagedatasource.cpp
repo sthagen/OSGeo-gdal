@@ -437,6 +437,15 @@ bool GDALGeoPackageDataset::ConvertGpkgSpatialRefSysToExtensionWkt2()
             const char* pszOrganization = oResultTable->GetValue(2, i);
             const char* pszOrganizationCoordsysID = oResultTable->GetValue(3, i);
             const char* pszDefinition = oResultTable->GetValue(4, i);
+            if( pszSrsName == nullptr ||
+                pszSrsId == nullptr ||
+                pszOrganization == nullptr ||
+                pszOrganizationCoordsysID == nullptr )
+            {
+                // should not happen as there are NOT NULL constraints
+                // But a database could lack such NOT NULL constraints or have
+                // large values that would cause a memory allocation failure.
+            }
             const char* pszDescription = oResultTable->GetValue(5, i);
             char* pszSQL;
 
@@ -1449,14 +1458,6 @@ int GDALGeoPackageDataset::Open( GDALOpenInfo* poOpenInfo )
                     (m_nUserVersion % 10000) / 100,
                     m_nUserVersion % 100);
         }
-    }
-
-    const char* pszPreludeStatements = CSLFetchNameValue(
-        poOpenInfo->papszOpenOptions, "PRELUDE_STATEMENTS");
-    if( pszPreludeStatements )
-    {
-        if( SQLCommand(hDB, pszPreludeStatements) != OGRERR_NONE )
-            return FALSE;
     }
 
     /* Requirement 6: The SQLite PRAGMA integrity_check SQL command SHALL return “ok” */
@@ -3795,6 +3796,16 @@ char **GDALGeoPackageDataset::GetMetadata( const char *pszDomain )
         const char* pszMDStandardURI = oResult->GetValue(1, i);
         const char* pszMimeType = oResult->GetValue(2, i);
         const char* pszReferenceScope = oResult->GetValue(3, i);
+        if( pszMetadata == nullptr ||
+            pszMDStandardURI == nullptr ||
+            pszMimeType == nullptr ||
+            pszReferenceScope == nullptr )
+        {
+            // should not happen as there are NOT NULL constraints
+            // But a database could lack such NOT NULL constraints or have
+            // large values that would cause a memory allocation failure.
+            continue;
+        }
         int bIsGPKGScope = EQUAL(pszReferenceScope, "geopackage");
         if( EQUAL(pszMDStandardURI, "http://gdal.org") &&
             EQUAL(pszMimeType, "text/xml") )
@@ -6344,6 +6355,7 @@ static const char* const apszFuncsWithSideEffects[] =
     "CreateSpatialIndex",
     "DisableSpatialIndex",
     "HasSpatialIndex",
+    "RegisterGeometryExtension",
 };
 
 OGRLayer * GDALGeoPackageDataset::ExecuteSQL( const char *pszSQLCommand,
@@ -7257,6 +7269,52 @@ void OGRGeoPackageSTSRID(sqlite3_context* pContext,
 }
 
 /************************************************************************/
+/*                     OGRGeoPackageSetSRID()                           */
+/************************************************************************/
+
+static
+void OGRGeoPackageSetSRID(sqlite3_context* pContext,
+                          int /* argc */, sqlite3_value** argv)
+{
+    if( sqlite3_value_type (argv[0]) != SQLITE_BLOB )
+    {
+        sqlite3_result_null(pContext);
+        return;
+    }
+    const int nDestSRID = sqlite3_value_int(argv[1]);
+    GPkgHeader sHeader;
+    int nBLOBLen = sqlite3_value_bytes (argv[0]);
+    const GByte* pabyBLOB = reinterpret_cast<const GByte *>(sqlite3_value_blob (argv[0]));
+
+    if( nBLOBLen < 8 ||
+        GPkgHeaderFromWKB(pabyBLOB, nBLOBLen, &sHeader) != OGRERR_NONE )
+    {
+        // Try also spatialite geometry blobs
+        OGRGeometry* poGeom = nullptr;
+        if( OGRSQLiteImportSpatiaLiteGeometry( pabyBLOB, nBLOBLen,
+                                               &poGeom ) != OGRERR_NONE )
+        {
+            sqlite3_result_null(pContext);
+            return;
+        }
+        size_t nBLOBDestLen = 0;
+        GByte* pabyDestBLOB =
+            GPkgGeometryFromOGR(poGeom, nDestSRID, &nBLOBDestLen);
+        sqlite3_result_blob(pContext, pabyDestBLOB,
+                            static_cast<int>(nBLOBDestLen), VSIFree);
+        return;
+    }
+
+    GByte* pabyDestBLOB = static_cast<GByte*>(CPLMalloc(nBLOBLen));
+    memcpy(pabyDestBLOB, pabyBLOB, nBLOBLen);
+    int32_t nSRIDToSerialize = nDestSRID;
+    if( OGR_SWAP(sHeader.eByteOrder) )
+        nSRIDToSerialize = CPL_SWAP32(nSRIDToSerialize);
+    memcpy(pabyDestBLOB + 4, &nSRIDToSerialize, 4);
+    sqlite3_result_blob(pContext, pabyDestBLOB, nBLOBLen, VSIFree);
+}
+
+/************************************************************************/
 /*                   OGRGeoPackageSTMakeValid()                         */
 /************************************************************************/
 
@@ -7404,7 +7462,10 @@ void OGRGeoPackageSTArea(sqlite3_context* pContext,
 /*                      OGRGeoPackageTransform()                        */
 /************************************************************************/
 
-static
+void OGRGeoPackageTransform(sqlite3_context* pContext,
+                            int argc,
+                            sqlite3_value** argv);
+
 void OGRGeoPackageTransform(sqlite3_context* pContext,
                             int argc,
                             sqlite3_value** argv)
@@ -7427,27 +7488,59 @@ void OGRGeoPackageTransform(sqlite3_context* pContext,
         return;
     }
 
-    GDALGeoPackageDataset* poDS = static_cast<GDALGeoPackageDataset*>(
-                                                sqlite3_user_data(pContext));
-
-    OGRSpatialReference* poSrcSRS = poDS->GetSpatialRef(sHeader.iSrsId, true);
-    if( poSrcSRS == nullptr )
+    const int nDestSRID = sqlite3_value_int (argv[1]);
+    if( sHeader.iSrsId == nDestSRID )
     {
-        CPLError(CE_Failure, CPLE_AppDefined,
-                 "SRID set on geometry (%d) is invalid", sHeader.iSrsId);
-        sqlite3_result_blob(pContext, nullptr, 0, nullptr);
+        // Return blob unmodified
+        sqlite3_result_blob(pContext, pabyBLOB, nBLOBLen, SQLITE_TRANSIENT);
         return;
     }
 
-    int nDestSRID = sqlite3_value_int (argv[1]);
-    OGRSpatialReference* poDstSRS = poDS->GetSpatialRef(nDestSRID, true);
-    if( poDstSRS == nullptr )
+    GDALGeoPackageDataset* poDS = static_cast<GDALGeoPackageDataset*>(
+                                                sqlite3_user_data(pContext));
+
+    // Try to get the cached coordinate transformation
+    OGRCoordinateTransformation* poCT;
+    if( poDS->m_nLastCachedCTSrcSRId == sHeader.iSrsId &&
+        poDS->m_nLastCachedCTDstSRId == nDestSRID )
     {
-        CPLError(CE_Failure, CPLE_AppDefined,
-                 "Target SRID (%d) is invalid", nDestSRID);
-        sqlite3_result_blob(pContext, nullptr, 0, nullptr);
+        poCT = poDS->m_poLastCachedCT.get();
+    }
+    else
+    {
+        OGRSpatialReference* poSrcSRS = poDS->GetSpatialRef(sHeader.iSrsId, true);
+        if( poSrcSRS == nullptr )
+        {
+            CPLError(CE_Failure, CPLE_AppDefined,
+                     "SRID set on geometry (%d) is invalid", sHeader.iSrsId);
+            sqlite3_result_blob(pContext, nullptr, 0, nullptr);
+            return;
+        }
+
+        OGRSpatialReference* poDstSRS = poDS->GetSpatialRef(nDestSRID, true);
+        if( poDstSRS == nullptr )
+        {
+            CPLError(CE_Failure, CPLE_AppDefined,
+                     "Target SRID (%d) is invalid", nDestSRID);
+            sqlite3_result_blob(pContext, nullptr, 0, nullptr);
+            poSrcSRS->Release();
+            return;
+        }
+        poCT = OGRCreateCoordinateTransformation(poSrcSRS, poDstSRS);
         poSrcSRS->Release();
-        return;
+        poDstSRS->Release();
+
+        if( poCT == nullptr )
+        {
+            sqlite3_result_blob(pContext, nullptr, 0, nullptr);
+            return;
+        }
+
+        // Cache coordinate transformation for potential later reuse
+        poDS->m_nLastCachedCTSrcSRId = sHeader.iSrsId;
+        poDS->m_nLastCachedCTDstSRId = nDestSRID;
+        poDS->m_poLastCachedCT.reset(poCT);
+        poCT = poDS->m_poLastCachedCT.get();
     }
 
     OGRGeometry* poGeom = GPkgGeometryToOGR(pabyBLOB, nBLOBLen, nullptr);
@@ -7459,18 +7552,13 @@ void OGRGeoPackageTransform(sqlite3_context* pContext,
         {
             CPLError(CE_Failure, CPLE_AppDefined, "Invalid geometry");
             sqlite3_result_blob(pContext, nullptr, 0, nullptr);
-            poSrcSRS->Release();
-            poDstSRS->Release();
             return;
         }
     }
 
-    poGeom->assignSpatialReference(poSrcSRS);
-    if( poGeom->transformTo(poDstSRS) != OGRERR_NONE )
+    if( poGeom->transform(poCT) != OGRERR_NONE )
     {
         sqlite3_result_blob(pContext, nullptr, 0, nullptr);
-        poSrcSRS->Release();
-        poDstSRS->Release();
         return;
     }
 
@@ -7480,8 +7568,6 @@ void OGRGeoPackageTransform(sqlite3_context* pContext,
     sqlite3_result_blob(pContext, pabyDestBLOB,
                         static_cast<int>(nBLOBDestLen), VSIFree);
 
-    poSrcSRS->Release();
-    poDstSRS->Release();
     delete poGeom;
 }
 
@@ -7542,6 +7628,55 @@ void OGRGeoPackageImportFromEPSG(sqlite3_context* pContext,
     }
 
     sqlite3_result_int( pContext,poDS->GetSrsId(oSRS) );
+}
+
+/************************************************************************/
+/*               OGRGeoPackageRegisterGeometryExtension()               */
+/************************************************************************/
+
+static
+void OGRGeoPackageRegisterGeometryExtension(sqlite3_context* pContext,
+                                            int /*argc*/,
+                                            sqlite3_value** argv)
+{
+    if( sqlite3_value_type (argv[0]) != SQLITE_TEXT ||
+        sqlite3_value_type (argv[1]) != SQLITE_TEXT ||
+        sqlite3_value_type (argv[2]) != SQLITE_TEXT )
+    {
+        sqlite3_result_int( pContext, 0 );
+        return;
+    }
+
+    const char* pszTableName = reinterpret_cast<const char*>(sqlite3_value_text(argv[0]));
+    const char* pszGeomName = reinterpret_cast<const char*>(sqlite3_value_text(argv[1]));
+    const char* pszGeomType = reinterpret_cast<const char*>(sqlite3_value_text(argv[2]));
+
+    GDALGeoPackageDataset* poDS = static_cast<GDALGeoPackageDataset*>(sqlite3_user_data(pContext));
+
+    OGRGeoPackageTableLayer* poLyr = cpl::down_cast<OGRGeoPackageTableLayer*>(poDS->GetLayerByName(pszTableName));
+    if( poLyr == nullptr )
+    {
+        CPLError(CE_Failure, CPLE_AppDefined, "Unknown layer name");
+        sqlite3_result_int( pContext, 0 );
+        return;
+    }
+    if( !EQUAL(poLyr->GetGeometryColumn(), pszGeomName) )
+    {
+        CPLError(CE_Failure, CPLE_AppDefined, "Unknown geometry column name");
+        sqlite3_result_int( pContext, 0 );
+        return;
+    }
+    const OGRwkbGeometryType eGeomType = OGRFromOGCGeomType(pszGeomType);
+    if( eGeomType == wkbUnknown )
+    {
+        CPLError(CE_Failure, CPLE_AppDefined, "Unknown geometry type name");
+        sqlite3_result_int( pContext, 0 );
+        return;
+    }
+
+    sqlite3_result_int( pContext,
+        static_cast<int>(poLyr->CreateGeometryExtensionIfNecessary(eGeomType))
+    );
 }
 
 /************************************************************************/
@@ -7872,6 +8007,11 @@ void GDALGeoPackageDataset::InstallSQLFunctions()
                             SQLITE_UTF8, this,
                             OGRGeoPackageSridFromAuthCRS, nullptr, nullptr);
 
+    // Implementation that directly hacks the GeoPackage geometry blob header
+    sqlite3_create_function(hDB, "SetSRID", 2,
+                            SQLITE_UTF8 | SQLITE_DETERMINISTIC, nullptr,
+                            OGRGeoPackageSetSRID, nullptr, nullptr);
+
     // GDAL specific function
     sqlite3_create_function(hDB, "ImportFromEPSG", 1,
                             SQLITE_UTF8, this,
@@ -7882,6 +8022,11 @@ void GDALGeoPackageDataset::InstallSQLFunctions()
                             SQLITE_UTF8 | SQLITE_DETERMINISTIC, this,
                             nullptr, OGR_GPKG_GeometryTypeAggregate_Step,
                             OGR_GPKG_GeometryTypeAggregate_Finalize);
+
+    // May be used by ogrmerge.py
+    sqlite3_create_function(hDB, "RegisterGeometryExtension", 3,
+                            SQLITE_UTF8, this,
+                            OGRGeoPackageRegisterGeometryExtension, nullptr, nullptr);
 
     // Check that OGRGeometry::MakeValid() is functional before registering
     // ST_MakeValid()

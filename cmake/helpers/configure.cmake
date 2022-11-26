@@ -129,12 +129,6 @@ else ()
     HAVE_PTHREAD_ATFORK)
 
   check_include_file("sys/stat.h" HAVE_SYS_STAT_H)
-  if (${CMAKE_SYSTEM} MATCHES "Linux")
-      check_include_file("linux/fs.h" HAVE_LINUX_FS_H)
-      if( NOT HAVE_LINUX_FS_H )
-        message(FATAL_ERROR "Required linux/fs.h file is missing.")
-      endif()
-  endif ()
 
   check_function_exists(readlink HAVE_READLINK)
   check_function_exists(posix_spawnp HAVE_POSIX_SPAWNP)
@@ -334,6 +328,14 @@ else ()
         int main () { return (sysconf(_SC_PHYS_PAGES)); return 0; }
     "
     HAVE_SC_PHYS_PAGES)
+
+  check_c_source_compiles(
+    "
+        #define _GNU_SOURCE
+        #include <sched.h>
+        int main () { return sched_getaffinity(0,0,0); }
+    "
+    HAVE_SCHED_GETAFFINITY)
 
   include(FindInt128)
   if (INT128_FOUND)

@@ -34,6 +34,8 @@
 
 #include "gdal_pam.h"
 
+#include <utility>
+
 /************************************************************************/
 /* ==================================================================== */
 /*                              RawDataset                              */
@@ -61,9 +63,18 @@ class CPL_DLL RawDataset : public GDALPamDataset
          virtual ~RawDataset() = 0;
 
     bool GetRawBinaryLayout(GDALDataset::RawBinaryLayout&) override;
-
+    void ClearCachedConfigOption(void);
   private:
     CPL_DISALLOW_COPY_ASSIGN(RawDataset)
+  protected:
+    typedef union {
+      struct {
+        bool valid;//false if no value is cached
+        char value;
+      } data;
+      int all;//this unioned field can be used to help query/update the cached value with atomic operations
+    } CachedValidValue_t ;
+    CachedValidValue_t  cachedCPLOneBigReadOption;
 };
 
 /************************************************************************/

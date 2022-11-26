@@ -3624,7 +3624,7 @@ def test_netcdf_expanded_form_of_grid_mapping():
 
 init_list = [
     ("byte.tif", 4672, []),
-    ("gtiff/byte_signed.tif", 4672, ["PIXELTYPE=SIGNEDBYTE"]),
+    ("gtiff/int8.tif", 1046, []),
     ("int16.tif", 4672, []),
     ("int32.tif", 4672, []),
     ("float32.tif", 4672, []),
@@ -6175,6 +6175,22 @@ def test_netcdf_read_cf_xy_latlon_crs_wkt():
     # note: contains dummy values in lat and lon variables
     ds = gdal.Open("data/netcdf/cf_xy_latlon_crs_wkt.nc")
     assert ds.GetGeoTransform() == (3500000.0, 1000.0, 0.0, 2102000.0, 0.0, -1000.0)
+
+
+###############################################################################
+# Test that a user receives a warning when it queries
+# GetMetadataItem("PIXELTYPE", "IMAGE_STRUCTURE")
+
+
+def test_netcdf_warning_get_metadata_item_PIXELTYPE():
+
+    ds = gdal.Open("data/netcdf/byte_no_cf.nc")
+    with gdaltest.error_handler():
+        ds.GetRasterBand(1).GetMetadataItem("PIXELTYPE", "IMAGE_STRUCTURE")
+    assert (
+        gdal.GetLastErrorMsg()
+        == "Starting with GDAL 3.7, PIXELTYPE=SIGNEDBYTE is no longer used to signal signed 8-bit raster. Change your code to test for the new GDT_Int8 data type instead."
+    )
 
 
 def test_clean_tmp():

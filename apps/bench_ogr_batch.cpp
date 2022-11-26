@@ -38,7 +38,7 @@
 static void Usage()
 {
     printf("Usage: bench_ogr_bach [-where filter] [-spat xmin ymin xmax ymax]\n");
-    printf("                      filename\n");
+    printf("                      filename [layer_name]\n");
     exit(1);
 }
 
@@ -58,6 +58,7 @@ int main(int argc, char* argv[])
     const char* pszWhere = nullptr;
     const char* pszDataset = nullptr;
     std::unique_ptr<OGRPolygon> poSpatialFilter;
+    const char* pszLayerName = nullptr;
     for( int iArg = 1; iArg < argc; ++iArg )
     {
         if( iArg + 1 < argc && strcmp(argv[iArg], "-where") == 0 )
@@ -88,9 +89,17 @@ int main(int argc, char* argv[])
         {
             Usage();
         }
-        else
+        else if( pszDataset == nullptr )
         {
             pszDataset = argv[iArg];
+        }
+        else if( pszLayerName == nullptr )
+        {
+            pszLayerName = argv[iArg];
+        }
+        else
+        {
+            Usage();
         }
     }
     if( pszDataset == nullptr )
@@ -100,15 +109,22 @@ int main(int argc, char* argv[])
 
     GDALAllRegister();
 
-    auto poDS = std::unique_ptr<GDALDataset>(GDALDataset::Open(pszDataset));
+    auto poDS = std::unique_ptr<GDALDataset>(
+        GDALDataset::Open(pszDataset, GDAL_OF_VECTOR | GDAL_OF_VERBOSE_ERROR));
     if( poDS == nullptr)
     {
-        fprintf(stderr, "Cannot open %s\n", pszDataset);
         CSLDestroy(argv);
         exit(1);
     }
 
-    OGRLayer* poLayer = poDS->GetLayer(0);
+    if( pszLayerName == nullptr && poDS->GetLayerCount() > 1 )
+    {
+        fprintf(stderr, "A layer name must be specified because the dataset has several layers.\n");
+        CSLDestroy(argv);
+        exit(1);
+    }
+    OGRLayer* poLayer = pszLayerName ?
+        poDS->GetLayerByName(pszLayerName) : poDS->GetLayer(0);
     if( poLayer == nullptr )
     {
         fprintf(stderr, "Cannot find layer\n");
@@ -136,6 +152,10 @@ int main(int argc, char* argv[])
         schema.release(&schema);
     }
 #endif
+
+#if 0
+    int64_t lastId = 0;
+#endif
     while( true )
     {
         struct ArrowArray array;
@@ -144,6 +164,16 @@ int main(int argc, char* argv[])
         {
             break;
         }
+#if 0
+        const int64_t* fid_col = static_cast<const int64_t*>(array.children[0]->buffers[1]);
+        for(int64_t i = 0; i < array.length; ++i )
+        {
+            int64_t id = fid_col[i];
+            if( id != lastId + 1 )
+                printf(CPL_FRMT_GIB "\n", static_cast<GIntBig>(id));
+            lastId = id;
+        }
+#endif
         array.release(&array);
     }
     stream.release(&stream);

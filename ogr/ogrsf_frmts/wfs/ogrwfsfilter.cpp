@@ -300,15 +300,14 @@ static bool WFS_ExprDumpAsOGCFilter( CPLString& osFilter,
         poExpr->nOperation == SWQ_ILIKE )
     {
         CPLString osVal;
-        char firstCh = 0;
         const char* pszMatchCase =
             poExpr->nOperation == SWQ_LIKE &&
                 !CPLTestBool(CPLGetConfigOption("OGR_SQL_LIKE_AS_ILIKE", "FALSE")) ? "true" : "false";
         if (psOptions->nVersion == 100)
-            osFilter += CPLSPrintf("<%sPropertyIsLike wildCard='*' singleChar='_' escape='!' matchCase='%s'>",
+            osFilter += CPLSPrintf("<%sPropertyIsLike wildCard=\"*\" singleChar=\"_\" escape=\"!\" matchCase=\"%s\">",
                                    psOptions->pszNSPrefix, pszMatchCase);
         else
-            osFilter += CPLSPrintf("<%sPropertyIsLike wildCard='*' singleChar='_' escapeChar='!' matchCase='%s'>",
+            osFilter += CPLSPrintf("<%sPropertyIsLike wildCard=\"*\" singleChar=\"_\" escapeChar=\"!\" matchCase=\"%s\">",
                                    psOptions->pszNSPrefix, pszMatchCase);
         if (!WFS_ExprDumpAsOGCFilter(osFilter, poExpr->papoSubExpr[0], FALSE, psOptions))
             return false;
@@ -319,14 +318,8 @@ static bool WFS_ExprDumpAsOGCFilter( CPLString& osFilter,
 
         // Escape value according to above special characters.  For URL
         // compatibility reason, we remap the OGR SQL '%' wildcard into '*'.
-        int i = 0;
-        char ch = poExpr->papoSubExpr[1]->string_value[i];
-        if (ch == '\'' || ch == '"')
-        {
-            firstCh = ch;
-            i ++;
-        }
-        for(;(ch = poExpr->papoSubExpr[1]->string_value[i]) != '\0';i++)
+        char ch;
+        for(int i = 0;(ch = poExpr->papoSubExpr[1]->string_value[i]) != '\0';i++)
         {
             if (ch == '%')
                 osVal += "*";
@@ -334,8 +327,6 @@ static bool WFS_ExprDumpAsOGCFilter( CPLString& osFilter,
                 osVal += "!!";
             else if (ch == '*')
                 osVal += "!*";
-            else if (ch == firstCh && poExpr->papoSubExpr[1]->string_value[i + 1] == 0)
-                break;
             else
             {
                 char ach[2];

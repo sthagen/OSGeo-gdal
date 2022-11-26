@@ -596,24 +596,17 @@ def test_ogr_sql_24():
     if gdal.GetDriverByName("DGN") is None:
         pytest.skip("DGN driver missing")
 
-    result = "success"
-
     ds = ogr.Open("data/dgn/smalltest.dgn")
 
     sql_layer = ds.ExecuteSQL("SELECT * from elements where colorindex=83 and type=3")
 
     feat = sql_layer.GetNextFeature()
-    if len(feat.GetStyleString()) < 10:
-        print(feat.GetStyleString())
-        gdaltest.post_reason(
-            "style string apparently not propagated to OGR SQL results."
-        )
-        result = "fail"
-    feat = None
-    ds.ReleaseResultSet(sql_layer)
+    try:
+        assert len(feat.GetStyleString()) >= 10
+        feat = None
+    finally:
+        ds.ReleaseResultSet(sql_layer)
     ds = None
-
-    return result
 
 
 ###############################################################################
@@ -1316,17 +1309,16 @@ def test_ogr_sql_42():
 
 def test_ogr_sql_43():
 
-    ret = "success"
     sql = "SELECT '\"' as a, '\\'' as b, '''' as c FROM poly"
     sql_lyr = gdaltest.ds.ExecuteSQL(sql)
 
     feat = sql_lyr.GetNextFeature()
-    if feat["a"] != '"' or feat["b"] != "'" or feat["c"] != "'":
-        ret = "fail"
-
-    gdaltest.ds.ReleaseResultSet(sql_lyr)
-
-    return ret
+    try:
+        assert feat["a"] == '"'
+        assert feat["b"] == "'"
+        assert feat["c"] == "'"
+    finally:
+        gdaltest.ds.ReleaseResultSet(sql_lyr)
 
 
 ###############################################################################
@@ -1610,6 +1602,51 @@ def test_ogr_sql_field_names_same_case():
     assert f["id"] == "foo"
     assert f["ID"] == "bar"
     assert f["ID2"] == "baz"
+
+
+###############################################################################
+# Test no crash when comparing string with integer array
+
+
+def test_ogr_sql_string_int_array_comparison():
+
+    ds = ogr.GetDriverByName("Memory").CreateDataSource("")
+    lyr = ds.CreateLayer("test")
+    lyr.CreateField(ogr.FieldDefn("id"))
+    lyr.CreateField(ogr.FieldDefn("int_array", ogr.OFTIntegerList))
+    f = ogr.Feature(lyr.GetLayerDefn())
+
+    f["id"] = "foo"
+    f.SetFieldIntegerList(1, [1, 2])
+
+    assert lyr.CreateFeature(f) == ogr.OGRERR_NONE
+
+    f = lyr.GetNextFeature()
+    assert f is not None
+
+    assert lyr.SetAttributeFilter("id = 'foo'") == ogr.OGRERR_NONE
+    f = lyr.GetNextFeature()
+    assert f is not None
+
+    for op in ("=", "<>", "<", "<=", ">", ">="):
+        assert lyr.SetAttributeFilter("int_array {} 1".format(op)) == ogr.OGRERR_NONE
+        f = lyr.GetNextFeature()
+        assert f is None
+
+    assert lyr.SetAttributeFilter("int_array BETWEEN 0 AND 3") == ogr.OGRERR_NONE
+    f = lyr.GetNextFeature()
+    assert f is None
+
+    assert lyr.SetAttributeFilter("int_array IS NULL") == ogr.OGRERR_NONE
+    f = lyr.GetNextFeature()
+    assert f is None
+
+    assert lyr.SetAttributeFilter("int_array IN (1, 2)") == ogr.OGRERR_NONE
+    f = lyr.GetNextFeature()
+    assert f is None
+
+    del lyr
+    del ds
 
 
 ###############################################################################

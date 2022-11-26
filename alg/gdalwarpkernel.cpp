@@ -1578,6 +1578,11 @@ static bool GWKSetPixelValue( const GDALWarpKernel *poWK, int iBand,
             dfDstImag = 0.0;
             break;
 
+          case GDT_Int8:
+            dfDstReal = reinterpret_cast<GInt8 *>(pabyDst)[iDstOffset];
+            dfDstImag = 0.0;
+            break;
+
           case GDT_Int16:
             dfDstReal = reinterpret_cast<GInt16 *>(pabyDst)[iDstOffset];
             dfDstImag = 0.0;
@@ -1638,7 +1643,8 @@ static bool GWKSetPixelValue( const GDALWarpKernel *poWK, int iBand,
             dfDstImag = reinterpret_cast<double*>(pabyDst)[iDstOffset*2+1];
             break;
 
-          default:
+          case GDT_Unknown:
+          case GDT_TypeCount:
             CPLAssert( false );
             return false;
         }
@@ -1689,6 +1695,10 @@ static bool GWKSetPixelValue( const GDALWarpKernel *poWK, int iBand,
     {
       case GDT_Byte:
         CLAMP(GByte);
+        break;
+
+      case GDT_Int8:
+        CLAMP(GInt8);
         break;
 
       case GDT_Int16:
@@ -1769,7 +1779,8 @@ static bool GWKSetPixelValue( const GDALWarpKernel *poWK, int iBand,
         reinterpret_cast<double*>(pabyDst)[iDstOffset*2+1] = dfImag;
         break;
 
-      default:
+      case GDT_Unknown:
+      case GDT_TypeCount:
         return false;
     }
 
@@ -1818,6 +1829,10 @@ static bool GWKSetPixelValueReal( const GDALWarpKernel *poWK, int iBand,
             dfDstReal = pabyDst[iDstOffset];
             break;
 
+          case GDT_Int8:
+            dfDstReal = reinterpret_cast<GInt8*>(pabyDst)[iDstOffset];
+            break;
+
           case GDT_Int16:
             dfDstReal = reinterpret_cast<GInt16*>(pabyDst)[iDstOffset];
             break;
@@ -1850,7 +1865,12 @@ static bool GWKSetPixelValueReal( const GDALWarpKernel *poWK, int iBand,
             dfDstReal = reinterpret_cast<double*>(pabyDst)[iDstOffset];
             break;
 
-          default:
+          case GDT_CInt16:
+          case GDT_CInt32:
+          case GDT_CFloat32:
+          case GDT_CFloat64:
+          case GDT_Unknown:
+          case GDT_TypeCount:
             CPLAssert( false );
             return false;
         }
@@ -1875,6 +1895,10 @@ static bool GWKSetPixelValueReal( const GDALWarpKernel *poWK, int iBand,
     {
       case GDT_Byte:
         CLAMP(GByte);
+        break;
+
+      case GDT_Int8:
+        CLAMP(GInt8);
         break;
 
       case GDT_Int16:
@@ -1909,7 +1933,15 @@ static bool GWKSetPixelValueReal( const GDALWarpKernel *poWK, int iBand,
         reinterpret_cast<double*>(pabyDst)[iDstOffset] = dfReal;
         break;
 
-      default:
+      case GDT_CInt16:
+      case GDT_CInt32:
+      case GDT_CFloat32:
+      case GDT_CFloat64:
+        return false;
+
+      case GDT_Unknown:
+      case GDT_TypeCount:
+        CPLAssert(false);
         return false;
     }
 
@@ -1937,11 +1969,19 @@ static bool GWKGetPixelValue( const GDALWarpKernel *poWK, int iBand,
         return false;
     }
 
+    *pdfReal = 0.0;
+    *pdfImag = 0.0;
+
     // TODO(schwehr): Fix casting.
     switch( poWK->eWorkingDataType )
     {
       case GDT_Byte:
         *pdfReal = pabySrc[iSrcOffset];
+        *pdfImag = 0.0;
+        break;
+
+      case GDT_Int8:
+        *pdfReal = reinterpret_cast<GInt8*>(pabySrc)[iSrcOffset];
         *pdfImag = 0.0;
         break;
 
@@ -2005,7 +2045,9 @@ static bool GWKGetPixelValue( const GDALWarpKernel *poWK, int iBand,
         *pdfImag = reinterpret_cast<double*>(pabySrc)[iSrcOffset*2+1];
         break;
 
-      default:
+      case GDT_Unknown:
+      case GDT_TypeCount:
+        CPLAssert(false);
         *pdfDensity = 0.0;
         return false;
     }
@@ -2043,6 +2085,10 @@ static bool GWKGetPixelValueReal( const GDALWarpKernel *poWK, int iBand,
         *pdfReal = pabySrc[iSrcOffset];
         break;
 
+      case GDT_Int8:
+        *pdfReal = reinterpret_cast<GInt8*>(pabySrc)[iSrcOffset];
+        break;
+
       case GDT_Int16:
         *pdfReal = reinterpret_cast<GInt16*>(pabySrc)[iSrcOffset];
         break;
@@ -2075,7 +2121,12 @@ static bool GWKGetPixelValueReal( const GDALWarpKernel *poWK, int iBand,
         *pdfReal = reinterpret_cast<double*>(pabySrc)[iSrcOffset];
         break;
 
-      default:
+      case GDT_CInt16:
+      case GDT_CInt32:
+      case GDT_CFloat32:
+      case GDT_CFloat64:
+      case GDT_Unknown:
+      case GDT_TypeCount:
         CPLAssert(false);
         return false;
     }
@@ -2167,6 +2218,18 @@ static bool GWKGetPixelRow( const GDALWarpKernel *poWK, int iBand,
         case GDT_Byte:
         {
             GByte* pSrc = reinterpret_cast<GByte*>(poWK->papabySrcImage[iBand]);
+            pSrc += iSrcOffset;
+            for( int i = 0; i < nSrcLen; i += 2 )
+            {
+                adfReal[i] = pSrc[i];
+                adfReal[i+1] = pSrc[i+1];
+            }
+            break;
+        }
+
+        case GDT_Int8:
+        {
+            GInt8* pSrc = reinterpret_cast<GInt8*>(poWK->papabySrcImage[iBand]);
             pSrc += iSrcOffset;
             for( int i = 0; i < nSrcLen; i += 2 )
             {
@@ -2332,7 +2395,8 @@ static bool GWKGetPixelRow( const GDALWarpKernel *poWK, int iBand,
             break;
         }
 
-        default:
+        case GDT_Unknown:
+        case GDT_TypeCount:
             CPLAssert(false);
             if( padfDensity )
                 memset( padfDensity, 0, nSrcLen * sizeof(double) );
@@ -4787,53 +4851,102 @@ static CPLErr GWKOpenCLCase( GDALWarpKernel *poWK )
 /*                     GWKCheckAndComputeSrcOffsets()                   */
 /************************************************************************/
 static CPL_INLINE bool GWKCheckAndComputeSrcOffsets(
-    const int* _pabSuccess,
+    GWKJobStruct* psJob,
+    int* _pabSuccess,
     int _iDstX,
-    const double* _padfX,
-    const double* _padfY,
-    const GDALWarpKernel* _poWK,
+    int _iDstY,
+    double* _padfX,
+    double* _padfY,
     int _nSrcXSize,
     int _nSrcYSize,
     GPtrDiff_t& iSrcOffset)
 {
-    if( !_pabSuccess[_iDstX] )
-        return false;
-
-    // If this happens this is likely the symptom of a bug somewhere.
-    if( CPLIsNan(_padfX[_iDstX]) || CPLIsNan(_padfY[_iDstX]) )
+    const GDALWarpKernel* _poWK = psJob->poWK;
+    for( int iTry = 0; iTry < 2; ++iTry )
     {
-        static bool bNanCoordFound = false;
-        if( !bNanCoordFound )
+        if( iTry == 1 )
         {
-            CPLDebug("WARP",
-                     "GWKCheckAndComputeSrcOffsets(): "
-                     "NaN coordinate found on point %d.",
-                     _iDstX);
-            bNanCoordFound = true;
+            // If the source coordinate is slightly outside of the source raster
+            // retry to transform it alone, so that the exact coordinate
+            // transformer is used.
+
+            _padfX[_iDstX] = _iDstX + 0.5 + _poWK->nDstXOff;
+            _padfY[_iDstX] = _iDstY + 0.5 + _poWK->nDstYOff;
+            double dfZ = 0;
+            _poWK->pfnTransformer( psJob->pTransformerArg, TRUE, 1,
+                                   _padfX + _iDstX, _padfY + _iDstX, &dfZ,
+                                   _pabSuccess + _iDstX );
         }
-        return false;
-    }
+        if( !_pabSuccess[_iDstX] )
+            return false;
+
+        // If this happens this is likely the symptom of a bug somewhere.
+        if( CPLIsNan(_padfX[_iDstX]) || CPLIsNan(_padfY[_iDstX]) )
+        {
+            static bool bNanCoordFound = false;
+            if( !bNanCoordFound )
+            {
+                CPLDebug("WARP",
+                         "GWKCheckAndComputeSrcOffsets(): "
+                         "NaN coordinate found on point %d.",
+                         _iDstX);
+                bNanCoordFound = true;
+            }
+            return false;
+        }
 
 /* -------------------------------------------------------------------- */
 /*      Figure out what pixel we want in our source raster, and skip    */
 /*      further processing if it is well off the source image.          */
 /* -------------------------------------------------------------------- */
-    /* We test against the value before casting to avoid the */
-    /* problem of asymmetric truncation effects around zero.  That is */
-    /* -0.5 will be 0 when cast to an int. */
-    if( _padfX[_iDstX] < _poWK->nSrcXOff
-        || _padfY[_iDstX] < _poWK->nSrcYOff )
-        return false;
+        /* We test against the value before casting to avoid the */
+        /* problem of asymmetric truncation effects around zero.  That is */
+        /* -0.5 will be 0 when cast to an int. */
+        if( _padfX[_iDstX] < _poWK->nSrcXOff )
+        {
+            // If the source coordinate is slightly outside of the source raster
+            // retry to transform it alone, so that the exact coordinate
+            // transformer is used.
+            if( iTry == 0 && _padfX[_iDstX] > _poWK->nSrcXOff - 1 )
+                continue;
+            return false;
+        }
 
-    // Check for potential overflow when casting from float to int, (if
-    // operating outside natural projection area, padfX/Y can be a very huge
-    // positive number before doing the actual conversion), as such cast is
-    // undefined behavior that can trigger exception with some compilers
-    // (see #6753)
-    if( _padfX[_iDstX] + 1e-10 > _nSrcXSize + _poWK->nSrcXOff ||
-        _padfY[_iDstX] + 1e-10 > _nSrcYSize + _poWK->nSrcYOff )
-    {
-        return false;
+        if( _padfY[_iDstX] < _poWK->nSrcYOff )
+        {
+            // If the source coordinate is slightly outside of the source raster
+            // retry to transform it alone, so that the exact coordinate
+            // transformer is used.
+            if( iTry == 0 && _padfY[_iDstX] > _poWK->nSrcYOff  - 1 )
+                continue;
+            return false;
+        }
+
+        // Check for potential overflow when casting from float to int, (if
+        // operating outside natural projection area, padfX/Y can be a very huge
+        // positive number before doing the actual conversion), as such cast is
+        // undefined behavior that can trigger exception with some compilers
+        // (see #6753)
+        if( _padfX[_iDstX] + 1e-10 > _nSrcXSize + _poWK->nSrcXOff )
+        {
+            // If the source coordinate is slightly outside of the source raster
+            // retry to transform it alone, so that the exact coordinate
+            // transformer is used.
+            if( iTry == 0 && _padfX[_iDstX] < _nSrcXSize + _poWK->nSrcXOff + 1 )
+                continue;
+            return false;
+        }
+        if( _padfY[_iDstX] + 1e-10 > _nSrcYSize + _poWK->nSrcYOff )
+        {
+            // If the source coordinate is slightly outside of the source raster
+            // retry to transform it alone, so that the exact coordinate
+            // transformer is used.
+            if( iTry == 0 && _padfY[_iDstX] < _nSrcYSize + _poWK->nSrcYOff + 1 )
+                continue;
+            return false;
+        }
+
+        break;
     }
 
     int iSrcX =
@@ -4944,8 +5057,9 @@ static void GWKGeneralCaseThread( void* pData)
         for( int iDstX = 0; iDstX < nDstXSize; iDstX++ )
         {
             GPtrDiff_t iSrcOffset = 0;
-            if( !GWKCheckAndComputeSrcOffsets(pabSuccess, iDstX, padfX, padfY,
-                                    poWK, nSrcXSize, nSrcYSize, iSrcOffset) )
+            if( !GWKCheckAndComputeSrcOffsets(psJob, pabSuccess, iDstX, iDstY,
+                                              padfX, padfY,
+                                              nSrcXSize, nSrcYSize, iSrcOffset) )
                 continue;
 
 /* -------------------------------------------------------------------- */
@@ -5175,8 +5289,9 @@ static void GWKRealCaseThread( void* pData)
         for( int iDstX = 0; iDstX < nDstXSize; iDstX++ )
         {
             GPtrDiff_t iSrcOffset = 0;
-            if( !GWKCheckAndComputeSrcOffsets(pabSuccess, iDstX, padfX, padfY,
-                                    poWK, nSrcXSize, nSrcYSize, iSrcOffset) )
+            if(!GWKCheckAndComputeSrcOffsets(psJob, pabSuccess, iDstX, iDstY,
+                                              padfX, padfY,
+                                              nSrcXSize, nSrcYSize, iSrcOffset) )
                 continue;
 
 /* -------------------------------------------------------------------- */
@@ -5429,9 +5544,9 @@ static void GWKResampleNoMasksOrDstDensityOnlyThreadInternal( void* pData )
         for( int iDstX = 0; iDstX < nDstXSize; iDstX++ )
         {
             GPtrDiff_t iSrcOffset = 0;
-            if( !GWKCheckAndComputeSrcOffsets(pabSuccess, iDstX, padfX, padfY,
-                                              poWK, nSrcXSize, nSrcYSize,
-                                              iSrcOffset) )
+            if( !GWKCheckAndComputeSrcOffsets(psJob, pabSuccess, iDstX, iDstY,
+                                              padfX, padfY,
+                                              nSrcXSize, nSrcYSize, iSrcOffset) )
                 continue;
 
 /* ==================================================================== */
@@ -5655,8 +5770,9 @@ static void GWKNearestThread( void* pData )
         for( int iDstX = 0; iDstX < nDstXSize; iDstX++ )
         {
             GPtrDiff_t iSrcOffset = 0;
-            if( !GWKCheckAndComputeSrcOffsets(pabSuccess, iDstX, padfX, padfY,
-                                    poWK, nSrcXSize, nSrcYSize, iSrcOffset) )
+            if( !GWKCheckAndComputeSrcOffsets(psJob, pabSuccess, iDstX, iDstY,
+                                              padfX, padfY,
+                                              nSrcXSize, nSrcYSize, iSrcOffset) )
                 continue;
 
 /* -------------------------------------------------------------------- */
@@ -5914,6 +6030,12 @@ static void GWKAverageOrModeThread( void* pData)
             if( poWK->eWorkingDataType == GDT_Byte )
             {
                 nBins = 256;
+            }
+            // In the case of Int8, input values are between -128 and 127.
+            else if( poWK->eWorkingDataType == GDT_Int8 )
+            {
+                nBins = 256;
+                nBinsOffset = 128;
             }
             // In the case of Int16, input values are between -32768 and 32767.
             else if( poWK->eWorkingDataType == GDT_Int16 )

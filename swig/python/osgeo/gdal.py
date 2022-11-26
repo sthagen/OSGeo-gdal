@@ -2249,6 +2249,14 @@ def NetworkStatsGetAsSerializedJSON(*args) -> "retStringAndCPLFree *":
 def ParseCommandLine(*args) -> "char **":
     r"""ParseCommandLine(char const * utf8_path) -> char **"""
     return _gdal.ParseCommandLine(*args)
+
+def GetNumCPUs(*args) -> "int":
+    r"""GetNumCPUs() -> int"""
+    return _gdal.GetNumCPUs(*args)
+
+def GetUsablePhysicalRAM(*args) -> "GIntBig":
+    r"""GetUsablePhysicalRAM() -> GIntBig"""
+    return _gdal.GetUsablePhysicalRAM(*args)
 class MajorObject(object):
     r"""Proxy of C++ GDALMajorObjectShadow class."""
 
@@ -3393,6 +3401,7 @@ class MDArray(object):
            count is None and buffer_stride is None and buffer_datatype is None:
             map_typecode_itemsize_to_gdal = {
                ('B', 1): GDT_Byte,
+               ('b', 1): GDT_Int8,
                ('h', 2): GDT_Int16,
                ('H', 2): GDT_UInt16,
                ('i', 4): GDT_Int32,
@@ -3624,7 +3633,7 @@ class Attribute(object):
               return s
           return self.ReadAsStringArray()
       if dt_class == GEDTC_NUMERIC:
-          if dt.GetNumericDataType() in (GDT_Byte, GDT_Int16, GDT_UInt16, GDT_Int32):
+          if dt.GetNumericDataType() in (GDT_Byte, GDT_Int8, GDT_Int16, GDT_UInt16, GDT_Int32):
               if self.GetTotalElementsCount() == 1:
                   return self.ReadAsInt()
               else:
@@ -4129,6 +4138,10 @@ class Band(MajorObject):
     def AsMDArray(self, *args) -> "GDALMDArrayHS *":
         r"""AsMDArray(Band self) -> MDArray"""
         return _gdal.Band_AsMDArray(self, *args)
+
+    def _EnablePixelTypeSignedByteWarning(self, *args) -> "void":
+        r"""_EnablePixelTypeSignedByteWarning(Band self, bool b)"""
+        return _gdal.Band__EnablePixelTypeSignedByteWarning(self, *args)
 
     def ReadRaster1(self, *args, **kwargs) -> "CPLErr":
         r"""ReadRaster1(Band self, double xoff, double yoff, double xsize, double ysize, int * buf_xsize=None, int * buf_ysize=None, GDALDataType * buf_type=None, GIntBig * buf_pixel_space=None, GIntBig * buf_line_space=None, GDALRIOResampleAlg resample_alg=GRIORA_NearestNeighbour, GDALProgressFunc callback=0, void * callback_data=None, void * inputOutputBuf=None) -> CPLErr"""

@@ -2053,8 +2053,6 @@ def test_tiff_write_58():
 
 def test_tiff_write_59():
 
-    ret = "success"
-
     for nbands in (1, 2):
         for nbits in (1, 8, 9, 12, 16, 17, 24, 32):
 
@@ -2092,16 +2090,9 @@ def test_tiff_write_59():
             # We expect zeros
             got = struct.unpack(ctype * 10, data)
             for g in got:
-                if g != 0:
-                    print(("nbands=%d, NBITS=%d" % (nbands, nbits)))
-                    print(got)
-                    ret = "fail"
-                    break
-
+                assert g == 0, (nbands, nbits)
             ds = None
             gdaltest.tiff_drv.Delete("tmp/tiff_write_59.tif")
-
-    return ret
 
 
 ###############################################################################
@@ -3042,15 +3033,16 @@ def test_tiff_write_81():
 def test_tiff_write_82():
 
     src_ds = gdal.Open("data/byte.tif")
-    ds = gdaltest.tiff_drv.CreateCopy(
-        "tmp/tiff_write_82.tif", src_ds, options=["PIXELTYPE=SIGNEDBYTE"]
-    )
+    with gdaltest.error_handler():
+        ds = gdaltest.tiff_drv.CreateCopy(
+            "tmp/tiff_write_82.tif", src_ds, options=["PIXELTYPE=SIGNEDBYTE"]
+        )
     src_ds = None
     ds = None
 
     ds = gdal.Open("tmp/tiff_write_82.tif")
-    md = ds.GetRasterBand(1).GetMetadata("IMAGE_STRUCTURE")
-    assert md["PIXELTYPE"] == "SIGNEDBYTE", "did not get SIGNEDBYTE"
+    assert ds.GetRasterBand(1).DataType == gdal.GDT_Int8
+    assert ds.GetRasterBand(1).ComputeRasterMinMax() == (-124, 123)
     ds = None
 
     gdaltest.tiff_drv.Delete("tmp/tiff_write_82.tif")
@@ -8725,16 +8717,17 @@ def test_tiff_write_179_lerc_data_types():
         assert cs == 4672
 
     filename_tmp = filename + ".tmp.tif"
-    gdal.Translate(
-        filename_tmp, "data/byte.tif", creationOptions=["PIXELTYPE=SIGNEDBYTE"]
-    )
+    with gdaltest.error_handler():
+        gdal.Translate(
+            filename_tmp, "data/byte.tif", creationOptions=["PIXELTYPE=SIGNEDBYTE"]
+        )
     gdal.Translate(filename, filename_tmp, creationOptions=["COMPRESS=LERC"])
     gdal.Unlink(filename_tmp)
     ds = gdal.Open(filename)
     cs = ds.GetRasterBand(1).Checksum()
     ds = None
     gdal.Unlink(filename)
-    assert cs == 4672
+    assert cs == 1046
 
     gdal.ErrorReset()
     with gdaltest.error_handler():
