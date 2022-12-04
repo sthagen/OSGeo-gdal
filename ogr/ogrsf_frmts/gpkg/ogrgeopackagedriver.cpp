@@ -498,10 +498,17 @@ COMPRESSION_OPTIONS
     poDriver->SetMetadataItem( GDAL_DCAP_MULTIPLE_VECTOR_LAYERS, "YES" );
     poDriver->SetMetadataItem( GDAL_DCAP_FIELD_DOMAINS, "YES" );
     poDriver->SetMetadataItem( GDAL_DCAP_RELATIONSHIPS, "YES" );
+    poDriver->SetMetadataItem( GDAL_DCAP_CREATE_RELATIONSHIP, "YES" );
+    poDriver->SetMetadataItem( GDAL_DCAP_DELETE_RELATIONSHIP, "YES" );
+    poDriver->SetMetadataItem( GDAL_DCAP_UPDATE_RELATIONSHIP, "YES" );
+    poDriver->SetMetadataItem( GDAL_DMD_RELATIONSHIP_FLAGS, "ManyToMany Association" );
+
     poDriver->SetMetadataItem( GDAL_DCAP_RENAME_LAYERS, "YES" );
     poDriver->SetMetadataItem( GDAL_DMD_CREATION_FIELD_DOMAIN_TYPES, "Coded Range Glob" );
 
     poDriver->SetMetadataItem( GDAL_DMD_ALTER_GEOM_FIELD_DEFN_FLAGS, "Name SRS CoordinateEpoch" );
+
+    poDriver->SetMetadataItem( GDAL_DMD_RELATIONSHIP_RELATED_TABLE_TYPES, "features media simple_attributes attributes tiles" );
 
 #ifdef ENABLE_SQL_GPKG_FORMAT
     poDriver->SetMetadataItem("ENABLE_SQL_GPKG_FORMAT", "YES");

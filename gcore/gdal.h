@@ -518,6 +518,13 @@ typedef struct GDALDimensionHS* GDALDimensionH;
  */
 #define GDAL_DMD_ALTER_FIELD_DEFN_FLAGS "GDAL_DMD_ALTER_FIELD_DEFN_FLAGS"
 
+/** List of (space separated) field names which are considered illegal by the driver and
+ * should not be used when creating/altering fields.
+ *
+ * @since GDAL 3.7
+ */
+#define GDAL_DMD_ILLEGAL_FIELD_NAMES "GDAL_DMD_ILLEGAL_FIELD_NAMES"
+
 /** Capability set by a driver that can create fields with NOT NULL constraint.
  * @since GDAL 2.0
  */
@@ -574,10 +581,24 @@ typedef struct GDALDimensionHS* GDALDimensionH;
  */
 #define GDAL_DMD_GEOMETRY_FLAGS "GDAL_DMD_GEOMETRY_FLAGS"
 
-/** Capability set by drivers which support feature styles.
+/** Capability set by drivers which support either reading or writing feature styles.
+ *
+ * Consider using the more granular GDAL_DCAP_FEATURE_STYLES_READ or
+ * GDAL_DCAP_FEATURE_STYLES_WRITE capabilities instead.
+ *
  * @since GDAL 2.3
  */
 #define GDAL_DCAP_FEATURE_STYLES     "DCAP_FEATURE_STYLES"
+
+/** Capability set by drivers which support reading feature styles.
+ * @since GDAL 3.7
+ */
+#define GDAL_DCAP_FEATURE_STYLES_READ "DCAP_FEATURE_STYLES_READ"
+
+/** Capability set by drivers which support writing feature styles.
+ * @since GDAL 3.7
+ */
+#define GDAL_DCAP_FEATURE_STYLES_WRITE "DCAP_FEATURE_STYLES_WRITE"
 
 /** Capability set by drivers which support storing/retrieving coordinate epoch for dynamic CRS
  * @since GDAL 3.4
@@ -639,6 +660,14 @@ typedef struct GDALDimensionHS* GDALDimensionH;
  * @since GDAL 3.6
  */
 #define GDAL_DMD_RELATIONSHIP_FLAGS "GDAL_DMD_RELATIONSHIP_FLAGS"
+
+/** List of (space separated) standard related table types which are recognised by the driver.
+ *
+ * See GDALRelationshipGetRelatedTableType/GDALRelationshipSetRelatedTableType
+ *
+ * @since GDAL 3.7
+ */
+#define GDAL_DMD_RELATIONSHIP_RELATED_TABLE_TYPES "GDAL_DMD_RELATIONSHIP_RELATED_TABLE_TYPES"
 
 /** Capability set by drivers for formats which support renaming vector layers.
  *

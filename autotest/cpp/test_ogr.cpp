@@ -440,11 +440,11 @@ namespace
       int bValueIsNull;
 
       EXPECT_NEAR(OGR_ST_GetParamDbl(hTool, OGRSTPenWidth, &bValueIsNull), 2.0 * (1.0 / (72.0 * 39.37)) * 1000, 1e-6);
-      ASSERT_EQ(OGR_ST_GetUnit(hTool), OGRSTUMM);
+      EXPECT_EQ(OGR_ST_GetUnit(hTool), OGRSTUMM);
 
       OGR_ST_SetUnit(hTool, OGRSTUPixel, 1.0);
-      ASSERT_EQ(OGR_ST_GetParamDbl(hTool, OGRSTPenWidth, &bValueIsNull), 2.0);
-      ASSERT_EQ(OGR_ST_GetUnit(hTool), OGRSTUPixel);
+      EXPECT_EQ(OGR_ST_GetParamDbl(hTool, OGRSTPenWidth, &bValueIsNull), 2.0);
+      EXPECT_EQ(OGR_ST_GetUnit(hTool), OGRSTUPixel);
       OGR_ST_Destroy(hTool);
 
       OGR_SM_Destroy(hSM);
@@ -1175,6 +1175,19 @@ namespace
         }
     }
 
+    // Test OGRToOGCGeomType()
+    TEST_F(test_ogr, OGRToOGCGeomType)
+    {
+        EXPECT_STREQ(OGRToOGCGeomType(wkbPoint), "POINT");
+        EXPECT_STREQ(OGRToOGCGeomType(wkbPointM), "POINT");
+        EXPECT_STREQ(OGRToOGCGeomType(wkbPoint, /*bCamelCase=*/ true), "Point");
+        EXPECT_STREQ(OGRToOGCGeomType(wkbPoint, /*bCamelCase=*/ true, /*bAddZM=*/true), "Point");
+        EXPECT_STREQ(OGRToOGCGeomType(wkbPoint25D, /*bCamelCase=*/ true, /*bAddZM=*/true), "PointZ");
+        EXPECT_STREQ(OGRToOGCGeomType(wkbPointM, /*bCamelCase=*/ true, /*bAddZM=*/true), "PointM");
+        EXPECT_STREQ(OGRToOGCGeomType(wkbPointZM, /*bCamelCase=*/ true, /*bAddZM=*/true), "PointZM");
+        EXPECT_STREQ(OGRToOGCGeomType(wkbPointZM, /*bCamelCase=*/ true, /*bAddZM=*/true, /*bAddSpaceBeforeZM=*/true), "Point ZM");
+    }
+
     // Test layer, dataset-feature and layer-feature iterators
     TEST_F(test_ogr, DatasetFeature_and_LayerFeature_iterators)
     {
@@ -1641,7 +1654,7 @@ namespace
         OGRPoint p(1, 2);
         p.exportToWkt(&pszWKT);
         ASSERT_TRUE(pszWKT != nullptr);
-        ASSERT_STREQ(pszWKT, "POINT (1 2)");
+        EXPECT_STREQ(pszWKT, "POINT (1 2)");
         CPLFree(pszWKT);
     }
 
@@ -1691,7 +1704,7 @@ namespace
             ASSERT_TRUE(poClone != nullptr);
             char* outWKT = nullptr;
             poClone->exportToWkt(&outWKT, wkbVariantIso);
-            ASSERT_STREQ(pszWKT, outWKT);
+            EXPECT_STREQ(pszWKT, outWKT);
             CPLFree(outWKT);
             delete poClone;
             delete poGeom;
@@ -1813,10 +1826,10 @@ namespace
         OGRStyleTableH hStyleTable = OGR_STBL_Create();
         OGR_STBL_AddStyle(hStyleTable, "@my_style", "PEN(c:#FF0000,w:5px)");
         OGRStyleMgrH hSM = OGR_SM_Create(hStyleTable);
-        ASSERT_EQ(OGR_SM_GetPartCount(hSM, nullptr), 0);
-        ASSERT_TRUE(OGR_SM_InitStyleString(hSM, "@my_style"));
-        ASSERT_EQ(OGR_SM_GetPartCount(hSM, nullptr), 1);
-        ASSERT_TRUE(!OGR_SM_InitStyleString(hSM, "@i_do_not_exist"));
+        EXPECT_EQ(OGR_SM_GetPartCount(hSM, nullptr), 0);
+        EXPECT_TRUE(OGR_SM_InitStyleString(hSM, "@my_style"));
+        EXPECT_EQ(OGR_SM_GetPartCount(hSM, nullptr), 1);
+        EXPECT_TRUE(!OGR_SM_InitStyleString(hSM, "@i_do_not_exist"));
         OGR_SM_Destroy(hSM);
         OGR_STBL_Destroy(hStyleTable);
     }
@@ -2115,6 +2128,52 @@ namespace
         ASSERT_EQ(poClonedCoded->GetFieldSubType(), oCoded.GetFieldSubType());
         ASSERT_EQ(poClonedCoded->GetSplitPolicy(), oCoded.GetSplitPolicy());
         ASSERT_EQ(poClonedCoded->GetMergePolicy(), oCoded.GetMergePolicy());
+    }
+
+    // Test OGRFeatureDefn C++ GetFields() iterator
+    TEST_F(test_ogr, feature_defn_fields_iterator)
+    {
+        OGRFeatureDefn oFDefn;
+        {
+            OGRFieldDefn oFieldDefn("field1", OFTString);
+            oFDefn.AddFieldDefn(&oFieldDefn);
+        }
+        {
+            OGRFieldDefn oFieldDefn("field2", OFTString);
+            oFDefn.AddFieldDefn(&oFieldDefn);
+        }
+        EXPECT_EQ(oFDefn.GetFields().size(), oFDefn.GetFieldCount());
+        int i = 0;
+        for( const auto* poFieldDefn: oFDefn.GetFields() )
+        {
+            EXPECT_EQ(oFDefn.GetFields()[i], oFDefn.GetFieldDefn(i));
+            EXPECT_EQ(poFieldDefn, oFDefn.GetFieldDefn(i));
+            ++i;
+        }
+        EXPECT_EQ(i, oFDefn.GetFieldCount());
+    }
+
+    // Test OGRFeatureDefn C++ GetGeomFields() iterator
+    TEST_F(test_ogr, feature_defn_geomfields_iterator)
+    {
+        OGRFeatureDefn oFDefn;
+        {
+            OGRGeomFieldDefn oGeomFieldDefn("field1", wkbUnknown);
+            oFDefn.AddGeomFieldDefn(&oGeomFieldDefn);
+        }
+        {
+            OGRGeomFieldDefn oGeomFieldDefn("field2", wkbUnknown);
+            oFDefn.AddGeomFieldDefn(&oGeomFieldDefn);
+        }
+        EXPECT_EQ(oFDefn.GetGeomFields().size(), oFDefn.GetGeomFieldCount());
+        int i = 0;
+        for( const auto* poGeomFieldDefn: oFDefn.GetGeomFields() )
+        {
+            EXPECT_EQ(oFDefn.GetGeomFields()[i], oFDefn.GetGeomFieldDefn(i));
+            EXPECT_EQ(poGeomFieldDefn, oFDefn.GetGeomFieldDefn(i));
+            ++i;
+        }
+        EXPECT_EQ(i, oFDefn.GetGeomFieldCount());
     }
 
 } // namespace
