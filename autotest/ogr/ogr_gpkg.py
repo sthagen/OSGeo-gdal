@@ -4945,6 +4945,20 @@ def test_ogr_gpkg_nolock():
     gdal.Unlink(filename + "-wal")
     gdal.Unlink(filename + "-shm")
 
+    ds = gdal.OpenEx(
+        "/vsizip/data/gpkg/poly.gpkg.zip/poly.gpkg",
+        gdal.OF_VECTOR,
+        open_options=["NOLOCK=YES"],
+    )
+    assert ds
+
+    ds = gdal.OpenEx(
+        "/vsizip/" + os.getcwd() + "/data/gpkg/poly.gpkg.zip/poly.gpkg",
+        gdal.OF_VECTOR,
+        open_options=["NOLOCK=YES"],
+    )
+    assert ds
+
 
 ###############################################################################
 # Run test_ogrsf
@@ -5188,14 +5202,14 @@ def test_ogr_gpkg_fixup_wrong_rtree_trigger():
 
     filename = "/vsimem/test_ogr_gpkg_fixup_wrong_rtree_trigger.gpkg"
     ds = ogr.GetDriverByName("GPKG").CreateDataSource(filename)
-    ds.CreateLayer("test")
+    ds.CreateLayer("test-with-dash")
     ds.CreateLayer("test2")
     ds = None
     with gdaltest.error_handler():
         ds = ogr.Open(filename, update=1)
         # inject wrong trigger on purpose with the wrong 'OF "geometry" ' part
-        ds.ExecuteSQL("DROP TRIGGER rtree_test_geometry_update3")
-        wrong_trigger = 'CREATE TRIGGER "rtree_test_geometry_update3" AFTER UPDATE OF "geometry" ON "test" WHEN OLD."fid" != NEW."fid" AND (NEW."geometry" NOTNULL AND NOT ST_IsEmpty(NEW."geometry")) BEGIN DELETE FROM "rtree_test_geometry" WHERE id = OLD."fid"; INSERT OR REPLACE INTO "rtree_test_geometry" VALUES (NEW."fid",ST_MinX(NEW."geometry"), ST_MaxX(NEW."geometry"),ST_MinY(NEW."geometry"), ST_MaxY(NEW."geometry")); END'
+        ds.ExecuteSQL('DROP TRIGGER "rtree_test-with-dash_geometry_update3"')
+        wrong_trigger = 'CREATE TRIGGER "rtree_test-with-dash_geometry_update3" AFTER UPDATE OF "geometry" ON "test-with-dash" WHEN OLD."fid" != NEW."fid" AND (NEW."geometry" NOTNULL AND NOT ST_IsEmpty(NEW."geometry")) BEGIN DELETE FROM "rtree_test_geometry" WHERE id = OLD."fid"; INSERT OR REPLACE INTO "rtree_test_geometry" VALUES (NEW."fid",ST_MinX(NEW."geometry"), ST_MaxX(NEW."geometry"),ST_MinY(NEW."geometry"), ST_MaxY(NEW."geometry")); END'
         ds.ExecuteSQL(wrong_trigger)
 
         ds.ExecuteSQL("DROP TRIGGER rtree_test2_geometry_update3")
@@ -5208,7 +5222,7 @@ def test_ogr_gpkg_fixup_wrong_rtree_trigger():
     # Open in read-only mode
     ds = ogr.Open(filename)
     sql_lyr = ds.ExecuteSQL(
-        "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'rtree_test_geometry_update3'"
+        "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'rtree_test-with-dash_geometry_update3'"
     )
     f = sql_lyr.GetNextFeature()
     sql = f["sql"]
@@ -5219,7 +5233,7 @@ def test_ogr_gpkg_fixup_wrong_rtree_trigger():
     # Open in update mode
     ds = ogr.Open(filename, update=1)
     sql_lyr = ds.ExecuteSQL(
-        "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'rtree_test_geometry_update3'"
+        "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'rtree_test-with-dash_geometry_update3'"
     )
     f = sql_lyr.GetNextFeature()
     sql = f["sql"]
@@ -5235,7 +5249,7 @@ def test_ogr_gpkg_fixup_wrong_rtree_trigger():
     gdal.Unlink(filename)
     assert (
         sql
-        == 'CREATE TRIGGER "rtree_test_geometry_update3" AFTER UPDATE ON "test" WHEN OLD."fid" != NEW."fid" AND (NEW."geometry" NOTNULL AND NOT ST_IsEmpty(NEW."geometry")) BEGIN DELETE FROM "rtree_test_geometry" WHERE id = OLD."fid"; INSERT OR REPLACE INTO "rtree_test_geometry" VALUES (NEW."fid",ST_MinX(NEW."geometry"), ST_MaxX(NEW."geometry"),ST_MinY(NEW."geometry"), ST_MaxY(NEW."geometry")); END'
+        == 'CREATE TRIGGER "rtree_test-with-dash_geometry_update3" AFTER UPDATE ON "test-with-dash" WHEN OLD."fid" != NEW."fid" AND (NEW."geometry" NOTNULL AND NOT ST_IsEmpty(NEW."geometry")) BEGIN DELETE FROM "rtree_test_geometry" WHERE id = OLD."fid"; INSERT OR REPLACE INTO "rtree_test_geometry" VALUES (NEW."fid",ST_MinX(NEW."geometry"), ST_MaxX(NEW."geometry"),ST_MinY(NEW."geometry"), ST_MaxY(NEW."geometry")); END'
     )
     assert (
         sql2
@@ -7839,10 +7853,15 @@ def test_ogr_gpkg_background_rtree_build(filename):
     ds = gdaltest.gpkg_dr.CreateDataSource(filename)
     with gdaltest.config_option("OGR_GPKG_THREADED_RTREE_AT_FIRST_FEATURE", "YES"):
         lyr = ds.CreateLayer("foo")
+    assert lyr.StartTransaction() == ogr.OGRERR_NONE
     for i in range(1000):
         f = ogr.Feature(lyr.GetLayerDefn())
         f.SetGeometryDirectly(ogr.CreateGeometryFromWkt("POINT(%d %d)" % (i, i)))
         assert lyr.CreateFeature(f) == ogr.OGRERR_NONE
+        if i == 500:
+            assert lyr.CommitTransaction() == ogr.OGRERR_NONE
+            assert lyr.StartTransaction() == ogr.OGRERR_NONE
+    assert lyr.CommitTransaction() == ogr.OGRERR_NONE
     ds = None
     assert gdal.VSIStatL(filename + ".tmp_rtree_foo.db") is None
 
@@ -7917,6 +7936,45 @@ def test_ogr_gpkg_background_rtree_build(filename):
     lyr.SetSpatialFilterRect(-0.5, -0.5, 0.5, 0.5)
     assert lyr.GetFeatureCount() == 1
     ds = None
+
+    gdal.Unlink(filename)
+
+
+###############################################################################
+
+
+def test_ogr_gpkg_detect_broken_rtree_gdal_3_6_0():
+
+    filename = "/vsimem/test_ogr_gpkg_detect_broken_rtree_gdal_3_6_0.gpkg"
+
+    ds = gdaltest.gpkg_dr.CreateDataSource(filename)
+    lyr = ds.CreateLayer("foo")
+    for i in range(100):
+        f = ogr.Feature(lyr.GetLayerDefn())
+        f.SetGeometryDirectly(
+            ogr.CreateGeometryFromWkt("POINT(%d %d)" % (i % 10, i // 10))
+        )
+        lyr.CreateFeature(f)
+    ds = None
+
+    # Voluntary corrupt the RTree by removing the entry for the last feature
+    ds = ogr.Open(filename, update=1)
+    sql_lyr = ds.ExecuteSQL("DELETE FROM rtree_foo_geom WHERE id = 100")
+    ds.ReleaseResultSet(sql_lyr)
+    ds = None
+
+    with gdaltest.config_option("OGR_GPKG_THRESHOLD_DETECT_BROKEN_RTREE", "100"):
+        ds = ogr.Open(filename)
+        lyr = ds.GetLayer(0)
+        with gdaltest.error_handler():
+            gdal.ErrorReset()
+            lyr.SetSpatialFilterRect(8.5, 8.5, 9.5, 9.5)
+            assert (
+                "Spatial index (perhaps created with GDAL 3.6.0) of table foo is corrupted"
+                in gdal.GetLastErrorMsg()
+            )
+        assert lyr.GetFeatureCount() == 1
+        ds = None
 
     gdal.Unlink(filename)
 
@@ -8053,5 +8111,129 @@ def test_ogr_gpkg_read_generated_column():
     )
 
     ds = None
+
+    gdal.Unlink(filename)
+
+
+###############################################################################
+# Test gdal_get_pixel_value() function
+
+
+def test_ogr_gpkg_sql_gdal_get_pixel_value():
+
+    filename = "/vsimem/test_ogr_gpkg_sql_gdal_get_pixel_value.gpkg"
+    ds = ogr.GetDriverByName("GPKG").CreateDataSource(filename)
+
+    with gdaltest.config_option("OGR_SQLITE_ALLOW_EXTERNAL_ACCESS", "YES"):
+        sql_lyr = ds.ExecuteSQL(
+            "select gdal_get_pixel_value('../gcore/data/byte.tif', 1, 'georef', 440780, 3751080)"
+        )
+    f = sql_lyr.GetNextFeature()
+    ds.ReleaseResultSet(sql_lyr)
+    assert f[0] == 156
+
+    with gdaltest.config_option("OGR_SQLITE_ALLOW_EXTERNAL_ACCESS", "YES"):
+        sql_lyr = ds.ExecuteSQL(
+            "select gdal_get_pixel_value('../gcore/data/byte.tif', 1, 'pixel', 1, 4)"
+        )
+    f = sql_lyr.GetNextFeature()
+    ds.ReleaseResultSet(sql_lyr)
+    assert f[0] == 156
+
+    with gdaltest.config_option("OGR_SQLITE_ALLOW_EXTERNAL_ACCESS", "YES"):
+        sql_lyr = ds.ExecuteSQL(
+            "select gdal_get_pixel_value('../gcore/data/float64.tif', 1, 'pixel', 0, 1)"
+        )
+    f = sql_lyr.GetNextFeature()
+    ds.ReleaseResultSet(sql_lyr)
+    assert f[0] == 115.0
+
+    # Invalid column
+    with gdaltest.config_option("OGR_SQLITE_ALLOW_EXTERNAL_ACCESS", "YES"):
+        sql_lyr = ds.ExecuteSQL(
+            "select gdal_get_pixel_value('../gcore/data/byte.tif', 1, 'pixel', -1, 0)"
+        )
+    f = sql_lyr.GetNextFeature()
+    ds.ReleaseResultSet(sql_lyr)
+    assert f[0] is None
+
+    # Missing OGR_SQLITE_ALLOW_EXTERNAL_ACCESS
+    with gdaltest.error_handler():
+        sql_lyr = ds.ExecuteSQL(
+            "select gdal_get_pixel_value('../gcore/data/byte.tif', 1, 'georef', 440720, 3751320)"
+        )
+        f = sql_lyr.GetNextFeature()
+        ds.ReleaseResultSet(sql_lyr)
+        assert f[0] is None
+
+    # NULL as 1st arg
+    with gdaltest.error_handler():
+        with gdaltest.config_option("OGR_SQLITE_ALLOW_EXTERNAL_ACCESS", "YES"):
+            sql_lyr = ds.ExecuteSQL(
+                "select gdal_get_pixel_value(NULL, 1, 'pixel', 0, 0)"
+            )
+        f = sql_lyr.GetNextFeature()
+        ds.ReleaseResultSet(sql_lyr)
+        assert f[0] is None
+
+    # NULL as 2nd arg
+    with gdaltest.error_handler():
+        with gdaltest.config_option("OGR_SQLITE_ALLOW_EXTERNAL_ACCESS", "YES"):
+            sql_lyr = ds.ExecuteSQL(
+                "select gdal_get_pixel_value('../gcore/data/byte.tif', NULL, 'pixel', 0, 0)"
+            )
+        f = sql_lyr.GetNextFeature()
+        ds.ReleaseResultSet(sql_lyr)
+        assert f[0] is None
+
+    # NULL as 3rd arg
+    with gdaltest.error_handler():
+        with gdaltest.config_option("OGR_SQLITE_ALLOW_EXTERNAL_ACCESS", "YES"):
+            sql_lyr = ds.ExecuteSQL(
+                "select gdal_get_pixel_value('../gcore/data/byte.tif', 1, NULL, 0, 0)"
+            )
+        f = sql_lyr.GetNextFeature()
+        ds.ReleaseResultSet(sql_lyr)
+        assert f[0] is None
+
+    # NULL as 4th arg
+    with gdaltest.error_handler():
+        with gdaltest.config_option("OGR_SQLITE_ALLOW_EXTERNAL_ACCESS", "YES"):
+            sql_lyr = ds.ExecuteSQL(
+                "select gdal_get_pixel_value('../gcore/data/byte.tif', 1, 'pixel', NULL, 0)"
+            )
+        f = sql_lyr.GetNextFeature()
+        ds.ReleaseResultSet(sql_lyr)
+        assert f[0] is None
+
+    # NULL as 5th arg
+    with gdaltest.error_handler():
+        with gdaltest.config_option("OGR_SQLITE_ALLOW_EXTERNAL_ACCESS", "YES"):
+            sql_lyr = ds.ExecuteSQL(
+                "select gdal_get_pixel_value('../gcore/data/byte.tif', 1, 'pixel', 0, NULL)"
+            )
+        f = sql_lyr.GetNextFeature()
+        ds.ReleaseResultSet(sql_lyr)
+        assert f[0] is None
+
+    # Invalid band number
+    with gdaltest.error_handler():
+        with gdaltest.config_option("OGR_SQLITE_ALLOW_EXTERNAL_ACCESS", "YES"):
+            sql_lyr = ds.ExecuteSQL(
+                "select gdal_get_pixel_value('../gcore/data/byte.tif', 0, 'pixel', 0, 0)"
+            )
+        f = sql_lyr.GetNextFeature()
+        ds.ReleaseResultSet(sql_lyr)
+        assert f[0] is None
+
+    # Invalid value for 3rd argument
+    with gdaltest.error_handler():
+        with gdaltest.config_option("OGR_SQLITE_ALLOW_EXTERNAL_ACCESS", "YES"):
+            sql_lyr = ds.ExecuteSQL(
+                "select gdal_get_pixel_value('../gcore/data/byte.tif', 1, 'invalid', 0, 0)"
+            )
+        f = sql_lyr.GetNextFeature()
+        ds.ReleaseResultSet(sql_lyr)
+        assert f[0] is None
 
     gdal.Unlink(filename)
