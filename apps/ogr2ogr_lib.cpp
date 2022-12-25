@@ -1104,6 +1104,23 @@ class CompositeCT : public OGRCoordinateTransformation
                        : nullptr;
     }
 
+    virtual bool GetEmitErrors() const override
+    {
+        if (poCT1)
+            return poCT1->GetEmitErrors();
+        if (poCT2)
+            return poCT2->GetEmitErrors();
+        return true;
+    }
+
+    virtual void SetEmitErrors(bool bEmitErrors) override
+    {
+        if (poCT1)
+            poCT1->SetEmitErrors(bEmitErrors);
+        if (poCT2)
+            poCT2->SetEmitErrors(bEmitErrors);
+    }
+
     virtual int Transform(int nCount, double *x, double *y, double *z,
                           double *t, int *pabSuccess) override
     {
@@ -4071,6 +4088,21 @@ SetupTargetLayer::Setup(OGRLayer *poSrcLayer, const char *pszNewLayerName,
             CPLDebug("GDALVectorTranslate", "Using FID=%s and -preserve_fid",
                      poSrcLayer->GetFIDColumn());
             bPreserveFID = true;
+        }
+        // Detect scenario of converting GML2 with fid attribute to GPKG
+        else if (EQUAL(m_poDstDS->GetDriver()->GetDescription(), "GPKG") &&
+                 CSLFetchNameValue(m_papszLCO, "FID") == nullptr)
+        {
+            int nFieldIdx = poSrcLayer->GetLayerDefn()->GetFieldIndex("fid");
+            if (nFieldIdx >= 0 && poSrcLayer->GetLayerDefn()
+                                          ->GetFieldDefn(nFieldIdx)
+                                          ->GetType() == OFTString)
+            {
+                CPLDebug("GDALVectorTranslate",
+                         "Source layer has a non-string 'fid' column. Using "
+                         "FID=gpkg_fid for GeoPackage");
+                papszLCOTemp = CSLSetNameValue(papszLCOTemp, "FID", "gpkg_fid");
+            }
         }
 
         // If bAddOverwriteLCO is ON (set up when overwriting a CARTO layer),
