@@ -493,8 +493,6 @@ static CPLErr GWKRun(GDALWarpKernel *poWK, const char *pszFuncName,
         nThreads = 1;
 
     CPLDebug("WARP", "Using %d threads", nThreads);
-    psThreadData->nTotalThreadCountForThisRun = nThreads;
-    psThreadData->nCurThreadCountForThisRun = 0;
 
     auto &jobs = *psThreadData->threadJobs;
     CPLAssert(static_cast<int>(jobs.size()) >= nThreads);
@@ -514,6 +512,9 @@ static CPLErr GWKRun(GDALWarpKernel *poWK, const char *pszFuncName,
 
     {
         std::unique_lock<std::mutex> lock(psThreadData->mutex);
+
+        psThreadData->nTotalThreadCountForThisRun = nThreads;
+        psThreadData->nCurThreadCountForThisRun = 0;
 
         // Start jobs.
         for (int i = 0; i < nThreads; ++i)
@@ -928,7 +929,7 @@ static CPLErr GWKRun(GDALWarpKernel *poWK, const char *pszFuncName,
  * The GDALWarpKern algorithm will only ever use this transformer in
  * "destination to source" mode (bDstToSrc=TRUE), and will always pass
  * partial or complete scanlines of points in the destination image as
- * input.  This means, among other things, that it is safe to the the
+ * input.  This means, among other things, that it is safe to the
  * approximating transform GDALApproxTransform() as the transformation
  * function.
  *

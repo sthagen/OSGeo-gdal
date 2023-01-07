@@ -37,7 +37,9 @@
 #include <algorithm>
 #include <fstream>
 
+#ifdef HAVE_SQLITE3
 #include <sqlite3.h>
+#endif
 
 #include "gtest_include.h"
 
@@ -2230,7 +2232,8 @@ TEST_F(test_ogr, GDALDatasetSetQueryLoggerFunc)
 
     auto tmpGPKG{testing::TempDir() + "/poly-1-feature.gpkg"};
     {
-        std::ifstream src("data/poly-1-feature.gpkg", std::ios::binary);
+        std::string srcfilename(data_ + SEP + "poly-1-feature.gpkg");
+        std::ifstream src(srcfilename, std::ios::binary);
         std::ofstream dst(tmpGPKG, std::ios::binary);
         dst << src.rdbuf();
     }

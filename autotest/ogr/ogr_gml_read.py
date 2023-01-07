@@ -734,25 +734,29 @@ def test_ogr_gml_15():
 
 
 ###############################################################################
-# Read CityGML generic attributes
+# Read CityGML generic attributes and reading 3D geometries by default
 
 
-def test_ogr_gml_16():
+def test_ogr_gml_city_gml():
 
     if not gdaltest.have_gml_reader:
         pytest.skip()
 
     ds = ogr.Open("data/gml/citygml.gml")
     lyr = ds.GetLayer(0)
+    assert lyr.GetGeomType() == ogr.wkbMultiPolygon25D
     feat = lyr.GetNextFeature()
 
-    if (
-        feat.GetField("Name_") != "aname"
-        or feat.GetField("a_int_attr") != 2
-        or feat.GetField("a_double_attr") != 3.45
-    ):
-        feat.DumpReadable()
-        pytest.fail("did not get expected values")
+    assert feat.GetField("Name_") == "aname"
+    assert feat.GetField("a_int_attr") == 2
+    assert feat.GetField("a_double_attr") == 3.45
+    assert (
+        feat.GetGeometryRef().ExportToIsoWkt()
+        == "MULTIPOLYGON Z (((0 0 0,0.0 0.5 0,0 1 0,1 1 0,1 0 0,0 0 0)))"
+    )
+    ds = None
+
+    gdal.Unlink("data/gml/citygml.gfs")
 
 
 ###############################################################################
@@ -2082,6 +2086,78 @@ def test_ogr_gml_50():
 
     gdal.Unlink("/vsimem/ogr_gml_50.gml")
     gdal.Unlink("/vsimem/ogr_gml_50.xsd")
+
+
+###############################################################################
+# Test FeaturePropertyList in gfs
+
+
+@pytest.mark.parametrize(
+    "open_options", [[], ["GFS_TEMPLATE=data/gml/testfeaturepropertylist.gfs"]]
+)
+def test_ogr_gml_read_FeaturePropertyList_in_gfs(open_options):
+
+    if not gdaltest.have_gml_reader:
+        pytest.skip()
+
+    ds = gdal.OpenEx("data/gml/testfeaturepropertylist.gml", open_options=open_options)
+    assert ds.GetLayerCount() == 2
+    lyr = ds.GetLayer(0)
+    assert lyr.GetFeatureCount() == 1
+    f = lyr.GetNextFeature()
+    assert f["gml_id"] == "FA"
+    assert f["name"] == "Feature A"
+    assert f["roleInline_href"] == ["#FB1_1", "#FB1_2"]
+
+    lyr = ds.GetLayer(1)
+    assert lyr.GetFeatureCount() == 3
+    f = lyr.GetNextFeature()
+    assert f["gml_id"] == "FB1_1"
+    assert f["name"] == "Feature B 1_1"
+    f = lyr.GetNextFeature()
+    assert f["gml_id"] == "FB1_2"
+    f = lyr.GetNextFeature()
+    assert f["gml_id"] == "FB2"
+
+
+###############################################################################
+# Test FeatureProperty and FeaturePropertyList in gfs
+
+
+@pytest.mark.parametrize(
+    "open_options", [[], ["GFS_TEMPLATE=data/gml/testfeaturepropertylist2.gfs"]]
+)
+def test_ogr_gml_read_FeatureProperty_in_gfs(open_options):
+
+    if not gdaltest.have_gml_reader:
+        pytest.skip()
+
+    ds = gdal.OpenEx("data/gml/testfeaturepropertylist2.xml", open_options=open_options)
+    assert ds.GetLayerCount() == 3
+    lyr = ds.GetLayer(0)
+    assert lyr.GetFeatureCount() == 1
+    f = lyr.GetNextFeature()
+    assert f["gml_id"] == "FT1_1"
+    assert f["roleFt2_href"] == ["#FT2_1", "#FT2_2"]
+    assert f["roleOt1_href"] == ["#OT1_1", "#OT1_2", "#OT1_3"]
+
+    lyr = ds.GetLayer(1)
+    assert lyr.GetFeatureCount() == 2
+    f = lyr.GetNextFeature()
+    assert f["gml_id"] == "FT2_1"
+    f = lyr.GetNextFeature()
+    assert f["gml_id"] == "FT2_2"
+
+    lyr = ds.GetLayer(2)
+    assert lyr.GetFeatureCount() == 4
+    f = lyr.GetNextFeature()
+    assert f["gml_id"] == "OT1_1"
+    f = lyr.GetNextFeature()
+    assert f["gml_id"] == "OT1_2"
+    f = lyr.GetNextFeature()
+    assert f["gml_id"] == "OT1_3"
+    f = lyr.GetNextFeature()
+    assert f["gml_id"] == "OT1_4"
 
 
 ###############################################################################
@@ -4492,3 +4568,21 @@ def test_ogr_gml_read_feature_with_gml_description():
     assert f["identifier"] == "gml_identifier"
     assert f["name"] == "gml_name"
     assert f["bar"] == 1
+
+
+###############################################################################
+# Test reading a file with srsDimension="3" only on top gml:Envelope (#6986)
+
+
+def test_ogr_gml_read_srsDimension_3_on_top_gml_Envelope():
+
+    if not gdaltest.have_gml_reader:
+        pytest.skip()
+
+    ds = gdal.OpenEx("data/gml/global_srsDimension_3.gml")
+    lyr = ds.GetLayer(0)
+    f = lyr.GetNextFeature()
+    assert (
+        f.GetGeometryRef().ExportToIsoWkt()
+        == "LINESTRING Z (1 2 3,4 5 6,7 8 9,10 11 12)"
+    )

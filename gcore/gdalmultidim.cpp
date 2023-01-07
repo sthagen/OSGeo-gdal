@@ -2241,7 +2241,7 @@ const std::string &GDALMDArray::GetUnit() const
 /*                          SetSpatialRef()                             */
 /************************************************************************/
 
-/** Assign a spatial reference system object to the the array.
+/** Assign a spatial reference system object to the array.
  *
  * This is the same as the C function GDALMDArraySetSpatialRef().
  */
@@ -4557,7 +4557,7 @@ void GDALSlicedMDArray::PrepareParentArrays(
                 m_parentStep[iParent] =
                     count[i] == 1 ? 1 :
                                   // other checks should have ensured this does
-                                  // not overflow
+                        // not overflow
                         arrayStep[i] * m_parentRanges[iParent].m_nIncr;
             }
             if (bufferStride)
@@ -10696,7 +10696,7 @@ const char *GDALMDArrayGetUnit(GDALMDArrayH hArray)
 /*                      GDALMDArrayGetSpatialRef()                      */
 /************************************************************************/
 
-/** Assign a spatial reference system object to the the array.
+/** Assign a spatial reference system object to the array.
  *
  * This is the same as the C++ method GDALMDArray::SetSpatialRef().
  * @return TRUE in case of success.

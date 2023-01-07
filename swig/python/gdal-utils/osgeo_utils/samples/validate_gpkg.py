@@ -277,6 +277,18 @@ class GPKGChecker(object):
             ]
             if has_epoch:
                 expected_columns += [(7, "epoch", "DOUBLE", 0, None, 0)]
+
+            # "Previous versions of this extension specified default values for
+            # definition and definition_12_063. Those defaults have been removed
+            # for interoperability reasons but implementers should be aware that
+            # some GeoPackages may have these defaults in place."
+            columns = [[v for v in column] for column in columns]
+            for column in columns:
+                if (
+                    column[1] in ("definition", "definition_12_063")
+                    and column[4] == "''"
+                ):
+                    column[4] = None
         else:
             expected_columns = [
                 (0, "srs_name", "TEXT", 1, None, 0),
@@ -661,6 +673,7 @@ class GPKGChecker(object):
         cols = c.fetchall()
         found_geom = False
         count_pkid = 0
+        pkid_column_name = None
         for (_, name, typ, notnull, default, pk) in cols:
             if name.lower() == geom_column_name.lower():
                 found_geom = True
@@ -683,6 +696,8 @@ class GPKGChecker(object):
                 )
 
             elif pk == 1:
+                if pkid_column_name is None:
+                    pkid_column_name = name
                 count_pkid += 1
                 self._assert(
                     typ == "INTEGER",
@@ -761,11 +776,16 @@ class GPKGChecker(object):
 
         wkb_geometries = GPKGChecker.BASE_GEOM_TYPES + GPKGChecker.EXT_GEOM_TYPES
         c.execute(
-            "SELECT %s FROM %s " % (_esc_id(geom_column_name), _esc_id(table_name))
+            "SELECT %s, %s FROM %s "
+            % (
+                _esc_id(pkid_column_name) if pkid_column_name else -1,
+                _esc_id(geom_column_name),
+                _esc_id(table_name),
+            )
         )
         found_geom_types = set()
         warning_messages = set()
-        for (blob,) in c.fetchall():
+        for (rowid, blob) in c.fetchall():
             if blob is None:
                 continue
 
@@ -858,14 +878,19 @@ class GPKGChecker(object):
 
             if has_gdal:
                 geom = ogr.CreateGeometryFromWkb(blob[header_len:])
-                self._assert(geom is not None, 19, "Invalid geometry")
-
                 self._assert(
-                    (geom.IsEmpty() and empty_flag)
-                    or (not geom.IsEmpty() and not empty_flag),
-                    152,
-                    "Inconsistent empty_flag vs geometry content",
+                    geom is not None,
+                    19,
+                    f"Invalid geometry for fid {rowid} of " f"table {table_name}",
                 )
+
+                if geom is not None:
+                    self._assert(
+                        (geom.IsEmpty() and empty_flag)
+                        or (not geom.IsEmpty() and not empty_flag),
+                        152,
+                        "Inconsistent empty_flag vs geometry content",
+                    )
 
         if geometry_type_name in (
             "POINT",
@@ -2355,20 +2380,21 @@ class GPKGChecker(object):
                     "Wrong scope for gpkg_schema in " "gpkg_extensions",
                 )
 
-                self._assert(
-                    c.fetchone() is not None,
-                    141,
-                    "There should be exactly 2 rows with "
-                    + "extension_name = "
-                    + "'gpkg_schema' in gpkg_extensions",
-                )
-                self._assert(
-                    c.fetchone() is None,
-                    141,
-                    "There should be exactly 2 rows with "
-                    + "extension_name = "
-                    + "'gpkg_schema' in gpkg_extensions",
-                )
+                if self.version >= (1, 2, 1):
+                    self._assert(
+                        c.fetchone() is not None,
+                        141,
+                        "There should be exactly 2 rows with "
+                        + "extension_name = "
+                        + "'gpkg_schema' in gpkg_extensions",
+                    )
+                    self._assert(
+                        c.fetchone() is None,
+                        141,
+                        "There should be exactly 2 rows with "
+                        + "extension_name = "
+                        + "'gpkg_schema' in gpkg_extensions",
+                    )
 
                 c.execute(
                     "SELECT 1 FROM gpkg_extensions WHERE "

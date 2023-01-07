@@ -10020,6 +10020,11 @@ static void CleanupSRSWGS84Mutex();
  *
  * This function will attempt to cleanup any cache spatial reference
  * related information, such as cached tables of coordinate systems.
+ *
+ * This function should not be called concurrently with any other GDAL/OGR
+ * function. It is meant at being called once before process termination
+ * (typically from the main thread). CPLCleanupTLS() might be used to clean
+ * thread-specific resources before thread termination.
  */
 void OSRCleanup(void)
 
@@ -11678,7 +11683,7 @@ OGRErr OGRSpatialReference::ImportFromESRIWisconsinWKT(const char *prjName,
  * <li>OAMS_CUSTOM means that the data axis are customly defined with
  *     SetDataAxisToSRSAxisMapping()
  * </ul>
- * @return the the data axis to CRS axis mapping strategy.
+ * @return the data axis to CRS axis mapping strategy.
  * @since GDAL 3.0
  */
 OSRAxisMappingStrategy OGRSpatialReference::GetAxisMappingStrategy() const

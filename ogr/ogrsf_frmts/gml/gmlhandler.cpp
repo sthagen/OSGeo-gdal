@@ -719,6 +719,15 @@ OGRErr GMLHandler::startElementBoundedBy(const char *pszName, int /*nLenName*/,
         char *pszGlobalSRSName = GetAttributeValue(attr, "srsName");
         m_poReader->SetGlobalSRSName(pszGlobalSRSName);
         CPLFree(pszGlobalSRSName);
+
+        if (m_nSRSDimensionIfMissing == 0)
+        {
+            char *pszGlobalSRSDimension =
+                GetAttributeValue(attr, "srsDimension");
+            if (pszGlobalSRSDimension)
+                m_nSRSDimensionIfMissing = atoi(pszGlobalSRSDimension);
+            CPLFree(pszGlobalSRSDimension);
+        }
     }
 
     return OGRERR_NONE;
@@ -1370,6 +1379,9 @@ OGRErr GMLHandler::startElementTop(const char *pszName, int /*nLenName*/,
     if (strcmp(pszName, "CityModel") == 0)
     {
         eAppSchemaType = APPSCHEMA_CITYGML;
+        // Default to 3D geometries for CityGML (#6989)
+        if (m_nSRSDimensionIfMissing == 0)
+            m_nSRSDimensionIfMissing = 3;
     }
     else if (strcmp(pszName, "AIXMBasicMessage") == 0)
     {
