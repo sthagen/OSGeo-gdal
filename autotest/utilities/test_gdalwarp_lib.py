@@ -1774,6 +1774,18 @@ def test_gdalwarp_lib_135():
         src_ds.SetGeoTransform([500000, 1, 0, 4000000, 0, -1])
         src_ds.GetRasterBand(1).Fill(100)
 
+        # Target CRS in us-ft
+        ds = gdal.Warp(
+            "",
+            src_ds,
+            format="VRT",
+            outputType=gdal.GDT_Float32,
+            srcSRS="+proj=utm +zone=31 +datum=WGS84 +units=m +geoidgrids=./tmp/grid.gtx +vunits=m +no_defs",
+            dstSRS="+proj=longlat +datum=WGS84 +geoidgrids=./tmp/grid2.gtx +vunits=us-ft +no_defs",
+        )
+        data = struct.unpack("f" * 1, ds.GetRasterBand(1).ReadRaster())[0]
+        assert data == pytest.approx(115 / (1200.0 / 3937)), "Bad value"
+
         # Both transforms to regular VRT
         gdal.GetDriverByName("GTiff").CreateCopy("tmp/dem.tif", src_ds)
         gdal.Warp(
@@ -3305,6 +3317,63 @@ def test_gdalwarp_lib_srcBands():
     assert ds.GetRasterBand(2).Checksum() != 0
     assert ds.GetRasterBand(2).Checksum() != ref_ds.GetRasterBand(4).Checksum()
     assert ds.GetRasterBand(2).GetColorInterpretation() == gdal.GCI_AlphaBand
+
+
+###############################################################################
+
+
+def test_gdalwarp_lib_preserve_non_square_pixels_if_no_reprojection():
+
+    src_ds = gdal.Translate("", "../gcore/data/byte.tif", options="-f MEM -tr 60 30")
+    out_ds = gdal.Warp("", src_ds, format="MEM")
+    assert out_ds.RasterXSize == src_ds.RasterXSize
+    assert out_ds.RasterYSize == src_ds.RasterYSize
+    assert out_ds.GetGeoTransform() == src_ds.GetGeoTransform()
+
+    out_ds = gdal.Warp(
+        "",
+        src_ds,
+        format="MEM",
+        outputBounds=[440720.000, 3750120.000, 441920.000, 3751320.000],
+    )
+    assert out_ds.RasterXSize == src_ds.RasterXSize
+    assert out_ds.RasterYSize == src_ds.RasterYSize
+    assert out_ds.GetGeoTransform() == src_ds.GetGeoTransform()
+
+
+###############################################################################
+
+
+def test_gdalwarp_lib_preserve_non_square_pixels_if_no_reprojection_multi_sources():
+
+    src_ds = gdal.Translate("", "../gcore/data/byte.tif", options="-f MEM -tr 60 30")
+    left_ds = gdal.Translate("", src_ds, options="-f MEM -srcwin 0 0 10 40")
+    right_ds = gdal.Translate("", src_ds, options="-f MEM -srcwin 10 0 10 40")
+    out_ds = gdal.Warp("", [left_ds, right_ds], format="MEM")
+    assert out_ds.RasterXSize == src_ds.RasterXSize
+    assert out_ds.RasterYSize == src_ds.RasterYSize
+    assert out_ds.GetGeoTransform() == src_ds.GetGeoTransform()
+
+    out_ds = gdal.Warp(
+        "",
+        [left_ds, right_ds],
+        format="MEM",
+        outputBounds=[440720.000, 3750120.000, 441920.000, 3751320.000],
+    )
+    assert out_ds.RasterXSize == src_ds.RasterXSize
+    assert out_ds.RasterYSize == src_ds.RasterYSize
+    assert out_ds.GetGeoTransform() == src_ds.GetGeoTransform()
+
+
+###############################################################################
+
+
+def test_gdalwarp_lib_tr_square():
+
+    src_ds = gdal.Translate("", "../gcore/data/byte.tif", options="-f MEM -tr 60 30")
+    out_ds = gdal.Warp("", src_ds, options="-f MEM -tr square")
+    gt = out_ds.GetGeoTransform()
+    assert gt[1] == abs(gt[5])
 
 
 ###############################################################################

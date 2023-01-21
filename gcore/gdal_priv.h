@@ -479,7 +479,7 @@ class CPL_DLL GDALDataset : public GDALMajorObject
      * @brief SetQueryLoggerFunc
      * @param pfnQueryLoggerFuncIn query logger function callback
      * @param poQueryLoggerArgIn arguments passed to the query logger function
-     * @return true on succcess
+     * @return true on success
      */
     virtual bool SetQueryLoggerFunc(GDALQueryLoggerFunc pfnQueryLoggerFuncIn,
                                     void *poQueryLoggerArgIn);
@@ -526,6 +526,8 @@ class CPL_DLL GDALDataset : public GDALMajorObject
     Bands GetBands();
 
     virtual void FlushCache(bool bAtClosing = false);
+
+    virtual GIntBig GetEstimatedRAMUsage();
 
     virtual const OGRSpatialReference *GetSpatialRef() const;
     virtual CPLErr SetSpatialRef(const OGRSpatialReference *poSRS);
