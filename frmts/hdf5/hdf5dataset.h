@@ -32,6 +32,7 @@
 #define HDF5DATASET_H_INCLUDED_
 
 #include "hdf5_api.h"
+#include "hdf5eosparser.h"
 
 #include "cpl_list.h"
 #include "gdal_pam.h"
@@ -144,12 +145,13 @@ class HDF5Dataset CPL_NON_FINAL : public GDALPamDataset
     hid_t hHDF5;
     hid_t hGroupID;  // H handler interface.
     char **papszSubDatasets;
-    int bIsHDFEOS;
     int nDatasetType;
     int nSubDataCount;
 
     HDF5GroupObjects *poH5RootGroup; /* Contain hdf5 Groups information */
     std::shared_ptr<GDALGroup> m_poRootGroup{};
+
+    HDF5EOSParser m_oHDFEOSParser{};
 
     CPLErr ReadGlobalAttributes(int);
     CPLErr HDF5ListGroupObjects(HDF5GroupObjects *, int);
