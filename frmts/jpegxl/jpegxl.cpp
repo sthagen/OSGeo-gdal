@@ -1054,7 +1054,7 @@ CPLErr JPEGXLDataset::ReadCompressedData(const char *pszFormat, int nXOff,
                 *ppszDetailedFormat = VSIStrdup("JXL");
             VSIFSeekL(m_fp, 0, SEEK_END);
             const auto nFileSize = VSIFTellL(m_fp);
-            if (nFileSize > std::numeric_limits<size_t>::max())
+            if (nFileSize > std::numeric_limits<size_t>::max() / 2)
                 return CE_Failure;
             auto nSize = static_cast<size_t>(nFileSize);
             if (ppBuffer)
@@ -1826,6 +1826,7 @@ GDALDataset *JPEGXLDataset::CreateCopy(const char *pszFilename,
                 &pJPEGXLContent, &nJPEGXLContent, nullptr) == CE_None)
         {
             CPLDebug("JPEGXL", "Lossless copy from source dataset");
+            GByte abySizeAndBoxName[8];
             std::vector<GByte> abyData;
             bool bFallbackToGeneral = false;
             try
@@ -1851,7 +1852,6 @@ GDALDataset *JPEGXLDataset::CreateCopy(const char *pszFilename,
                         abyJXLContainerSignatureAndFtypBox +
                             sizeof(abyJXLContainerSignatureAndFtypBox));
                     CPL_MSBPTR32(&nBoxSize);
-                    GByte abySizeAndBoxName[8];
                     memcpy(abySizeAndBoxName, &nBoxSize, 4);
                     memcpy(abySizeAndBoxName + 4, "jxlc", 4);
                     nInsertPos = sizeof(abyJXLContainerSignatureAndFtypBox);
@@ -1901,11 +1901,9 @@ GDALDataset *JPEGXLDataset::CreateCopy(const char *pszFilename,
                         memcpy(&abyEXIF[4], pabyEXIF + 6, nMarkerSize - 6);
                         CPLFree(pabyEXIF);
 
-                        abyData.reserve(abyData.size() + 8 + abyEXIF.size());
                         uint32_t nBoxSize =
                             static_cast<uint32_t>(8 + abyEXIF.size());
                         CPL_MSBPTR32(&nBoxSize);
-                        GByte abySizeAndBoxName[8];
                         memcpy(abySizeAndBoxName, &nBoxSize, 4);
                         memcpy(abySizeAndBoxName + 4, "Exif", 4);
                         abyData.insert(
@@ -1929,10 +1927,8 @@ GDALDataset *JPEGXLDataset::CreateCopy(const char *pszFilename,
                     if (nInsertPos)
                     {
                         const size_t nXMPLen = strlen(papszXMP[0]);
-                        abyData.reserve(abyData.size() + 8 + nXMPLen);
                         uint32_t nBoxSize = static_cast<uint32_t>(8 + nXMPLen);
                         CPL_MSBPTR32(&nBoxSize);
-                        GByte abySizeAndBoxName[8];
                         memcpy(abySizeAndBoxName, &nBoxSize, 4);
                         memcpy(abySizeAndBoxName + 4, "xml ", 4);
                         abyData.insert(
@@ -1959,10 +1955,8 @@ GDALDataset *JPEGXLDataset::CreateCopy(const char *pszFilename,
                     {
                         const size_t nDataLen =
                             static_cast<size_t>(poJUMBFBox->GetBoxLength());
-                        abyData.reserve(abyData.size() + 8 + nDataLen);
                         uint32_t nBoxSize = static_cast<uint32_t>(8 + nDataLen);
                         CPL_MSBPTR32(&nBoxSize);
-                        GByte abySizeAndBoxName[8];
                         memcpy(abySizeAndBoxName, &nBoxSize, 4);
                         memcpy(abySizeAndBoxName + 4, "jumb", 4);
                         abyData.insert(

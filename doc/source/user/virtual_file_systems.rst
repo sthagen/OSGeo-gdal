@@ -115,7 +115,7 @@ GDAL (>= 3.7) has full read and write support for .zip files following the
   it to an new or existing ZIP file, enables the SOZip optimization when relevant
   (ie when a file to be compressed is larger than 1 MB).
   SOZip optimization can be forced by setting the :decl_configoption:`CPL_SOZIP_ENABLED`
-  configuration option to YES. Or totally disabled by setting it ot NO.
+  configuration option to YES. Or totally disabled by setting it to NO.
 
 * The :cpp:func:`VSIGetFileMetadata` method can be called on a filename of
   the form :file:`/vsizip/path/to/the/file.zip/path/inside/the/zip/file` and
@@ -173,6 +173,37 @@ Examples:
     /vsitar/c:\users\even\my.tar\subdir\my.tif
 
 Starting with GDAL 2.2, an alternate syntax is available so as to enable chaining and not being dependent on .tar extension, e.g.: :file:`/vsitar/{/path/to/the/archive}/path/inside/the/tar/file`. Note that :file:`/path/to/the/archive` may also itself use this alternate syntax.
+
+.. _vsi7z:
+
+/vsi7z/ (.7z archives)
+----------------------
+
+.. versionadded:: 3.7
+
+/vsi7z/ is a file handler that allows reading `7z <https://en.wikipedia.org/wiki/7z>`__
+archives on-the-fly without decompressing them beforehand. This file system is
+read-only. Directory listing and :cpp:func:`VSIStatL` are available, similarly
+to above mentioned file systems.
+
+It requires GDAL to be built against `libarchive <https://libarchive.org/>`__
+(and libarchive having LZMA support to be of practical use).
+
+To point to a file inside a 7z file, the filename must be of the form
+:file:`/vsi7z/path/to/the/file.7z/path/inside/the/7z/file`, where
+:file:`path/to/the/file.7z` is relative or absolute and :file:`path/inside/the/7z/file`
+is the relative path to the file inside the archive.`
+
+Default extensions recognized by this virtual file system are:
+``7z``, ``lpk`` (Esri ArcGIS Layer Package), ``lpkx``, ``mpk`` (Esri ArcGIS Map Package) and ``mpkx``.
+
+An alternate syntax is available so as to enable chaining and not being
+dependent on those extensions, e.g.: :file:`/vsi7z/{/path/to/the/archive}/path/inside/the/archive`.
+Note that :file:`/path/to/the/archive` may also itself use this alternate syntax.
+
+Note that random seeking within a large compressed file will be inefficient when
+backward seeking is needed (decompression will be restarted from the start of the
+file). Performance will be the best in sequential reading.
 
 Network based file systems
 --------------------------

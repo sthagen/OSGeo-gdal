@@ -1975,13 +1975,13 @@ CPLErr JPGDatasetCommon::IBuildOverviews(const char *pszResampling,
 }
 
 /************************************************************************/
-/*                           FlushCache(bool bAtClosing) */
+/*                           FlushCache()                               */
 /************************************************************************/
 
-void JPGDatasetCommon::FlushCache(bool bAtClosing)
+CPLErr JPGDatasetCommon::FlushCache(bool bAtClosing)
 
 {
-    GDALPamDataset::FlushCache(bAtClosing);
+    CPLErr eErr = GDALPamDataset::FlushCache(bAtClosing);
 
     if (bHasDoneJpegStartDecompress)
     {
@@ -1990,7 +1990,11 @@ void JPGDatasetCommon::FlushCache(bool bAtClosing)
 
     // For the needs of the implicit JPEG-in-TIFF overview mechanism.
     for (int i = 0; i < nInternalOverviewsCurrent; i++)
-        papoInternalOverviews[i]->FlushCache(bAtClosing);
+    {
+        if (papoInternalOverviews[i]->FlushCache(bAtClosing) != CE_None)
+            eErr = CE_Failure;
+    }
+    return eErr;
 }
 
 #endif  // !defined(JPGDataset)
@@ -2831,6 +2835,10 @@ GDALDataset *JPGDatasetCommon::OpenFLIRRawThermalImage()
                 nRasterXSize = nXSizeIn;
                 nRasterYSize = nYSizeIn;
             }
+            CPLErr Close() override
+            {
+                return GDALPamDataset::Close();
+            }
             ~JPEGRawDataset() = default;
 
             void SetBand(int nBand, GDALRasterBand *poBand)
@@ -3465,7 +3473,7 @@ CPLErr JPGDatasetCommon::ReadCompressedData(
             const auto nSavedPos = VSIFTellL(m_fpImage);
             VSIFSeekL(m_fpImage, 0, SEEK_END);
             auto nFileSize = VSIFTellL(m_fpImage);
-            if (nFileSize > std::numeric_limits<size_t>::max())
+            if (nFileSize > std::numeric_limits<size_t>::max() / 2)
                 return CE_Failure;
             if (nFileSize > 4)
             {
@@ -3534,20 +3542,16 @@ CPLErr JPGDatasetCommon::ReadCompressedData(
                 GByte *pabyJPEG = static_cast<GByte *>(*ppBuffer);
                 while (nChunkLoc + 4 <= nSize)
                 {
-                    if (pabyJPEG[nChunkLoc + 0] == 0xFF &&
-                        pabyJPEG[nChunkLoc + 1] == 0xDA)
-                    {
-                        break;
-                    }
                     if (pabyJPEG[nChunkLoc + 0] != 0xFF)
+                        break;
+                    if (pabyJPEG[nChunkLoc + 1] == 0xDA)
                         break;
                     const int nChunkLength =
                         pabyJPEG[nChunkLoc + 2] * 256 + pabyJPEG[nChunkLoc + 3];
                     if (nChunkLength < 2 || static_cast<size_t>(nChunkLength) >
                                                 nSize - (nChunkLoc + 2))
                         break;
-                    if (pabyJPEG[nChunkLoc + 0] == 0xFF &&
-                        pabyJPEG[nChunkLoc + 1] == 0xE1 &&
+                    if (pabyJPEG[nChunkLoc + 1] == 0xE1 &&
                         nChunkLoc + 4 + sizeof(EXIF_SIGNATURE) <= nSize &&
                         memcmp(pabyJPEG + nChunkLoc + 4, EXIF_SIGNATURE,
                                sizeof(EXIF_SIGNATURE)) == 0)
@@ -3560,8 +3564,7 @@ CPLErr JPGDatasetCommon::ReadCompressedData(
                         nSize -= 2 + nChunkLength;
                         continue;
                     }
-                    else if (pabyJPEG[nChunkLoc + 0] == 0xFF &&
-                             pabyJPEG[nChunkLoc + 1] == 0xE1 &&
+                    else if (pabyJPEG[nChunkLoc + 1] == 0xE1 &&
                              nChunkLoc + 4 + sizeof(APP1_XMP_SIGNATURE) <=
                                  nSize &&
                              memcmp(pabyJPEG + nChunkLoc + 4,
@@ -4128,22 +4131,20 @@ GDALDataset *JPGDataset::CreateCopy(const char *pszFilename,
                                                             'f', '\0', '\0'};
                         while (nChunkLoc + 4 <= abyJPEG.size())
                         {
-                            if (abyJPEG[nChunkLoc + 0] == 0xFF &&
-                                abyJPEG[nChunkLoc + 1] == 0xDA)
+                            if (abyJPEG[nChunkLoc + 0] != 0xFF)
+                                break;
+                            if (abyJPEG[nChunkLoc + 1] == 0xDA)
                             {
                                 if (nInsertPos == 0)
                                     nInsertPos = nChunkLoc;
                                 break;
                             }
-                            if (abyJPEG[nChunkLoc + 0] != 0xFF)
-                                break;
                             const int nChunkLength =
                                 abyJPEG[nChunkLoc + 2] * 256 +
                                 abyJPEG[nChunkLoc + 3];
                             if (nChunkLength < 2)
                                 break;
-                            if (abyJPEG[nChunkLoc + 0] == 0xFF &&
-                                abyJPEG[nChunkLoc + 1] == 0xE0 &&
+                            if (abyJPEG[nChunkLoc + 1] == 0xE0 &&
                                 nChunkLoc + 4 + sizeof(JFIF_SIGNATURE) <=
                                     abyJPEG.size() &&
                                 memcmp(abyJPEG.data() + nChunkLoc + 4,
@@ -4153,8 +4154,7 @@ GDALDataset *JPGDataset::CreateCopy(const char *pszFilename,
                                 if (nInsertPos == 0)
                                     nInsertPos = nChunkLoc + 2 + nChunkLength;
                             }
-                            else if (abyJPEG[nChunkLoc + 0] == 0xFF &&
-                                     abyJPEG[nChunkLoc + 1] == 0xE1 &&
+                            else if (abyJPEG[nChunkLoc + 1] == 0xE1 &&
                                      nChunkLoc + 4 + sizeof(EXIF_SIGNATURE) <=
                                          abyJPEG.size() &&
                                      memcmp(abyJPEG.data() + nChunkLoc + 4,
@@ -4212,21 +4212,19 @@ GDALDataset *JPGDataset::CreateCopy(const char *pszFilename,
                         "http://ns.adobe.com/xap/1.0/";
                     while (nChunkLoc + 4 <= abyJPEG.size())
                     {
-                        if (abyJPEG[nChunkLoc + 0] == 0xFF &&
-                            abyJPEG[nChunkLoc + 1] == 0xDA)
+                        if (abyJPEG[nChunkLoc + 0] != 0xFF)
+                            break;
+                        if (abyJPEG[nChunkLoc + 1] == 0xDA)
                         {
                             if (nInsertPos == 0)
                                 nInsertPos = nChunkLoc;
                             break;
                         }
-                        if (abyJPEG[nChunkLoc + 0] != 0xFF)
-                            break;
                         const int nChunkLength = abyJPEG[nChunkLoc + 2] * 256 +
                                                  abyJPEG[nChunkLoc + 3];
                         if (nChunkLength < 2)
                             break;
-                        if (abyJPEG[nChunkLoc + 0] == 0xFF &&
-                            abyJPEG[nChunkLoc + 1] == 0xE0 &&
+                        if (abyJPEG[nChunkLoc + 1] == 0xE0 &&
                             nChunkLoc + 4 + sizeof(JFIF_SIGNATURE) <=
                                 abyJPEG.size() &&
                             memcmp(abyJPEG.data() + nChunkLoc + 4,
@@ -4235,8 +4233,7 @@ GDALDataset *JPGDataset::CreateCopy(const char *pszFilename,
                             if (nInsertPos == 0)
                                 nInsertPos = nChunkLoc + 2 + nChunkLength;
                         }
-                        else if (abyJPEG[nChunkLoc + 0] == 0xFF &&
-                                 abyJPEG[nChunkLoc + 1] == 0xE1 &&
+                        else if (abyJPEG[nChunkLoc + 1] == 0xE1 &&
                                  nChunkLoc + 4 + sizeof(APP1_XMP_SIGNATURE) <=
                                      abyJPEG.size() &&
                                  memcmp(abyJPEG.data() + nChunkLoc + 4,

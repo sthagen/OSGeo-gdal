@@ -789,6 +789,37 @@ def test_gml_read_compound_crs_lat_long():
 
 
 ###############################################################################
+# Read CityGML Lod2 with xlink:href in the gml:Solid
+
+
+def test_ogr_gml_city_gml_lod2_with_xlink_href():
+
+    if not gdaltest.have_gml_reader:
+        pytest.skip()
+
+    gdal.Unlink("data/gml/citygml_lod2_713_5322.gfs")
+    gdal.ErrorReset()
+    ds = ogr.Open("data/gml/citygml_lod2_713_5322.xml")
+    lyr = ds.GetLayer(0)
+    assert gdal.GetLastErrorMsg() == ""
+    assert lyr.GetSpatialRef().IsProjected()
+    assert lyr.GetGeomType() == ogr.wkbPolyhedralSurfaceZ
+
+    feat = lyr.GetNextFeature()
+
+    # print(feat.GetGeometryRef().ExportToIsoWkt())
+    wkt = "POLYHEDRALSURFACE Z (((713235.347 5322980.429 584.22,713235.909 5322980.781 584.22,713237.154 5322981.561 584.22,713237.154 5322981.561 587.655,713235.909 5322980.781 588.03,713235.347 5322980.429 587.86,713235.347 5322980.429 584.22)),((713236.374 5322982.678 587.658,713237.154 5322981.561 587.655,713237.154 5322981.561 584.22,713236.374 5322982.678 584.22,713234.768 5322984.981 584.22,713234.768 5322984.981 587.666,713236.374 5322982.678 587.658)),((713234.612 5322981.452 584.22,713235.347 5322980.429 584.22,713235.347 5322980.429 587.86,713234.612 5322981.452 587.853,713234.612 5322981.452 588.21,713234.585 5322981.49 588.21,713234.585 5322981.49 584.22,713234.612 5322981.452 584.22)),((713229.269 5322983.856 587.663,713231.399 5322985.337 588.33,713233.571 5322986.847 587.65,713235.231 5322988.002 587.13,713235.231 5322988.002 584.22,713233.571 5322986.847 584.22,713231.399 5322985.337 584.22,713229.269 5322983.856 584.22,713229.269 5322983.856 587.663)),((713235.231 5322988.002 584.22,713235.231 5322988.002 587.13,713236.493 5322986.18 587.126,713236.493 5322986.18 584.22,713235.231 5322988.002 584.22)),((713232.071 5322979.751 584.22,713232.071 5322979.751 587.663,713229.269 5322983.856 587.663,713229.269 5322983.856 584.22,713232.071 5322979.751 584.22)),((713235.909 5322980.781 584.22,713235.347 5322980.429 584.22,713234.612 5322981.452 584.22,713234.585 5322981.49 584.22,713234.205 5322981.227 584.22,713232.071 5322979.751 584.22,713229.269 5322983.856 584.22,713231.399 5322985.337 584.22,713233.571 5322986.847 584.22,713235.231 5322988.002 584.22,713236.493 5322986.18 584.22,713234.82 5322985.017 584.22,713234.768 5322984.981 584.22,713236.374 5322982.678 584.22,713237.154 5322981.561 584.22,713235.909 5322980.781 584.22)),((713232.071 5322979.751 584.22,713234.205 5322981.227 584.22,713234.585 5322981.49 584.22,713234.585 5322981.49 588.21,713234.205 5322981.227 588.33,713232.071 5322979.751 587.663,713232.071 5322979.751 584.22)),((713235.181 5322981.849 588.032,713234.612 5322981.452 588.21,713234.612 5322981.452 587.853,713235.181 5322981.849 588.032)),((713235.347 5322980.429 587.86,713235.909 5322980.781 588.03,713235.181 5322981.849 588.032,713234.612 5322981.452 587.853,713235.347 5322980.429 587.86)),((713234.768 5322984.981 584.22,713234.82 5322985.017 584.22,713236.493 5322986.18 584.22,713236.493 5322986.18 587.126,713234.82 5322985.017 587.65,713234.768 5322984.981 587.666,713234.768 5322984.981 584.22)),((713234.205 5322981.227 588.33,713234.585 5322981.49 588.21,713234.612 5322981.452 588.21,713235.181 5322981.849 588.032,713235.909 5322980.781 588.03,713237.154 5322981.561 587.655,713236.374 5322982.678 587.658,713234.768 5322984.981 587.666,713234.82 5322985.017 587.65,713236.493 5322986.18 587.126,713235.231 5322988.002 587.13,713233.571 5322986.847 587.65,713231.399 5322985.337 588.33,713234.205 5322981.227 588.33)),((713232.071 5322979.751 587.663,713234.205 5322981.227 588.33,713231.399 5322985.337 588.33,713229.269 5322983.856 587.663,713232.071 5322979.751 587.663)))"
+    assert not ogrtest.check_feature_geometry(feat, wkt), "Wrong geometry"
+
+    feat = lyr.GetNextFeature()
+    assert not feat.GetGeometryRef().IsEmpty()
+
+    ds = None
+
+    gdal.Unlink("data/gml/citygml_lod2_713_5322.gfs")
+
+
+###############################################################################
 # Read layer SRS for WFS 1.0.0 return
 
 
@@ -4586,3 +4617,96 @@ def test_ogr_gml_read_srsDimension_3_on_top_gml_Envelope():
         f.GetGeometryRef().ExportToIsoWkt()
         == "LINESTRING Z (1 2 3,4 5 6,7 8 9,10 11 12)"
     )
+
+
+###############################################################################
+# Test reading a file with only a boundedBy property in features without
+# a regular geometry field
+
+
+def test_ogr_gml_read_boundedby_only():
+
+    if not gdaltest.have_gml_reader:
+        pytest.skip()
+
+    def check():
+        ds = gdal.OpenEx("data/gml/only_boundedby.gml")
+        lyr = ds.GetLayer(0)
+        assert lyr.GetLayerDefn().GetGeomFieldCount() == 1
+        assert lyr.GetGeomType() == ogr.wkbPolygon
+        assert lyr.GetGeometryColumn() == "boundedBy"
+        assert lyr.GetExtent() == (0, 2, 1, 3)
+        f = lyr.GetNextFeature()
+        assert f["fid"] == "fid1"
+        assert f.GetGeometryRef().ExportToIsoWkt() == "POLYGON ((0 1,2 1,2 3,0 3,0 1))"
+        f = lyr.GetNextFeature()
+        assert f["fid"] == "fid2"
+        assert f.GetGeometryRef() is None
+        ds = None
+
+    gdal.Unlink("data/gml/only_boundedby.gfs")
+    check()
+
+    # This time with .gfs
+    assert os.path.exists("data/gml/only_boundedby.gfs")
+    check()
+    gdal.Unlink("data/gml/only_boundedby.gfs")
+
+
+###############################################################################
+# Test reading a file with only a boundedBy property in features without
+# a regular geometry field. And when it contains only gml:null
+
+
+def test_ogr_gml_read_boundedby_only_gml_null_only():
+
+    if not gdaltest.have_gml_reader:
+        pytest.skip()
+
+    def check():
+        ds = gdal.OpenEx("data/gml/only_boundedby_only_null.gml")
+        lyr = ds.GetLayer(0)
+        assert lyr.GetLayerDefn().GetGeomFieldCount() == 0
+        f = lyr.GetNextFeature()
+        assert f["fid"] == "fid1"
+        assert f.GetGeometryRef() is None
+        ds = None
+
+    gdal.Unlink("data/gml/only_boundedby_only_null.gfs")
+    check()
+
+    # This time with .gfs
+    assert os.path.exists("data/gml/only_boundedby_only_null.gfs")
+    check()
+    gdal.Unlink("data/gml/only_boundedby_only_null.gfs")
+
+
+###############################################################################
+# Test reading a file with only a boundedBy property in features that is
+# invalid
+
+
+def test_ogr_gml_read_boundedby_invalid():
+
+    if not gdaltest.have_gml_reader:
+        pytest.skip()
+
+    with gdaltest.error_handler():
+        ds = gdal.OpenEx("data/gml/only_boundedby_invalid.gml")
+        lyr = ds.GetLayer(0)
+        assert lyr.GetFeatureCount() == 0
+
+
+###############################################################################
+# Test reading a file with 2 boundedBy property in features: a first empty one,
+# and a second valid one (this mostly tests we don't crash)
+
+
+def test_ogr_gml_read_boundedby_repeated():
+
+    if not gdaltest.have_gml_reader:
+        pytest.skip()
+
+    ds = gdal.OpenEx("data/gml/only_boundedby_repeated.gml")
+    lyr = ds.GetLayer(0)
+    assert lyr.GetFeatureCount() == 1

@@ -124,6 +124,7 @@ class OGROpenFileGDBLayer final : public OGRLayer
     int m_iAreaField = -1;    // index of Shape_Area field
     int m_iLengthField = -1;  // index of Shape_Length field
     int m_iCurFeat = 0;
+    int m_iFIDAsRegularColumnIndex = -1;
     std::string m_osDefinition{};
     std::string m_osDocumentation{};
     std::string m_osConfigurationKeyword{};
@@ -459,6 +460,8 @@ class OGROpenFileGDBDataSource final : public OGRDataSource
 
     bool BackupSystemTablesForTransaction();
 
+    CPLErr Close() override;
+
   public:
     OGROpenFileGDBDataSource();
     virtual ~OGROpenFileGDBDataSource();
@@ -466,7 +469,7 @@ class OGROpenFileGDBDataSource final : public OGRDataSource
     int Open(const GDALOpenInfo *poOpenInfo);
     bool Create(const char *pszName);
 
-    virtual void FlushCache(bool bAtClosing = false) override;
+    virtual CPLErr FlushCache(bool bAtClosing = false) override;
 
     virtual const char *GetName() override
     {

@@ -134,8 +134,9 @@ static int Validate(const char *pszZipFilename, bool bVerbose)
                 const uint64_t nUncompressedSize = std::strtoull(
                     CSLFetchNameValue(papszMD, "UNCOMPRESSED_SIZE"), nullptr,
                     10);
-                if ((nUncompressedSize - 1) / nChunkSize >
-                    static_cast<uint64_t>(std::numeric_limits<int>::max()))
+                if (nChunkSize == 0 ||  // cannot happen
+                    (nUncompressedSize - 1) / nChunkSize >
+                        static_cast<uint64_t>(std::numeric_limits<int>::max()))
                 {
                     fprintf(
                         stderr,
@@ -213,7 +214,7 @@ static int Validate(const char *pszZipFilename, bool bVerbose)
                 }
 
                 if (bVerbose)
-                    printf("  %s: checking chunks can be independantly "
+                    printf("  %s: checking chunks can be independently "
                            "decompressed...\n",
                            psEntry->pszName);
 
