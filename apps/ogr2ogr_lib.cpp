@@ -52,6 +52,7 @@
 #include "cpl_error.h"
 #include "cpl_progress.h"
 #include "cpl_string.h"
+#include "cpl_time.h"
 #include "cpl_vsi.h"
 #include "gdal.h"
 #include "gdal_alg.h"
@@ -88,6 +89,8 @@ typedef enum
 #define COORD_DIM_UNCHANGED -1
 #define COORD_DIM_LAYER_DIM -2
 #define COORD_DIM_XYM -3
+
+#define TZ_OFFSET_INVALID INT_MIN
 
 /************************************************************************/
 /*                              CopyableGCPs                            */
@@ -424,6 +427,9 @@ struct GDALVectorTranslateOptions
 
     /*! Maximum number of features, or -1 if no limit. */
     GIntBig nLimit = -1;
+
+    /*! Wished offset w.r.t UTC of dateTime */
+    int nTZOffsetInSec = TZ_OFFSET_INVALID;
 };
 
 struct TargetLayerInfo
@@ -452,6 +458,7 @@ struct TargetLayerInfo
     const char *m_pszSpatSRSDef = nullptr;
     OGRGeometryH m_hSpatialFilter = nullptr;
     const char *m_pszGeomField = nullptr;
+    std::vector<int> m_anDateTimeFieldIdx{};
 };
 
 struct AssociatedLayers
@@ -534,6 +541,10 @@ class LayerTranslator
                   GIntBig nCountLayerFeatures, GIntBig *pnReadFeatureCount,
                   GIntBig &nTotalEventsDone, GDALProgressFunc pfnProgress,
                   void *pProgressArg, GDALVectorTranslateOptions *psOptions);
+
+  private:
+    const OGRGeometry *GetDstClipGeom(OGRSpatialReference *poGeomSRS);
+    const OGRGeometry *GetSrcClipGeom(OGRSpatialReference *poGeomSRS);
 };
 
 static OGRLayer *GetLayerAndOverwriteIfNecessary(GDALDataset *poDstDS,
@@ -547,10 +558,10 @@ static OGRLayer *GetLayerAndOverwriteIfNecessary(GDALDataset *poDstDS,
 /*                           LoadGeometry()                             */
 /************************************************************************/
 
-static OGRGeometry *LoadGeometry(const std::string &osDS,
-                                 const std::string &osSQL,
-                                 const std::string &osLyr,
-                                 const std::string &osWhere)
+static std::unique_ptr<OGRGeometry> LoadGeometry(const std::string &osDS,
+                                                 const std::string &osSQL,
+                                                 const std::string &osLyr,
+                                                 const std::string &osWhere)
 {
     auto poDS = std::unique_ptr<GDALDataset>(
         GDALDataset::Open(osDS.c_str(), GDAL_OF_VECTOR));
@@ -622,7 +633,7 @@ static OGRGeometry *LoadGeometry(const std::string &osDS,
     if (!osSQL.empty())
         poDS->ReleaseResultSet(poLyr);
 
-    return poMP.release();
+    return poMP;
 }
 
 /************************************************************************/
@@ -2241,9 +2252,9 @@ GDALDatasetH GDALVectorTranslate(const char *pszDest, GDALDatasetH hDstDS,
 
     if (!psOptions->poClipSrc && !psOptions->osClipSrcDS.empty())
     {
-        psOptions->poClipSrc.reset(
+        psOptions->poClipSrc =
             LoadGeometry(psOptions->osClipSrcDS, psOptions->osClipSrcSQL,
-                         psOptions->osClipSrcLayer, psOptions->osClipSrcWhere));
+                         psOptions->osClipSrcLayer, psOptions->osClipSrcWhere);
         if (psOptions->poClipSrc == nullptr)
         {
             CPLError(CE_Failure, CPLE_IllegalArg,
@@ -2251,33 +2262,30 @@ GDALDatasetH GDALVectorTranslate(const char *pszDest, GDALDatasetH hDstDS,
             return nullptr;
         }
     }
+    else if (psOptions->bClipSrc && !psOptions->poClipSrc &&
+             psOptions->poSpatialFilter)
+    {
+        psOptions->poClipSrc.reset(psOptions->poSpatialFilter->clone());
+        if (poSpatSRS)
+        {
+            psOptions->poClipSrc->assignSpatialReference(poSpatSRS.get());
+        }
+    }
     else if (psOptions->bClipSrc && !psOptions->poClipSrc)
     {
-        if (psOptions->poSpatialFilter)
-        {
-            psOptions->poClipSrc.reset(psOptions->poSpatialFilter->clone());
-            if (poSpatSRS)
-            {
-                psOptions->poClipSrc->assignSpatialReference(poSpatSRS.get());
-            }
-        }
-        if (psOptions->poClipSrc == nullptr)
-        {
-            CPLError(
-                CE_Failure, CPLE_IllegalArg,
-                "-clipsrc must be used with -spat option or a\n"
-                "bounding box, WKT string or datasource must be specified");
-            if (pbUsageError)
-                *pbUsageError = TRUE;
-            return nullptr;
-        }
+        CPLError(CE_Failure, CPLE_IllegalArg,
+                 "-clipsrc must be used with -spat option or a\n"
+                 "bounding box, WKT string or datasource must be specified");
+        if (pbUsageError)
+            *pbUsageError = TRUE;
+        return nullptr;
     }
 
     if (!psOptions->osClipDstDS.empty())
     {
-        psOptions->poClipDst.reset(
+        psOptions->poClipDst =
             LoadGeometry(psOptions->osClipDstDS, psOptions->osClipDstSQL,
-                         psOptions->osClipDstLayer, psOptions->osClipDstWhere));
+                         psOptions->osClipDstLayer, psOptions->osClipDstWhere);
         if (psOptions->poClipDst == nullptr)
         {
             CPLError(CE_Failure, CPLE_IllegalArg,
@@ -4788,6 +4796,17 @@ SetupTargetLayer::Setup(OGRLayer *poSrcLayer, const char *pszNewLayerName,
     psInfo->m_pszGeomField =
         psOptions->bGeomFieldSet ? psOptions->osGeomField.c_str() : nullptr;
 
+    if (psOptions->nTZOffsetInSec != TZ_OFFSET_INVALID && poDstFDefn)
+    {
+        for (int i = 0; i < poDstFDefn->GetFieldCount(); ++i)
+        {
+            if (poDstFDefn->GetFieldDefn(i)->GetType() == OFTDateTime)
+            {
+                psInfo->m_anDateTimeFieldIdx.push_back(i);
+            }
+        }
+    }
+
     return psInfo;
 }
 
@@ -5255,67 +5274,30 @@ int LayerTranslator::Translate(OGRFeature *poFeatureIn, TargetLayerInfo *psInfo,
                  */
                 /* target feature : we steal it from the source feature for
                  * now... */
-                OGRGeometry *poStolenGeometry = nullptr;
+                std::unique_ptr<OGRGeometry> poStolenGeometry;
                 if (!bExplodeCollections && nSrcGeomFieldCount == 1 &&
                     (nDstGeomFieldCount == 1 ||
                      (nDstGeomFieldCount == 0 && m_poClipSrcOri)))
                 {
-                    poStolenGeometry = poFeature->StealGeometry();
+                    poStolenGeometry.reset(poFeature->StealGeometry());
                 }
                 else if (!bExplodeCollections && iRequestedSrcGeomField >= 0)
                 {
-                    poStolenGeometry =
-                        poFeature->StealGeometry(iRequestedSrcGeomField);
+                    poStolenGeometry.reset(
+                        poFeature->StealGeometry(iRequestedSrcGeomField));
                 }
 
                 if (nDstGeomFieldCount == 0 && poStolenGeometry &&
                     m_poClipSrcOri)
                 {
-                    auto poGeomSRS = poStolenGeometry->getSpatialReference();
-                    if (m_poClipSrcReprojectedToSrcSRS_SRS != poGeomSRS)
+                    const OGRGeometry *poClipGeom =
+                        GetSrcClipGeom(poStolenGeometry->getSpatialReference());
+
+                    if (poClipGeom != nullptr &&
+                        !poClipGeom->Intersects(poStolenGeometry.get()))
                     {
-                        auto poClipSrcSRS =
-                            m_poClipSrcOri->getSpatialReference();
-                        if (poClipSrcSRS && poGeomSRS &&
-                            !poClipSrcSRS->IsSame(poGeomSRS))
-                        {
-                            // Transform clip geom to geometry SRS
-                            m_poClipSrcReprojectedToSrcSRS.reset(
-                                m_poClipSrcOri->clone());
-                            if (m_poClipSrcReprojectedToSrcSRS->transformTo(
-                                    poGeomSRS) != OGRERR_NONE)
-                            {
-                                delete poStolenGeometry;
-                                goto end_loop;
-                            }
-                            m_poClipSrcReprojectedToSrcSRS_SRS = poGeomSRS;
-                        }
-                        else if (!poClipSrcSRS && poGeomSRS)
-                        {
-                            if (!m_bWarnedClipSrcSRS)
-                            {
-                                m_bWarnedClipSrcSRS = true;
-                                CPLError(
-                                    CE_Warning, CPLE_AppDefined,
-                                    "Clip source geometry has no attached SRS, "
-                                    "but the feature's geometry has one. "
-                                    "Assuming clip source geometry SRS is the "
-                                    "same as the feature's geometry");
-                            }
-                        }
-                    }
-                    OGRGeometry *poClipped = poStolenGeometry->Intersection(
-                        m_poClipSrcReprojectedToSrcSRS
-                            ? m_poClipSrcReprojectedToSrcSRS.get()
-                            : m_poClipSrcOri);
-                    delete poStolenGeometry;
-                    poStolenGeometry = nullptr;
-                    if (poClipped == nullptr || poClipped->IsEmpty())
-                    {
-                        delete poClipped;
                         goto end_loop;
                     }
-                    delete poClipped;
                 }
 
                 poDstFeature->Reset();
@@ -5328,8 +5310,6 @@ int LayerTranslator::Translate(OGRFeature *poFeatureIn, TargetLayerInfo *psInfo,
                         {
                             if (poDstLayer->CommitTransaction() != OGRERR_NONE)
                             {
-                                OGRGeometryFactory::destroyGeometry(
-                                    poStolenGeometry);
                                 return false;
                             }
                         }
@@ -5340,14 +5320,14 @@ int LayerTranslator::Translate(OGRFeature *poFeatureIn, TargetLayerInfo *psInfo,
                              " from layer %s.",
                              nSrcFID, poSrcLayer->GetName());
 
-                    OGRGeometryFactory::destroyGeometry(poStolenGeometry);
                     return false;
                 }
 
                 /* ... and now we can attach the stolen geometry */
                 if (poStolenGeometry)
                 {
-                    poDstFeature->SetGeometryDirectly(poStolenGeometry);
+                    poDstFeature->SetGeometryDirectly(
+                        poStolenGeometry.release());
                 }
 
                 if (!psInfo->m_oMapResolved.empty())
@@ -5388,6 +5368,51 @@ int LayerTranslator::Translate(OGRFeature *poFeatureIn, TargetLayerInfo *psInfo,
                     auto str = poDstFeature->GetFieldAsString(i);
                     if (strcmp(str, "") == 0)
                         poDstFeature->SetFieldNull(i);
+                }
+            }
+
+            if (!psInfo->m_anDateTimeFieldIdx.empty())
+            {
+                for (int i : psInfo->m_anDateTimeFieldIdx)
+                {
+                    if (!poDstFeature->IsFieldSetAndNotNull(i))
+                        continue;
+                    auto psField = poDstFeature->GetRawFieldRef(i);
+                    if (psField->Date.TZFlag == 0 || psField->Date.TZFlag == 1)
+                        continue;
+
+                    const int nTZOffsetInSec =
+                        (psField->Date.TZFlag - 100) * 15 * 60;
+                    if (nTZOffsetInSec == psOptions->nTZOffsetInSec)
+                        continue;
+
+                    struct tm brokendowntime;
+                    memset(&brokendowntime, 0, sizeof(brokendowntime));
+                    brokendowntime.tm_year = psField->Date.Year - 1900;
+                    brokendowntime.tm_mon = psField->Date.Month - 1;
+                    brokendowntime.tm_mday = psField->Date.Day;
+                    GIntBig nUnixTime = CPLYMDHMSToUnixTime(&brokendowntime);
+                    int nSec = psField->Date.Hour * 3600 +
+                               psField->Date.Minute * 60 +
+                               static_cast<int>(psField->Date.Second);
+                    nSec += psOptions->nTZOffsetInSec - nTZOffsetInSec;
+                    nUnixTime += nSec;
+                    CPLUnixTimeToYMDHMS(nUnixTime, &brokendowntime);
+
+                    psField->Date.Year =
+                        static_cast<GInt16>(brokendowntime.tm_year + 1900);
+                    psField->Date.Month =
+                        static_cast<GByte>(brokendowntime.tm_mon + 1);
+                    psField->Date.Day =
+                        static_cast<GByte>(brokendowntime.tm_mday);
+                    psField->Date.Hour =
+                        static_cast<GByte>(brokendowntime.tm_hour);
+                    psField->Date.Minute =
+                        static_cast<GByte>(brokendowntime.tm_min);
+                    psField->Date.Second = static_cast<float>(
+                        brokendowntime.tm_sec + fmod(psField->Date.Second, 1));
+                    psField->Date.TZFlag = static_cast<GByte>(
+                        100 + psOptions->nTZOffsetInSec / (15 * 60));
                 }
             }
 
@@ -5474,47 +5499,29 @@ int LayerTranslator::Translate(OGRFeature *poFeatureIn, TargetLayerInfo *psInfo,
 
                 if (m_poClipSrcOri)
                 {
-                    auto poGeomSRS = poDstGeometry->getSpatialReference();
-                    if (m_poClipSrcReprojectedToSrcSRS_SRS != poGeomSRS)
+
+                    const OGRGeometry *poClipGeom =
+                        GetSrcClipGeom(poDstGeometry->getSpatialReference());
+
+                    std::unique_ptr<OGRGeometry> poClipped;
+                    if (poClipGeom != nullptr)
                     {
-                        auto poClipSrcSRS =
-                            m_poClipSrcOri->getSpatialReference();
-                        if (poClipSrcSRS && poGeomSRS &&
-                            !poClipSrcSRS->IsSame(poGeomSRS))
+                        OGREnvelope oClipEnv;
+                        OGREnvelope oDstEnv;
+
+                        poClipGeom->getEnvelope(&oClipEnv);
+                        poDstGeometry->getEnvelope(&oDstEnv);
+
+                        if (oClipEnv.Intersects(oDstEnv))
                         {
-                            // Transform clip geom to geometry SRS
-                            m_poClipSrcReprojectedToSrcSRS.reset(
-                                m_poClipSrcOri->clone());
-                            if (m_poClipSrcReprojectedToSrcSRS->transformTo(
-                                    poGeomSRS) != OGRERR_NONE)
-                            {
-                                delete poDstGeometry;
-                                goto end_loop;
-                            }
-                            m_poClipSrcReprojectedToSrcSRS_SRS = poGeomSRS;
-                        }
-                        else if (!poClipSrcSRS && poGeomSRS)
-                        {
-                            if (!m_bWarnedClipSrcSRS)
-                            {
-                                m_bWarnedClipSrcSRS = true;
-                                CPLError(
-                                    CE_Warning, CPLE_AppDefined,
-                                    "Clip source geometry has no attached SRS, "
-                                    "but the feature's geometry has one. "
-                                    "Assuming clip source geometry SRS is the "
-                                    "same as the feature's geometry");
-                            }
+                            poClipped.reset(
+                                poClipGeom->Intersection(poDstGeometry));
                         }
                     }
-                    OGRGeometry *poClipped = poDstGeometry->Intersection(
-                        m_poClipSrcReprojectedToSrcSRS
-                            ? m_poClipSrcReprojectedToSrcSRS.get()
-                            : m_poClipSrcOri);
+
                     if (poClipped == nullptr || poClipped->IsEmpty())
                     {
                         delete poDstGeometry;
-                        delete poClipped;
                         goto end_loop;
                     }
 
@@ -5533,12 +5540,11 @@ int LayerTranslator::Translate(OGRFeature *poFeatureIn, TargetLayerInfo *psInfo,
                             OGRToOGCGeomType(poClipped->getGeometryType()),
                             OGRToOGCGeomType(poDstGeometry->getGeometryType()));
                         delete poDstGeometry;
-                        delete poClipped;
                         goto end_loop;
                     }
 
                     delete poDstGeometry;
-                    poDstGeometry = poClipped;
+                    poDstGeometry = poClipped.release();
                 }
 
                 OGRCoordinateTransformation *const poCT =
@@ -5592,47 +5598,31 @@ int LayerTranslator::Translate(OGRFeature *poFeatureIn, TargetLayerInfo *psInfo,
                 {
                     if (m_poClipDstOri)
                     {
-                        auto poGeomSRS = poDstGeometry->getSpatialReference();
-                        if (m_poClipDstReprojectedToDstSRS_SRS != poGeomSRS)
+                        const OGRGeometry *poClipGeom = GetDstClipGeom(
+                            poDstGeometry->getSpatialReference());
+                        if (poClipGeom == nullptr)
                         {
-                            auto poClipDstSRS =
-                                m_poClipDstOri->getSpatialReference();
-                            if (poClipDstSRS && poGeomSRS &&
-                                !poClipDstSRS->IsSame(poGeomSRS))
-                            {
-                                // Transform clip geom to geometry SRS
-                                m_poClipDstReprojectedToDstSRS.reset(
-                                    m_poClipDstOri->clone());
-                                if (m_poClipDstReprojectedToDstSRS->transformTo(
-                                        poGeomSRS) != OGRERR_NONE)
-                                {
-                                    delete poDstGeometry;
-                                    goto end_loop;
-                                }
-                                m_poClipDstReprojectedToDstSRS_SRS = poGeomSRS;
-                            }
-                            else if (!poClipDstSRS && poGeomSRS)
-                            {
-                                if (!m_bWarnedClipDstSRS)
-                                {
-                                    m_bWarnedClipDstSRS = true;
-                                    CPLError(CE_Warning, CPLE_AppDefined,
-                                             "Clip destination geometry has no "
-                                             "attached SRS, but the feature's "
-                                             "geometry has one. Assuming clip "
-                                             "destination geometry SRS is the "
-                                             "same as the feature's geometry");
-                                }
-                            }
+                            delete poDstGeometry;
+                            goto end_loop;
                         }
-                        OGRGeometry *poClipped = poDstGeometry->Intersection(
-                            m_poClipDstReprojectedToDstSRS
-                                ? m_poClipDstReprojectedToDstSRS.get()
-                                : m_poClipDstOri);
+
+                        std::unique_ptr<OGRGeometry> poClipped;
+
+                        OGREnvelope oClipEnv;
+                        OGREnvelope oDstEnv;
+
+                        poClipGeom->getEnvelope(&oClipEnv);
+                        poDstGeometry->getEnvelope(&oDstEnv);
+
+                        if (oClipEnv.Intersects(oDstEnv))
+                        {
+                            poClipped.reset(
+                                poClipGeom->Intersection(poDstGeometry));
+                        }
+
                         if (poClipped == nullptr || poClipped->IsEmpty())
                         {
                             delete poDstGeometry;
-                            delete poClipped;
                             goto end_loop;
                         }
 
@@ -5652,12 +5642,11 @@ int LayerTranslator::Translate(OGRFeature *poFeatureIn, TargetLayerInfo *psInfo,
                                 OGRToOGCGeomType(
                                     poDstGeometry->getGeometryType()));
                             delete poDstGeometry;
-                            delete poClipped;
                             goto end_loop;
                         }
 
                         delete poDstGeometry;
-                        poDstGeometry = poClipped;
+                        poDstGeometry = poClipped.release();
                     }
 
                     if (m_bMakeValid)
@@ -5798,6 +5787,85 @@ int LayerTranslator::Translate(OGRFeature *poFeatureIn, TargetLayerInfo *psInfo,
     }
 
     return bRet;
+}
+
+/************************************************************************/
+/*                LayerTranslator::GetDstClipGeom()                     */
+/************************************************************************/
+
+const OGRGeometry *
+LayerTranslator::GetDstClipGeom(OGRSpatialReference *poGeomSRS)
+{
+    if (m_poClipDstReprojectedToDstSRS_SRS != poGeomSRS)
+    {
+        auto poClipDstSRS = m_poClipDstOri->getSpatialReference();
+        if (poClipDstSRS && poGeomSRS && !poClipDstSRS->IsSame(poGeomSRS))
+        {
+            // Transform clip geom to geometry SRS
+            m_poClipDstReprojectedToDstSRS.reset(m_poClipDstOri->clone());
+            if (m_poClipDstReprojectedToDstSRS->transformTo(poGeomSRS) !=
+                OGRERR_NONE)
+            {
+                return nullptr;
+            }
+            m_poClipDstReprojectedToDstSRS_SRS = poGeomSRS;
+        }
+        else if (!poClipDstSRS && poGeomSRS)
+        {
+            if (!m_bWarnedClipDstSRS)
+            {
+                m_bWarnedClipDstSRS = true;
+                CPLError(CE_Warning, CPLE_AppDefined,
+                         "Clip destination geometry has no "
+                         "attached SRS, but the feature's "
+                         "geometry has one. Assuming clip "
+                         "destination geometry SRS is the "
+                         "same as the feature's geometry");
+            }
+        }
+    }
+
+    return m_poClipDstReprojectedToDstSRS ? m_poClipDstReprojectedToDstSRS.get()
+                                          : m_poClipDstOri;
+}
+
+/************************************************************************/
+/*                LayerTranslator::GetSrcClipGeom()                     */
+/************************************************************************/
+
+const OGRGeometry *
+LayerTranslator::GetSrcClipGeom(OGRSpatialReference *poGeomSRS)
+{
+    if (m_poClipSrcReprojectedToSrcSRS_SRS != poGeomSRS)
+    {
+        auto poClipSrcSRS = m_poClipSrcOri->getSpatialReference();
+        if (poClipSrcSRS && poGeomSRS && !poClipSrcSRS->IsSame(poGeomSRS))
+        {
+            // Transform clip geom to geometry SRS
+            m_poClipSrcReprojectedToSrcSRS.reset(m_poClipSrcOri->clone());
+            if (m_poClipSrcReprojectedToSrcSRS->transformTo(poGeomSRS) !=
+                OGRERR_NONE)
+            {
+                return nullptr;
+            }
+            m_poClipSrcReprojectedToSrcSRS_SRS = poGeomSRS;
+        }
+        else if (!poClipSrcSRS && poGeomSRS)
+        {
+            if (!m_bWarnedClipSrcSRS)
+            {
+                m_bWarnedClipSrcSRS = true;
+                CPLError(CE_Warning, CPLE_AppDefined,
+                         "Clip source geometry has no attached SRS, "
+                         "but the feature's geometry has one. "
+                         "Assuming clip source geometry SRS is the "
+                         "same as the feature's geometry");
+            }
+        }
+    }
+
+    return m_poClipSrcReprojectedToSrcSRS ? m_poClipSrcReprojectedToSrcSRS.get()
+                                          : m_poClipSrcOri;
 }
 
 /************************************************************************/
@@ -6594,6 +6662,50 @@ GDALVectorTranslateOptions *GDALVectorTranslateOptionsNew(
         {
             CHECK_HAS_ENOUGH_ADDITIONAL_ARGS(1);
             psOptions->nLimit = CPLAtoGIntBig(papszArgv[++i]);
+        }
+        else if (EQUAL(papszArgv[i], "-dateTimeTo"))
+        {
+            CHECK_HAS_ENOUGH_ADDITIONAL_ARGS(1);
+            const char *pszFormat = papszArgv[++i];
+            if (EQUAL(pszFormat, "UTC"))
+            {
+                psOptions->nTZOffsetInSec = 0;
+            }
+            else if (STARTS_WITH_CI(pszFormat, "UTC") &&
+                     (strlen(pszFormat) == strlen("UTC+HH") ||
+                      strlen(pszFormat) == strlen("UTC+HH:MM")) &&
+                     (pszFormat[3] == '+' || pszFormat[3] == '-'))
+            {
+                const int nHour = atoi(pszFormat + strlen("UTC+"));
+                if (nHour < 0 || nHour > 14)
+                {
+                    // invalid
+                }
+                else if (strlen(pszFormat) == strlen("UTC+HH"))
+                {
+                    psOptions->nTZOffsetInSec = nHour * 3600;
+                    if (pszFormat[3] == '-')
+                        psOptions->nTZOffsetInSec = -psOptions->nTZOffsetInSec;
+                }
+                else  // if( strlen(pszFormat) == strlen("UTC+HH:MM") )
+                {
+                    const int nMin = atoi(pszFormat + strlen("UTC+HH:"));
+                    if (nMin == 0 || nMin == 15 || nMin == 30 || nMin == 45)
+                    {
+                        psOptions->nTZOffsetInSec = nHour * 3600 + nMin * 60;
+                        if (pszFormat[3] == '-')
+                            psOptions->nTZOffsetInSec =
+                                -psOptions->nTZOffsetInSec;
+                    }
+                }
+            }
+            if (psOptions->nTZOffsetInSec == TZ_OFFSET_INVALID)
+            {
+                CPLError(CE_Failure, CPLE_NotSupported,
+                         "Value of -dateTimeTo should be UTC, UTC(+|-)HH or "
+                         "UTC(+|-)HH:MM with HH in [0,14] and MM=00,15,30,45");
+                return nullptr;
+            }
         }
         else if (papszArgv[i][0] == '-')
         {
