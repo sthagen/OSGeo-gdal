@@ -1055,9 +1055,7 @@ OGRErr OGRFlatGeobufLayer::parseFeature(OGRFeature *poFeature)
 
     if (m_bVerifyBuffers)
     {
-        const auto vBuf = const_cast<const uint8_t *>(
-            reinterpret_cast<uint8_t *>(m_featureBuf));
-        Verifier v(vBuf, featureSize);
+        Verifier v(m_featureBuf, featureSize);
         const auto ok = VerifyFeatureBuffer(v);
         if (!ok)
         {
@@ -1499,9 +1497,7 @@ int OGRFlatGeobufLayer::GetNextArrowArray(struct ArrowArrayStream *stream,
 
         if (m_bVerifyBuffers)
         {
-            const auto vBuf = const_cast<const uint8_t *>(
-                reinterpret_cast<uint8_t *>(m_featureBuf));
-            Verifier v(vBuf, featureSize);
+            Verifier v(m_featureBuf, featureSize);
             const auto ok = VerifyFeatureBuffer(v);
             if (!ok)
             {
@@ -2130,6 +2126,17 @@ OGRErr OGRFlatGeobufLayer::ICreateFeature(OGRFeature *poNewFeature)
 
     try
     {
+        // FlatBuffer serialization will crash/assert if the vectors go
+        // beyond FLATBUFFERS_MAX_BUFFER_SIZE. We cannot easily anticipate
+        // the size of the FlatBuffer, but WKB might be a good approximation.
+        // Takes an extra security margin of 10%
+        const auto nWKBSize = ogrGeometry->WkbSize();
+        if (nWKBSize > feature_max_buffer_size - nWKBSize / 10)
+        {
+            CPLError(CE_Failure, CPLE_OutOfMemory,
+                     "ICreateFeature: Too big geometry");
+            return OGRERR_FAILURE;
+        }
         GeometryWriter writer{fbb, ogrGeometry, m_geometryType, m_hasZ, m_hasM};
         const auto geometryOffset = writer.write(0);
         const auto pProperties = properties.empty() ? nullptr : &properties;
