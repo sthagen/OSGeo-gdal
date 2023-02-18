@@ -282,6 +282,9 @@ class GDALGridGeometryVisitor final : public OGRDefaultConstGeometryVisitor
         if (poClipSrc && !p->Within(poClipSrc))
             return;
 
+        if (iBurnField < 0 && std::isnan(p->getZ()))
+            return;
+
         adfX.push_back(p->getX());
         adfY.push_back(p->getY());
         if (iBurnField < 0)
@@ -345,11 +348,14 @@ static CPLErr ProcessLayer(OGRLayerH hSrcLayer, GDALDatasetH hDstDS,
         const OGRGeometry *poGeom = poFeat->GetGeometryRef();
         if (poGeom)
         {
-            double dfBurnValue = 0.0;
-
             if (iBurnField >= 0)
-                dfBurnValue = poFeat->GetFieldAsDouble(iBurnField);
-            oVisitor.dfBurnValue = dfBurnValue;
+            {
+                if (!poFeat->IsFieldSetAndNotNull(iBurnField))
+                {
+                    continue;
+                }
+                oVisitor.dfBurnValue = poFeat->GetFieldAsDouble(iBurnField);
+            }
 
             poGeom->accept(&oVisitor);
         }
@@ -985,8 +991,8 @@ GDALGridOptionsNew(char **papszArgv,
     psOptions->bNoDataSet = false;
     psOptions->dfNoDataValue = 0;
 
-    ParseAlgorithmAndOptions(szAlgNameInvDist, &psOptions->eAlgorithm,
-                             &psOptions->pOptions);
+    GDALGridParseAlgorithmAndOptions(szAlgNameInvDist, &psOptions->eAlgorithm,
+                                     &psOptions->pOptions);
 
     bool bGotSourceFilename = false;
     bool bGotDestFilename = false;
@@ -1236,8 +1242,9 @@ GDALGridOptionsNew(char **papszArgv,
         {
             const char *pszAlgorithm = papszArgv[++i];
             CPLFree(psOptions->pOptions);
-            if (ParseAlgorithmAndOptions(pszAlgorithm, &psOptions->eAlgorithm,
-                                         &psOptions->pOptions) != CE_None)
+            if (GDALGridParseAlgorithmAndOptions(
+                    pszAlgorithm, &psOptions->eAlgorithm,
+                    &psOptions->pOptions) != CE_None)
             {
                 CPLError(CE_Failure, CPLE_AppDefined,
                          "Failed to process algorithm name and parameters");

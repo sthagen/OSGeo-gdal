@@ -468,6 +468,7 @@ void VSIInstallOSSStreamingFileHandler(void);
 void VSIInstallSwiftFileHandler(void);
 void VSIInstallSwiftStreamingFileHandler(void);
 void VSIInstall7zFileHandler(void);   /* No reason to export that */
+void VSIInstallRarFileHandler(void);  /* No reason to export that */
 void VSIInstallGZipFileHandler(void); /* No reason to export that */
 void VSIInstallZipFileHandler(void);  /* No reason to export that */
 void VSIInstallStdinHandler(void);    /* No reason to export that */
@@ -481,6 +482,9 @@ void CPL_DLL VSISetCryptKey(const GByte *pabyKey, int nKeySize);
 /*! @cond Doxygen_Suppress */
 void CPL_DLL VSICleanupFileManager(void);
 /*! @endcond */
+
+bool CPL_DLL VSIDuplicateFileSystemHandler(const char *pszSourceFSName,
+                                           const char *pszNewFSName);
 
 VSILFILE CPL_DLL *
 VSIFileFromMemBuffer(const char *pszFilename, GByte *pabyData,
