@@ -41,6 +41,16 @@ import test_py_scripts  # noqa  # pylint: disable=E0401
 from osgeo import gdal  # noqa
 from osgeo_utils.gdalcompare import compare_db
 
+pytestmark = pytest.mark.skipif(
+    test_py_scripts.get_py_script("gdal2tiles") is None,
+    reason="gdal2tiles not available",
+)
+
+
+@pytest.fixture()
+def script_path():
+    return test_py_scripts.get_py_script("gdal2tiles")
+
 
 def _verify_raster_band_checksums(filename, expected_cs=[]):
     ds = gdal.Open(filename)
@@ -56,13 +66,8 @@ def _verify_raster_band_checksums(filename, expected_cs=[]):
     ds = None
 
 
-def test_gdal2tiles_py_simple():
-    script_path = test_py_scripts.get_py_script("gdal2tiles")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("PNG") is None:
-        pytest.skip("PNG driver is missing")
+@pytest.mark.require_driver("PNG")
+def test_gdal2tiles_py_simple(script_path):
 
     shutil.copy(
         test_py_scripts.get_data_path("gdrivers") + "small_world.tif",
@@ -93,14 +98,8 @@ def test_gdal2tiles_py_simple():
         )
 
 
-def test_gdal2tiles_py_zoom_option():
-
-    script_path = test_py_scripts.get_py_script("gdal2tiles")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("PNG") is None:
-        pytest.skip("PNG driver is missing")
+@pytest.mark.require_driver("PNG")
+def test_gdal2tiles_py_zoom_option(script_path):
 
     shutil.rmtree("tmp/out_gdal2tiles_smallworld", ignore_errors=True)
 
@@ -123,18 +122,15 @@ def test_gdal2tiles_py_zoom_option():
     assert not os.path.exists("tmp/out_gdal2tiles_smallworld/0/0/0.png.aux.xml")
     assert not os.path.exists("tmp/out_gdal2tiles_smallworld/1/0/0.png.aux.xml")
 
+    if gdal.GetDriverByName("KMLSuperOverlay") is None:
+        pytest.skip("KMLSuperOverlay driver missing")
+
     ds = gdal.Open("tmp/out_gdal2tiles_smallworld/doc.kml")
     assert ds is not None, "did not get kml"
 
 
-def test_gdal2tiles_py_resampling_option():
-
-    script_path = test_py_scripts.get_py_script("gdal2tiles")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("PNG") is None:
-        pytest.skip("PNG driver is missing")
+@pytest.mark.require_driver("PNG")
+def test_gdal2tiles_py_resampling_option(script_path):
 
     resampling_list = [
         "average",
@@ -187,13 +183,8 @@ def test_gdal2tiles_py_resampling_option():
     shutil.rmtree(out_dir, ignore_errors=True)
 
 
-def test_gdal2tiles_py_xyz():
-    script_path = test_py_scripts.get_py_script("gdal2tiles")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("PNG") is None:
-        pytest.skip("PNG driver is missing")
+@pytest.mark.require_driver("PNG")
+def test_gdal2tiles_py_xyz(script_path):
 
     try:
         shutil.copy(
@@ -233,17 +224,12 @@ def test_gdal2tiles_py_xyz():
         shutil.rmtree("tmp/out_gdal2tiles_smallworld_xyz")
 
 
-def test_gdal2tiles_py_invalid_srs():
+@pytest.mark.require_driver("PNG")
+def test_gdal2tiles_py_invalid_srs(script_path):
     """
     Case where the input image is not georeferenced, i.e. it's missing the SRS info,
     and no --s_srs option is provided. The script should fail validation and terminate.
     """
-    script_path = test_py_scripts.get_py_script("gdal2tiles")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("PNG") is None:
-        pytest.skip("PNG driver is missing")
 
     shutil.copy(
         test_py_scripts.get_data_path("gdrivers") + "test_nosrs.vrt",
@@ -273,7 +259,7 @@ def test_gdal2tiles_py_invalid_srs():
     assert "ERROR ret code" not in ret2
 
 
-def test_does_not_error_when_source_bounds_close_to_tiles_bound():
+def test_does_not_error_when_source_bounds_close_to_tiles_bound(script_path):
     """
     Case where the border coordinate of the input file is inside a tile T but the first pixel is
     actually assigned to the tile next to T (nearest neighbour), meaning that when the query is done
@@ -289,10 +275,6 @@ def test_does_not_error_when_source_bounds_close_to_tiles_bound():
     except Exception:
         pass
 
-    script_path = test_py_scripts.get_py_script("gdal2tiles")
-    if script_path is None:
-        pytest.skip()
-
     try:
         for in_file in in_files:
             test_py_scripts.run_py_script(
@@ -305,7 +287,7 @@ def test_does_not_error_when_source_bounds_close_to_tiles_bound():
         )
 
 
-def test_does_not_error_when_nothing_to_put_in_the_low_zoom_tile():
+def test_does_not_error_when_nothing_to_put_in_the_low_zoom_tile(script_path):
     """
     Case when the highest zoom level asked is actually too low for any pixel of the raster to be
     selected
@@ -316,10 +298,6 @@ def test_does_not_error_when_nothing_to_put_in_the_low_zoom_tile():
         shutil.rmtree(out_folder)
     except OSError:
         pass
-
-    script_path = test_py_scripts.get_py_script("gdal2tiles")
-    if script_path is None:
-        pytest.skip()
 
     try:
         test_py_scripts.run_py_script(
@@ -332,14 +310,9 @@ def test_does_not_error_when_nothing_to_put_in_the_low_zoom_tile():
         )
 
 
-def test_handle_utf8_filename():
+@pytest.mark.require_driver("PNG")
+def test_handle_utf8_filename(script_path):
     input_file = "data/test_utf8_漢字.vrt"
-    script_path = test_py_scripts.get_py_script("gdal2tiles")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("PNG") is None:
-        pytest.skip("PNG driver is missing")
 
     out_folder = "tmp/utf8_test"
 
@@ -373,13 +346,8 @@ def test_gdal2tiles_py_cleanup():
             pass
 
 
-def test_exclude_transparent_tiles():
-    script_path = test_py_scripts.get_py_script("gdal2tiles")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("PNG") is None:
-        pytest.skip("PNG driver is missing")
+@pytest.mark.require_driver("PNG")
+def test_exclude_transparent_tiles(script_path):
 
     output_folder = "tmp/test_exclude_transparent_tiles"
     os.makedirs(output_folder)
@@ -415,14 +383,8 @@ def test_exclude_transparent_tiles():
         shutil.rmtree(output_folder)
 
 
-def test_gdal2tiles_py_profile_raster():
-
-    script_path = test_py_scripts.get_py_script("gdal2tiles")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("PNG") is None:
-        pytest.skip("PNG driver is missing")
+@pytest.mark.require_driver("PNG")
+def test_gdal2tiles_py_profile_raster(script_path):
 
     shutil.rmtree("tmp/out_gdal2tiles_smallworld", ignore_errors=True)
 
@@ -434,32 +396,31 @@ def test_gdal2tiles_py_profile_raster():
         + "small_world.tif tmp/out_gdal2tiles_smallworld",
     )
 
-    if sys.platform != "win32":
-        # For some reason, the checksums on the kml file on Windows are the ones of the below png
+    try:
         _verify_raster_band_checksums(
-            "tmp/out_gdal2tiles_smallworld/0/0/0.kml",
-            expected_cs=[29839, 34244, 42706, 64319],
+            "tmp/out_gdal2tiles_smallworld/0/0/0.png",
+            expected_cs=[10125, 10802, 27343, 48852],
         )
-    _verify_raster_band_checksums(
-        "tmp/out_gdal2tiles_smallworld/0/0/0.png",
-        expected_cs=[10125, 10802, 27343, 48852],
-    )
-    _verify_raster_band_checksums(
-        "tmp/out_gdal2tiles_smallworld/1/0/0.png",
-        expected_cs=[62125, 59756, 43894, 38539],
-    )
+        _verify_raster_band_checksums(
+            "tmp/out_gdal2tiles_smallworld/1/0/0.png",
+            expected_cs=[62125, 59756, 43894, 38539],
+        )
 
-    shutil.rmtree("tmp/out_gdal2tiles_smallworld", ignore_errors=True)
+        if gdal.GetDriverByName("KMLSuperOverlay") is None:
+            pytest.skip("KMLSuperOverlay driver missing")
+
+        if sys.platform != "win32":
+            # For some reason, the checksums on the kml file on Windows are the ones of the below png
+            _verify_raster_band_checksums(
+                "tmp/out_gdal2tiles_smallworld/0/0/0.kml",
+                expected_cs=[29839, 34244, 42706, 64319],
+            )
+    finally:
+        shutil.rmtree("tmp/out_gdal2tiles_smallworld", ignore_errors=True)
 
 
-def test_gdal2tiles_py_profile_raster_oversample():
-
-    script_path = test_py_scripts.get_py_script("gdal2tiles")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("PNG") is None:
-        pytest.skip("PNG driver is missing")
+@pytest.mark.require_driver("PNG")
+def test_gdal2tiles_py_profile_raster_oversample(script_path):
 
     shutil.rmtree("tmp/out_gdal2tiles_smallworld", ignore_errors=True)
 
@@ -484,14 +445,8 @@ def test_gdal2tiles_py_profile_raster_oversample():
     shutil.rmtree("tmp/out_gdal2tiles_smallworld", ignore_errors=True)
 
 
-def test_gdal2tiles_py_profile_raster_xyz():
-
-    script_path = test_py_scripts.get_py_script("gdal2tiles")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("PNG") is None:
-        pytest.skip("PNG driver is missing")
+@pytest.mark.require_driver("PNG")
+def test_gdal2tiles_py_profile_raster_xyz(script_path):
 
     shutil.rmtree("tmp/out_gdal2tiles_smallworld", ignore_errors=True)
 
@@ -503,32 +458,32 @@ def test_gdal2tiles_py_profile_raster_xyz():
         + "small_world.tif tmp/out_gdal2tiles_smallworld",
     )
 
-    if sys.platform != "win32":
-        # For some reason, the checksums on the kml file on Windows are the ones of the below png
+    try:
         _verify_raster_band_checksums(
-            "tmp/out_gdal2tiles_smallworld/0/0/0.kml",
-            expected_cs=[27644, 31968, 38564, 64301],
+            "tmp/out_gdal2tiles_smallworld/0/0/0.png",
+            expected_cs=[11468, 10719, 27582, 48827],
         )
-    _verify_raster_band_checksums(
-        "tmp/out_gdal2tiles_smallworld/0/0/0.png",
-        expected_cs=[11468, 10719, 27582, 48827],
-    )
-    _verify_raster_band_checksums(
-        "tmp/out_gdal2tiles_smallworld/1/0/0.png",
-        expected_cs=[60550, 62572, 46338, 38489],
-    )
+        _verify_raster_band_checksums(
+            "tmp/out_gdal2tiles_smallworld/1/0/0.png",
+            expected_cs=[60550, 62572, 46338, 38489],
+        )
 
-    shutil.rmtree("tmp/out_gdal2tiles_smallworld", ignore_errors=True)
+        if gdal.GetDriverByName("KMLSuperOverlay") is None:
+            pytest.skip("KMLSuperOverlay driver missing")
+
+        if sys.platform != "win32":
+            # For some reason, the checksums on the kml file on Windows are the ones of the below png
+            _verify_raster_band_checksums(
+                "tmp/out_gdal2tiles_smallworld/0/0/0.kml",
+                expected_cs=[27644, 31968, 38564, 64301],
+            )
+
+    finally:
+        shutil.rmtree("tmp/out_gdal2tiles_smallworld", ignore_errors=True)
 
 
-def test_gdal2tiles_py_profile_geodetic_tmscompatible_xyz():
-
-    script_path = test_py_scripts.get_py_script("gdal2tiles")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("PNG") is None:
-        pytest.skip("PNG driver is missing")
+@pytest.mark.require_driver("PNG")
+def test_gdal2tiles_py_profile_geodetic_tmscompatible_xyz(script_path):
 
     shutil.rmtree("tmp/out_gdal2tiles_smallworld", ignore_errors=True)
 
@@ -540,30 +495,32 @@ def test_gdal2tiles_py_profile_geodetic_tmscompatible_xyz():
         + "small_world.tif tmp/out_gdal2tiles_smallworld",
     )
 
-    if sys.platform != "win32":
-        # For some reason, the checksums on the kml file on Windows are the ones of the below png
+    try:
         _verify_raster_band_checksums(
-            "tmp/out_gdal2tiles_smallworld/0/0/0.kml",
-            expected_cs=[12361, 18212, 21827, 5934],
+            "tmp/out_gdal2tiles_smallworld/0/0/0.png",
+            expected_cs=[8560, 8031, 7209, 17849],
         )
-    _verify_raster_band_checksums(
-        "tmp/out_gdal2tiles_smallworld/0/0/0.png", expected_cs=[8560, 8031, 7209, 17849]
-    )
-    _verify_raster_band_checksums(
-        "tmp/out_gdal2tiles_smallworld/1/0/0.png", expected_cs=[2799, 3468, 8686, 17849]
-    )
+        _verify_raster_band_checksums(
+            "tmp/out_gdal2tiles_smallworld/1/0/0.png",
+            expected_cs=[2799, 3468, 8686, 17849],
+        )
 
-    shutil.rmtree("tmp/out_gdal2tiles_smallworld", ignore_errors=True)
+        if gdal.GetDriverByName("KMLSuperOverlay") is None:
+            pytest.skip("KMLSuperOverlay driver missing")
+
+        if sys.platform != "win32":
+            # For some reason, the checksums on the kml file on Windows are the ones of the below png
+            _verify_raster_band_checksums(
+                "tmp/out_gdal2tiles_smallworld/0/0/0.kml",
+                expected_cs=[12361, 18212, 21827, 5934],
+            )
+
+    finally:
+        shutil.rmtree("tmp/out_gdal2tiles_smallworld", ignore_errors=True)
 
 
-def test_gdal2tiles_py_mapml():
-
-    script_path = test_py_scripts.get_py_script("gdal2tiles")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("PNG") is None:
-        pytest.skip("PNG driver is missing")
+@pytest.mark.require_driver("PNG")
+def test_gdal2tiles_py_mapml(script_path):
 
     shutil.rmtree("tmp/out_gdal2tiles_mapml", ignore_errors=True)
 
@@ -657,14 +614,8 @@ def _run_webp_test(script_path, resampling):
     shutil.rmtree("tmp/out_gdal2tiles_smallworld_webp", ignore_errors=True)
 
 
-def test_gdal2tiles_py_webp():
-
-    script_path = test_py_scripts.get_py_script("gdal2tiles")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("WEBP") is None:
-        pytest.skip()
+@pytest.mark.require_driver("WEBP")
+def test_gdal2tiles_py_webp(script_path):
 
     _run_webp_test(script_path, "average")
     try:

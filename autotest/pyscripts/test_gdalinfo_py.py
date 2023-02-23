@@ -34,17 +34,22 @@ import shutil
 import pytest
 import test_py_scripts
 
-from osgeo import gdal
+pytestmark = pytest.mark.skipif(
+    test_py_scripts.get_py_script("gdalinfo") is None,
+    reason="gdalinfo.py not available",
+)
+
+
+@pytest.fixture()
+def script_path():
+    return test_py_scripts.get_py_script("gdalinfo")
+
 
 ###############################################################################
 # Simple test
 
 
-def test_gdalinfo_py_1():
-
-    script_path = test_py_scripts.get_py_script("gdalinfo")
-    if script_path is None:
-        pytest.skip()
+def test_gdalinfo_py_1(script_path):
 
     ret = test_py_scripts.run_py_script(
         script_path, "gdalinfo", test_py_scripts.get_data_path("gcore") + "byte.tif"
@@ -56,10 +61,7 @@ def test_gdalinfo_py_1():
 # Test -checksum option
 
 
-def test_gdalinfo_py_2():
-    script_path = test_py_scripts.get_py_script("gdalinfo")
-    if script_path is None:
-        pytest.skip()
+def test_gdalinfo_py_2(script_path):
 
     ret = test_py_scripts.run_py_script(
         script_path,
@@ -73,10 +75,7 @@ def test_gdalinfo_py_2():
 # Test -nomd option
 
 
-def test_gdalinfo_py_3():
-    script_path = test_py_scripts.get_py_script("gdalinfo")
-    if script_path is None:
-        pytest.skip()
+def test_gdalinfo_py_3(script_path):
 
     ret = test_py_scripts.run_py_script(
         script_path, "gdalinfo", test_py_scripts.get_data_path("gcore") + "byte.tif"
@@ -95,13 +94,8 @@ def test_gdalinfo_py_3():
 # Test -noct option
 
 
-def test_gdalinfo_py_4():
-    script_path = test_py_scripts.get_py_script("gdalinfo")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("GIF") is None:
-        pytest.skip("GIF driver is missing")
+@pytest.mark.require_driver("GIF")
+def test_gdalinfo_py_4(script_path):
 
     ret = test_py_scripts.run_py_script(
         script_path,
@@ -122,10 +116,7 @@ def test_gdalinfo_py_4():
 # Test -stats option
 
 
-def test_gdalinfo_py_5():
-    script_path = test_py_scripts.get_py_script("gdalinfo")
-    if script_path is None:
-        pytest.skip()
+def test_gdalinfo_py_5(script_path):
 
     tmpfilename = "tmp/test_gdalinfo_py_5.tif"
     if os.path.exists(tmpfilename + ".aux.xml"):
@@ -149,10 +140,7 @@ def test_gdalinfo_py_5():
 # Test a dataset with overviews and RAT
 
 
-def test_gdalinfo_py_6():
-    script_path = test_py_scripts.get_py_script("gdalinfo")
-    if script_path is None:
-        pytest.skip()
+def test_gdalinfo_py_6(script_path):
 
     ret = test_py_scripts.run_py_script(
         script_path,
@@ -166,10 +154,7 @@ def test_gdalinfo_py_6():
 # Test a dataset with GCPs
 
 
-def test_gdalinfo_py_7():
-    script_path = test_py_scripts.get_py_script("gdalinfo")
-    if script_path is None:
-        pytest.skip()
+def test_gdalinfo_py_7(script_path):
 
     ret = test_py_scripts.run_py_script(
         script_path, "gdalinfo", test_py_scripts.get_data_path("gcore") + "gcps.vrt"
@@ -193,10 +178,7 @@ def test_gdalinfo_py_7():
 # Test -hist option
 
 
-def test_gdalinfo_py_8():
-    script_path = test_py_scripts.get_py_script("gdalinfo")
-    if script_path is None:
-        pytest.skip()
+def test_gdalinfo_py_8(script_path):
 
     tmpfilename = "tmp/test_gdalinfo_py_8.tif"
     if os.path.exists(tmpfilename + ".aux.xml"):
@@ -228,13 +210,8 @@ def test_gdalinfo_py_8():
 # Test -mdd option
 
 
-def test_gdalinfo_py_9():
-    script_path = test_py_scripts.get_py_script("gdalinfo")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("NITF") is None:
-        pytest.skip("NITF driver is missing")
+@pytest.mark.require_driver("NITF")
+def test_gdalinfo_py_9(script_path):
 
     ret = test_py_scripts.run_py_script(
         script_path,
@@ -255,10 +232,7 @@ def test_gdalinfo_py_9():
 # Test -mm option
 
 
-def test_gdalinfo_py_10():
-    script_path = test_py_scripts.get_py_script("gdalinfo")
-    if script_path is None:
-        pytest.skip()
+def test_gdalinfo_py_10(script_path):
 
     ret = test_py_scripts.run_py_script(
         script_path, "gdalinfo", test_py_scripts.get_data_path("gcore") + "byte.tif"

@@ -215,6 +215,7 @@ def test_ehdr_11():
 # Test CreateCopy with 1bit data
 
 
+@pytest.mark.require_driver("BMP")
 def test_ehdr_12():
 
     src_ds = gdal.Open("../gcore/data/1bit.bmp")

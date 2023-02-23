@@ -3024,7 +3024,11 @@ def test_gpkg_39():
     ds = None
 
     # From a AREA_OR_POINT=Point dataset
-    gdal.Translate("/vsimem/gpkg_39.gpkg", "data/n43.dt0", format="GPKG")
+    src_ds2 = gdal.GetDriverByName("MEM").Create("", 2, 2, 1, gdal.GDT_Int16)
+    src_ds2.SetGeoTransform([2, 1, 0, 49, 0, -1])
+    src_ds2.SetMetadataItem("AREA_OR_POINT", "Point")
+    src_ds2.GetRasterBand(1).SetUnitType("m")
+    gdal.Translate("/vsimem/gpkg_39.gpkg", src_ds2, format="GPKG")
     ds = gdal.Open("/vsimem/gpkg_39.gpkg")
     assert ds.GetMetadataItem("AREA_OR_POINT") == "Point", ds.GetMetadata()
     assert ds.GetRasterBand(1).GetUnitType() == "m"
@@ -3957,11 +3961,10 @@ def test_gpkg_wkt2():
 # Test reading a 50000x25000 block uint16
 
 
+@pytest.mark.slow()
 def test_gpkg_50000_25000_uint16():
 
     if gdaltest.gpkg_dr is None:
-        pytest.skip()
-    if not gdaltest.run_slow_tests():
         pytest.skip()
     if sys.maxsize < 2**32:
         pytest.skip("Test not available on 32 bit")
@@ -3990,11 +3993,10 @@ def test_gpkg_50000_25000_uint16():
 # Test reading a 50000x50000 block uint16
 
 
+@pytest.mark.slow()
 def test_gpkg_50000_50000_uint16():
 
     if gdaltest.gpkg_dr is None:
-        pytest.skip()
-    if not gdaltest.run_slow_tests():
         pytest.skip()
     if sys.maxsize < 2**32:
         pytest.skip("Test not available on 32 bit")
@@ -4118,7 +4120,7 @@ def test_gpkg_flushing_not_all_bands(tile_format):
         drv_req = [drv_req]
     for drv in drv_req:
         if gdal.GetDriverByName(drv) is None:
-            pytest.skip()
+            pytest.skip(f"Driver {drv} is missing")
 
     out_filename = "/vsimem/test.gpkg"
     ds = gdal.GetDriverByName("GPKG").Create(

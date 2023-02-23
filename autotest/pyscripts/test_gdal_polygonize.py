@@ -37,18 +37,23 @@ import test_py_scripts
 
 from osgeo import gdal, ogr
 
+pytestmark = pytest.mark.skipif(
+    test_py_scripts.get_py_script("gdal_polygonize") is None,
+    reason="gdal_polygonize not available",
+)
+
+
+@pytest.fixture()
+def script_path():
+    return test_py_scripts.get_py_script("gdal_polygonize")
+
+
 ###############################################################################
 # Test a fairly simple case, with nodata masking.
 
 
-def test_gdal_polygonize_1():
-
-    script_path = test_py_scripts.get_py_script("gdal_polygonize")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("AAIGRID") is None:
-        pytest.skip("AAIGRID driver is missing")
+@pytest.mark.require_driver("AAIGRID")
+def test_gdal_polygonize_1(script_path):
 
     outfilename = "tmp/poly.shp"
     # Create a OGR datasource to put results in.
@@ -110,14 +115,8 @@ def test_gdal_polygonize_1():
 # Test a simple case without masking.
 
 
-def test_gdal_polygonize_2():
-
-    script_path = test_py_scripts.get_py_script("gdal_polygonize")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("AAIGRID") is None:
-        pytest.skip("AAIGRID driver is missing")
+@pytest.mark.require_driver("AAIGRID")
+def test_gdal_polygonize_2(script_path):
 
     outfilename = "tmp/out.geojson"
     gdal.Unlink(outfilename)
@@ -169,15 +168,10 @@ def test_gdal_polygonize_2():
     assert tr
 
 
-def test_gdal_polygonize_3():
-
-    script_path = test_py_scripts.get_py_script("gdal_polygonize")
-    if script_path is None:
-        pytest.skip()
+@pytest.mark.require_driver("GPKG")
+def test_gdal_polygonize_3(script_path):
 
     drv = ogr.GetDriverByName("GPKG")
-    if drv is None:
-        pytest.skip()
     outfilename = "tmp/out.gpkg"
     if os.path.exists(outfilename):
         drv.DeleteDataSource(outfilename)
@@ -215,14 +209,8 @@ def test_gdal_polygonize_3():
 # Test -b mask
 
 
-def test_gdal_polygonize_4():
-
-    script_path = test_py_scripts.get_py_script("gdal_polygonize")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("GML") is None:
-        pytest.skip("GML driver is missing")
+@pytest.mark.require_driver("GML")
+def test_gdal_polygonize_4(script_path):
 
     outfilename = "tmp/out.gml"
     # Test mask syntax
@@ -270,11 +258,7 @@ def test_gdal_polygonize_4():
 # Test -8
 
 
-def test_gdal_polygonize_minus_8():
-
-    script_path = test_py_scripts.get_py_script("gdal_polygonize")
-    if script_path is None:
-        pytest.skip()
+def test_gdal_polygonize_minus_8(script_path):
 
     outfilename = "tmp/out.geojson"
     test_py_scripts.run_py_script(

@@ -44,14 +44,22 @@ import test_py_scripts
 
 from osgeo import gdal, ogr, osr
 
+pytestmark = pytest.mark.skipif(
+    test_py_scripts.get_py_script("ogr2ogr") is None,
+    reason="ogr2ogr.py not available",
+)
+
+
+@pytest.fixture()
+def script_path():
+    return test_py_scripts.get_py_script("ogr2ogr")
+
+
 ###############################################################################
 # Simple test
 
 
-def test_ogr2ogr_py_1():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_1(script_path):
 
     try:
         os.stat("tmp/poly.shp")
@@ -84,10 +92,7 @@ def test_ogr2ogr_py_1():
 # Test -sql
 
 
-def test_ogr2ogr_py_2():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_2(script_path):
 
     try:
         os.stat("tmp/poly.shp")
@@ -114,10 +119,7 @@ def test_ogr2ogr_py_2():
 # Test -spat
 
 
-def test_ogr2ogr_py_3():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_3(script_path):
 
     try:
         os.stat("tmp/poly.shp")
@@ -147,10 +149,7 @@ def test_ogr2ogr_py_3():
 # Test -where
 
 
-def test_ogr2ogr_py_4():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_4(script_path):
 
     try:
         os.stat("tmp/poly.shp")
@@ -177,10 +176,7 @@ def test_ogr2ogr_py_4():
 # Test -append
 
 
-def test_ogr2ogr_py_5():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_5(script_path):
 
     try:
         os.stat("tmp/poly.shp")
@@ -221,13 +217,10 @@ def test_ogr2ogr_py_5():
 # Test -overwrite
 
 
-def test_ogr2ogr_py_6():
+def test_ogr2ogr_py_6(script_path):
 
     ogr_pg = pytest.importorskip("ogr_pg")
 
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
     if test_cli_utilities.get_ogrinfo_path() is None:
         pytest.skip()
 
@@ -278,13 +271,10 @@ def test_ogr2ogr_py_6():
 # Test -gt
 
 
-def test_ogr2ogr_py_7():
+def test_ogr2ogr_py_7(script_path):
 
     ogr_pg = pytest.importorskip("ogr_pg")
 
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
     if test_cli_utilities.get_ogrinfo_path() is None:
         pytest.skip()
 
@@ -326,10 +316,7 @@ def test_ogr2ogr_py_7():
 # Test -t_srs
 
 
-def test_ogr2ogr_py_8():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_8(script_path):
 
     try:
         os.stat("tmp/poly.shp")
@@ -356,10 +343,7 @@ def test_ogr2ogr_py_8():
 # Test -a_srs
 
 
-def test_ogr2ogr_py_9():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_9(script_path):
 
     try:
         os.stat("tmp/poly.shp")
@@ -386,10 +370,7 @@ def test_ogr2ogr_py_9():
 # Test -select
 
 
-def test_ogr2ogr_py_10():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_10(script_path):
 
     try:
         os.stat("tmp/poly.shp")
@@ -422,11 +403,7 @@ def test_ogr2ogr_py_10():
 # Test -lco
 
 
-def test_ogr2ogr_py_11():
-
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_11(script_path):
 
     try:
         os.stat("tmp/poly.shp")
@@ -453,11 +430,7 @@ def test_ogr2ogr_py_11():
 # Test -nlt
 
 
-def test_ogr2ogr_py_12():
-
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_12(script_path):
 
     try:
         os.stat("tmp/poly.shp")
@@ -484,10 +457,7 @@ def test_ogr2ogr_py_12():
 # Add explicit source layer name
 
 
-def test_ogr2ogr_py_13():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_13(script_path):
 
     try:
         os.stat("tmp/poly.shp")
@@ -513,10 +483,7 @@ def test_ogr2ogr_py_13():
 
 
 @pytest.mark.skip(reason="-segmentize not implemented")
-def test_ogr2ogr_py_14():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_14(script_path):
 
     try:
         os.stat("tmp/poly.shp")
@@ -545,11 +512,7 @@ def test_ogr2ogr_py_14():
 # Test -overwrite with a shapefile
 
 
-def test_ogr2ogr_py_15():
-
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_15(script_path):
 
     try:
         os.stat("tmp/poly.shp")
@@ -585,10 +548,7 @@ def test_ogr2ogr_py_15():
 # Test -fid
 
 
-def test_ogr2ogr_py_16():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_16(script_path):
 
     try:
         os.stat("tmp/poly.shp")
@@ -618,10 +578,7 @@ def test_ogr2ogr_py_16():
 # Test -progress
 
 
-def test_ogr2ogr_py_17():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_17(script_path):
 
     try:
         os.stat("tmp/poly.shp")
@@ -650,10 +607,7 @@ def test_ogr2ogr_py_17():
 
 
 @pytest.mark.skip(reason="-wrapdateline not implemented")
-def test_ogr2ogr_py_18():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_18(script_path):
 
     if not ogrtest.have_geos():
         pytest.skip()
@@ -715,10 +669,7 @@ def test_ogr2ogr_py_18():
 # Test -clipsrc
 
 
-def test_ogr2ogr_py_19():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_19(script_path):
 
     if not ogrtest.have_geos():
         pytest.skip()
@@ -758,13 +709,8 @@ def test_ogr2ogr_py_19():
 # FIXME: Any field is skipped if a subsequent field with same name is found.
 
 
-def test_ogr2ogr_py_20():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver is missing")
+@pytest.mark.require_driver("CSV")
+def test_ogr2ogr_py_20(script_path):
 
     try:
         os.remove("tmp/Fields.dbf")
@@ -855,13 +801,8 @@ def test_ogr2ogr_py_20():
 # at dataset creation (#3247)
 
 
-def test_ogr2ogr_py_21():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
-
-    if ogr.GetDriverByName("GPX") is None:
-        pytest.skip()
+@pytest.mark.require_driver("GPX")
+def test_ogr2ogr_py_21(script_path):
 
     try:
         os.remove("tmp/testogr2ogr21.gpx")
@@ -884,16 +825,9 @@ def test_ogr2ogr_py_21():
 # Test ogr2ogr when the output driver delays the destination layer defn creation (#3384)
 
 
-def test_ogr2ogr_py_22():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("MapInfo File") is None:
-        pytest.skip("MapInfo File driver is missing")
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver is missing")
+@pytest.mark.require_driver("MapInfo File")
+@pytest.mark.require_driver("CSV")
+def test_ogr2ogr_py_22(script_path):
 
     test_py_scripts.run_py_script(
         script_path,
@@ -926,18 +860,12 @@ def test_ogr2ogr_py_22():
 # Same as previous but with -select
 
 
-def test_ogr2ogr_py_23():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+@pytest.mark.require_driver("MapInfo File")
+@pytest.mark.require_driver("CSV")
+def test_ogr2ogr_py_23(script_path):
+
     if test_cli_utilities.get_ogr2ogr_path() is None:
         pytest.skip()
-
-    if gdal.GetDriverByName("MapInfo File") is None:
-        pytest.skip("MapInfo File driver is missing")
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver is missing")
 
     gdaltest.runexternal(
         test_cli_utilities.get_ogr2ogr_path()
@@ -969,13 +897,8 @@ def test_ogr2ogr_py_23():
 # Test -clipsrc with WKT geometry (#3530)
 
 
-def test_ogr2ogr_py_24():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
-
-    if not ogrtest.have_geos():
-        pytest.skip()
+@pytest.mark.skipif(not ogrtest.have_geos(), reason="GEOS missing")
+def test_ogr2ogr_py_24(script_path):
 
     try:
         os.stat("tmp/poly.shp")
@@ -1010,16 +933,9 @@ def test_ogr2ogr_py_24():
 # Test -clipsrc with clip from external datasource
 
 
-def test_ogr2ogr_py_25():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver is missing")
-
-    if not ogrtest.have_geos():
-        pytest.skip()
+@pytest.mark.require_driver("CSV")
+@pytest.mark.skipif(not ogrtest.have_geos(), reason="GEOS missing")
+def test_ogr2ogr_py_25(script_path):
 
     try:
         os.stat("tmp/poly.shp")
@@ -1062,13 +978,8 @@ def test_ogr2ogr_py_25():
 # Test -clipdst with WKT geometry (#3530)
 
 
-def test_ogr2ogr_py_26():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
-
-    if not ogrtest.have_geos():
-        pytest.skip()
+@pytest.mark.skipif(not ogrtest.have_geos(), reason="GEOS missing")
+def test_ogr2ogr_py_26(script_path):
 
     try:
         os.stat("tmp/poly.shp")
@@ -1103,16 +1014,9 @@ def test_ogr2ogr_py_26():
 # Test -clipdst with clip from external datasource
 
 
-def test_ogr2ogr_py_27():
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver is missing")
-
-    if not ogrtest.have_geos():
-        pytest.skip()
+@pytest.mark.require_driver("CSV")
+@pytest.mark.skipif(not ogrtest.have_geos(), reason="GEOS missing")
+def test_ogr2ogr_py_27(script_path):
 
     try:
         os.stat("tmp/poly.shp")
@@ -1155,11 +1059,7 @@ def test_ogr2ogr_py_27():
 # Test that -overwrite work if the output file doesn't yet exist (#3825)
 
 
-def test_ogr2ogr_py_31():
-
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_31(script_path):
 
     try:
         os.stat("tmp/poly.shp")
@@ -1184,11 +1084,7 @@ def test_ogr2ogr_py_31():
 # Test that -append/-overwrite to a single-file shapefile work without specifying -nln
 
 
-def test_ogr2ogr_py_32():
-
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_32(script_path):
 
     try:
         os.stat("tmp/test_ogr2ogr_32.shp")
@@ -1236,14 +1132,8 @@ def test_ogr2ogr_py_32():
 # Test -explodecollections
 
 
-def test_ogr2ogr_py_33():
-
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver is missing")
+@pytest.mark.require_driver("CSV")
+def test_ogr2ogr_py_33(script_path):
 
     try:
         os.stat("tmp/test_ogr2ogr_33_src.csv")
@@ -1321,11 +1211,7 @@ def test_ogr2ogr_py_33():
 # someDirThatDoesNotExist.shp/dbf/shx inside this directory
 
 
-def test_ogr2ogr_py_34():
-
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_34(script_path):
 
     try:
         os.stat("tmp/test_ogr2ogr_34_dir")
@@ -1382,11 +1268,7 @@ def test_ogr2ogr_py_34():
 # Test 'ogr2ogr someDirThatDoesNotExist src.shp'
 
 
-def test_ogr2ogr_py_35():
-
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_35(script_path):
 
     try:
         os.stat("tmp/test_ogr2ogr_35_dir")
@@ -1443,11 +1325,7 @@ def test_ogr2ogr_py_35():
 # Test ogr2ogr -zfield
 
 
-def test_ogr2ogr_py_36():
-
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_36(script_path):
 
     try:
         os.stat("tmp/test_ogr2ogr_36.shp")
@@ -1479,11 +1357,7 @@ def test_ogr2ogr_py_36():
 # Test 'ogr2ogr someDirThatDoesNotExist.shp dataSourceWithMultipleLayer'
 
 
-def test_ogr2ogr_py_37():
-
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_37(script_path):
 
     try:
         os.stat("tmp/test_ogr2ogr_37_dir.shp")
@@ -1538,11 +1412,7 @@ def test_ogr2ogr_py_37():
 # -select and -where (#4015)
 
 
-def test_ogr2ogr_py_38():
-
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_38(script_path):
 
     try:
         os.stat("tmp/test_ogr2ogr_38.shp")
@@ -1573,11 +1443,7 @@ def test_ogr2ogr_py_38():
 # Test 'ogr2ogr someDirThatDoesNotExist.shp dataSourceWithMultipleLayer -sql "select * from alayer"' (#4268)
 
 
-def test_ogr2ogr_py_39():
-
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_39(script_path):
 
     try:
         os.stat("tmp/test_ogr2ogr_39_dir.shp")
@@ -1631,11 +1497,7 @@ def test_ogr2ogr_py_39():
 # Test -dim 3 and -dim 2
 
 
-def test_ogr2ogr_py_43():
-
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
+def test_ogr2ogr_py_43(script_path):
 
     try:
         os.stat("tmp/test_ogr2ogr_43_3d.shp")
@@ -1685,14 +1547,8 @@ def test_ogr2ogr_py_43():
 # Test -nlt PROMOTE_TO_MULTI for polygon/multipolygon
 
 
-def test_ogr2ogr_py_44():
-
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("GML") is None:
-        pytest.skip("GML driver is missing")
+@pytest.mark.require_driver("GML")
+def test_ogr2ogr_py_44(script_path):
 
     try:
         os.stat("tmp/test_ogr2ogr_44_src.shp")
@@ -1755,14 +1611,8 @@ def test_ogr2ogr_py_44():
 # Test -nlt PROMOTE_TO_MULTI for polygon/multipolygon
 
 
-def test_ogr2ogr_py_45():
-
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("GML") is None:
-        pytest.skip("GML driver is missing")
+@pytest.mark.require_driver("GML")
+def test_ogr2ogr_py_45(script_path):
 
     try:
         os.stat("tmp/test_ogr2ogr_44_src.shp")
@@ -1825,14 +1675,8 @@ def test_ogr2ogr_py_45():
 # Test -nlt PROMOTE_TO_MULTI for linestring/multilinestring
 
 
-def test_ogr2ogr_py_46():
-
-    script_path = test_py_scripts.get_py_script("ogr2ogr")
-    if script_path is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver is missing")
+@pytest.mark.require_driver("CSV")
+def test_ogr2ogr_py_46(script_path):
 
     try:
         os.stat("tmp/test_ogr2ogr_45_src.shp")

@@ -43,20 +43,25 @@ import test_cli_utilities
 
 from osgeo import gdal, ogr
 
+pytestmark = pytest.mark.skipif(
+    test_cli_utilities.get_gdal_grid_path() is None, reason="gdal_grid not available"
+)
+
+
+@pytest.fixture()
+def gdal_grid_path():
+    return test_cli_utilities.get_gdal_grid_path()
+
+
 # List of output TIFF files that will be created by tests and later deleted
 # in test_gdal_grid_cleanup()
 outfiles = []
-
-# Path to gdal_grid utility executable
-gdal_grid = test_cli_utilities.get_gdal_grid_path()
 
 ###############################################################################
 #
 
 
-def test_gdal_grid_1():
-    if gdal_grid is None:
-        pytest.skip()
+def test_gdal_grid_1(gdal_grid_path):
 
     shape_drv = ogr.GetDriverByName("ESRI Shapefile")
     outfiles.append("tmp/n43.tif")
@@ -107,7 +112,7 @@ def test_gdal_grid_1():
 
     # Create a GDAL dataset from the previous generated OGR grid
     (_, err) = gdaltest.runexternal_out_and_err(
-        gdal_grid
+        gdal_grid_path
         + " -txe -80.0041667 -78.9958333 -tye 42.9958333 44.0041667 -outsize 121 121 -ot Int16 -a nearest:radius1=0.0:radius2=0.0:angle=0.0 -co TILED=YES -co BLOCKXSIZE=256 -co BLOCKYSIZE=256 tmp/n43.shp "
         + outfiles[-1]
     )
@@ -129,12 +134,10 @@ def test_gdal_grid_1():
 
 ###############################################################################
 # Test Nearest Neighbour gridding algorithm
-def test_gdal_grid_2():
-    if gdal_grid is None:
-        pytest.skip()
 
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver missing")
+
+@pytest.mark.require_driver("CSV")
+def test_gdal_grid_2(gdal_grid_path):
 
     # Open reference dataset
     ds_ref = gdal.Open("../gcore/data/byte.tif")
@@ -151,7 +154,7 @@ def test_gdal_grid_2():
     # Create a GDAL dataset from the values of "grid.csv".
     # Grid nodes are located exactly in raster nodes.
     gdaltest.runexternal(
-        gdal_grid
+        gdal_grid_path
         + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Byte -l grid -a nearest:radius1=0.0:radius2=0.0:angle=0.0:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
@@ -177,7 +180,7 @@ def test_gdal_grid_2():
     # Now the same, but shift grid nodes a bit in both horizontal and vertical
     # directions.
     gdaltest.runexternal(
-        gdal_grid
+        gdal_grid_path
         + " -txe 440721.0 441920.0 -tye 3751321.0 3750120.0 -outsize 20 20 -ot Byte -l grid -a nearest:radius1=0.0:radius2=0.0:angle=0.0:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
@@ -193,13 +196,9 @@ def test_gdal_grid_2():
     ds = None
 
 
+@pytest.mark.require_driver("CSV")
 @pytest.mark.parametrize("use_quadtree", [True, False])
-def test_gdal_grid_3(use_quadtree):
-    if gdal_grid is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver missing")
+def test_gdal_grid_3(gdal_grid_path, use_quadtree):
 
     # Open reference dataset
     ds_ref = gdal.Open("../gcore/data/byte.tif")
@@ -219,7 +218,7 @@ def test_gdal_grid_3(use_quadtree):
         "GDAL_GRID_POINT_COUNT_THRESHOLD", "0" if use_quadtree else "1000000000"
     ):
         gdaltest.runexternal(
-            gdal_grid
+            gdal_grid_path
             + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Byte -l grid -a nearest:radius1=180.0:radius2=180.0:angle=0.0:nodata=0.0 data/grid.vrt "
             + outfiles[-1]
         )
@@ -243,7 +242,7 @@ def test_gdal_grid_3(use_quadtree):
 
         # Search ellipse smaller than the raster cell.
         gdaltest.runexternal(
-            gdal_grid
+            gdal_grid_path
             + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Byte -l grid -a nearest:radius1=20.0:radius2=20.0:angle=0.0:nodata=0.0 data/grid.vrt "
             + outfiles[-1]
         )
@@ -267,7 +266,7 @@ def test_gdal_grid_3(use_quadtree):
 
         # Large search ellipse and the grid shift.
         gdaltest.runexternal(
-            gdal_grid
+            gdal_grid_path
             + " -txe 440721.0 441920.0 -tye 3751321.0 3750120.0 -outsize 20 20 -ot Byte -l grid -a nearest:radius1=180.0:radius2=180.0:angle=0.0:nodata=0.0 data/grid.vrt "
             + outfiles[-1]
         )
@@ -291,7 +290,7 @@ def test_gdal_grid_3(use_quadtree):
 
         # Small search ellipse and the grid shift.
         gdaltest.runexternal(
-            gdal_grid
+            gdal_grid_path
             + " -txe 440721.0 441920.0 -tye 3751321.0 3750120.0 -outsize 20 20 -ot Byte -l grid -a nearest:radius1=20.0:radius2=20.0:angle=0.0:nodata=0.0 data/grid.vrt "
             + outfiles[-1]
         )
@@ -311,12 +310,8 @@ def test_gdal_grid_3(use_quadtree):
 # Test Inverse Distance to a Power gridding algorithm
 
 
-def test_gdal_grid_4():
-    if gdal_grid is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver missing")
+@pytest.mark.require_driver("CSV")
+def test_gdal_grid_4(gdal_grid_path):
 
     #################
     # Test generic implementation (no AVX, no SSE)
@@ -329,7 +324,7 @@ def test_gdal_grid_4():
     # Create a GDAL dataset from the values of "grid.csv".
     print("Step 1: Disabling AVX/SSE optimized versions...")
     (_, err) = gdaltest.runexternal_out_and_err(
-        gdal_grid
+        gdal_grid_path
         + " --debug on --config GDAL_USE_AVX NO --config GDAL_USE_SSE NO -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Float64 -l grid -a invdist:power=2.0:smoothing=0.0:radius1=0.0:radius2=0.0:angle=0.0:max_points=0:min_points=0:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
@@ -361,7 +356,7 @@ def test_gdal_grid_4():
     # Create a GDAL dataset from the values of "grid.csv".
     print("Step 2: Trying SSE optimized version...")
     (_, err) = gdaltest.runexternal_out_and_err(
-        gdal_grid
+        gdal_grid_path
         + " --debug on --config GDAL_USE_AVX NO -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Float64 -l grid -a invdist:power=2.0:smoothing=0.0:radius1=0.0:radius2=0.0:angle=0.0:max_points=0:min_points=0:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
@@ -392,7 +387,7 @@ def test_gdal_grid_4():
     # Create a GDAL dataset from the values of "grid.csv".
     print("Step 3: Trying AVX optimized version...")
     (_, err) = gdaltest.runexternal_out_and_err(
-        gdal_grid
+        gdal_grid_path
         + " --debug on -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Float64 -l grid -a invdist:power=2.0:smoothing=0.0:radius1=0.0:radius2=0.0:angle=0.0:max_points=0:min_points=0:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
@@ -422,7 +417,7 @@ def test_gdal_grid_4():
 
     # Create a GDAL dataset from the values of "grid.csv".
     gdaltest.runexternal(
-        gdal_grid
+        gdal_grid_path
         + " --config GDAL_NUM_THREADS 1 -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Float64 -l grid -a invdist:power=2.0:smoothing=0.0:radius1=0.0:radius2=0.0:angle=0.0:max_points=0:min_points=0:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
@@ -448,7 +443,7 @@ def test_gdal_grid_4():
 
     # Create a GDAL dataset from the values of "grid.csv".
     gdaltest.runexternal(
-        gdal_grid
+        gdal_grid_path
         + " --config GDAL_NUM_THREADS 2 -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Float64 -l grid -a invdist:power=2.0:smoothing=0.0:radius1=0.0:radius2=0.0:angle=0.0:max_points=0:min_points=0:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
@@ -473,7 +468,7 @@ def test_gdal_grid_4():
     # Create a GDAL dataset from the values of "grid.csv".
     # Circular window, shifted, test min points and NODATA setting.
     gdaltest.runexternal(
-        gdal_grid
+        gdal_grid_path
         + " -txe 440721.0 441920.0 -tye 3751321.0 3750120.0 -outsize 20 20 -ot Float64 -l grid -a invdist:power=2.0:radius1=90.0:radius2=90.0:angle=0.0:max_points=0:min_points=8:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
@@ -493,12 +488,8 @@ def test_gdal_grid_4():
 # Test Moving Average gridding algorithm
 
 
-def test_gdal_grid_5():
-    if gdal_grid is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver missing")
+@pytest.mark.require_driver("CSV")
+def test_gdal_grid_5(gdal_grid_path):
 
     #################
     outfiles.append("tmp/grid_average.tif")
@@ -511,7 +502,7 @@ def test_gdal_grid_5():
     # We are using all the points from input dataset to average, so
     # the result is a raster filled with the same value in each node.
     gdaltest.runexternal(
-        gdal_grid
+        gdal_grid_path
         + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Float64 -l grid -a average:radius1=0.0:radius2=0.0:angle=0.0:min_points=0:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
@@ -536,7 +527,7 @@ def test_gdal_grid_5():
     # Create a GDAL dataset from the values of "grid.csv".
     # Elliptical window, rotated.
     gdaltest.runexternal(
-        gdal_grid
+        gdal_grid_path
         + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Float64 -l grid -a average:radius1=300.0:radius2=100.0:angle=40.0:min_points=0:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
@@ -552,13 +543,9 @@ def test_gdal_grid_5():
     ds = None
 
 
+@pytest.mark.require_driver("CSV")
 @pytest.mark.parametrize("use_quadtree", [True, False])
-def test_gdal_grid_6(use_quadtree):
-    if gdal_grid is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver missing")
+def test_gdal_grid_6(gdal_grid_path, use_quadtree):
 
     #################
     outfiles.append("tmp/grid_average_190_190.tif")
@@ -573,7 +560,7 @@ def test_gdal_grid_6(use_quadtree):
         # Create a GDAL dataset from the values of "grid.csv".
         # This time using a circular window.
         gdaltest.runexternal(
-            gdal_grid
+            gdal_grid_path
             + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Float64 -l grid -a average:radius1=190.0:radius2=190.0:angle=0.0:min_points=0:nodata=0.0 data/grid.vrt "
             + outfiles[-1]
         )
@@ -598,7 +585,7 @@ def test_gdal_grid_6(use_quadtree):
         # Create a GDAL dataset from the values of "grid.csv".
         # Circular window, shifted, test min points and NODATA setting.
         gdaltest.runexternal(
-            gdal_grid
+            gdal_grid_path
             + " -txe 440721.0 441920.0 -tye 3751321.0 3750120.0 -outsize 20 20 -ot Float64 -l grid -a average:radius1=90.0:radius2=90.0:angle=0.0:min_points=8:nodata=0.0 data/grid.vrt "
             + outfiles[-1]
         )
@@ -618,12 +605,8 @@ def test_gdal_grid_6(use_quadtree):
 # Test Minimum data metric
 
 
-def test_gdal_grid_7():
-    if gdal_grid is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver missing")
+@pytest.mark.require_driver("CSV")
+def test_gdal_grid_7(gdal_grid_path):
 
     #################
     outfiles.append("tmp/grid_minimum.tif")
@@ -635,7 +618,7 @@ def test_gdal_grid_7():
     # Create a GDAL dataset from the values of "grid.csv".
     # Search the whole dataset for minimum.
     gdaltest.runexternal(
-        gdal_grid
+        gdal_grid_path
         + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Byte -l grid -a minimum:radius1=0.0:radius2=0.0:angle=0.0:min_points=0:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
@@ -662,7 +645,7 @@ def test_gdal_grid_7():
     # Create a GDAL dataset from the values of "grid.csv".
     # Elliptical window, rotated.
     gdaltest.runexternal(
-        gdal_grid
+        gdal_grid_path
         + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Byte -l grid -a minimum:radius1=400.0:radius2=100.0:angle=120.0:min_points=0:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
@@ -680,13 +663,9 @@ def test_gdal_grid_7():
     ds = None
 
 
+@pytest.mark.require_driver("CSV")
 @pytest.mark.parametrize("use_quadtree", [True, False])
-def test_gdal_grid_8(use_quadtree):
-    if gdal_grid is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver missing")
+def test_gdal_grid_8(gdal_grid_path, use_quadtree):
 
     #################
     outfiles.append("tmp/grid_minimum_180_180.tif")
@@ -701,7 +680,7 @@ def test_gdal_grid_8(use_quadtree):
         # Create a GDAL dataset from the values of "grid.csv".
         # Search ellipse larger than the raster cell.
         gdaltest.runexternal(
-            gdal_grid
+            gdal_grid_path
             + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Byte -l grid -a minimum:radius1=180.0:radius2=180.0:angle=0.0:min_points=0:nodata=0.0 data/grid.vrt "
             + outfiles[-1]
         )
@@ -728,7 +707,7 @@ def test_gdal_grid_8(use_quadtree):
         # Create a GDAL dataset from the values of "grid.csv".
         # Search ellipse smaller than the raster cell.
         gdaltest.runexternal(
-            gdal_grid
+            gdal_grid_path
             + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Byte -l grid -a minimum:radius1=20.0:radius2=20.0:angle=0.0:min_points=0:nodata=0.0 data/grid.vrt "
             + outfiles[-1]
         )
@@ -750,12 +729,8 @@ def test_gdal_grid_8(use_quadtree):
 # Test Maximum data metric
 
 
-def test_gdal_grid_9():
-    if gdal_grid is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver missing")
+@pytest.mark.require_driver("CSV")
+def test_gdal_grid_9(gdal_grid_path):
 
     #################
     outfiles.append("tmp/grid_maximum.tif")
@@ -767,7 +742,7 @@ def test_gdal_grid_9():
     # Create a GDAL dataset from the values of "grid.csv".
     # Search the whole dataset for maximum.
     gdaltest.runexternal(
-        gdal_grid
+        gdal_grid_path
         + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Byte -l grid -a maximum:radius1=0.0:radius2=0.0:angle=0.0:min_points=0:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
@@ -794,7 +769,7 @@ def test_gdal_grid_9():
     # Create a GDAL dataset from the values of "grid.csv".
     # Circular window.
     gdaltest.runexternal(
-        gdal_grid
+        gdal_grid_path
         + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Byte -l grid -a maximum:radius1=100.0:radius2=100.0:angle=0.0:min_points=0:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
@@ -812,13 +787,9 @@ def test_gdal_grid_9():
     ds = None
 
 
+@pytest.mark.require_driver("CSV")
 @pytest.mark.parametrize("use_quadtree", [True, False])
-def test_gdal_grid_10(use_quadtree):
-    if gdal_grid is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver missing")
+def test_gdal_grid_10(gdal_grid_path, use_quadtree):
 
     #################
     outfiles.append("tmp/grid_maximum_180_180.tif")
@@ -833,7 +804,7 @@ def test_gdal_grid_10(use_quadtree):
         # Create a GDAL dataset from the values of "grid.csv".
         # Search ellipse larger than the raster cell.
         gdaltest.runexternal(
-            gdal_grid
+            gdal_grid_path
             + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Byte -l grid -a maximum:radius1=180.0:radius2=180.0:angle=0.0:min_points=0:nodata=0.0 data/grid.vrt "
             + outfiles[-1]
         )
@@ -860,7 +831,7 @@ def test_gdal_grid_10(use_quadtree):
         # Create a GDAL dataset from the values of "grid.csv".
         # Search ellipse smaller than the raster cell.
         gdaltest.runexternal(
-            gdal_grid
+            gdal_grid_path
             + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Byte -l grid -a maximum:radius1=20.0:radius2=20.0:angle=120.0:min_points=0:nodata=0.0 data/grid.vrt "
             + outfiles[-1]
         )
@@ -882,12 +853,8 @@ def test_gdal_grid_10(use_quadtree):
 # Test Range data metric
 
 
-def test_gdal_grid_11():
-    if gdal_grid is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver missing")
+@pytest.mark.require_driver("CSV")
+def test_gdal_grid_11(gdal_grid_path):
 
     #################
     outfiles.append("tmp/grid_range.tif")
@@ -899,7 +866,7 @@ def test_gdal_grid_11():
     # Create a GDAL dataset from the values of "grid.csv".
     # Search the whole dataset.
     gdaltest.runexternal(
-        gdal_grid
+        gdal_grid_path
         + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Byte -l grid -a range:radius1=0.0:radius2=0.0:angle=0.0:min_points=0:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
@@ -917,13 +884,9 @@ def test_gdal_grid_11():
     ds = None
 
 
+@pytest.mark.require_driver("CSV")
 @pytest.mark.parametrize("use_quadtree", [True, False])
-def test_gdal_grid_12(use_quadtree):
-    if gdal_grid is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver missing")
+def test_gdal_grid_12(gdal_grid_path, use_quadtree):
 
     #################
     outfiles.append("tmp/grid_range_90_90_8p.tif")
@@ -939,7 +902,7 @@ def test_gdal_grid_12(use_quadtree):
         # Circular window, fill node with NODATA value if less than required
         # points found.
         gdaltest.runexternal(
-            gdal_grid
+            gdal_grid_path
             + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Byte -l grid -a range:radius1=90.0:radius2=90.0:angle=0.0:min_points=8:nodata=0.0 data/grid.vrt "
             + outfiles[-1]
         )
@@ -961,13 +924,9 @@ def test_gdal_grid_12(use_quadtree):
 # Test Count data metric
 
 
+@pytest.mark.require_driver("CSV")
 @pytest.mark.parametrize("use_quadtree", [True, False])
-def test_gdal_grid_13(use_quadtree):
-    if gdal_grid is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver missing")
+def test_gdal_grid_13(gdal_grid_path, use_quadtree):
 
     #################
     outfiles.append("tmp/grid_count_70_70.tif")
@@ -981,7 +940,7 @@ def test_gdal_grid_13(use_quadtree):
     ):
         # Create a GDAL dataset from the values of "grid.csv".
         gdaltest.runexternal(
-            gdal_grid
+            gdal_grid_path
             + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Byte -l grid -a count:radius1=70.0:radius2=70.0:angle=0.0:min_points=0:nodata=0.0 data/grid.vrt "
             + outfiles[-1]
         )
@@ -1007,7 +966,7 @@ def test_gdal_grid_13(use_quadtree):
 
         # Create a GDAL dataset from the values of "grid.csv".
         gdaltest.runexternal(
-            gdal_grid
+            gdal_grid_path
             + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Byte -l grid -a count:radius1=300.0:radius2=300.0:angle=0.0:min_points=0:nodata=0.0 data/grid.vrt "
             + outfiles[-1]
         )
@@ -1029,12 +988,8 @@ def test_gdal_grid_13(use_quadtree):
 # Test Average Distance data metric
 
 
-def test_gdal_grid_14():
-    if gdal_grid is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver missing")
+@pytest.mark.require_driver("CSV")
+def test_gdal_grid_14(gdal_grid_path):
 
     #################
     outfiles.append("tmp/grid_avdist.tif")
@@ -1047,7 +1002,7 @@ def test_gdal_grid_14():
     # We are using all the points from input dataset to average, so
     # the result is a raster filled with the same value in each node.
     gdaltest.runexternal(
-        gdal_grid
+        gdal_grid_path
         + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Float64 -l grid -a average_distance:radius1=0.0:radius2=0.0:angle=0.0:min_points=0:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
@@ -1063,13 +1018,9 @@ def test_gdal_grid_14():
     ds_ref = None
 
 
+@pytest.mark.require_driver("CSV")
 @pytest.mark.parametrize("use_quadtree", [True, False])
-def test_gdal_grid_15(use_quadtree):
-    if gdal_grid is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver missing")
+def test_gdal_grid_15(gdal_grid_path, use_quadtree):
 
     #################
     outfiles.append("tmp/grid_avdist_150_150.tif")
@@ -1085,7 +1036,7 @@ def test_gdal_grid_15(use_quadtree):
         # We are using all the points from input dataset to average, so
         # the result is a raster filled with the same value in each node.
         gdaltest.runexternal(
-            gdal_grid
+            gdal_grid_path
             + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Float64 -l grid -a average_distance:radius1=150.0:radius2=150.0:angle=0.0:min_points=0:nodata=0.0 data/grid.vrt "
             + outfiles[-1]
         )
@@ -1105,12 +1056,8 @@ def test_gdal_grid_15(use_quadtree):
 # Test Average Distance Between Points data metric
 
 
-def test_gdal_grid_16():
-    if gdal_grid is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver missing")
+@pytest.mark.require_driver("CSV")
+def test_gdal_grid_16(gdal_grid_path):
 
     #################
     outfiles.append("tmp/grid_avdistpts_150_50_-15.tif")
@@ -1123,7 +1070,7 @@ def test_gdal_grid_16():
     # We are using all the points from input dataset to average, so
     # the result is a raster filled with the same value in each node.
     gdaltest.runexternal(
-        gdal_grid
+        gdal_grid_path
         + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Float64 -l grid -a average_distance_pts:radius1=150.0:radius2=50.0:angle=-15.0:min_points=0:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
@@ -1139,13 +1086,9 @@ def test_gdal_grid_16():
     ds_ref = None
 
 
+@pytest.mark.require_driver("CSV")
 @pytest.mark.parametrize("use_quadtree", [True, False])
-def test_gdal_grid_17(use_quadtree):
-    if gdal_grid is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver missing")
+def test_gdal_grid_17(gdal_grid_path, use_quadtree):
 
     #################
     outfiles.append("tmp/grid_avdistpts_150_150.tif")
@@ -1161,7 +1104,7 @@ def test_gdal_grid_17(use_quadtree):
         # We are using all the points from input dataset to average, so
         # the result is a raster filled with the same value in each node.
         gdaltest.runexternal(
-            gdal_grid
+            gdal_grid_path
             + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Float64 -l grid -a average_distance_pts:radius1=150.0:radius2=150.0:angle=0.0:min_points=0:nodata=0.0 data/grid.vrt "
             + outfiles[-1]
         )
@@ -1181,18 +1124,14 @@ def test_gdal_grid_17(use_quadtree):
 # Test linear
 
 
-def test_gdal_grid_18():
-    if gdal_grid is None:
-        pytest.skip()
-
-    if not gdal.HasTriangulation():
-        pytest.skip("qhull missing")
+@pytest.mark.skipif(not gdal.HasTriangulation(), reason="qhull missing")
+def test_gdal_grid_18(gdal_grid_path):
 
     outfiles.append("tmp/n43_linear.tif")
 
     # Create a GDAL dataset from the previous generated OGR grid
     (_, err) = gdaltest.runexternal_out_and_err(
-        gdal_grid
+        gdal_grid_path
         + " -txe -80.0041667 -78.9958333 -tye 42.9958333 44.0041667 -outsize 121 121 -ot Int16 -l n43 -a linear -co TILED=YES -co BLOCKXSIZE=256 -co BLOCKYSIZE=256 tmp/n43.shp "
         + outfiles[-1]
     )
@@ -1216,12 +1155,8 @@ def test_gdal_grid_18():
 # Test Inverse Distance to a Power with Nearest Neighbor gridding algorithm
 
 
-def test_gdal_grid_19():
-    if gdal_grid is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver missing")
+@pytest.mark.require_driver("CSV")
+def test_gdal_grid_19(gdal_grid_path):
 
     #################
     # Test generic implementation (no AVX, no SSE)
@@ -1233,7 +1168,7 @@ def test_gdal_grid_19():
 
     # Create a GDAL dataset from the values of "grid.csv".
     (_, _) = gdaltest.runexternal_out_and_err(
-        gdal_grid
+        gdal_grid_path
         + " -txe 440721.0 441920.0 -tye 3751321.0 3750120.0 -outsize 20 20 -ot Float64 -l grid -a invdistnn:power=2.0:radius=1.0:max_points=12:min_points=0:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
@@ -1258,7 +1193,7 @@ def test_gdal_grid_19():
     # Create a GDAL dataset from the values of "grid.csv".
     # Circular window, shifted, test min points and NODATA setting.
     gdaltest.runexternal(
-        gdal_grid
+        gdal_grid_path
         + " -txe 440721.0 441920.0 -tye 3751321.0 3750120.0 -outsize 20 20 -ot Float64 -l grid -a invdistnn:power=2.0:radius=250.0:max_points=12:min_points=8:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
@@ -1283,7 +1218,7 @@ def test_gdal_grid_19():
 
     # Create a GDAL dataset from the values of "grid.csv".
     gdaltest.runexternal(
-        gdal_grid
+        gdal_grid_path
         + " -txe 440721.0 441920.0 -tye 3751321.0 3750120.0 -outsize 20 20 -ot Float64 -l grid -a invdistnn:power=3.0:radius=250.0:max_points=10:min_points=0:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
@@ -1303,15 +1238,9 @@ def test_gdal_grid_19():
 # Test -clipsrc
 
 
-def test_gdal_grid_clipsrc():
-    if gdal_grid is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver missing")
-
-    if not ogrtest.have_geos():
-        pytest.skip()
+@pytest.mark.require_driver("CSV")
+@pytest.mark.skipif(not ogrtest.have_geos(), reason="GEOS missing")
+def test_gdal_grid_clipsrc(gdal_grid_path):
 
     #################
     outfiles.append("tmp/grid_clipsrc.tif")
@@ -1327,7 +1256,7 @@ def test_gdal_grid_clipsrc():
     # Create a GDAL dataset from the values of "grid.csv".
     # Grid nodes are located exactly in raster nodes.
     gdaltest.runexternal_out_and_err(
-        gdal_grid
+        gdal_grid_path
         + " -clipsrc tmp/clip.csv -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -outsize 20 20 -ot Byte -l grid -a nearest:radius1=0.0:radius2=0.0:angle=0.0:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
@@ -1345,12 +1274,8 @@ def test_gdal_grid_clipsrc():
 # Test -tr
 
 
-def test_gdal_grid_tr():
-    if gdal_grid is None:
-        pytest.skip()
-
-    if gdal.GetDriverByName("CSV") is None:
-        pytest.skip("CSV driver missing")
+@pytest.mark.require_driver("CSV")
+def test_gdal_grid_tr(gdal_grid_path):
 
     #################
     outfiles.append("tmp/grid_count_70_70.tif")
@@ -1361,7 +1286,7 @@ def test_gdal_grid_tr():
 
     # Create a GDAL dataset from the values of "grid.csv".
     gdaltest.runexternal(
-        gdal_grid
+        gdal_grid_path
         + " -txe 440720.0 441920.0 -tye 3751320.0 3750120.0 -tr 60 60 -ot Byte -l grid -a count:radius1=70.0:radius2=70.0:angle=0.0:min_points=0:nodata=0.0 data/grid.vrt "
         + outfiles[-1]
     )
