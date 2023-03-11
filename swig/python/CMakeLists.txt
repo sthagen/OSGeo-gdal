@@ -435,18 +435,22 @@ if (Python_Interpreter_FOUND)
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 
   set(INSTALL_ARGS "--single-version-externally-managed --record=record.txt")
+  set(CAN_USE_CMAKE_INSTALL_PREFIX_FROM_CMAKE_INSTALL FALSE)
+  set(IGNORE_CMAKE_INSTALL_PREFIX_CONFIGURE_TIME_DIFFERENT_FROM_RUNTIME FALSE)
   if (DEFINED GDAL_PYTHON_INSTALL_PREFIX)
     file(TO_NATIVE_PATH "${GDAL_PYTHON_INSTALL_PREFIX}" NATIVE_GDAL_PYTHON_INSTALL_PREFIX)
     if (WIN32)
       string(REPLACE "\\" "\\\\" NATIVE_GDAL_PYTHON_INSTALL_PREFIX "${NATIVE_GDAL_PYTHON_INSTALL_PREFIX}")
     endif ()
     set(INSTALL_ARGS "${INSTALL_ARGS} \"--prefix=${NATIVE_GDAL_PYTHON_INSTALL_PREFIX}\"")
+    set(IGNORE_CMAKE_INSTALL_PREFIX_CONFIGURE_TIME_DIFFERENT_FROM_RUNTIME TRUE)
   elseif (CMAKE_INSTALL_PREFIX)
-    file(TO_NATIVE_PATH "${CMAKE_INSTALL_PREFIX}" NATIVE_CMAKE_INSTALL_PREFIX)
-    if (WIN32)
+    if (WIN32 AND _isMultiConfig)
+      file(TO_NATIVE_PATH "${CMAKE_INSTALL_PREFIX}" NATIVE_CMAKE_INSTALL_PREFIX)
       string(REPLACE "\\" "\\\\" NATIVE_CMAKE_INSTALL_PREFIX "${NATIVE_CMAKE_INSTALL_PREFIX}")
-    endif ()
-    if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+      set(INSTALL_ARGS "${INSTALL_ARGS} \"--prefix=${NATIVE_CMAKE_INSTALL_PREFIX}\"")
+      set(IGNORE_CMAKE_INSTALL_PREFIX_CONFIGURE_TIME_DIFFERENT_FROM_RUNTIME TRUE)
+    elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
       file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/is_std_unix_layout.py
            "import sys;print(\"FALSE\" if \"framework\" in sys.prefix.lower() else \"TRUE\")\n")
       execute_process(
@@ -454,12 +458,12 @@ if (Python_Interpreter_FOUND)
         OUTPUT_VARIABLE STD_UNIX_LAYOUT
         OUTPUT_STRIP_TRAILING_WHITESPACE)
       if ("${STD_UNIX_LAYOUT}" STREQUAL "TRUE")
-        set(INSTALL_ARGS "${INSTALL_ARGS} \"--prefix=${NATIVE_CMAKE_INSTALL_PREFIX}\"")
+        set(CAN_USE_CMAKE_INSTALL_PREFIX_FROM_CMAKE_INSTALL TRUE)
       elseif (DEFINED GDAL_PYTHON_INSTALL_LIB)
         set(INSTALL_ARGS "${INSTALL_ARGS} \"--install-lib=${GDAL_PYTHON_INSTALL_LIB}\"")
       endif ()
     else ()
-      set(INSTALL_ARGS "${INSTALL_ARGS} \"--prefix=${NATIVE_CMAKE_INSTALL_PREFIX}\"")
+      set(CAN_USE_CMAKE_INSTALL_PREFIX_FROM_CMAKE_INSTALL TRUE)
     endif ()
   endif ()
 
@@ -488,8 +492,8 @@ if (Python_Interpreter_FOUND)
         GENERATE
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/install_binding_$<CONFIG>.cmake
         CONTENT
-          "execute_process(COMMAND $<IF:$<NOT:$<CONFIG:Debug>>,${CMAKE_COMMAND} ${WERROR_DEV_FLAG} -P ${CMAKE_CURRENT_BINARY_DIR}/install_python_$<CONFIG>.cmake,${CMAKE_COMMAND} -E echo \"setup.py install only run in configuration != Debug\">
-                                          WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})")
+          "execute_process(COMMAND $<IF:$<NOT:$<CONFIG:Debug>>,${CMAKE_COMMAND} ${WERROR_DEV_FLAG} -P \"${CMAKE_CURRENT_BINARY_DIR}/install_python_$<CONFIG>.cmake\",${CMAKE_COMMAND} -E echo \"setup.py install only run in configuration != Debug\">
+                                          WORKING_DIRECTORY \"${CMAKE_CURRENT_BINARY_DIR}\")")
       install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/install_binding_$<CONFIG>.cmake)
     else ()
       message(WARNING "Installing Python bindings with a multi generator requires CMake >= 3.14")
@@ -497,10 +501,7 @@ if (Python_Interpreter_FOUND)
   else ()
     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/install_python.cmake.in" "${CMAKE_CURRENT_BINARY_DIR}/install_python.cmake"
                    @ONLY)
-    install(
-      CODE "execute_process(COMMAND ${CMAKE_COMMAND} ${WERROR_DEV_FLAG} -P \"${CMAKE_CURRENT_BINARY_DIR}/install_python.cmake\"
-                                  WORKING_DIRECTORY \"${INSTALL_WORKING_DIRECTORY}\")")
-
+    install(SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/install_python.cmake")
   endif ()
 
 elseif (Python_Development_FOUND)
