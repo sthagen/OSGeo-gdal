@@ -581,7 +581,6 @@ def test_cog_byte_to_web_mercator_manual():
     assert ds.RasterYSize == 1024
     assert ds.GetRasterBand(1).GetMaskFlags() == gdal.GMF_ALPHA + gdal.GMF_PER_DATASET
     assert ds.GetRasterBand(1).GetBlockSize() == [256, 256]
-    gt = ds.GetGeoTransform()
     expected_gt = [
         -13149614.849955443,
         76.43702828517598,
@@ -590,9 +589,7 @@ def test_cog_byte_to_web_mercator_manual():
         0.0,
         -76.43702828517598,
     ]
-    for i in range(6):
-        if gt[i] != pytest.approx(expected_gt[i], abs=1e-10 * abs(expected_gt[i])):
-            assert False, gt
+    assert ds.GetGeoTransform() == pytest.approx(expected_gt, rel=1e-10)
     assert ds.GetRasterBand(1).Checksum() in (
         4363,
         4264,  # got on Mac at some point
@@ -602,9 +599,26 @@ def test_cog_byte_to_web_mercator_manual():
     assert ds.GetRasterBand(1).GetMaskBand().Checksum() == 4356
     assert ds.GetRasterBand(1).GetOverviewCount() == 2
     ds = None
-
     src_ds = None
+
+    # Check that we correctly round to the closest tile if input bounds are
+    # very close to its boundary (less than half a pixel)
+    filename2 = directory + "/cog2.tif"
+    eps = 0.49 * res
+    gdal.Translate(
+        filename2,
+        filename,
+        options="-of COG -co TILING_SCHEME=GoogleMapsCompatible -a_ullr %.18g %.18g %.18g %.18g"
+        % (minx - eps, maxy + eps, maxx + eps, miny - eps),
+    )
+    ds = gdal.Open(filename2)
+    assert ds.RasterXSize == 1024
+    assert ds.RasterYSize == 1024
+    assert ds.GetGeoTransform() == pytest.approx(expected_gt, rel=1e-10)
+    ds = None
+
     gdal.GetDriverByName("GTiff").Delete(filename)
+    gdal.GetDriverByName("GTiff").Delete(filename2)
     gdal.Unlink(directory)
 
 
@@ -1508,11 +1522,10 @@ def test_cog_odd_overview_size_and_msk():
 
 
 @gdaltest.require_creation_option("COG", "WEBP")
+@pytest.mark.require_driver("WEBP")
 def test_cog_webp_overview_turn_on_lossy_if_webp_level():
 
     tmpfilename = "/vsimem/test_cog_webp_overview_turn_on_lossy_if_webp_level.tif"
-    if gdal.GetDriverByName("WEBP") is None:
-        pytest.skip()
 
     gdal.Translate(
         tmpfilename,
@@ -1541,11 +1554,10 @@ def test_cog_webp_overview_turn_on_lossy_if_webp_level():
 
 
 @gdaltest.require_creation_option("COG", "WEBP")
+@pytest.mark.require_driver("WEBP")
 def test_cog_webp_lossless_webp():
 
     tmpfilename = "/vsimem/test_cog_webp_lossless_webp.tif"
-    if gdal.GetDriverByName("WEBP") is None:
-        pytest.skip()
 
     src_ds = gdal.Open("../gdrivers/data/small_world.tif")
     gdal.ErrorReset()

@@ -1486,7 +1486,7 @@ in the computation of the pansharpening, but not exposed as an output band.
 Panchromatic and spectral bands should generally come from different datasets,
 since bands of a GDAL dataset are assumed to have all the same dimensions.
 Spectral bands themselves can come from one or several datasets. The only
-constraint is that they have all the same dimensions.
+constraint is that they have all the same dimensions and geotransform.
 
 An example of a minimalist working VRT is the following. It will generates a dataset with 3 output
 bands corresponding to the 3 input spectral bands of multispectral.tif, pansharpened
@@ -1534,7 +1534,7 @@ the PansharpeningOptions element may have the following children elements :
 - **NumThreads**: Number of worker threads. Integer number or ALL_CPUS. If this option is not set, the :decl_configoption:`GDAL_NUM_THREADS` configuration option will be queried (its value can also be set to an integer or ALL_CPUS)
 - **BitDepth**: Can be used to specify the bit depth of the panchromatic and spectral bands (e.g. 12). If not specified, the NBITS metadata item from the panchromatic band will be used if it exists.
 - **NoData**: Nodata value to take into account for panchromatic and spectral bands. It will be also used as the output nodata value. If not specified and all input bands have the same nodata value, it will be implicitly used (unless the special None value is put in NoData to prevent that).
-- **SpatialExtentAdjustment**: Can be one of **Union** (default), **Intersection**, **None** or **NoneWithoutWarning**. Controls the behavior when panchromatic and spectral bands have not the same geospatial extent. By default, Union will take the union of all spatial extents. Intersection the intersection of all spatial extents. None will not proceed to any adjustment at all (might be useful if the geotransform are somehow dummy, and the top-left and bottom-right corners of all bands match), but will emit a warning. NoneWithoutWarning is the same as None, but in a silent way.
+- **SpatialExtentAdjustment**: Can be one of **Union** (default), **Intersection**, **None** or **NoneWithoutWarning**. Controls the behavior when panchromatic and spectral bands have not the same geospatial extent. By default, Union will take the union of all spatial extents. Intersection the intersection of all spatial extents. None will not proceed to any adjustment at all, but will emit a warning. NoneWithoutWarning is the same as None, but in a silent way.
 
 The below examples creates a VRT dataset with 4 bands. The first band is the
 panchromatic band. The 3 following bands are than red, green, blue pansharpened
@@ -1656,8 +1656,8 @@ For example:
     vrt://my.tif?bands=2&ovr=4
 
 
-The supported options currently are ``bands``, ``a_srs``, ``a_ullr``, ``ovr``, ``expand``,
-``a_scale``, ``a_offset``, ``ot``, and ``gcp``.
+The supported options currently are ``bands``, ``a_srs``, ``a_ullr``, ``ovr``, ``expand``, 
+``a_scale``, ``a_offset``, ``ot``, ``gcp``, and ``if``. 
 
 Other options may be added in the future.
 
@@ -1694,6 +1694,10 @@ The effect of the ``gcp`` option (added in GDAL 3.7) is to add the indicated gro
 to the output dataset. Values are a set of numbers as per (:ref:`gdal_translate`)``pixel,line,easting,northing[,elevation]``.
 Multiple entries may be included. This can also be seen as an equivalent of running
 `gdal_translate -of VRT -gcp pixel1 line1 easting1 northing1 [elevation1] -gcp pixel2 line2 easting2 northing2 [elevation2] ... -gcp pixelN lineN eastingN northingN [elevationN]`.
+
+The effect of the ``if`` option (added in GDAL 3.7) is to specify the format/driver name/s
+to be attempted to open the input file (:ref:`gdal_translate`). Values may be repeated separated by comma
+This can also be seen as an equivalent of running `gdal_translate -of VRT -if DRV1 -if DRV2 ... -if DRVN`.
 
 The options may be chained together separated by '&'. (Beware the need for quoting to protect
 the ampersand).

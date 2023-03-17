@@ -172,10 +172,8 @@ def test_vrt_read_4():
 # Test serializing and deserializing of various band metadata
 
 
+@pytest.mark.require_driver("AAIGRID")
 def test_vrt_read_5():
-
-    if gdal.GetDriverByName("AAIGRID") is None:
-        pytest.skip("AAIGRID driver missing")
 
     src_ds = gdal.Open("data/testserialization.asc")
     ds = gdal.GetDriverByName("VRT").CreateCopy("/vsimem/vrt_read_5.vrt", src_ds)
@@ -1000,12 +998,8 @@ def test_vrt_read_24():
 # Test GetDataCoverageStatus()
 
 
+@pytest.mark.require_geos
 def test_vrt_read_25():
-
-    import ogrtest
-
-    if not ogrtest.have_geos():
-        pytest.skip()
 
     ds = gdal.Open(
         """<VRTDataset rasterXSize="2000" rasterYSize="200">
@@ -1198,10 +1192,8 @@ def test_vrt_read_30():
 # Check that we take into account intermediate data type demotion
 
 
+@pytest.mark.require_driver("AAIGRID")
 def test_vrt_read_31():
-
-    if gdal.GetDriverByName("AAIGRID") is None:
-        pytest.skip("AAIGRID driver missing")
 
     gdal.FileFromMemBuffer(
         "/vsimem/in.asc",
@@ -1477,6 +1469,14 @@ def test_vrt_protocol():
 
     ds = gdal.Open("vrt://data/float32.tif?gcp=invalid")
     assert ds is None
+
+    ## not compatible, or no such driver
+    ds = gdal.Open("vrt://data/float32.tif?if=AAIGrid,doesnotexist")
+    assert ds is None
+
+    ## compatible driver included
+    ds = gdal.Open("vrt://data/float32.tif?if=AAIGrid,GTiff")
+    assert ds is not None
 
 
 @pytest.mark.require_driver("BMP")

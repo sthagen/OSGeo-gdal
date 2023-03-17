@@ -586,46 +586,41 @@ static std::unique_ptr<OGRGeometry> LoadGeometry(const std::string &osDS,
     if (!osWhere.empty())
         poLyr->SetAttributeFilter(osWhere.c_str());
 
-    std::unique_ptr<OGRMultiPolygon> poMP;
+    OGRGeometryCollection oGC;
+
+    const auto poSRSSrc = poLyr->GetSpatialRef();
+    if (poSRSSrc)
+    {
+        auto poSRSClone = poSRSSrc->Clone();
+        oGC.assignSpatialReference(poSRSClone);
+        poSRSClone->Release();
+    }
+
     for (auto &poFeat : poLyr)
     {
-        OGRGeometry *poSrcGeom = poFeat->GetGeometryRef();
+        auto poSrcGeom = std::unique_ptr<OGRGeometry>(poFeat->StealGeometry());
         if (poSrcGeom)
         {
-            const OGRwkbGeometryType eType =
-                wkbFlatten(poSrcGeom->getGeometryType());
-
-            if (poMP == nullptr)
+            // Only take into account areal geometries.
+            if (poSrcGeom->getCoordinateDimension() == 2)
             {
-                poMP = cpl::make_unique<OGRMultiPolygon>();
-                const auto poSRSSrc = poSrcGeom->getSpatialReference();
-                if (poSRSSrc)
+                if (!poSrcGeom->IsValid())
                 {
-                    auto poSRSClone = poSRSSrc->Clone();
-                    poMP->assignSpatialReference(poSRSClone);
-                    poSRSClone->Release();
+                    CPLError(CE_Warning, CPLE_AppDefined,
+                             "Geometry of feature " CPL_FRMT_GIB " of %s "
+                             "is invalid. Trying to make it valid",
+                             poFeat->GetFID(), osDS.c_str());
+                    auto poValid =
+                        std::unique_ptr<OGRGeometry>(poSrcGeom->MakeValid());
+                    if (poValid)
+                    {
+                        oGC.addGeometryDirectly(poValid.release());
+                    }
                 }
-            }
-
-            if (eType == wkbPolygon)
-                poMP->addGeometry(poSrcGeom);
-            else if (eType == wkbMultiPolygon)
-            {
-                OGRMultiPolygon *poSrcMP = poSrcGeom->toMultiPolygon();
-                const int nGeomCount = poSrcMP->getNumGeometries();
-
-                for (int iGeom = 0; iGeom < nGeomCount; iGeom++)
+                else
                 {
-                    poMP->addGeometry(poSrcMP->getGeometryRef(iGeom));
+                    oGC.addGeometryDirectly(poSrcGeom.release());
                 }
-            }
-            else
-            {
-                CPLError(CE_Failure, CPLE_AppDefined,
-                         "Geometry not of polygon type.");
-                if (!osSQL.empty())
-                    poDS->ReleaseResultSet(poLyr);
-                return nullptr;
             }
         }
     }
@@ -633,7 +628,10 @@ static std::unique_ptr<OGRGeometry> LoadGeometry(const std::string &osDS,
     if (!osSQL.empty())
         poDS->ReleaseResultSet(poLyr);
 
-    return poMP;
+    if (oGC.IsEmpty())
+        return nullptr;
+
+    return std::unique_ptr<OGRGeometry>(oGC.UnaryUnion());
 }
 
 /************************************************************************/
@@ -3687,14 +3685,42 @@ static void DoFieldTypeConversion(GDALDataset *poDstDS,
     if (bUnsetDefault)
         oFieldDefn.SetDefault(nullptr);
 
-    if (poDstDS->GetDriver() != nullptr &&
-        poDstDS->GetDriver()->GetMetadataItem(
-            GDAL_DMD_CREATIONFIELDDATATYPES) != nullptr &&
-        strstr(poDstDS->GetDriver()->GetMetadataItem(
-                   GDAL_DMD_CREATIONFIELDDATATYPES),
+    const auto poDstDriver = poDstDS->GetDriver();
+    const char *pszCreationFieldDataTypes =
+        poDstDriver
+            ? poDstDriver->GetMetadataItem(GDAL_DMD_CREATIONFIELDDATATYPES)
+            : nullptr;
+    const char *pszCreationFieldDataSubtypes =
+        poDstDriver
+            ? poDstDriver->GetMetadataItem(GDAL_DMD_CREATIONFIELDDATASUBTYPES)
+            : nullptr;
+    if (pszCreationFieldDataTypes &&
+        strstr(pszCreationFieldDataTypes,
                OGRFieldDefn::GetFieldTypeName(oFieldDefn.GetType())) == nullptr)
     {
-        if (oFieldDefn.GetType() == OFTInteger64)
+        if (pszCreationFieldDataSubtypes &&
+            (oFieldDefn.GetType() == OFTIntegerList ||
+             oFieldDefn.GetType() == OFTInteger64List ||
+             oFieldDefn.GetType() == OFTRealList ||
+             oFieldDefn.GetType() == OFTStringList) &&
+            strstr(pszCreationFieldDataSubtypes, "JSON"))
+        {
+            if (!bQuiet)
+            {
+                CPLError(
+                    CE_Warning, CPLE_AppDefined,
+                    "The output driver does not seem to natively support %s "
+                    "type for field %s. Converting it to String(JSON) instead. "
+                    "-mapFieldType can be used to control field type "
+                    "conversion.",
+                    OGRFieldDefn::GetFieldTypeName(oFieldDefn.GetType()),
+                    oFieldDefn.GetNameRef());
+            }
+            oFieldDefn.SetSubType(OFSTNone);
+            oFieldDefn.SetType(OFTString);
+            oFieldDefn.SetSubType(OFSTJSON);
+        }
+        else if (oFieldDefn.GetType() == OFTInteger64)
         {
             if (!bQuiet)
             {
@@ -3720,9 +3746,7 @@ static void DoFieldTypeConversion(GDALDataset *poDstDS,
                 oFieldDefn.GetNameRef());
         }
     }
-    else if (poDstDS->GetDriver() != nullptr &&
-             poDstDS->GetDriver()->GetMetadataItem(
-                 GDAL_DMD_CREATIONFIELDDATATYPES) == nullptr)
+    else if (!pszCreationFieldDataTypes)
     {
         // All drivers supporting OFTInteger64 should advertise it theoretically
         if (oFieldDefn.GetType() == OFTInteger64)

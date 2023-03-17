@@ -741,6 +741,10 @@ OGRErr OGR_G_TransformTo(OGRGeometryH hGeom, OGRSpatialReferenceH hSRS)
  * will be ignored.  On successful completion the output OGRSpatialReference
  * of the OGRCoordinateTransformation will be assigned to the geometry.
  *
+ * This method only does reprojection on a point-by-point basis. It does not
+ * include advanced logic to deal with discontinuities at poles or antimeridian.
+ * For that, use the OGRGeometryFactory::transformWithOptions() method.
+ *
  * This method is the same as the C function OGR_G_Transform().
  *
  * @param poCT the transformation to apply.
@@ -765,6 +769,11 @@ OGRErr OGR_G_TransformTo(OGRGeometryH hGeom, OGRSpatialReferenceH hSRS)
  * OGRCoordinateTransformation object, and the actual SRS of the geometry
  * will be ignored.  On successful completion the output OGRSpatialReference
  * of the OGRCoordinateTransformation will be assigned to the geometry.
+ *
+ * This function only does reprojection on a point-by-point basis. It does not
+ * include advanced logic to deal with discontinuities at poles or antimeridian.
+ * For that, use the OGR_GeomTransformer_Create() and
+ * OGR_GeomTransformer_Transform() functions.
  *
  * This function is the same as the CPP method OGRGeometry::transform.
  *
@@ -3825,8 +3834,7 @@ OGRGeometryH OGR_G_MakeValid(OGRGeometryH hGeom)
 {
     VALIDATE_POINTER1(hGeom, "OGR_G_MakeValid", nullptr);
 
-    return reinterpret_cast<OGRGeometryH>(
-        reinterpret_cast<OGRGeometry *>(hGeom)->MakeValid());
+    return OGRGeometry::ToHandle(OGRGeometry::FromHandle(hGeom)->MakeValid());
 }
 
 /************************************************************************/
@@ -3856,8 +3864,8 @@ OGRGeometryH OGR_G_MakeValidEx(OGRGeometryH hGeom, CSLConstList papszOptions)
 {
     VALIDATE_POINTER1(hGeom, "OGR_G_MakeValidEx", nullptr);
 
-    return reinterpret_cast<OGRGeometryH>(
-        reinterpret_cast<OGRGeometry *>(hGeom)->MakeValid(papszOptions));
+    return OGRGeometry::ToHandle(
+        OGRGeometry::FromHandle(hGeom)->MakeValid(papszOptions));
 }
 
 /************************************************************************/
@@ -4622,6 +4630,8 @@ OGRGeometryH OGR_G_Union(OGRGeometryH hThis, OGRGeometryH hOther)
  * of the input geometries, call IsValid() before, otherwise the result might
  * be wrong.
  *
+ * The input geometry must be a MultiPolygon.
+ *
  * This method is the same as the C function OGR_G_UnionCascaded().
  *
  * This method is built on the GEOS library, check it for the definition
@@ -4632,6 +4642,8 @@ OGRGeometryH OGR_G_Union(OGRGeometryH hThis, OGRGeometryH hOther)
  * @return a new geometry representing the union or NULL if an error occurs.
  *
  * @since OGR 1.8.0
+ *
+ * @deprecated Use UnaryUnion() instead
  */
 
 OGRGeometry *OGRGeometry::UnionCascaded() const
@@ -4682,6 +4694,8 @@ OGRGeometry *OGRGeometry::UnionCascaded() const
  * of the input geometries, call IsValid() before, otherwise the result might
  * be wrong.
  *
+ * The input geometry must be a MultiPolygon.
+ *
  * This function is the same as the C++ method OGRGeometry::UnionCascaded().
  *
  * This function is built on the GEOS library, check it for the definition
@@ -4692,6 +4706,8 @@ OGRGeometry *OGRGeometry::UnionCascaded() const
  * @param hThis the geometry.
  *
  * @return a new geometry representing the union or NULL if an error occurs.
+ *
+ * @deprecated Use OGR_G_UnaryUnion() instead
  */
 
 OGRGeometryH OGR_G_UnionCascaded(OGRGeometryH hThis)
@@ -4701,6 +4717,105 @@ OGRGeometryH OGR_G_UnionCascaded(OGRGeometryH hThis)
 
     return OGRGeometry::ToHandle(
         OGRGeometry::FromHandle(hThis)->UnionCascaded());
+}
+
+/************************************************************************/
+/*                               UnaryUnion()                           */
+/************************************************************************/
+
+/**
+ * \brief Returns the union of all components of a single geometry.
+ *
+ * Usually used to convert a collection into the smallest set of polygons that
+ * cover the same area.
+ *
+ * See https://postgis.net/docs/ST_UnaryUnion.html for more details.
+ *
+ * This method is the same as the C function OGR_G_UnaryUnion().
+ *
+ * This method is built on the GEOS library, check it for the definition
+ * of the geometry operation.
+ * If OGR is built without the GEOS library, this method will always fail,
+ * issuing a CPLE_NotSupported error.
+ *
+ * @return a new geometry representing the union or NULL if an error occurs.
+ *
+ * @since GDAL 3.7
+ */
+
+OGRGeometry *OGRGeometry::UnaryUnion() const
+
+{
+#ifndef HAVE_GEOS
+
+    CPLError(CE_Failure, CPLE_NotSupported, "GEOS support not enabled.");
+    return nullptr;
+#else
+
+#if GEOS_VERSION_MAJOR == 3 && GEOS_VERSION_MINOR < 11
+    if (IsEmpty())
+    {
+        // GEOS < 3.11 crashes on an empty geometry
+        auto poRet = new OGRGeometryCollection();
+        poRet->assignSpatialReference(getSpatialReference());
+        return poRet;
+    }
+#endif
+    OGRGeometry *poOGRProduct = nullptr;
+
+    GEOSContextHandle_t hGEOSCtxt = createGEOSContext();
+    GEOSGeom hThisGeosGeom = exportToGEOS(hGEOSCtxt);
+    if (hThisGeosGeom != nullptr)
+    {
+        GEOSGeom hGeosProduct = GEOSUnaryUnion_r(hGEOSCtxt, hThisGeosGeom);
+        GEOSGeom_destroy_r(hGEOSCtxt, hThisGeosGeom);
+
+        poOGRProduct =
+            BuildGeometryFromGEOS(hGEOSCtxt, hGeosProduct, this, nullptr);
+    }
+    freeGEOSContext(hGEOSCtxt);
+
+    return poOGRProduct;
+
+#endif  // HAVE_GEOS
+}
+
+/************************************************************************/
+/*                            OGR_G_UnaryUnion()                        */
+/************************************************************************/
+
+/**
+ * \brief Returns the union of all components of a single geometry.
+ *
+ * Usually used to convert a collection into the smallest set of polygons that
+ * cover the same area.
+ *
+ * See https://postgis.net/docs/ST_UnaryUnion.html for more details.
+ *
+ * Geometry validity is not checked. In case you are unsure of the validity
+ * of the input geometries, call IsValid() before, otherwise the result might
+ * be wrong.
+ *
+ * This function is the same as the C++ method OGRGeometry::UnaryUnion().
+ *
+ * This function is built on the GEOS library, check it for the definition
+ * of the geometry operation.
+ * If OGR is built without the GEOS library, this function will always fail,
+ * issuing a CPLE_NotSupported error.
+ *
+ * @param hThis the geometry.
+ *
+ * @return a new geometry representing the union or NULL if an error occurs.
+ *
+ * @since GDAL 3.7
+ */
+
+OGRGeometryH OGR_G_UnaryUnion(OGRGeometryH hThis)
+
+{
+    VALIDATE_POINTER1(hThis, "OGR_G_UnaryUnion", nullptr);
+
+    return OGRGeometry::ToHandle(OGRGeometry::FromHandle(hThis)->UnaryUnion());
 }
 
 /************************************************************************/

@@ -36,6 +36,7 @@
 #include "filegdbtable_priv.h"
 
 #include <algorithm>
+#include <cassert>
 #include <limits>
 #include <new>
 #include <utility>
@@ -1193,6 +1194,7 @@ CPLErr GDALOpenFileGDBRasterBand::IReadBlock(int nBlockXOff, int nBlockYOff,
         CPLError(CE_Failure, CPLE_AppDefined,
                  "poGDS->m_oMapGDALBandToGDBBandId.find(%d) failed",
                  nGDALBandId);
+        return CE_Failure;
     }
     const int nGDBRasterBandId = oIter->second;
 
@@ -1324,8 +1326,10 @@ CPLErr GDALOpenFileGDBRasterBand::IReadBlock(int nBlockXOff, int nBlockYOff,
             }
 
             size_t nOutBytes = 0;
-            if (!CPLZLibInflate(pabyData, nInBytes, abyTmpBuffer.data(),
-                                abyTmpBuffer.size(), &nOutBytes) ||
+            GByte *outPtr = abyTmpBuffer.data();
+            assert(outPtr != nullptr);  // For Coverity Scan
+            if (!CPLZLibInflate(pabyData, nInBytes, outPtr, abyTmpBuffer.size(),
+                                &nOutBytes) ||
                 !(nOutBytes == nImageSizePacked ||
                   nOutBytes == nImageSizeWithBinaryMask))
             {
@@ -1412,9 +1416,11 @@ CPLErr GDALOpenFileGDBRasterBand::IReadBlock(int nBlockXOff, int nBlockYOff,
                     }
                 }
                 size_t nOutBytes = 0;
-                if (CPLZLibInflate(
-                        pabyData + 5 + nJPEGSize, nInBytes - 5 - nJPEGSize,
-                        abyTmpBuffer.data(), nBinaryMaskSize, &nOutBytes) &&
+                GByte *outPtr = abyTmpBuffer.data();
+                assert(outPtr != nullptr);  // For Coverity Scan
+                if (CPLZLibInflate(pabyData + 5 + nJPEGSize,
+                                   nInBytes - 5 - nJPEGSize, outPtr,
+                                   nBinaryMaskSize, &nOutBytes) &&
                     nOutBytes == nBinaryMaskSize)
                 {
                     pabyMask = abyTmpBuffer.data();
@@ -1537,12 +1543,14 @@ CPLErr GDALOpenFileGDBRasterBand::IReadBlock(int nBlockXOff, int nBlockYOff,
                     }
                 }
                 size_t nOutBytes = 0;
-                if (CPLZLibInflate(
-                        pabyData + 5 + nJPEGSize, nInBytes - 5 - nJPEGSize,
-                        abyTmpBuffer.data(), nBinaryMaskSize, &nOutBytes) &&
+                GByte *outPtr = abyTmpBuffer.data();
+                assert(outPtr != nullptr);  // For Coverity Scan
+                if (CPLZLibInflate(pabyData + 5 + nJPEGSize,
+                                   nInBytes - 5 - nJPEGSize, outPtr,
+                                   nBinaryMaskSize, &nOutBytes) &&
                     nOutBytes == nBinaryMaskSize)
                 {
-                    pabyMask = abyTmpBuffer.data();
+                    pabyMask = outPtr;
                 }
                 else
                 {

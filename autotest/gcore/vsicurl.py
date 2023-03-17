@@ -28,6 +28,7 @@
 # DEALINGS IN THE SOFTWARE.
 ###############################################################################
 
+import sys
 import time
 
 import gdaltest
@@ -36,15 +37,14 @@ import webserver
 
 from osgeo import gdal, ogr
 
+pytestmark = pytest.mark.require_curl()
+
 ###############################################################################
 #
 
 
 @pytest.mark.slow()
 def test_vsicurl_1():
-
-    if not gdaltest.built_against_curl():
-        pytest.skip()
 
     ds = ogr.Open(
         "/vsizip/vsicurl/http://publicfiles.dep.state.fl.us/dear/BWR_GIS/2007NWFLULC/NWFWMD2007LULC.zip"
@@ -59,9 +59,6 @@ def test_vsicurl_1():
 @pytest.mark.slow()
 def vsicurl_2():
 
-    if not gdaltest.built_against_curl():
-        pytest.skip()
-
     ds = gdal.Open(
         "/vsizip//vsicurl/http://eros.usgs.gov/archive/nslrsda/GeoTowns/HongKong/srtm/n22e113.zip/n22e113.bil"
     )
@@ -74,9 +71,6 @@ def vsicurl_2():
 
 @pytest.mark.slow()
 def vsicurl_3():
-
-    if not gdaltest.built_against_curl():
-        pytest.skip()
 
     ds = ogr.Open(
         "/vsizip/vsicurl/http://www.iucnredlist.org/spatial-data/MAMMALS_TERRESTRIAL.zip"
@@ -91,9 +85,6 @@ def vsicurl_3():
 @pytest.mark.slow()
 def test_vsicurl_4():
 
-    if not gdaltest.built_against_curl():
-        pytest.skip()
-
     ds = ogr.Open(
         "/vsizip/vsicurl/http://lelserver.env.duke.edu:8080/LandscapeTools/export/49/Downloads/1_Habitats.zip"
     )
@@ -106,8 +97,6 @@ def test_vsicurl_4():
 
 @pytest.mark.slow()
 def test_vsicurl_5():
-    if not gdaltest.built_against_curl():
-        pytest.skip()
 
     ds = gdal.Open(
         "/vsicurl/http://dds.cr.usgs.gov/srtm/SRTM_image_sample/picture%20examples/N34W119_DEM.tif"
@@ -122,9 +111,6 @@ def test_vsicurl_5():
 @pytest.mark.slow()
 def vsicurl_6_disabled():
 
-    if not gdaltest.built_against_curl():
-        pytest.skip()
-
     fl = gdal.ReadDir("/vsicurl/ftp://ftp2.cits.rncan.gc.ca/pub/cantopo/250k_tif")
     assert fl
 
@@ -136,9 +122,6 @@ def vsicurl_6_disabled():
 @pytest.mark.slow()
 def test_vsicurl_7():
 
-    if not gdaltest.built_against_curl():
-        pytest.skip()
-
     fl = gdal.ReadDir("/vsicurl/http://ortho.linz.govt.nz/tifs/2005_06")
     assert fl
 
@@ -149,9 +132,6 @@ def test_vsicurl_7():
 
 @pytest.mark.slow()
 def vsicurl_8():
-
-    if not gdaltest.built_against_curl():
-        pytest.skip()
 
     ds1 = gdal.Open(
         "/vsigzip//vsicurl/http://dds.cr.usgs.gov/pub/data/DEM/250/notavail/C/chipicoten-w.gz"
@@ -171,9 +151,6 @@ def vsicurl_8():
 @pytest.mark.slow()
 def test_vsicurl_9():
 
-    if not gdaltest.built_against_curl():
-        pytest.skip()
-
     ds = gdal.Open(
         "/vsicurl/http://download.osgeo.org/gdal/data/gtiff/"
         "xx\u4E2D\u6587.\u4E2D\u6587"
@@ -188,9 +165,6 @@ def test_vsicurl_9():
 @pytest.mark.slow()
 def test_vsicurl_10():
 
-    if not gdaltest.built_against_curl():
-        pytest.skip()
-
     ds = gdal.Open(
         "/vsicurl/http://download.osgeo.org/gdal/data/gtiff/xx%E4%B8%AD%E6%96%87.%E4%B8%AD%E6%96%87"
     )
@@ -203,9 +177,6 @@ def test_vsicurl_10():
 
 @pytest.mark.slow()
 def test_vsicurl_11():
-
-    if not gdaltest.built_against_curl():
-        pytest.skip()
 
     f = gdal.VSIFOpenL(
         "/vsicurl/http://download.osgeo.org/gdal/data/bmp/Bug2236.bmp", "rb"
@@ -227,9 +198,6 @@ def test_vsicurl_start_webserver():
 
     gdaltest.webserver_process = None
     gdaltest.webserver_port = 0
-
-    if not gdaltest.built_against_curl():
-        pytest.skip()
 
     (gdaltest.webserver_process, gdaltest.webserver_port) = webserver.launch(
         handler=webserver.DispatcherHttpHandler
@@ -1141,3 +1109,27 @@ def test_vsicurl_stop_webserver():
     gdal.VSICurlClearCache()
 
     webserver.server_stop(gdaltest.webserver_process, gdaltest.webserver_port)
+
+
+###############################################################################
+# Check that GDAL_HTTP_NETRC_FILE is taken into account
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Incorrect platform")
+@pytest.mark.skipif(not gdaltest.built_against_curl(), reason="curl not available")
+def test_vsicurl_NETRC_FILE():
+
+    python_exe = sys.executable
+    cmd = (
+        f'strace -f "{python_exe}" -c "'
+        + "from osgeo import gdal; "
+        + "gdal.SetConfigOption('GDAL_HTTP_NETRC_FILE', '/i_do/not_exist'); "
+        + "gdal.Open('/vsicurl/http://i.do.not.exist.com/foo');"
+        + '"'
+    )
+    try:
+        (_, err) = gdaltest.runexternal_out_and_err(cmd, encoding="UTF-8")
+    except Exception as e:
+        pytest.skip("got exception %s" % str(e))
+
+    assert "/i_do/not_exist" in err

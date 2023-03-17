@@ -142,7 +142,8 @@ class OGRSQLiteBaseDataSource CPL_NON_FINAL : public GDALPamDataset
         nullptr; /* Set by the VFS layer when it opens the DB */
                  /* Must *NOT* be closed by the datasource explicitly. */
 
-    int OpenOrCreateDB(int flags, bool bRegisterOGR2SQLiteExtensions);
+    bool OpenOrCreateDB(int flags, bool bRegisterOGR2SQLiteExtensions,
+                        bool bLoadExtensions);
     bool SetSynchronous();
     bool SetCacheSize();
     void LoadExtensions();
@@ -156,8 +157,8 @@ class OGRSQLiteBaseDataSource CPL_NON_FINAL : public GDALPamDataset
         m_osMapRelationships{};
 
     void *hSpatialiteCtxt = nullptr;
-    bool InitNewSpatialite();
-    void FinishNewSpatialite();
+    bool InitSpatialite();
+    void FinishSpatialite();
 
     int bUserTransactionActive = FALSE;
     int nSoftTransactionLevel = 0;

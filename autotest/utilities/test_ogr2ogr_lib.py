@@ -479,13 +479,13 @@ def test_ogr2ogr_lib_21():
 
 
 @pytest.mark.require_driver("CSV")
-@pytest.mark.skipif(not ogrtest.have_geos(), reason="GEOS missing")
+@pytest.mark.require_geos
 def test_ogr2ogr_clipsrc_wkt_no_dst_geom():
 
     tmpfilename = "/vsimem/out.csv"
     wkt = "POLYGON ((479461 4764494,479461 4764196,480012 4764196,480012 4764494,479461 4764494))"
     ds = gdal.VectorTranslate(
-        tmpfilename, "../ogr/data/poly.shp", format="CSV", clipSrc=wkt
+        tmpfilename, "../ogr/data/poly.shp", format="Memory", clipSrc=wkt
     )
     lyr = ds.GetLayer(0)
     fc = lyr.GetFeatureCount()
@@ -834,10 +834,8 @@ def test_ogr2ogr_assign_coord_epoch():
 # Test -s_coord_epoch
 
 
+@gdaltest.require_proj_version(7, 2)
 def test_ogr2ogr_s_coord_epoch():
-
-    if osr.GetPROJVersionMajor() * 100 + osr.GetPROJVersionMinor() < 702:
-        pytest.skip("requires PROJ 7.2 or later")
 
     src_ds = gdal.GetDriverByName("Memory").Create("", 0, 0, 0, gdal.GDT_Unknown)
     src_lyr = src_ds.CreateLayer("layer")
@@ -862,10 +860,8 @@ def test_ogr2ogr_s_coord_epoch():
 # Test -t_coord_epoch
 
 
+@gdaltest.require_proj_version(7, 2)
 def test_ogr2ogr_t_coord_epoch():
-
-    if osr.GetPROJVersionMajor() * 100 + osr.GetPROJVersionMinor() < 702:
-        pytest.skip("requires PROJ 7.2 or later")
 
     src_ds = gdal.GetDriverByName("Memory").Create("", 0, 0, 0, gdal.GDT_Unknown)
     src_lyr = src_ds.CreateLayer("layer")
@@ -1027,7 +1023,7 @@ def test_ogr2ogr_lib_t_srs_ignored():
 # Test spatSRS
 
 
-@pytest.mark.skipif(not ogrtest.have_geos(), reason="GEOS missing")
+@pytest.mark.require_geos
 def test_ogr2ogr_lib_spat_srs_projected():
 
     # Check that we densify spatial filter geometry when not expressed in
@@ -1062,7 +1058,7 @@ def test_ogr2ogr_lib_spat_srs_projected():
 # Test spatSRS
 
 
-@pytest.mark.skipif(not ogrtest.have_geos(), reason="GEOS missing")
+@pytest.mark.require_geos
 def test_ogr2ogr_lib_spat_srs_geographic():
 
     # Check that we densify spatial filter geometry when not expressed in
@@ -1091,7 +1087,7 @@ def test_ogr2ogr_lib_spat_srs_geographic():
 
 
 @pytest.mark.require_driver("GPKG")
-@pytest.mark.skipif(not ogrtest.have_geos(), reason="GEOS is not available")
+@pytest.mark.require_geos
 def test_ogr2ogr_lib_clipsrc_datasource():
 
     # Prepare the data layer to clip
@@ -1169,7 +1165,7 @@ def test_ogr2ogr_lib_clipsrc_datasource():
 # Test -clipsrc and intersection being of a lower dimensionality
 
 
-@pytest.mark.skipif(not ogrtest.have_geos(), reason="GEOS missing")
+@pytest.mark.require_geos
 def test_ogr2ogr_lib_clipsrc_discard_lower_dimensionality():
 
     srcDS = gdal.GetDriverByName("Memory").Create("", 0, 0, 0, gdal.GDT_Unknown)
@@ -1188,11 +1184,56 @@ def test_ogr2ogr_lib_clipsrc_discard_lower_dimensionality():
 
 
 ###############################################################################
+# Test -clipsrc with a clip layer with an invalid polygon
+
+
+@pytest.mark.require_driver("GPKG")
+@pytest.mark.skipif(not ogrtest.have_geos(), reason="GEOS missing")
+@pytest.mark.skipif(
+    ogr.CreateGeometryFromWkt("POLYGON ((0 0,10 10,0 10,10 0,0 0))").MakeValid()
+    is None,
+    reason="GEOS < 3.8, no MakeValid",
+)
+def test_ogr2ogr_lib_clipsrc_invalid_polygon():
+
+    srcDS = gdal.GetDriverByName("Memory").Create("", 0, 0, 0, gdal.GDT_Unknown)
+    srs = osr.SpatialReference()
+    srs.ImportFromEPSG(4326)
+    srcLayer = srcDS.CreateLayer("test", srs=srs, geom_type=ogr.wkbLineString)
+    f = ogr.Feature(srcLayer.GetLayerDefn())
+    f.SetGeometry(ogr.CreateGeometryFromWkt("POINT(0.25 0.25)"))
+    srcLayer.CreateFeature(f)
+    f = ogr.Feature(srcLayer.GetLayerDefn())
+    f.SetGeometry(ogr.CreateGeometryFromWkt("POINT(-0.5 0.5)"))
+    srcLayer.CreateFeature(f)
+
+    # Prepare the data layers to clip with
+    clip_path = "/vsimem/clip_test.gpkg"
+    clip_ds = gdal.GetDriverByName("GPKG").Create(clip_path, 0, 0, 0, gdal.GDT_Unknown)
+    clip_layer = clip_ds.CreateLayer("cliptest", geom_type=ogr.wkbPolygon)
+    f = ogr.Feature(clip_layer.GetLayerDefn())
+    # Invalid polygon with self crossing
+    f.SetGeometry(ogr.CreateGeometryFromWkt("POLYGON((0 0,1 1,0 1,1 0,0 0))"))
+    clip_layer.CreateFeature(f)
+    clip_ds = None
+
+    # Intersection of above geometry with clipSrc bounding box is a point
+    with gdaltest.error_handler():
+        ds = gdal.VectorTranslate("", srcDS, format="Memory", clipSrc=clip_path)
+    lyr = ds.GetLayer(0)
+    assert lyr.GetFeatureCount() == 1
+    ds = None
+
+    # Cleanup
+    gdal.Unlink(clip_path)
+
+
+###############################################################################
 # Test -clipdst with a clip datasource
 
 
 @pytest.mark.require_driver("GPKG")
-@pytest.mark.skipif(not ogrtest.have_geos(), reason="GEOS is not available")
+@pytest.mark.require_geos
 def test_ogr2ogr_lib_clipdst_datasource():
 
     # Prepare the data layer to clip
@@ -1270,7 +1311,7 @@ def test_ogr2ogr_lib_clipdst_datasource():
 # Test -clipdst and intersection being of a lower dimensionality
 
 
-@pytest.mark.skipif(not ogrtest.have_geos(), reason="GEOS missing")
+@pytest.mark.require_geos
 def test_ogr2ogr_lib_clipdst_discard_lower_dimensionality():
 
     srcDS = gdal.GetDriverByName("Memory").Create("", 0, 0, 0, gdal.GDT_Unknown)
@@ -1291,7 +1332,7 @@ def test_ogr2ogr_lib_clipdst_discard_lower_dimensionality():
 # Test /-clipsrc-clipdst with reprojection
 
 
-@pytest.mark.skipif(not ogrtest.have_geos(), reason="GEOS is not available")
+@pytest.mark.require_geos
 @pytest.mark.parametrize("clipSrc", [True, False])
 def test_ogr2ogr_lib_clip_datasource_reprojection(clipSrc):
 
@@ -1430,7 +1471,7 @@ def test_ogr2ogr_lib_options_and_args():
 # Test using simplify
 
 
-@pytest.mark.skipif(not ogrtest.have_geos(), reason="GEOS is not available")
+@pytest.mark.require_geos
 def test_ogr2ogr_lib_simplify():
 
     src_ds = gdal.GetDriverByName("Memory").Create("", 0, 0, 0, gdal.GDT_Unknown)
@@ -1550,3 +1591,36 @@ def test_ogr2ogr_lib_dateTimeTo():
     dst_lyr = dst_ds.GetLayer(0)
     f = dst_lyr.GetNextFeature()
     assert f["dt"] == "2023/01/31 09:34:56.789-1345"
+
+
+###############################################################################
+# Test converting a list type to JSON (#7397)
+
+
+@pytest.mark.require_driver("GPKG")
+def test_ogr2ogr_lib_convert_list_type_to_JSON():
+
+    src_ds = gdal.GetDriverByName("Memory").Create("", 0, 0, 0, gdal.GDT_Unknown)
+    src_lyr = src_ds.CreateLayer("layer")
+    src_lyr.CreateField(ogr.FieldDefn("strlist", ogr.OFTStringList))
+    src_lyr.CreateField(ogr.FieldDefn("intlist", ogr.OFTIntegerList))
+    src_lyr.CreateField(ogr.FieldDefn("int64list", ogr.OFTInteger64List))
+    src_lyr.CreateField(ogr.FieldDefn("reallist", ogr.OFTRealList))
+    f = ogr.Feature(src_lyr.GetLayerDefn())
+    f["strlist"] = ["one", "two"]
+    f["intlist"] = [1, 2]
+    f["int64list"] = [1234567890123, 1]
+    f["reallist"] = [1.5, 2.5]
+    src_lyr.CreateFeature(f)
+
+    out_filename = "/vsimem/test_ogr2ogr_lib_convert_list_type_to_JSON.gpkg"
+    dst_ds = gdal.VectorTranslate(out_filename, src_ds)
+    dst_lyr = dst_ds.GetLayer(0)
+    assert dst_lyr.GetLayerDefn().GetFieldDefn(0).GetSubType() == ogr.OFSTJSON
+    f = dst_lyr.GetNextFeature()
+    assert f["strlist"] == '[ "one", "two" ]'
+    assert f["intlist"] == "[ 1, 2 ]"
+    assert f["int64list"] == "[ 1234567890123, 1 ]"
+    assert f["reallist"] == "[ 1.5, 2.5 ]"
+    dst_ds = None
+    gdal.Unlink(out_filename)

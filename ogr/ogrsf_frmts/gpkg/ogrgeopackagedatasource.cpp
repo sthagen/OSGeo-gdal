@@ -219,7 +219,7 @@ OGRErr GDALGeoPackageDataset::SetApplicationAndUserVersionId()
 #else
     CPLAssert(m_pszFilename != NULL);
 
-    FinishNewSpatialite();
+    FinishSpatialite();
 
     /* Have to flush the file before f***ing with the header */
     CloseDB();
@@ -269,7 +269,7 @@ bool GDALGeoPackageDataset::ReOpenDB()
     CPLAssert(hDB != nullptr);
     CPLAssert(m_pszFilename != nullptr);
 
-    FinishNewSpatialite();
+    FinishSpatialite();
 
     CloseDB();
 
@@ -970,7 +970,10 @@ CPLErr GDALGeoPackageDataset::Close()
     CPLErr eErr = CE_None;
     if (nOpenFlags != OPEN_FLAGS_CLOSED)
     {
-        SetPamFlags(0);
+        if (eAccess == GA_Update || !m_bMetadataDirty)
+        {
+            SetPamFlags(0);
+        }
 
         if (eAccess == GA_Update && m_poParentDS == nullptr &&
             !m_osRasterTable.empty() && !m_bGeoTransformValid)
@@ -986,6 +989,14 @@ CPLErr GDALGeoPackageDataset::Close()
 
         if (FlushMetadata() != CE_None)
             eErr = CE_Failure;
+
+        if (eAccess == GA_Update || !m_bMetadataDirty)
+        {
+            // Needed again as above GDALGeoPackageDataset::FlushCache()
+            // may have call GDALGeoPackageRasterBand::InvalidateStatistics()
+            // which modifies metadata
+            SetPamFlags(0);
+        }
 
         // Destroy bands now since we don't want
         // GDALGPKGMBTilesLikeRasterBand::FlushCache() to run after dataset
@@ -1843,6 +1854,8 @@ int GDALGeoPackageDataset::Open(GDALOpenInfo *poOpenInfo,
         FixupWrongRTreeTrigger();
         FixupWrongMedataReferenceColumnNameUpdate();
     }
+
+    SetPamFlags(0);
 
     return bRet;
 }
@@ -3325,8 +3338,40 @@ CPLErr GDALGeoPackageDataset::IFlushCacheWithErrCode(bool bAtClosing)
     if (m_bInFlushCache)
         return CE_None;
     m_bInFlushCache = true;
-    // Short circuit GDALPamDataset to avoid serialization to .aux.xml
-    GDALDataset::FlushCache(bAtClosing);
+    if (hDB && eAccess == GA_ReadOnly && bAtClosing)
+    {
+        // Clean-up metadata that will go to PAM by removing items that
+        // are reconstructed.
+        CPLStringList aosMD;
+        for (CSLConstList papszIter = GetMetadata(); papszIter && *papszIter;
+             ++papszIter)
+        {
+            char *pszKey = nullptr;
+            CPLParseNameValue(*papszIter, &pszKey);
+            if (pszKey &&
+                (EQUAL(pszKey, "AREA_OR_POINT") ||
+                 EQUAL(pszKey, "IDENTIFIER") || EQUAL(pszKey, "DESCRIPTION") ||
+                 EQUAL(pszKey, "ZOOM_LEVEL") ||
+                 STARTS_WITH(pszKey, "GPKG_METADATA_ITEM_")))
+            {
+                // remove it
+            }
+            else
+            {
+                aosMD.AddString(*papszIter);
+            }
+            CPLFree(pszKey);
+        }
+        oMDMD.SetMetadata(aosMD.List());
+        oMDMD.SetMetadata(nullptr, "IMAGE_STRUCTURE");
+
+        GDALPamDataset::FlushCache(bAtClosing);
+    }
+    else
+    {
+        // Short circuit GDALPamDataset to avoid serialization to .aux.xml
+        GDALDataset::FlushCache(bAtClosing);
+    }
 
     for (int i = 0; i < m_nLayers; i++)
     {
@@ -3337,6 +3382,18 @@ CPLErr GDALGeoPackageDataset::IFlushCacheWithErrCode(bool bAtClosing)
     // Update raster table last_change column in gpkg_contents if needed
     if (m_bHasModifiedTiles)
     {
+        for (int i = 1; i <= nBands; ++i)
+        {
+            auto poBand =
+                cpl::down_cast<GDALGeoPackageRasterBand *>(GetRasterBand(i));
+            if (!poBand->HaveStatsMetadataBeenSetInThisSession())
+            {
+                poBand->InvalidateStatistics();
+                if (psPam && psPam->pszPamFilename)
+                    VSIUnlink(psPam->pszPamFilename);
+            }
+        }
+
         UpdateGpkgContentsLastChange(m_osRasterTable);
 
         m_bHasModifiedTiles = false;
@@ -3686,6 +3743,16 @@ CPLErr GDALGeoPackageDataset::IBuildOverviews(
 }
 
 /************************************************************************/
+/*                            GetFileList()                             */
+/************************************************************************/
+
+char **GDALGeoPackageDataset::GetFileList()
+{
+    TryLoadXML();
+    return GDALPamDataset::GetFileList();
+}
+
+/************************************************************************/
 /*                      GetMetadataDomainList()                         */
 /************************************************************************/
 
@@ -3967,6 +4034,8 @@ char **GDALGeoPackageDataset::GetMetadata(const char *pszDomain)
 
     m_bHasReadMetadataFromStorage = true;
 
+    TryLoadXML();
+
     if (!HasMetadataTables())
         return GDALPamDataset::GetMetadata(pszDomain);
 
@@ -4091,9 +4160,12 @@ char **GDALGeoPackageDataset::GetMetadata(const char *pszDomain)
                             }
                         }
 
-                        else if (!EQUAL(*papszIter, ""))
+                        else if (!EQUAL(*papszIter, "") &&
+                                 !STARTS_WITH(*papszIter, "BAND_"))
+                        {
                             oMDMD.SetMetadata(
                                 oLocalMDMD.GetMetadata(*papszIter), *papszIter);
+                        }
                         papszIter++;
                     }
                 }
@@ -4488,6 +4560,11 @@ CPLErr GDALGeoPackageDataset::FlushMetadata()
         return CE_None;
     m_bMetadataDirty = false;
 
+    if (eAccess == GA_ReadOnly)
+    {
+        return CE_None;
+    }
+
     bool bCanWriteAreaOrPoint =
         !m_bGridCellEncodingAsCO &&
         (m_eTF == GPKG_TF_PNG_16BIT || m_eTF == GPKG_TF_TIFF_32BIT_FLOAT);
@@ -4652,6 +4729,18 @@ CPLErr GDALGeoPackageDataset::FlushMetadata()
                 oLocalMDMD.SetMetadataItem("NODATA_VALUE",
                                            CPLSPrintf("%.18g", dfNoDataValue),
                                            "IMAGE_STRUCTURE");
+            }
+        }
+        for (int i = 1; i <= GetRasterCount(); ++i)
+        {
+            auto poBand =
+                cpl::down_cast<GDALGeoPackageRasterBand *>(GetRasterBand(i));
+            poBand->AddImplicitStatistics(false);
+            char **papszMD = GetRasterBand(i)->GetMetadata();
+            poBand->AddImplicitStatistics(true);
+            if (papszMD)
+            {
+                oLocalMDMD.SetMetadata(papszMD, CPLSPrintf("BAND_%d", i));
             }
         }
         psXMLNode = oLocalMDMD.Serialize();
@@ -5815,6 +5904,8 @@ GDALDataset *GDALGeoPackageDataset::CreateCopy(const char *pszFilename,
                 poDS->m_bMetadataDirty = true;
             }
         }
+        if (poDS)
+            poDS->SetPamFlags(0);
         return poDS;
     }
 
@@ -6192,6 +6283,9 @@ GDALDataset *GDALGeoPackageDataset::CreateCopy(const char *pszFilename,
 
     GDALDestroyTransformer(hTransformArg);
     GDALDestroyWarpOptions(psWO);
+
+    if (poDS)
+        poDS->SetPamFlags(0);
 
     return poDS;
 }
@@ -8562,6 +8656,71 @@ static void GPKG_gdal_get_layer_pixel_value(sqlite3_context *pContext,
 }
 
 /************************************************************************/
+/*                       GPKG_ogr_layer_Extent()                        */
+/************************************************************************/
+
+static void GPKG_ogr_layer_Extent(sqlite3_context *pContext, int /*argc*/,
+                                  sqlite3_value **argv)
+{
+    if (sqlite3_value_type(argv[0]) != SQLITE_TEXT)
+    {
+        CPLError(CE_Failure, CPLE_AppDefined, "%s: Invalid argument type",
+                 "ogr_layer_Extent");
+        sqlite3_result_null(pContext);
+        return;
+    }
+
+    const char *pszLayerName =
+        reinterpret_cast<const char *>(sqlite3_value_text(argv[0]));
+    GDALGeoPackageDataset *poDS =
+        static_cast<GDALGeoPackageDataset *>(sqlite3_user_data(pContext));
+    OGRLayer *poLayer = poDS->GetLayerByName(pszLayerName);
+    if (!poLayer)
+    {
+        CPLError(CE_Failure, CPLE_AppDefined, "%s: unknown layer",
+                 "ogr_layer_Extent");
+        sqlite3_result_null(pContext);
+        return;
+    }
+
+    if (poLayer->GetGeomType() == wkbNone)
+    {
+        sqlite3_result_null(pContext);
+        return;
+    }
+
+    OGREnvelope sExtent;
+    if (poLayer->GetExtent(&sExtent) != OGRERR_NONE)
+    {
+        CPLError(CE_Failure, CPLE_AppDefined, "%s: Cannot fetch layer extent",
+                 "ogr_layer_Extent");
+        sqlite3_result_null(pContext);
+        return;
+    }
+
+    OGRPolygon oPoly;
+    OGRLinearRing *poRing = new OGRLinearRing();
+    oPoly.addRingDirectly(poRing);
+    poRing->addPoint(sExtent.MinX, sExtent.MinY);
+    poRing->addPoint(sExtent.MaxX, sExtent.MinY);
+    poRing->addPoint(sExtent.MaxX, sExtent.MaxY);
+    poRing->addPoint(sExtent.MinX, sExtent.MaxY);
+    poRing->addPoint(sExtent.MinX, sExtent.MinY);
+
+    const auto poSRS = poLayer->GetSpatialRef();
+    const int nSRID = poSRS ? poDS->GetSrsId(*poSRS) : 0;
+    size_t nBLOBDestLen = 0;
+    GByte *pabyDestBLOB = GPkgGeometryFromOGR(&oPoly, nSRID, &nBLOBDestLen);
+    if (!pabyDestBLOB)
+    {
+        sqlite3_result_null(pContext);
+        return;
+    }
+    sqlite3_result_blob(pContext, pabyDestBLOB, static_cast<int>(nBLOBDestLen),
+                        VSIFree);
+}
+
+/************************************************************************/
 /*                      InstallSQLFunctions()                           */
 /************************************************************************/
 
@@ -8571,7 +8730,7 @@ static void GPKG_gdal_get_layer_pixel_value(sqlite3_context *pContext,
 
 void GDALGeoPackageDataset::InstallSQLFunctions()
 {
-    InitNewSpatialite();
+    InitSpatialite();
 
     // Enable SpatiaLite 4.3 "amphibious" mode, i.e. that SpatiaLite functions
     // that take geometries will accept GPKG encoded geometries without
@@ -8693,6 +8852,10 @@ void GDALGeoPackageDataset::InstallSQLFunctions()
                             this, GPKG_gdal_get_layer_pixel_value, nullptr,
                             nullptr);
 
+    // Function from VirtualOGR
+    sqlite3_create_function(hDB, "ogr_layer_Extent", 1, SQLITE_UTF8, this,
+                            GPKG_ogr_layer_Extent, nullptr, nullptr);
+
     m_pSQLFunctionData = OGRSQLiteRegisterSQLFunctionsCommon(hDB);
 }
 
@@ -8702,8 +8865,9 @@ void GDALGeoPackageDataset::InstallSQLFunctions()
 
 bool GDALGeoPackageDataset::OpenOrCreateDB(int flags)
 {
-    const bool bSuccess =
-        CPL_TO_BOOL(OGRSQLiteBaseDataSource::OpenOrCreateDB(flags, false));
+    const bool bSuccess = OGRSQLiteBaseDataSource::OpenOrCreateDB(
+        flags, /*bRegisterOGR2SQLiteExtensions=*/false,
+        /*bLoadExtensions=*/true);
     if (!bSuccess)
         return false;
 
