@@ -2080,9 +2080,13 @@ OGRErr OGRPGTableLayer::CreateFeatureViaCopy(OGRFeature *poFeature)
     for (size_t i = 0; i < abFieldsToInclude.size(); i++)
         abFieldsToInclude[i] = !m_abGeneratedColumns[i];
 
-    OGRPGCommonAppendCopyFieldsExceptGeom(
-        osCommand, poFeature, pszFIDColumn, CPL_TO_BOOL(bFIDColumnInCopyFields),
-        abFieldsToInclude, OGRPGEscapeString, hPGConn);
+    if (bFIDColumnInCopyFields)
+    {
+        OGRPGCommonAppendCopyFID(osCommand, poFeature);
+    }
+    OGRPGCommonAppendCopyRegularFields(osCommand, poFeature, pszFIDColumn,
+                                       abFieldsToInclude, OGRPGEscapeString,
+                                       hPGConn);
 
     /* Add end of line marker */
     osCommand += "\n";
@@ -2464,10 +2468,10 @@ OGRErr OGRPGTableLayer::CreateGeomField(OGRGeomFieldDefn *poGeomFieldIn,
             poGeomField->SetName(CPLSPrintf(
                 "wkb_geometry%d", poFeatureDefn->GetGeomFieldCount() + 1));
     }
-    auto l_poSRS = poGeomFieldIn->GetSpatialRef();
-    if (l_poSRS)
+    const auto poSRSIn = poGeomFieldIn->GetSpatialRef();
+    if (poSRSIn)
     {
-        l_poSRS = l_poSRS->Clone();
+        auto l_poSRS = poSRSIn->Clone();
         l_poSRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
         poGeomField->SetSpatialRef(l_poSRS);
         l_poSRS->Release();
@@ -2485,7 +2489,7 @@ OGRErr OGRPGTableLayer::CreateGeomField(OGRGeomFieldDefn *poGeomFieldIn,
         CPLFree(pszSafeName);
     }
 
-    OGRSpatialReference *poSRS = poGeomField->GetSpatialRef();
+    const OGRSpatialReference *poSRS = poGeomField->GetSpatialRef();
     int nSRSId = poDS->GetUndefinedSRID();
     if (nForcedSRSId != UNDETERMINED_SRID)
         nSRSId = nForcedSRSId;
