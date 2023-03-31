@@ -1035,10 +1035,17 @@ It can be detected with pkg-config.
 
     Path to a shared or static library file for ``kmlengine``
 
+.. option:: LIBKML_MINIZIP_LIBRARY
+
+    Path to a shared or static library file for ``minizip``
+
+.. option:: LIBKML_URIPARSER_LIBRARY
+
+    Path to a shared or static library file for ``uriparser``
+
 .. option:: GDAL_USE_LIBKML=ON/OFF
 
     Control whether to use LibKML. Defaults to ON when LibKML is found.
-
 
 LibLZMA
 *******
