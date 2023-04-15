@@ -29,6 +29,7 @@
 # DEALINGS IN THE SOFTWARE.
 ###############################################################################
 
+import array
 import os
 import random
 import struct
@@ -460,16 +461,15 @@ def test_lcp_8():
     assert mem_drv is not None
     lcp_drv = gdal.GetDriverByName("LCP")
     assert lcp_drv is not None
-    gdal.PushErrorHandler("CPLQuietErrorHandler")
-    co = ["LATITUDE=0", "LINEAR_UNIT=METER"]
-    for i in [0, 1, 2, 3, 4, 6, 9, 11]:
-        src_ds = mem_drv.Create("", 10, 10, i, gdal.GDT_Int16)
-        assert src_ds is not None
-        dst_ds = lcp_drv.CreateCopy("tmp/lcp_8.lcp", src_ds, False, co)
-        src_ds = None
-        assert dst_ds is None, i
-        dst_ds = None
-    gdal.PopErrorHandler()
+    with gdaltest.error_handler():
+        co = ["LATITUDE=0", "LINEAR_UNIT=METER"]
+        for i in [0, 1, 2, 3, 4, 6, 9, 11]:
+            src_ds = mem_drv.Create("", 10, 10, i, gdal.GDT_Int16)
+            assert src_ds is not None
+            dst_ds = lcp_drv.CreateCopy("tmp/lcp_8.lcp", src_ds, False, co)
+            src_ds = None
+            assert dst_ds is None, i
+            dst_ds = None
     for ext in ["lcp", "lcp.aux.xml"]:
         try:
             os.remove("tmp/lcp_8." + ext)
@@ -489,6 +489,12 @@ def test_lcp_9():
     assert lcp_drv is not None
     src_ds = mem_drv.Create("", 10, 20, 10, gdal.GDT_Int16)
     assert src_ds is not None
+    # Test negative values
+    src_ds.GetRasterBand(1).Fill(-10000)
+    # More than 100 values
+    src_ds.GetRasterBand(2).WriteRaster(
+        0, 0, 10, 20, array.array("H", [i for i in range(200)])
+    )
     co = ["LATITUDE=0", "LINEAR_UNIT=METER"]
     lcp_ds = lcp_drv.CreateCopy("tmp/lcp_9.lcp", src_ds, False, co)
     assert lcp_ds is not None

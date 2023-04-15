@@ -1568,10 +1568,9 @@ def test_ogr_gpkg_19():
     ds.SetMetadataItem("foo", "bar")
 
     # GEOPACKAGE metadata domain is not allowed in a non-raster context
-    gdal.PushErrorHandler()
-    ds.SetMetadata(ds.GetMetadata("GEOPACKAGE"), "GEOPACKAGE")
-    ds.SetMetadataItem("foo", ds.GetMetadataItem("foo", "GEOPACKAGE"), "GEOPACKAGE")
-    gdal.PopErrorHandler()
+    with gdaltest.error_handler():
+        ds.SetMetadata(ds.GetMetadata("GEOPACKAGE"), "GEOPACKAGE")
+        ds.SetMetadataItem("foo", ds.GetMetadataItem("foo", "GEOPACKAGE"), "GEOPACKAGE")
 
     ds = None
 
@@ -2043,17 +2042,15 @@ def test_ogr_gpkg_21():
     f = ogr.Feature(lyr.GetLayerDefn())
     f.SetFieldBinaryFromHexString(0, "41E9")
     gdal.ErrorReset()
-    gdal.PushErrorHandler()
-    lyr.CreateFeature(f)
-    gdal.PopErrorHandler()
+    with gdaltest.error_handler():
+        lyr.CreateFeature(f)
     assert gdal.GetLastErrorMsg() != ""
 
     f = ogr.Feature(lyr.GetLayerDefn())
     f.SetField(0, "abc")
     gdal.ErrorReset()
-    gdal.PushErrorHandler()
-    lyr.CreateFeature(f)
-    gdal.PopErrorHandler()
+    with gdaltest.error_handler():
+        lyr.CreateFeature(f)
     assert gdal.GetLastErrorMsg() != ""
 
     f = lyr.GetFeature(f.GetFID())
@@ -2070,9 +2067,8 @@ def test_ogr_gpkg_21():
     f = ogr.Feature(lyr.GetLayerDefn())
     f.SetFieldBinaryFromHexString(0, "41E9")
     gdal.ErrorReset()
-    gdal.PushErrorHandler()
-    lyr.CreateFeature(f)
-    gdal.PopErrorHandler()
+    with gdaltest.error_handler():
+        lyr.CreateFeature(f)
     assert gdal.GetLastErrorMsg() != ""
 
     f = lyr.GetFeature(f.GetFID())
@@ -2081,9 +2077,8 @@ def test_ogr_gpkg_21():
     f = ogr.Feature(lyr.GetLayerDefn())
     f.SetField(0, "abc")
     gdal.ErrorReset()
-    gdal.PushErrorHandler()
-    lyr.CreateFeature(f)
-    gdal.PopErrorHandler()
+    with gdaltest.error_handler():
+        lyr.CreateFeature(f)
     assert gdal.GetLastErrorMsg() != ""
 
     f = lyr.GetFeature(f.GetFID())
@@ -2170,18 +2165,16 @@ def test_ogr_gpkg_23():
     # Error case: missing geometry
     f = ogr.Feature(lyr.GetLayerDefn())
     f.SetField("field_not_nullable", "not_null")
-    gdal.PushErrorHandler()
-    ret = lyr.CreateFeature(f)
-    gdal.PopErrorHandler()
+    with gdaltest.error_handler():
+        ret = lyr.CreateFeature(f)
     assert ret != 0
     f = None
 
     # Error case: missing non-nullable field
     f = ogr.Feature(lyr.GetLayerDefn())
     f.SetGeometryDirectly(ogr.CreateGeometryFromWkt("POINT(0 0)"))
-    gdal.PushErrorHandler()
-    ret = lyr.CreateFeature(f)
-    gdal.PopErrorHandler()
+    with gdaltest.error_handler():
+        ret = lyr.CreateFeature(f)
     assert ret != 0
     f = None
 
@@ -2189,9 +2182,8 @@ def test_ogr_gpkg_23():
     lyr = ds.CreateLayer("test2", geom_type=ogr.wkbPoint, options=["SPATIAL_INDEX=NO"])
 
     # Cannot add more than one geometry field
-    gdal.PushErrorHandler()
-    ret = lyr.CreateGeomField(ogr.GeomFieldDefn("foo", ogr.wkbPoint))
-    gdal.PopErrorHandler()
+    with gdaltest.error_handler():
+        ret = lyr.CreateGeomField(ogr.GeomFieldDefn("foo", ogr.wkbPoint))
     assert ret != 0
 
     f = ogr.Feature(lyr.GetLayerDefn())
@@ -2599,9 +2591,8 @@ def test_ogr_gpkg_25():
     lyr = ds.CreateLayer("test", geom_type=ogr.wkbNone, options=["FID=myfid"])
 
     lyr.CreateField(ogr.FieldDefn("str", ogr.OFTString))
-    gdal.PushErrorHandler()
-    ret = lyr.CreateField(ogr.FieldDefn("myfid", ogr.OFTString))
-    gdal.PopErrorHandler()
+    with gdaltest.error_handler():
+        ret = lyr.CreateField(ogr.FieldDefn("myfid", ogr.OFTString))
     assert ret != 0
 
     ret = lyr.CreateField(ogr.FieldDefn("myfid", ogr.OFTInteger))
@@ -2634,20 +2625,17 @@ def test_ogr_gpkg_25():
     feat = ogr.Feature(lyr.GetLayerDefn())
     feat.SetFID(1)
     feat.SetField("myfid", 10)
-    gdal.PushErrorHandler()
-    ret = lyr.CreateFeature(feat)
-    gdal.PopErrorHandler()
+    with gdaltest.error_handler():
+        ret = lyr.CreateFeature(feat)
     assert ret != 0
 
-    gdal.PushErrorHandler()
-    ret = lyr.SetFeature(feat)
-    gdal.PopErrorHandler()
+    with gdaltest.error_handler():
+        ret = lyr.SetFeature(feat)
     assert ret != 0
 
     feat.UnsetField("myfid")
-    gdal.PushErrorHandler()
-    ret = lyr.SetFeature(feat)
-    gdal.PopErrorHandler()
+    with gdaltest.error_handler():
+        ret = lyr.SetFeature(feat)
     assert ret != 0
 
     lyr.ResetReading()
@@ -2688,18 +2676,16 @@ def test_ogr_gpkg_26():
 
     ret = ds.StartTransaction()
     assert ret == 0
-    gdal.PushErrorHandler()
-    ret = ds.StartTransaction()
-    gdal.PopErrorHandler()
+    with gdaltest.error_handler():
+        ret = ds.StartTransaction()
     assert ret != 0
 
     lyr = ds.CreateLayer("test")
     lyr.CreateField(ogr.FieldDefn("foo", ogr.OFTString))
     ret = ds.RollbackTransaction()
     assert ret == 0
-    gdal.PushErrorHandler()
-    ret = ds.RollbackTransaction()
-    gdal.PopErrorHandler()
+    with gdaltest.error_handler():
+        ret = ds.RollbackTransaction()
     assert ret != 0
     ds = None
 
@@ -2707,18 +2693,16 @@ def test_ogr_gpkg_26():
     assert ds.GetLayerCount() == 0
     ret = ds.StartTransaction()
     assert ret == 0
-    gdal.PushErrorHandler()
-    ret = ds.StartTransaction()
-    gdal.PopErrorHandler()
+    with gdaltest.error_handler():
+        ret = ds.StartTransaction()
     assert ret != 0
 
     lyr = ds.CreateLayer("test")
     lyr.CreateField(ogr.FieldDefn("foo", ogr.OFTString))
     ret = ds.CommitTransaction()
     assert ret == 0
-    gdal.PushErrorHandler()
-    ret = ds.CommitTransaction()
-    gdal.PopErrorHandler()
+    with gdaltest.error_handler():
+        ret = ds.CommitTransaction()
     assert ret != 0
     ds = None
 
@@ -2800,9 +2784,8 @@ def test_ogr_gpkg_26():
 def test_ogr_gpkg_27():
 
     ds = gdaltest.gpkg_dr.CreateDataSource("/vsimem/ogr_gpkg_27.gpkg")
-    gdal.PushErrorHandler()
-    sql_lyr = ds.ExecuteSQL("SELECT GeomFromGPB(null)")
-    gdal.PopErrorHandler()
+    with gdaltest.error_handler():
+        sql_lyr = ds.ExecuteSQL("SELECT GeomFromGPB(null)")
     if sql_lyr is None:
         ds = None
         gdaltest.gpkg_dr.DeleteDataSource("/vsimem/ogr_gpkg_27.gpkg")
@@ -3044,13 +3027,13 @@ def test_ogr_gpkg_34():
         """CREATE TABLE gpkg_data_columns (
   table_name TEXT NOT NULL,
   column_name TEXT NOT NULL,
-  name TEXT UNIQUE,
+  name TEXT,
   title TEXT,
   description TEXT,
   mime_type TEXT,
   constraint_name TEXT,
   CONSTRAINT pk_gdc PRIMARY KEY (table_name, column_name),
-  CONSTRAINT fk_gdc_tn FOREIGN KEY (table_name) REFERENCES gpkg_contents(table_name)
+  CONSTRAINT gdc_tn UNIQUE (table_name, name)
 )"""
     )
     ds.ExecuteSQL(
@@ -3211,13 +3194,13 @@ def test_ogr_gpkg_35():
         """CREATE TABLE gpkg_data_columns (
   table_name TEXT NOT NULL,
   column_name TEXT NOT NULL,
-  name TEXT UNIQUE,
+  name TEXT,
   title TEXT,
   description TEXT,
   mime_type TEXT,
   constraint_name TEXT,
   CONSTRAINT pk_gdc PRIMARY KEY (table_name, column_name),
-  CONSTRAINT fk_gdc_tn FOREIGN KEY (table_name) REFERENCES gpkg_contents(table_name)
+  CONSTRAINT gdc_tn UNIQUE (table_name, name)
 )"""
     )
     ds.ExecuteSQL(
@@ -3332,13 +3315,13 @@ def test_ogr_gpkg_36():
         """CREATE TABLE gpkg_data_columns (
   table_name TEXT NOT NULL,
   column_name TEXT NOT NULL,
-  name TEXT UNIQUE,
+  name TEXT,
   title TEXT,
   description TEXT,
   mime_type TEXT,
   constraint_name TEXT,
   CONSTRAINT pk_gdc PRIMARY KEY (table_name, column_name),
-  CONSTRAINT fk_gdc_tn FOREIGN KEY (table_name) REFERENCES gpkg_contents(table_name)
+  CONSTRAINT gdc_tn UNIQUE (table_name, name)
 )"""
     )
     ds.ExecuteSQL(
@@ -3533,13 +3516,13 @@ def test_ogr_gpkg_37():
         """CREATE TABLE gpkg_data_columns (
   table_name TEXT NOT NULL,
   column_name TEXT NOT NULL,
-  name TEXT UNIQUE,
+  name TEXT,
   title TEXT,
   description TEXT,
   mime_type TEXT,
   constraint_name TEXT,
   CONSTRAINT pk_gdc PRIMARY KEY (table_name, column_name),
-  CONSTRAINT fk_gdc_tn FOREIGN KEY (table_name) REFERENCES gpkg_contents(table_name)
+  CONSTRAINT gdc_tn UNIQUE (table_name, name)
 )"""
     )
     ds.ExecuteSQL(
@@ -8451,3 +8434,159 @@ def test_ogr_gpkg_ogr_layer_Extent():
 
     finally:
         gdal.Unlink(tmpfilename)
+
+
+###############################################################################
+# Test field alternative names and comments
+
+
+def test_ogr_gpkg_field_alternative_names_comment():
+
+    dbname = "/vsimem/ogr_gpkg_alternative_names.gpkg"
+    try:
+        ds = gdaltest.gpkg_dr.CreateDataSource(dbname)
+        lyr = ds.CreateLayer("test", geom_type=ogr.wkbPolygon)
+        lyr.CreateField(ogr.FieldDefn("foo", ogr.OFTString))
+        lyr.CreateField(ogr.FieldDefn("baz", ogr.OFTString))
+
+        # with no gpkg_data_columns table
+        lyr = ds.GetLayer("test")
+        assert lyr.GetLayerDefn().GetFieldCount() == 2
+        assert lyr.GetLayerDefn().GetFieldDefn(0).GetName() == "foo"
+        assert lyr.GetLayerDefn().GetFieldDefn(0).GetAlternativeName() == ""
+        assert lyr.GetLayerDefn().GetFieldDefn(0).GetComment() == ""
+        assert lyr.GetLayerDefn().GetFieldDefn(1).GetName() == "baz"
+        assert lyr.GetLayerDefn().GetFieldDefn(1).GetAlternativeName() == ""
+        assert lyr.GetLayerDefn().GetFieldDefn(1).GetComment() == ""
+
+        ds.ExecuteSQL(
+            """CREATE TABLE gpkg_data_columns (
+  table_name TEXT NOT NULL,
+  column_name TEXT NOT NULL,
+  name TEXT,
+  title TEXT,
+  description TEXT,
+  mime_type TEXT,
+  constraint_name TEXT,
+  CONSTRAINT pk_gdc PRIMARY KEY (table_name, column_name),
+  CONSTRAINT gdc_tn UNIQUE (table_name, name)
+)"""
+        )
+        # name same as column name, won't be used as alternative name
+        ds.ExecuteSQL(
+            "INSERT INTO gpkg_data_columns('table_name', 'column_name', 'name', 'description') VALUES ('test', 'foo', 'foo', 'my description')"
+        )
+        ds = None
+
+        ds = gdal.OpenEx(dbname, gdal.OF_VECTOR | gdal.OF_UPDATE)
+        lyr = ds.GetLayer("test")
+        assert lyr.GetLayerDefn().GetFieldCount() == 2
+        assert lyr.GetLayerDefn().GetFieldDefn(0).GetName() == "foo"
+        assert lyr.GetLayerDefn().GetFieldDefn(0).GetAlternativeName() == ""
+        assert lyr.GetLayerDefn().GetFieldDefn(0).GetComment() == "my description"
+        assert lyr.GetLayerDefn().GetFieldDefn(1).GetName() == "baz"
+        assert lyr.GetLayerDefn().GetFieldDefn(1).GetAlternativeName() == ""
+        assert lyr.GetLayerDefn().GetFieldDefn(1).GetComment() == ""
+
+        # name different from column name, should be used as alternative names
+        ds.ExecuteSQL("DELETE FROM gpkg_data_columns")
+        ds.ExecuteSQL(
+            "INSERT INTO gpkg_data_columns('table_name', 'column_name', 'name') VALUES ('test', 'foo', 'Foo field')"
+        )
+        ds = None
+
+        ds = gdaltest.gpkg_dr.Open(dbname)
+        lyr = ds.GetLayer("test")
+        assert lyr.GetLayerDefn().GetFieldCount() == 2
+        assert lyr.GetLayerDefn().GetFieldDefn(0).GetName() == "foo"
+        assert lyr.GetLayerDefn().GetFieldDefn(0).GetAlternativeName() == "Foo field"
+        assert lyr.GetLayerDefn().GetFieldDefn(1).GetName() == "baz"
+        assert lyr.GetLayerDefn().GetFieldDefn(1).GetAlternativeName() == ""
+        ds = None
+
+    finally:
+        gdal.Unlink(dbname)
+
+
+###############################################################################
+# Test altering field definition to add alternative names and comments
+
+
+def test_ogr_gpkg_field_alter_field_defn_alternative_names_comment():
+
+    dbname = "/vsimem/ogr_gpkg_alternative_names_alter_defn.gpkg"
+    try:
+        ds = gdaltest.gpkg_dr.CreateDataSource(dbname)
+        lyr = ds.CreateLayer("test", geom_type=ogr.wkbPolygon)
+        lyr.CreateField(ogr.FieldDefn("foo", ogr.OFTString))
+        lyr.CreateField(ogr.FieldDefn("baz", ogr.OFTString))
+
+        # with no gpkg_data_columns table
+        lyr = ds.GetLayer("test")
+        assert lyr.GetLayerDefn().GetFieldCount() == 2
+        assert lyr.GetLayerDefn().GetFieldDefn(0).GetName() == "foo"
+        assert lyr.GetLayerDefn().GetFieldDefn(0).GetAlternativeName() == ""
+        assert lyr.GetLayerDefn().GetFieldDefn(0).GetComment() == ""
+        assert lyr.GetLayerDefn().GetFieldDefn(1).GetName() == "baz"
+        assert lyr.GetLayerDefn().GetFieldDefn(1).GetAlternativeName() == ""
+        assert lyr.GetLayerDefn().GetFieldDefn(1).GetComment() == ""
+
+        foo_with_alternative_name = ogr.FieldDefn("foo")
+        foo_with_alternative_name.SetAlternativeName("alt foo name")
+
+        ret = lyr.AlterFieldDefn(0, foo_with_alternative_name, ogr.ALTER_ALL_FLAG)
+        assert ret == 0
+
+        baz_with_comment = ogr.FieldDefn("baz")
+        baz_with_comment.SetComment("baz comment")
+
+        ret = lyr.AlterFieldDefn(1, baz_with_comment, ogr.ALTER_ALL_FLAG)
+        assert ret == 0
+
+        assert lyr.GetLayerDefn().GetFieldCount() == 2
+        assert lyr.GetLayerDefn().GetFieldDefn(0).GetName() == "foo"
+        assert lyr.GetLayerDefn().GetFieldDefn(0).GetAlternativeName() == "alt foo name"
+        assert lyr.GetLayerDefn().GetFieldDefn(0).GetComment() == ""
+        assert lyr.GetLayerDefn().GetFieldDefn(1).GetName() == "baz"
+        assert lyr.GetLayerDefn().GetFieldDefn(1).GetAlternativeName() == ""
+        assert lyr.GetLayerDefn().GetFieldDefn(1).GetComment() == "baz comment"
+
+        del lyr
+        ds = None
+
+        ds = gdal.OpenEx(dbname, gdal.OF_VECTOR | gdal.OF_UPDATE)
+        lyr = ds.GetLayer("test")
+        assert lyr.GetLayerDefn().GetFieldCount() == 2
+        assert lyr.GetLayerDefn().GetFieldDefn(0).GetName() == "foo"
+        assert lyr.GetLayerDefn().GetFieldDefn(0).GetAlternativeName() == "alt foo name"
+        assert lyr.GetLayerDefn().GetFieldDefn(0).GetComment() == ""
+        assert lyr.GetLayerDefn().GetFieldDefn(1).GetName() == "baz"
+        assert lyr.GetLayerDefn().GetFieldDefn(1).GetAlternativeName() == ""
+        assert lyr.GetLayerDefn().GetFieldDefn(1).GetComment() == "baz comment"
+
+        # create field
+        field_defn = ogr.FieldDefn("third", ogr.OFTString)
+        field_defn.SetAlternativeName("third alias")
+        field_defn.SetComment("third comment")
+        assert lyr.CreateField(field_defn) == 0
+
+        del lyr
+        ds = None
+
+        ds = gdal.OpenEx(dbname, gdal.OF_VECTOR)
+        lyr = ds.GetLayer("test")
+
+        assert lyr.GetLayerDefn().GetFieldCount() == 3
+        assert lyr.GetLayerDefn().GetFieldDefn(0).GetName() == "foo"
+        assert lyr.GetLayerDefn().GetFieldDefn(0).GetAlternativeName() == "alt foo name"
+        assert lyr.GetLayerDefn().GetFieldDefn(0).GetComment() == ""
+        assert lyr.GetLayerDefn().GetFieldDefn(1).GetName() == "baz"
+        assert lyr.GetLayerDefn().GetFieldDefn(1).GetAlternativeName() == ""
+        assert lyr.GetLayerDefn().GetFieldDefn(1).GetComment() == "baz comment"
+        assert lyr.GetLayerDefn().GetFieldDefn(2).GetName() == "third"
+        assert lyr.GetLayerDefn().GetFieldDefn(2).GetAlternativeName() == "third alias"
+        assert lyr.GetLayerDefn().GetFieldDefn(2).GetComment() == "third comment"
+        ds = None
+
+    finally:
+        gdal.Unlink(dbname)

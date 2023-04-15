@@ -1284,10 +1284,11 @@ OGRErr OGRGeoPackageTableLayer::ReadTableDefinition()
     // Look for sub-types such as JSON
     if (m_poDS->HasDataColumnsTable())
     {
-        pszSQL = sqlite3_mprintf("SELECT column_name, mime_type, "
-                                 "constraint_name FROM gpkg_data_columns "
-                                 "WHERE table_name = '%q'",
-                                 m_pszTableName);
+        pszSQL = sqlite3_mprintf(
+            "SELECT column_name, name, mime_type, "
+            "constraint_name, description FROM gpkg_data_columns "
+            "WHERE table_name = '%q'",
+            m_pszTableName);
         oResultTable = SQLQuery(poDb, pszSQL);
         sqlite3_free(pszSQL);
         if (oResultTable)
@@ -1297,12 +1298,42 @@ OGRErr OGRGeoPackageTableLayer::ReadTableDefinition()
                 const char *pszColumn = oResultTable->GetValue(0, iRecord);
                 if (pszColumn == nullptr)
                     continue;
-                const char *pszMimeType = oResultTable->GetValue(1, iRecord);
+                const char *pszName = oResultTable->GetValue(1, iRecord);
+
+                // We use the "name" attribute from gpkg_data_columns as the
+                // field alternative name, so long as it isn't just a copy
+                // of the column name
+                const char *pszAlias = nullptr;
+                if (pszName && !EQUAL(pszName, pszColumn))
+                    pszAlias = pszName;
+
+                if (pszAlias)
+                {
+                    const int iIdx = m_poFeatureDefn->GetFieldIndex(pszColumn);
+                    if (iIdx >= 0)
+                    {
+                        m_poFeatureDefn->GetFieldDefn(iIdx)->SetAlternativeName(
+                            pszAlias);
+                    }
+                }
+
+                if (const char *pszDescription =
+                        oResultTable->GetValue(4, iRecord))
+                {
+                    const int iIdx = m_poFeatureDefn->GetFieldIndex(pszColumn);
+                    if (iIdx >= 0)
+                    {
+                        m_poFeatureDefn->GetFieldDefn(iIdx)->SetComment(
+                            pszDescription);
+                    }
+                }
+
+                const char *pszMimeType = oResultTable->GetValue(2, iRecord);
                 const char *pszConstraintName =
-                    oResultTable->GetValue(2, iRecord);
+                    oResultTable->GetValue(3, iRecord);
                 if (pszMimeType && EQUAL(pszMimeType, "application/json"))
                 {
-                    int iIdx = m_poFeatureDefn->GetFieldIndex(pszColumn);
+                    const int iIdx = m_poFeatureDefn->GetFieldIndex(pszColumn);
                     if (iIdx >= 0 &&
                         m_poFeatureDefn->GetFieldDefn(iIdx)->GetType() ==
                             OFTString)
@@ -1313,7 +1344,7 @@ OGRErr OGRGeoPackageTableLayer::ReadTableDefinition()
                 }
                 else if (pszConstraintName)
                 {
-                    int iIdx = m_poFeatureDefn->GetFieldIndex(pszColumn);
+                    const int iIdx = m_poFeatureDefn->GetFieldIndex(pszColumn);
                     if (iIdx >= 0)
                     {
                         m_poFeatureDefn->GetFieldDefn(iIdx)->SetDomainName(
@@ -1677,40 +1708,87 @@ OGRErr OGRGeoPackageTableLayer::CreateField(OGRFieldDefn *poField,
 bool OGRGeoPackageTableLayer::DoSpecialProcessingForColumnCreation(
     OGRFieldDefn *poField)
 {
+    const std::string &osConstraintName(poField->GetDomainName());
+    const std::string osName(poField->GetAlternativeNameRef());
+    const std::string &osDescription(poField->GetComment());
 
+    std::string osMimeType;
     if (poField->GetType() == OFTString && poField->GetSubType() == OFSTJSON)
     {
-        if (!m_poDS->CreateColumnsTableAndColumnConstraintsTablesIfNecessary())
-            return false;
-
-        /* Now let's register our column. */
-        char *pszSQL = sqlite3_mprintf(
-            "INSERT INTO gpkg_data_columns (table_name, column_name, name, "
-            "title, description, mime_type, constraint_name) VALUES ("
-            "'%q', '%q', NULL, NULL, NULL, 'application/json', NULL)",
-            m_pszTableName, poField->GetNameRef());
-        bool ok = SQLCommand(m_poDS->GetDB(), pszSQL) == OGRERR_NONE;
-        sqlite3_free(pszSQL);
-        return ok;
+        osMimeType = "application/json";
     }
 
-    else if (!poField->GetDomainName().empty())
+    if (osConstraintName.empty() && osName.empty() && osDescription.empty() &&
+        osMimeType.empty())
     {
-        if (!m_poDS->CreateColumnsTableAndColumnConstraintsTablesIfNecessary())
-            return false;
-
-        char *pszSQL = sqlite3_mprintf(
-            "INSERT INTO gpkg_data_columns (table_name, column_name, name, "
-            "title, description, mime_type, constraint_name) VALUES ("
-            "'%q', '%q', NULL, NULL, NULL, NULL, '%q')",
-            m_pszTableName, poField->GetNameRef(),
-            poField->GetDomainName().c_str());
-        bool ok = SQLCommand(m_poDS->GetDB(), pszSQL) == OGRERR_NONE;
-        sqlite3_free(pszSQL);
-        return ok;
+        // no record required
+        return true;
     }
 
-    return true;
+    if (!m_poDS->CreateColumnsTableAndColumnConstraintsTablesIfNecessary())
+        return false;
+
+    /* Now let's register our column. */
+    std::string osNameSqlValue;
+    if (osName.empty())
+    {
+        osNameSqlValue = "NULL";
+    }
+    else
+    {
+        char *pszName = sqlite3_mprintf("'%q'", osName.c_str());
+        osNameSqlValue = std::string(pszName);
+        sqlite3_free(pszName);
+    }
+
+    std::string osDescriptionSqlValue;
+    if (osDescription.empty())
+    {
+        osDescriptionSqlValue = "NULL";
+    }
+    else
+    {
+        char *pszDescription = sqlite3_mprintf("'%q'", osDescription.c_str());
+        osDescriptionSqlValue = std::string(pszDescription);
+        sqlite3_free(pszDescription);
+    }
+
+    std::string osMimeTypeSqlValue;
+    if (osMimeType.empty())
+    {
+        osMimeTypeSqlValue = "NULL";
+    }
+    else
+    {
+        char *pszMimeType = sqlite3_mprintf("'%q'", osMimeType.c_str());
+        osMimeTypeSqlValue = std::string(pszMimeType);
+        sqlite3_free(pszMimeType);
+    }
+
+    std::string osConstraintNameValue;
+    if (osConstraintName.empty())
+    {
+        osConstraintNameValue = "NULL";
+    }
+    else
+    {
+        char *pszConstraintName =
+            sqlite3_mprintf("'%q'", osConstraintName.c_str());
+        osConstraintNameValue = std::string(pszConstraintName);
+        sqlite3_free(pszConstraintName);
+    }
+
+    char *pszSQL = sqlite3_mprintf(
+        "INSERT INTO gpkg_data_columns (table_name, column_name, name, "
+        "title, description, mime_type, constraint_name) VALUES ("
+        "'%q', '%q', %s, NULL, %s, %s, %s)",
+        m_pszTableName, poField->GetNameRef(), osNameSqlValue.c_str(),
+        osDescriptionSqlValue.c_str(), osMimeTypeSqlValue.c_str(),
+        osConstraintNameValue.c_str());
+
+    bool ok = SQLCommand(m_poDS->GetDB(), pszSQL) == OGRERR_NONE;
+    sqlite3_free(pszSQL);
+    return ok;
 }
 
 /************************************************************************/
@@ -6102,6 +6180,20 @@ OGRErr OGRGeoPackageTableLayer::AlterFieldDefn(int iFieldToAlter,
         nActualFlags |= ALTER_DOMAIN_FLAG;
         oTmpFieldDefn.SetDomainName(poNewFieldDefn->GetDomainName());
     }
+    if ((nFlagsIn & ALTER_ALTERNATIVE_NAME_FLAG) != 0 &&
+        strcmp(poFieldDefnToAlter->GetAlternativeNameRef(),
+               poNewFieldDefn->GetAlternativeNameRef()) != 0)
+    {
+        nActualFlags |= ALTER_ALTERNATIVE_NAME_FLAG;
+        oTmpFieldDefn.SetAlternativeName(
+            poNewFieldDefn->GetAlternativeNameRef());
+    }
+    if ((nFlagsIn & ALTER_COMMENT_FLAG) != 0 &&
+        poFieldDefnToAlter->GetComment() != poNewFieldDefn->GetComment())
+    {
+        nActualFlags |= ALTER_COMMENT_FLAG;
+        oTmpFieldDefn.SetComment(poNewFieldDefn->GetComment());
+    }
 
     /* -------------------------------------------------------------------- */
     /*      Build list of old fields, and the list of new fields.           */
@@ -6440,6 +6532,41 @@ OGRErr OGRGeoPackageTableLayer::AlterFieldDefn(int iFieldToAlter,
 
                 poFieldDefnToAlter->SetDomainName(
                     poNewFieldDefn->GetDomainName());
+            }
+            if ((nActualFlags & ALTER_ALTERNATIVE_NAME_FLAG) &&
+                strcmp(poFieldDefnToAlter->GetAlternativeNameRef(),
+                       poNewFieldDefn->GetAlternativeNameRef()) != 0)
+            {
+                if (!std::string(poFieldDefnToAlter->GetAlternativeNameRef())
+                         .empty())
+                {
+                    bDeleteFromGpkgDataColumns = true;
+                }
+
+                if (!std::string(poNewFieldDefn->GetAlternativeNameRef())
+                         .empty())
+                {
+                    bRunDoSpecialProcessingForColumnCreation = true;
+                }
+
+                poFieldDefnToAlter->SetAlternativeName(
+                    poNewFieldDefn->GetAlternativeNameRef());
+            }
+            if ((nActualFlags & ALTER_COMMENT_FLAG) &&
+                poFieldDefnToAlter->GetComment() !=
+                    poNewFieldDefn->GetComment())
+            {
+                if (!poFieldDefnToAlter->GetComment().empty())
+                {
+                    bDeleteFromGpkgDataColumns = true;
+                }
+
+                if (!poNewFieldDefn->GetComment().empty())
+                {
+                    bRunDoSpecialProcessingForColumnCreation = true;
+                }
+
+                poFieldDefnToAlter->SetComment(poNewFieldDefn->GetComment());
             }
 
             if (bDeleteFromGpkgDataColumns)

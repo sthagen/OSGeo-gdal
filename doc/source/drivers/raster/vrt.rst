@@ -97,7 +97,7 @@ The allowed subelements for VRTDataset are :
 
 The **dataAxisToSRSAxisMapping** attribute is allowed since GDAL 3.0 to describe the relationship between the axis indicated in the CRS definition and the axis of the GeoTransform or GCP metadata. The value of the attribute is a comma separated list of integers. The number of elements of this list must be the number of axis of the CRS. Values start at 1. If m denotes the array values of this attribute, then m[0] is the data axis number for the first axis of the CRS. If the attribute is missing, then the OAMS_TRADITIONAL_GIS_ORDER data axis to CRS axis mapping strategy is implied.
 
-- **GeoTransform**: This element contains a six value affine geotransformation for the dataset, mapping between pixel/line coordinates and georeferenced coordinates.
+- **GeoTransform**: This element contains a six value affine geotransformation for the dataset, mapping between pixel/line coordinates and georeferenced coordinates. Typically (geotransform[0], geotransform[3]) will be the (easting, northing) of the upper-left corner of the raster, geotransform[1] the horizontal resolution in geospatial coordinates/pixel, and geotransform[5] the vertical resolution in geospatial coordinates/pixel, as a negative value if the image is north-up oriented. See :ref:`raster_data_model_geotransform` for more details about that mapping.
 
 .. code-block:: xml
 
@@ -306,6 +306,12 @@ The SimpleSource may have the SourceFilename, SourceBand, SrcRect, and DstRect
 subelements.  The SrcRect element will indicate what rectangle on the indicated
 source file should be read, and the DstRect element indicates how that
 rectangle of source data should be mapped into the VRTRasterBands space.
+
+SrcRect and DstRect are expressed in pixel/line coordinate space. Their
+relationship with the geospatial coordinate space is given by the geotransform
+matrix of the source for SrcRect, and of the VRT itself (**GeoTransform**
+element) for DstRect.
+See :ref:`raster_data_model_geotransform` for more details about that mapping.
 
 The relativeToVRT attribute on the SourceFilename indicates whether the
 filename should be interpreted as relative to the .vrt file (value is 1)
@@ -1656,8 +1662,8 @@ For example:
     vrt://my.tif?bands=2&ovr=4
 
 
-The supported options currently are ``bands``, ``a_srs``, ``a_ullr``, ``ovr``, ``expand``, 
-``a_scale``, ``a_offset``, ``ot``, ``gcp``, ``if``, ``scale``, ``exponent``, and ``outsize``. 
+The supported options currently are ``bands``, ``a_srs``, ``a_ullr``, ``ovr``, ``expand``,
+``a_scale``, ``a_offset``, ``ot``, ``gcp``, ``if``, ``scale``, ``exponent``, and ``outsize``.
 
 Other options may be added in the future.
 
@@ -1699,16 +1705,16 @@ The effect of the ``if`` option (added in GDAL 3.7) is to specify the format/dri
 to be attempted to open the input file (:ref:`gdal_translate`). Values may be repeated separated by comma
 This can also be seen as an equivalent of running `gdal_translate -of VRT -if DRV1 -if DRV2 ... -if DRVN`.
 
-The effect of the ``scale`` option (added in GDAL 3.7) is to rescale the input pixel values from the 
-range **src_min** to **src_max** to the range **dst_min** to **dst_max**  ``src_min,src_max[,dst_min,dst_max]`` 
+The effect of the ``scale`` option (added in GDAL 3.7) is to rescale the input pixel values from the
+range **src_min** to **src_max** to the range **dst_min** to **dst_max**  ``src_min,src_max[,dst_min,dst_max]``
 either 2 or 4 comma separated values. The same rules apply for the source and destination ranges, and ``scale_bn`` syntax may be used as it is
-with (:ref:`gdal_translate`). 
+with (:ref:`gdal_translate`).
 
-The effect of the ``exponent`` option (added in GDAL 3.7) is to apply non-linear scaling with a power function, 
-a single value to be used with the ``scale`` option. The same ``exponent_bn`` syntax may be used in combination with ``scale_bn`` to 
-target specific band/s as per (:ref:`gdal_translate`). 
+The effect of the ``exponent`` option (added in GDAL 3.7) is to apply non-linear scaling with a power function,
+a single value to be used with the ``scale`` option. The same ``exponent_bn`` syntax may be used in combination with ``scale_bn`` to
+target specific band/s as per (:ref:`gdal_translate`).
 
-The effect of the ``outsize`` option (added in GDAL 3.7) is to set the size of the output, in numbers `pixel,line` or in fraction `pixel%,line%` as per (:ref:`gdal_translate`). 
+The effect of the ``outsize`` option (added in GDAL 3.7) is to set the size of the output, in numbers `pixel,line` or in fraction `pixel%,line%` as per (:ref:`gdal_translate`).
 
 The options may be chained together separated by '&'. (Beware the need for quoting to protect
 the ampersand).
