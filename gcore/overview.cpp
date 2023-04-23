@@ -1,3 +1,4 @@
+
 /******************************************************************************
  *
  * Project:  GDAL Core
@@ -51,9 +52,9 @@
 #include "gdal_thread_pool.h"
 #include "gdalwarper.h"
 
-// Restrict to 64bit processors because they are guaranteed to have SSE2.
-// Could possibly be used too on 32bit, but we would need to check at runtime.
-#if defined(__x86_64) || defined(_M_X64)
+// Restrict to 64bit processors because they are guaranteed to have SSE2,
+// or if __AVX2__ is defined.
+#if defined(__x86_64) || defined(_M_X64) || defined(__AVX2__)
 #define USE_SSE2
 
 #include "gdalsse_priv.h"
@@ -66,6 +67,9 @@
 #endif
 #ifdef __SSE4_1__
 #include <smmintrin.h>
+#endif
+#ifdef __AVX2__
+#include <immintrin.h>
 #endif
 
 #endif
@@ -440,6 +444,7 @@ inline __m128i sse2_hadd_epi16(__m128i a, __m128i b)
 #endif
 
 #ifdef __AVX2__
+
 #define DEST_ELTS 16
 #define set1_epi16 _mm256_set1_epi16
 #define set1_epi32 _mm256_set1_epi32
@@ -501,8 +506,26 @@ inline __m128i sse2_hadd_epi16(__m128i a, __m128i b)
 #define zeroupper() (void)0
 #endif
 
+#if defined(__GNUC__) && defined(__AVX2__)
+// Disabling inlining works around a bug with gcc 9.3 (Ubuntu 20.04) in
+// -O2 -mavx2 mode in QuadraticMeanFloatSSE2(),
+// where the registry that contains minus_zero is correctly
+// loaded the first time the function is called (looking at the disassembly,
+// one sees it is loaded much earlier than the function), but gets corrupted
+// (zeroed) in following iterations.
+// It appears the bug is due to the explicit zeroupper() call at the end of
+// the function.
+// The bug is at least solved in gcc 10.2.
+// Inlining doesn't bring much here to performance.
+// This is also needed with gcc 9.3 on QuadraticMeanByteSSE2OrAVX2() in
+// -O3 -mavx2 mode
+#define NOINLINE __attribute__((noinline))
+#else
+#define NOINLINE
+#endif
+
 template <class T>
-static int
+static int NOINLINE
 QuadraticMeanByteSSE2OrAVX2(int nDstXWidth, int nChunkXSize,
                             const T *&CPL_RESTRICT pSrcScanlineShiftedInOut,
                             T *CPL_RESTRICT pDstScanline)
@@ -661,6 +684,11 @@ inline __m128d SQUARE(__m128d x)
 
 #ifdef __AVX2__
 
+inline __m256d SQUARE(__m256d x)
+{
+    return _mm256_mul_pd(x, x);
+}
+
 inline __m256d FIXUP_LANES(__m256d x)
 {
     return _mm256_permute4x64_pd(x, _MM_SHUFFLE(3, 1, 2, 0));
@@ -712,8 +740,15 @@ QuadraticMeanUInt16SSE2(int nDstXWidth, int nChunkXSize,
         // and we can do a much faster implementation.
         const auto maskTmp =
             _mm_srli_epi16(_mm_or_si128(firstLine, secondLine), 14);
+#if defined(__i386__) || defined(_M_IX86)
+        uint64_t nMaskFitsIn14Bits = 0;
+        _mm_storel_epi64(
+            reinterpret_cast<__m128i *>(&nMaskFitsIn14Bits),
+            _mm_packus_epi16(maskTmp, maskTmp /* could be anything */));
+#else
         const auto nMaskFitsIn14Bits = _mm_cvtsi128_si64(
             _mm_packus_epi16(maskTmp, maskTmp /* could be anything */));
+#endif
         if (nMaskFitsIn14Bits == 0)
         {
             // Multiplication of 16 bit values and horizontal
@@ -1016,21 +1051,6 @@ inline __m128 FIXUP_LANES(__m128 x)
     return x;
 }
 
-#endif
-
-#if defined(__GNUC__) && defined(__AVX2__)
-// Disabling inlining works around a bug with gcc 9.3 (Ubuntu 20.04) in
-// -O2 -mavx2 mode, where the registry that contains minus_zero is correctly
-// loaded the first time the function is called (looking at the disassembly,
-// one sees it is loaded much earlier than the function), but gets corrupted
-// (zeroed) in following iterations.
-// It appears the bug is due to the explicit zeroupper() call at the end of
-// the function.
-// The bug is at least solved in gcc 10.2.
-// Inlining doesn't bring much here to performance.
-#define NOINLINE __attribute__((noinline))
-#else
-#define NOINLINE
 #endif
 
 template <class T>
