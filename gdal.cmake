@@ -6,8 +6,8 @@
 # a new member or virtual function in a public C++ class, etc.
 # This will typically happen for each GDAL feature release (change of X or Y in
 # a X.Y.Z numbering scheme), but should not happen for a bugfix release (change of Z)
-# Previous value: 32 for GDAL 3.6
-set(GDAL_SOVERSION 32)
+# Previous value: 33 for GDAL 3.7
+set(GDAL_SOVERSION 33)
 
 # Switches to control build targets(cached)
 option(ENABLE_GNM "Build GNM (Geography Network Model) component" ON)
@@ -659,7 +659,9 @@ set(GDAL_DATA_FILES
     data/gdalinfo_output.schema.json
     data/gdalmdiminfo_output.schema.json
     data/gdalvrt.xsd
+    data/gfs.xsd
     data/gml_registry.xml
+    data/gml_registry.xsd
     data/gmlasconf.xml
     data/gmlasconf.xsd
     data/grib2_table_versions.csv

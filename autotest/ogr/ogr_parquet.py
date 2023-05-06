@@ -39,22 +39,7 @@ from osgeo import gdal, ogr, osr
 
 pytestmark = pytest.mark.require_driver("Parquet")
 
-###############################################################################
-# Validate against GeoParquet json schema
-
-
-def _validate_json_output(instance):
-
-    try:
-        from jsonschema import validate
-    except ImportError:
-        pytest.skip("jsonschema module not available")
-
-    import json
-
-    schema = json.loads(open("data/parquet/schema.json", "rb").read())
-
-    validate(instance=instance, schema=schema)
+PARQUET_JSON_SCHEMA = "data/parquet/schema.json"
 
 
 ###############################################################################
@@ -700,7 +685,7 @@ def test_ogr_parquet_coordinate_epoch(epsg_code):
     assert "geometry" in j["columns"]
     if epsg_code == 4326:
         assert "crs" not in j["columns"]["geometry"]
-        _validate_json_output(j)
+        gdaltest.validate_json(j, PARQUET_JSON_SCHEMA)
     else:
         assert "crs" in j["columns"]["geometry"]
         assert j["columns"]["geometry"]["crs"]["type"] == "GeographicCRS"
@@ -795,7 +780,7 @@ def test_ogr_parquet_crs_identification_on_write(input_definition, expected_crs)
     else:
         assert "crs" in j["columns"]["geometry"]
         if expected_crs == "4269":
-            _validate_json_output(j)
+            gdaltest.validate_json(j, PARQUET_JSON_SCHEMA)
 
     srs = lyr.GetSpatialRef()
     assert srs is not None
@@ -834,7 +819,7 @@ def test_ogr_parquet_edges(edges):
     assert geo is not None
     j = json.loads(geo)
     assert j is not None
-    _validate_json_output(j)
+    gdaltest.validate_json(j, PARQUET_JSON_SCHEMA)
 
     ds = None
 
@@ -989,7 +974,7 @@ def test_ogr_parquet_geometry_types(
     )
 
     if expected_geometry_types == ["LineString Z", "MultiLineString"]:
-        _validate_json_output(j)
+        gdaltest.validate_json(j, PARQUET_JSON_SCHEMA)
 
     ds = None
 
@@ -1052,7 +1037,7 @@ def test_ogr_parquet_polygon_orientation(option_value, written_wkt, expected_wkt
     else:
         assert "orientation" not in j["columns"]["geometry"]
 
-    _validate_json_output(j)
+    gdaltest.validate_json(j, PARQUET_JSON_SCHEMA)
 
     ds = None
 
@@ -1437,7 +1422,7 @@ def test_ogr_parquet_read_partitioned_geo():
 # Cf https://github.com/opengeospatial/geoparquet/discussions/110
 
 
-@gdaltest.require_proj_version(7, 2)
+@pytest.mark.require_proj(7, 2)
 def test_ogr_parquet_write_crs_without_id_in_datum_ensemble_members():
 
     outfilename = "/vsimem/out.parquet"
@@ -1499,6 +1484,7 @@ def test_ogr_parquet_arrow_stream_numpy():
         "float32",
         "float64",
         "string",
+        "large_string",
         "timestamp_ms_gmt",
         "timestamp_ms_gmt_plus_2",
         "timestamp_ms_gmt_minus_0215",
@@ -1509,6 +1495,7 @@ def test_ogr_parquet_arrow_stream_numpy():
         "date32",
         "date64",
         "binary",
+        "large_binary",
         "fixed_size_binary",
         "list_boolean",
         "list_uint8",

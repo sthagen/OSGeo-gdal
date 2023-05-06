@@ -566,8 +566,8 @@ expose a layer as GeoPandas GeoDataFrame (which involves parsing WKB as GEOS obj
 
 .. _rfc-86-bench-geopandas:
 
-bench_gepandas.py
-+++++++++++++++++
+bench_geopandas.py
+++++++++++++++++++
 
 Use of the GeoPandas Python library which uses Fiona underneath to
 expose a layer as GeoPandas GeoDataFrame.
@@ -641,7 +641,7 @@ GeoPandas GeoDataFrame from the concatenation of the returned arrays.
         geom_field_name = None
         for field in schema:
             field_md = field.metadata
-            if (field_md and field_md.get(b'ARROW:extension:name', None) == b'WKB') or field.name == lyr.GetGeometryColumn():
+            if (field_md and field_md.get(b'ARROW:extension:name', None) == b'ogc.wkb') or field.name == lyr.GetGeometryColumn():
                 geom_field_name = field.name
                 break
 

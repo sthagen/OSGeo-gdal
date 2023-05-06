@@ -337,6 +337,13 @@ Starting with GDAL 3.6, the following configuration options control the TCP keep
 - :decl_configoption:`GDAL_HTTP_TCP_KEEPIDLE` = integer, in seconds. Keep-alive idle time. Defaults to 60. Only taken into account if GDAL_HTTP_TCP_KEEPALIVE=YES.
 - :decl_configoption:`GDAL_HTTP_TCP_KEEPINTVL` = integer, in seconds. Interval time between keep-alive probes. Defaults to 60. Only taken into account if GDAL_HTTP_TCP_KEEPALIVE=YES.
 
+Starting with GDAL 3.7, the following configuration options control support for SSL client certificates:
+
+- :decl_configoption:`GDAL_HTTP_SSLCERT` = filename. Filename of the the SSL client certificate. Cf https://curl.se/libcurl/c/CURLOPT_SSLCERT.html
+- :decl_configoption:`GDAL_HTTP_SSLCERTTYPE` = string. Format of the SSL certificate: "PEM" or "DER". Cf https://curl.se/libcurl/c/CURLOPT_SSLCERTTYPE.html
+- :decl_configoption:`GDAL_HTTP_SSLKEY` = filename. Private key file for TLS and SSL client certificate. Cf https://curl.se/libcurl/c/CURLOPT_SSLKEY.html
+- :decl_configoption:`GDAL_HTTP_KEYPASSWD` = string. Passphrase to private key. Cf https://curl.se/libcurl/c/CURLOPT_KEYPASSWD.html
+
 More generally options of :cpp:func:`CPLHTTPFetch` available through configuration options are available.
 Starting with GDAL 3.7, the above configuration options can also be specified
 as path-specific options with :cpp:func:`VSISetPathSpecificOption`.
@@ -419,6 +426,8 @@ accept a comma-separated list of storage class names and defaults to ``GLACIER,D
 Since GDAL 3.1, the :cpp:func:`VSIRename` operation is supported (first doing a copy of the original file and then deleting it)
 
 Since GDAL 3.1, the :cpp:func:`VSIRmdirRecursive` operation is supported (using batch deletion method). The :decl_configoption:`CPL_VSIS3_USE_BASE_RMDIR_RECURSIVE` configuration option can be set to YES if using a S3-like API that doesn't support batch deletion (GDAL >= 3.2). Starting with GDAL 3.6, this can be set as a path-specific option in the :ref:`GDAL configuration file <gdal_configuration_file>`
+
+The :decl_configoption:`CPL_VSIS3_CREATE_DIR_OBJECT` configuration option can be set to NO to prevent the :cpp:func:`VSIMkdir` operation from creating an empty object with the name of the directory terminated with a slash directory. By default GDAL creates such object, so that empty directories can be modeled, but this may cause compatibility problems with applications not expected such empty objects.
 
 Starting with GDAL 3.5, profiles that use IAM role assumption (see https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-role.html) are handled. The ``role_arn`` and ``source_profile`` keywords are required in such profiles. The optional ``external_id``, ``mfa_serial`` and ``role_session_name`` can be specified. ``credential_source`` is not supported currently.
 
@@ -656,7 +665,32 @@ Authentication options, and read-only features, are identical to :ref:`/vsiswift
 /vsihdfs/ (Hadoop File System)
 ++++++++++++++++++++++++++++++
 
-/vsihdfs/ is a file system handler that provides read access to HDFS. This handler requires GDAL to have been built with Java support (``--with-java``) and HDFS support (``--with-hdfs``). Support for this handler is currently only available on Unix-like systems. Note: support for the HTTP REST API (webHdfs) is also available with :ref:`vsiwebhdfs`
+/vsihdfs/ is a file system handler that provides read access to HDFS.
+This handler requires GDAL to have been built with Java support
+(CMake `FindJNI <https://cmake.org/cmake/help/latest/module/FindJNI.html>`__)
+and :ref:`HDFS <building_from_source_hdfs>` support.
+Support for this handler is currently only available on Unix-like systems.
+
+Note: support for the HTTP REST API (webHdfs) is also available with :ref:`vsiwebhdfs`
+
+The LD_LIBRARY_PATH and CLASSPATH environment variables must be typically
+set up as following.
+
+::
+
+    HADOOP_HOME=$HOME/hadoop-3.3.5
+    LD_LIBRARY_PATH=$HADOOP_HOME/lib/native:$LD_LIBRARY_PATH
+    CLASSPATH=$HADOOP_HOME/etc/hadoop:$HADOOP_HOME/share/hadoop/common/*:$HADOOP_HOME/share/hadoop/common/lib/*:$HADOOP_HOME/share/hadoop/hdfs/*
+
+
+Failure to properly define the CLASSPATH will result in hard crashes in the
+native libhdfs.
+
+Relevant Hadoop documentation links:
+
+- `C API libhdfs <https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/LibHdfs.html>`__
+- `HDFS Users Guide <https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/HdfsUserGuide.html>`__
+- `Hadoop: Setting up a Single Node Cluster <https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/SingleCluster.html>`__
 
 Recognized filenames are of the form :file:`/vsihdfs/hdfsUri` where ``hdfsUri`` is a valid HDFS URI.
 
@@ -664,8 +698,8 @@ Examples:
 
 ::
 
-    /vsihdfs/file:/tmp/my.tif  (a local file accessed through HDFS)
-    /vsihdfs/hdfs:/hadoop/my.tif  (a file stored in HDFS)
+    /vsihdfs/file:/home/user//my.tif  (a local file accessed through HDFS)
+    /vsihdfs/hdfs://localhost:9000/my.tif  (a file stored in HDFS)
 
 .. versionadded:: 2.4
 

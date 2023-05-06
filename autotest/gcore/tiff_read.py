@@ -157,9 +157,8 @@ def test_tiff_check_alpha():
 
     ds = None
 
-    gdal.SetConfigOption("GTIFF_FORCE_RGBA", "YES")
-    ds = gdal.Open("data/stefan_full_greyalpha.tif")
-    gdal.SetConfigOption("GTIFF_FORCE_RGBA", None)
+    with gdal.config_option("GTIFF_FORCE_RGBA", "YES"):
+        ds = gdal.Open("data/stefan_full_greyalpha.tif")
     gdaltest.supports_force_rgba = False
     if ds.RasterCount == 4:
         gdaltest.supports_force_rgba = True
@@ -179,9 +178,8 @@ def test_tiff_check_alpha():
     ds = None
 
     if gdaltest.supports_force_rgba:
-        gdal.SetConfigOption("GTIFF_FORCE_RGBA", "YES")
-        ds = gdal.Open("data/stefan_full_rgba.tif")
-        gdal.SetConfigOption("GTIFF_FORCE_RGBA", None)
+        with gdal.config_option("GTIFF_FORCE_RGBA", "YES"):
+            ds = gdal.Open("data/stefan_full_rgba.tif")
         got_cs = [ds.GetRasterBand(i + 1).Checksum() for i in range(ds.RasterCount)]
         # FIXME? Not the same as without GTIFF_FORCE_RGBA=YES
         assert got_cs == [11547, 57792, 35643, 10807]
@@ -198,9 +196,8 @@ def test_tiff_check_alpha():
     ds = None
 
     if gdaltest.supports_force_rgba:
-        gdal.SetConfigOption("GTIFF_FORCE_RGBA", "YES")
-        ds = gdal.Open("data/stefan_full_rgba_photometric_rgb.tif")
-        gdal.SetConfigOption("GTIFF_FORCE_RGBA", None)
+        with gdal.config_option("GTIFF_FORCE_RGBA", "YES"):
+            ds = gdal.Open("data/stefan_full_rgba_photometric_rgb.tif")
         got_cs = [ds.GetRasterBand(i + 1).Checksum() for i in range(ds.RasterCount)]
         assert got_cs == [12603, 58561, 36064, 10807]
         ds = None
@@ -253,7 +250,7 @@ def test_tiff_read_cmyk_raw():
 # Test reading a OJPEG image
 
 
-@gdaltest.require_creation_option("GTiff", "JPEG")
+@pytest.mark.require_creation_option("GTiff", "JPEG")
 def test_tiff_read_ojpeg():
     with gdal.ExceptionMgr(useExceptions=False):
         with gdaltest.error_handler():
@@ -517,48 +514,46 @@ def test_tiff_linearparmunits():
 
 def test_tiff_linearparmunits2():
 
-    gdal.SetConfigOption("GTIFF_LINEAR_UNITS", "BROKEN")
+    with gdal.config_option("GTIFF_LINEAR_UNITS", "BROKEN"):
 
-    # Test the file with the correct formulation.
+        # Test the file with the correct formulation.
 
-    ds = gdal.Open("data/spaf27_correct.tif")
-    wkt = ds.GetProjectionRef()
-    ds = None
+        ds = gdal.Open("data/spaf27_correct.tif")
+        wkt = ds.GetProjectionRef()
+        ds = None
 
-    srs = osr.SpatialReference(wkt)
+        srs = osr.SpatialReference(wkt)
 
-    fe = srs.GetProjParm(osr.SRS_PP_FALSE_EASTING)
-    assert fe == pytest.approx(
-        6561666.66667, abs=0.001
-    ), "did not get expected false easting (1)"
+        fe = srs.GetProjParm(osr.SRS_PP_FALSE_EASTING)
+        assert fe == pytest.approx(
+            6561666.66667, abs=0.001
+        ), "did not get expected false easting (1)"
 
-    # Test the file with the correct formulation that is marked as correct.
+        # Test the file with the correct formulation that is marked as correct.
 
-    ds = gdal.Open("data/spaf27_markedcorrect.tif")
-    wkt = ds.GetProjectionRef()
-    ds = None
+        ds = gdal.Open("data/spaf27_markedcorrect.tif")
+        wkt = ds.GetProjectionRef()
+        ds = None
 
-    srs = osr.SpatialReference(wkt)
+        srs = osr.SpatialReference(wkt)
 
-    fe = srs.GetProjParm(osr.SRS_PP_FALSE_EASTING)
-    assert fe == pytest.approx(
-        2000000.0, abs=0.001
-    ), "did not get expected false easting (2)"
+        fe = srs.GetProjParm(osr.SRS_PP_FALSE_EASTING)
+        assert fe == pytest.approx(
+            2000000.0, abs=0.001
+        ), "did not get expected false easting (2)"
 
-    # Test the file with the old (broken) GDAL formulation.
+        # Test the file with the old (broken) GDAL formulation.
 
-    ds = gdal.Open("data/spaf27_brokengdal.tif")
-    wkt = ds.GetProjectionRef()
-    ds = None
+        ds = gdal.Open("data/spaf27_brokengdal.tif")
+        wkt = ds.GetProjectionRef()
+        ds = None
 
-    srs = osr.SpatialReference(wkt)
+        srs = osr.SpatialReference(wkt)
 
-    fe = srs.GetProjParm(osr.SRS_PP_FALSE_EASTING)
-    assert fe == pytest.approx(
-        2000000.0, abs=0.001
-    ), "did not get expected false easting (3)"
-
-    gdal.SetConfigOption("GTIFF_LINEAR_UNITS", "DEFAULT")
+        fe = srs.GetProjParm(osr.SRS_PP_FALSE_EASTING)
+        assert fe == pytest.approx(
+            2000000.0, abs=0.001
+        ), "did not get expected false easting (3)"
 
 
 ###############################################################################
@@ -710,13 +705,11 @@ def test_tiff_GTModelTypeGeoKey_only():
 @pytest.mark.skipif(
     "SKIP_TIFF_JPEG12" in os.environ, reason="Crashes on build-windows-msys2-mingw"
 )
-@gdaltest.require_creation_option("GTiff", "JPEG")
+@pytest.mark.require_creation_option("GTiff", "JPEG")
 @gdaltest.disable_exceptions()
 def test_tiff_12bitjpeg():
-    old_accum = gdal.GetConfigOption("CPL_ACCUM_ERROR_MSG", "OFF")
-    gdal.SetConfigOption("CPL_ACCUM_ERROR_MSG", "ON")
     gdal.ErrorReset()
-    with gdaltest.error_handler():
+    with gdal.config_option("CPL_ACCUM_ERROR_MSG", "ON"), gdaltest.error_handler():
 
         if os.path.exists("data/mandrilmini_12bitjpeg.tif.aux.xml"):
             os.unlink("data/mandrilmini_12bitjpeg.tif.aux.xml")
@@ -726,8 +719,6 @@ def test_tiff_12bitjpeg():
             ds.GetRasterBand(1).ReadRaster(0, 0, 1, 1)
         except Exception:
             ds = None
-
-    gdal.SetConfigOption("CPL_ACCUM_ERROR_MSG", old_accum)
 
     if gdal.GetLastErrorMsg().find("Unsupported JPEG data precision 12") != -1:
         pytest.skip("12bit jpeg not available")
@@ -839,29 +830,27 @@ Definition Table
 
 def test_tiff_read_pixelispoint():
 
-    gdal.SetConfigOption("GTIFF_POINT_GEO_IGNORE", "FALSE")
+    with gdal.config_option("GTIFF_POINT_GEO_IGNORE", "FALSE"):
 
-    ds = gdal.Open("data/byte_point.tif")
-    gt = ds.GetGeoTransform()
-    ds = None
+        ds = gdal.Open("data/byte_point.tif")
+        gt = ds.GetGeoTransform()
+        ds = None
 
-    gt_expected = (440690.0, 60.0, 0.0, 3751350.0, 0.0, -60.0)
+        gt_expected = (440690.0, 60.0, 0.0, 3751350.0, 0.0, -60.0)
 
-    assert gt == gt_expected, "did not get expected geotransform"
+        assert gt == gt_expected, "did not get expected geotransform"
 
-    gdal.SetConfigOption("GTIFF_POINT_GEO_IGNORE", "TRUE")
+    with gdal.config_option("GTIFF_POINT_GEO_IGNORE", "TRUE"):
 
-    ds = gdal.Open("data/byte_point.tif")
-    gt = ds.GetGeoTransform()
-    ds = None
+        ds = gdal.Open("data/byte_point.tif")
+        gt = ds.GetGeoTransform()
+        ds = None
 
-    gt_expected = (440720.0, 60.0, 0.0, 3751320.0, 0.0, -60.0)
+        gt_expected = (440720.0, 60.0, 0.0, 3751320.0, 0.0, -60.0)
 
-    assert (
-        gt == gt_expected
-    ), "did not get expected geotransform with GTIFF_POINT_GEO_IGNORE TRUE"
-
-    gdal.SetConfigOption("GTIFF_POINT_GEO_IGNORE", None)
+        assert (
+            gt == gt_expected
+        ), "did not get expected geotransform with GTIFF_POINT_GEO_IGNORE TRUE"
 
 
 ###############################################################################
@@ -870,29 +859,27 @@ def test_tiff_read_pixelispoint():
 
 def test_tiff_read_geomatrix():
 
-    gdal.SetConfigOption("GTIFF_POINT_GEO_IGNORE", "FALSE")
+    with gdal.config_option("GTIFF_POINT_GEO_IGNORE", "FALSE"):
 
-    ds = gdal.Open("data/geomatrix.tif")
-    gt = ds.GetGeoTransform()
-    ds = None
+        ds = gdal.Open("data/geomatrix.tif")
+        gt = ds.GetGeoTransform()
+        ds = None
 
-    gt_expected = (1841001.75, 1.5, -5.0, 1144003.25, -5.0, -1.5)
+        gt_expected = (1841001.75, 1.5, -5.0, 1144003.25, -5.0, -1.5)
 
-    assert gt == gt_expected, "did not get expected geotransform"
+        assert gt == gt_expected, "did not get expected geotransform"
 
-    gdal.SetConfigOption("GTIFF_POINT_GEO_IGNORE", "TRUE")
+    with gdal.config_option("GTIFF_POINT_GEO_IGNORE", "TRUE"):
 
-    ds = gdal.Open("data/geomatrix.tif")
-    gt = ds.GetGeoTransform()
-    ds = None
+        ds = gdal.Open("data/geomatrix.tif")
+        gt = ds.GetGeoTransform()
+        ds = None
 
-    gt_expected = (1841000.0, 1.5, -5.0, 1144000.0, -5.0, -1.5)
+        gt_expected = (1841000.0, 1.5, -5.0, 1144000.0, -5.0, -1.5)
 
-    assert (
-        gt == gt_expected
-    ), "did not get expected geotransform with GTIFF_POINT_GEO_IGNORE TRUE"
-
-    gdal.SetConfigOption("GTIFF_POINT_GEO_IGNORE", None)
+        assert (
+            gt == gt_expected
+        ), "did not get expected geotransform with GTIFF_POINT_GEO_IGNORE TRUE"
 
 
 ###############################################################################
@@ -944,10 +931,8 @@ def test_tiff_read_corrupted_gtiff():
 def test_tiff_read_tag_without_null_byte():
 
     gdal.ErrorReset()
-    oldval = gdal.GetConfigOption("CPL_DEBUG")
-    gdal.SetConfigOption("CPL_DEBUG", "OFF")
-    ds = gdal.Open("data/tag_without_null_byte.tif")
-    gdal.SetConfigOption("CPL_DEBUG", oldval)
+    with gdal.config_option("CPL_DEBUG", "OFF"):
+        ds = gdal.Open("data/tag_without_null_byte.tif")
     assert (
         gdal.GetLastErrorType() == 0
     ), "should have not emitted a warning, but only a CPLDebug() message"
@@ -1086,7 +1071,7 @@ def test_tiff_read_exif_and_gps():
 # Test reading a pixel interleaved RGBA JPEG-compressed TIFF
 
 
-@gdaltest.require_creation_option("GTiff", "JPEG")
+@pytest.mark.require_creation_option("GTiff", "JPEG")
 def test_tiff_jpeg_rgba_pixel_interleaved():
     ds = gdal.Open("data/stefan_full_rgba_jpeg_contig.tif")
     md = ds.GetMetadata("IMAGE_STRUCTURE")
@@ -1109,7 +1094,7 @@ def test_tiff_jpeg_rgba_pixel_interleaved():
 # Test reading a band interleaved RGBA JPEG-compressed TIFF
 
 
-@gdaltest.require_creation_option("GTiff", "JPEG")
+@pytest.mark.require_creation_option("GTiff", "JPEG")
 def test_tiff_jpeg_rgba_band_interleaved():
     ds = gdal.Open("data/stefan_full_rgba_jpeg_separate.tif")
     md = ds.GetMetadata("IMAGE_STRUCTURE")
@@ -1132,7 +1117,7 @@ def test_tiff_jpeg_rgba_band_interleaved():
 # Test reading a YCbCr JPEG all-in-one-strip multiband TIFF (#3259, #3894)
 
 
-@gdaltest.require_creation_option("GTiff", "JPEG")
+@pytest.mark.require_creation_option("GTiff", "JPEG")
 def test_tiff_read_online_1():
     gdaltest.download_or_skip(
         "http://trac.osgeo.org/gdal/raw-attachment/ticket/3259/imgpb17.tif",
@@ -1266,7 +1251,7 @@ def test_tiff_read_bigtiff():
 # Test reading in TIFF metadata domain
 
 
-@gdaltest.require_creation_option("GTiff", "JPEG")
+@pytest.mark.require_creation_option("GTiff", "JPEG")
 def test_tiff_read_tiff_metadata():
 
     ds = gdal.Open("data/stefan_full_rgba_jpeg_contig.tif")
@@ -1287,7 +1272,7 @@ def test_tiff_read_tiff_metadata():
 # Test reading a JPEG-in-TIFF with tiles of irregular size (corrupted image)
 
 
-@gdaltest.require_creation_option("GTiff", "JPEG")
+@pytest.mark.require_creation_option("GTiff", "JPEG")
 def test_tiff_read_irregular_tile_size_jpeg_in_tiff():
 
     ds = gdal.Open("data/irregular_tile_size_jpeg_in_tiff.tif")
@@ -1296,7 +1281,7 @@ def test_tiff_read_irregular_tile_size_jpeg_in_tiff():
 
 
 # Getting (hidden) overview band requires JPEG driver availability
-@gdaltest.require_creation_option("GTiff", "JPEG")
+@pytest.mark.require_creation_option("GTiff", "JPEG")
 @pytest.mark.require_driver("JPEG")
 def test_tiff_read_irregular_tile_size_jpeg_in_tiff_overview():
 
@@ -2638,12 +2623,10 @@ def test_tiff_read_strace_check():
 
 def test_tiff_read_readdir_limit_on_open():
 
-    gdal.SetConfigOption("GDAL_READDIR_LIMIT_ON_OPEN", "1")
+    with gdal.config_option("GDAL_READDIR_LIMIT_ON_OPEN", "1"):
 
-    ds = gdal.Open("data/md_kompsat.tif", gdal.GA_ReadOnly)
-    filelist = ds.GetFileList()
-
-    gdal.SetConfigOption("GDAL_READDIR_LIMIT_ON_OPEN", None)
+        ds = gdal.Open("data/md_kompsat.tif", gdal.GA_ReadOnly)
+        filelist = ds.GetFileList()
 
     assert len(filelist) == 3, "did not get expected file list."
 
@@ -2657,9 +2640,8 @@ def test_tiff_read_minisblack_as_rgba():
     if not gdaltest.supports_force_rgba:
         pytest.skip()
 
-    gdal.SetConfigOption("GTIFF_FORCE_RGBA", "YES")
-    ds = gdal.Open("data/byte.tif")
-    gdal.SetConfigOption("GTIFF_FORCE_RGBA", None)
+    with gdal.config_option("GTIFF_FORCE_RGBA", "YES"):
+        ds = gdal.Open("data/byte.tif")
     got_cs = [ds.GetRasterBand(i + 1).Checksum() for i in range(ds.RasterCount)]
     assert got_cs == [4672, 4672, 4672, 4873]
     ds = None
@@ -2674,9 +2656,8 @@ def test_tiff_read_colortable_as_rgba():
     if not gdaltest.supports_force_rgba:
         pytest.skip()
 
-    gdal.SetConfigOption("GTIFF_FORCE_RGBA", "YES")
-    ds = gdal.Open("data/test_average_palette.tif")
-    gdal.SetConfigOption("GTIFF_FORCE_RGBA", None)
+    with gdal.config_option("GTIFF_FORCE_RGBA", "YES"):
+        ds = gdal.Open("data/test_average_palette.tif")
     got_cs = [ds.GetRasterBand(i + 1).Checksum() for i in range(ds.RasterCount)]
     assert got_cs == [2433, 2433, 2433, 4873]
     ds = None
@@ -2691,9 +2672,8 @@ def test_tiff_read_logl_as_rgba():
     if not gdaltest.supports_force_rgba:
         pytest.skip()
 
-    gdal.SetConfigOption("GTIFF_FORCE_RGBA", "YES")
-    ds = gdal.Open("data/uint16_sgilog.tif")
-    gdal.SetConfigOption("GTIFF_FORCE_RGBA", None)
+    with gdal.config_option("GTIFF_FORCE_RGBA", "YES"):
+        ds = gdal.Open("data/uint16_sgilog.tif")
     got_cs = [ds.GetRasterBand(i + 1).Checksum() for i in range(ds.RasterCount)]
     # I'm pretty sure this isn't the expected result...
     assert got_cs == [0, 0, 0, 4873]
@@ -2716,9 +2696,8 @@ def test_tiff_read_strip_separate_as_rgba():
         options="-co INTERLEAVE=BAND",
     )
 
-    gdal.SetConfigOption("GTIFF_FORCE_RGBA", "YES")
-    ds = gdal.Open("/vsimem/tiff_read_strip_separate_as_rgba.tif")
-    gdal.SetConfigOption("GTIFF_FORCE_RGBA", None)
+    with gdal.config_option("GTIFF_FORCE_RGBA", "YES"):
+        ds = gdal.Open("/vsimem/tiff_read_strip_separate_as_rgba.tif")
     got_cs = [ds.GetRasterBand(i + 1).Checksum() for i in range(ds.RasterCount)]
     assert got_cs == [21212, 21053, 21349, 30658]
     ds = None
@@ -2733,9 +2712,8 @@ def test_tiff_read_strip_separate_as_rgba():
         options="-co INTERLEAVE=BAND -co PHOTOMETRIC=MINISBLACK",
     )
 
-    gdal.SetConfigOption("GTIFF_FORCE_RGBA", "YES")
-    ds = gdal.Open("/vsimem/tiff_read_strip_separate_as_rgba.tif")
-    gdal.SetConfigOption("GTIFF_FORCE_RGBA", None)
+    with gdal.config_option("GTIFF_FORCE_RGBA", "YES"):
+        ds = gdal.Open("/vsimem/tiff_read_strip_separate_as_rgba.tif")
     got_cs = [ds.GetRasterBand(i + 1).Checksum() for i in range(ds.RasterCount)]
     assert got_cs == [21212, 21212, 21212, 30658]
     ds = None
@@ -2759,9 +2737,8 @@ def test_tiff_read_tiled_separate_as_rgba():
         options="-co TILED=YES -co INTERLEAVE=BAND",
     )
 
-    gdal.SetConfigOption("GTIFF_FORCE_RGBA", "YES")
-    ds = gdal.Open("/vsimem/tiff_read_tiled_separate_as_rgba.tif")
-    gdal.SetConfigOption("GTIFF_FORCE_RGBA", None)
+    with gdal.config_option("GTIFF_FORCE_RGBA", "YES"):
+        ds = gdal.Open("/vsimem/tiff_read_tiled_separate_as_rgba.tif")
     got_cs = [ds.GetRasterBand(i + 1).Checksum() for i in range(ds.RasterCount)]
     assert got_cs == [21212, 21053, 21349, 30658]
     ds = None
@@ -2775,9 +2752,8 @@ def test_tiff_read_tiled_separate_as_rgba():
         options="-co TILED=YES -co INTERLEAVE=BAND",
     )
 
-    gdal.SetConfigOption("GTIFF_FORCE_RGBA", "YES")
-    ds = gdal.Open("/vsimem/tiff_read_tiled_separate_as_rgba.tif")
-    gdal.SetConfigOption("GTIFF_FORCE_RGBA", None)
+    with gdal.config_option("GTIFF_FORCE_RGBA", "YES"):
+        ds = gdal.Open("/vsimem/tiff_read_tiled_separate_as_rgba.tif")
     got_cs = [ds.GetRasterBand(i + 1).Checksum() for i in range(ds.RasterCount)]
     assert got_cs == [4672, 4672, 4672, 4873]
     ds = None
@@ -2955,35 +2931,35 @@ def test_tiff_read_nogeoref():
         expected_gt,
     ) in tests:
         for iteration in range(2):
-            gdal.SetConfigOption("GDAL_GEOREF_SOURCES", config_option_value)
-            gdal.FileFromMemBuffer(
-                "/vsimem/byte_nogeoref.tif", open("data/byte_nogeoref.tif", "rb").read()
-            )
-            if copy_pam:
+            with gdal.config_option("GDAL_GEOREF_SOURCES", config_option_value):
                 gdal.FileFromMemBuffer(
-                    "/vsimem/byte_nogeoref.tif.aux.xml",
-                    open("data/byte_nogeoref.tif.aux.xml", "rb").read(),
+                    "/vsimem/byte_nogeoref.tif",
+                    open("data/byte_nogeoref.tif", "rb").read(),
                 )
-            if copy_worldfile:
-                gdal.FileFromMemBuffer(
-                    "/vsimem/byte_nogeoref.tfw",
-                    open("data/byte_nogeoref.tfw", "rb").read(),
-                )
-            if copy_tabfile:
-                gdal.FileFromMemBuffer(
-                    "/vsimem/byte_nogeoref.tab",
-                    open("data/byte_nogeoref.tab", "rb").read(),
-                )
+                if copy_pam:
+                    gdal.FileFromMemBuffer(
+                        "/vsimem/byte_nogeoref.tif.aux.xml",
+                        open("data/byte_nogeoref.tif.aux.xml", "rb").read(),
+                    )
+                if copy_worldfile:
+                    gdal.FileFromMemBuffer(
+                        "/vsimem/byte_nogeoref.tfw",
+                        open("data/byte_nogeoref.tfw", "rb").read(),
+                    )
+                if copy_tabfile:
+                    gdal.FileFromMemBuffer(
+                        "/vsimem/byte_nogeoref.tab",
+                        open("data/byte_nogeoref.tab", "rb").read(),
+                    )
 
-            ds = gdal.Open("/vsimem/byte_nogeoref.tif")
-            if iteration == 0:
-                gt = ds.GetGeoTransform()
-                srs_wkt = ds.GetProjectionRef()
-            else:
-                srs_wkt = ds.GetProjectionRef()
-                gt = ds.GetGeoTransform()
-            ds = None
-            gdal.SetConfigOption("GDAL_GEOREF_SOURCES", None)
+                ds = gdal.Open("/vsimem/byte_nogeoref.tif")
+                if iteration == 0:
+                    gt = ds.GetGeoTransform()
+                    srs_wkt = ds.GetProjectionRef()
+                else:
+                    srs_wkt = ds.GetProjectionRef()
+                    gt = ds.GetGeoTransform()
+                ds = None
             with gdal.ExceptionMgr(useExceptions=False):
                 gdal.Unlink("/vsimem/byte_nogeoref.tif")
                 gdal.Unlink("/vsimem/byte_nogeoref.tif.aux.xml")
@@ -3116,35 +3092,34 @@ def test_tiff_read_inconsistent_georef():
         expected_gt,
     ) in tests:
         for iteration in range(2):
-            gdal.SetConfigOption("GDAL_GEOREF_SOURCES", config_option_value)
-            gdal.FileFromMemBuffer(
-                "/vsimem/byte_inconsistent_georef.tif",
-                open("data/byte_inconsistent_georef.tif", "rb").read(),
-            )
-            if copy_pam:
+            with gdal.config_option("GDAL_GEOREF_SOURCES", config_option_value):
                 gdal.FileFromMemBuffer(
-                    "/vsimem/byte_inconsistent_georef.tif.aux.xml",
-                    open("data/byte_inconsistent_georef.tif.aux.xml", "rb").read(),
+                    "/vsimem/byte_inconsistent_georef.tif",
+                    open("data/byte_inconsistent_georef.tif", "rb").read(),
                 )
-            if copy_worldfile:
-                gdal.FileFromMemBuffer(
-                    "/vsimem/byte_inconsistent_georef.tfw",
-                    open("data/byte_inconsistent_georef.tfw", "rb").read(),
-                )
-            if copy_tabfile:
-                gdal.FileFromMemBuffer(
-                    "/vsimem/byte_inconsistent_georef.tab",
-                    open("data/byte_inconsistent_georef.tab", "rb").read(),
-                )
-            ds = gdal.Open("/vsimem/byte_inconsistent_georef.tif")
-            if iteration == 0:
-                gt = ds.GetGeoTransform()
-                srs_wkt = ds.GetProjectionRef()
-            else:
-                srs_wkt = ds.GetProjectionRef()
-                gt = ds.GetGeoTransform()
-            ds = None
-            gdal.SetConfigOption("GDAL_GEOREF_SOURCES", None)
+                if copy_pam:
+                    gdal.FileFromMemBuffer(
+                        "/vsimem/byte_inconsistent_georef.tif.aux.xml",
+                        open("data/byte_inconsistent_georef.tif.aux.xml", "rb").read(),
+                    )
+                if copy_worldfile:
+                    gdal.FileFromMemBuffer(
+                        "/vsimem/byte_inconsistent_georef.tfw",
+                        open("data/byte_inconsistent_georef.tfw", "rb").read(),
+                    )
+                if copy_tabfile:
+                    gdal.FileFromMemBuffer(
+                        "/vsimem/byte_inconsistent_georef.tab",
+                        open("data/byte_inconsistent_georef.tab", "rb").read(),
+                    )
+                ds = gdal.Open("/vsimem/byte_inconsistent_georef.tif")
+                if iteration == 0:
+                    gt = ds.GetGeoTransform()
+                    srs_wkt = ds.GetProjectionRef()
+                else:
+                    srs_wkt = ds.GetProjectionRef()
+                    gt = ds.GetGeoTransform()
+                ds = None
             with gdal.ExceptionMgr(useExceptions=False):
                 gdal.Unlink("/vsimem/byte_inconsistent_georef.tif")
                 gdal.Unlink("/vsimem/byte_inconsistent_georef.tif.aux.xml")
@@ -3305,7 +3280,7 @@ def test_tiff_read_one_band_from_two_bands():
     gdal.Unlink("/vsimem/tiff_read_one_band_from_two_bands_dst.tif")
 
 
-@gdaltest.require_creation_option("GTiff", "JPEG")
+@pytest.mark.require_creation_option("GTiff", "JPEG")
 def test_tiff_read_jpeg_cloud_optimized():
 
     for i in range(4):
@@ -3322,7 +3297,7 @@ def test_tiff_read_jpeg_cloud_optimized():
 # error while jpeg-8 works fine
 
 
-@gdaltest.require_creation_option("GTiff", "JPEG")
+@pytest.mark.require_creation_option("GTiff", "JPEG")
 def test_tiff_read_corrupted_jpeg_cloud_optimized():
 
     ds = gdal.Open("data/byte_ovr_jpeg_tablesmode_not_correctly_set_on_ovr.tif")
@@ -3854,7 +3829,7 @@ def test_tiff_read_stripoffset_types():
 # http://www.libjpeg-turbo.org/pmwiki/uploads/About/TwoIssueswiththeJPEGStandard.pdf
 
 
-@gdaltest.require_creation_option("GTiff", "JPEG")
+@pytest.mark.require_creation_option("GTiff", "JPEG")
 def test_tiff_read_progressive_jpeg_denial_of_service():
 
     if not check_libtiff_internal_or_at_least(4, 0, 9):
@@ -3911,10 +3886,9 @@ def test_tiff_read_mmap_interface():
     tmpfile = "/vsimem/tiff_read_mmap_interface.tif"
     for options in [[], ["TILED=YES"], ["COMPRESS=LZW"], ["COMPRESS=LZW", "TILED=YES"]]:
         gdal.GetDriverByName("GTiff").CreateCopy(tmpfile, src_ds, options=options)
-        gdal.SetConfigOption("GTIFF_USE_MMAP", "YES")
-        ds = gdal.Open(tmpfile)
-        cs = ds.GetRasterBand(1).Checksum()
-        gdal.SetConfigOption("GTIFF_USE_MMAP", None)
+        with gdal.config_option("GTIFF_USE_MMAP", "YES"):
+            ds = gdal.Open(tmpfile)
+            cs = ds.GetRasterBand(1).Checksum()
         assert cs == 4672, (options, cs)
 
         f = gdal.VSIFOpenL(tmpfile, "rb")
@@ -3923,12 +3897,10 @@ def test_tiff_read_mmap_interface():
         f = gdal.VSIFOpenL(tmpfile, "wb")
         gdal.VSIFWriteL(data, 1, len(data), f)
         gdal.VSIFCloseL(f)
-        gdal.SetConfigOption("GTIFF_USE_MMAP", "YES")
-        with gdaltest.error_handler():
+        with gdal.config_option("GTIFF_USE_MMAP", "YES"):
             ds = gdal.Open(tmpfile)
             with pytest.raises(Exception):
                 ds.GetRasterBand(1).Checksum()
-        gdal.SetConfigOption("GTIFF_USE_MMAP", None)
         gdal.Unlink(tmpfile)
 
 
@@ -3938,7 +3910,7 @@ def test_tiff_read_mmap_interface():
 # image height.
 
 
-@gdaltest.require_creation_option("GTiff", "JPEG")
+@pytest.mark.require_creation_option("GTiff", "JPEG")
 def test_tiff_read_jpeg_too_big_last_stripe():
 
     if not check_libtiff_internal_or_at_least(4, 0, 9):
@@ -3978,7 +3950,7 @@ def test_tiff_read_negative_scaley():
 # Test ZSTD compression
 
 
-@gdaltest.require_creation_option("GTiff", "ZSTD")
+@pytest.mark.require_creation_option("GTiff", "ZSTD")
 def test_tiff_read_zstd():
 
     ut = gdaltest.GDALTest("GTiff", "byte_zstd.tif", 1, 4672)
@@ -3989,7 +3961,7 @@ def test_tiff_read_zstd():
 # Test ZSTD compression
 
 
-@gdaltest.require_creation_option("GTiff", "ZSTD")
+@pytest.mark.require_creation_option("GTiff", "ZSTD")
 def test_tiff_read_zstd_corrupted():
 
     ut = gdaltest.GDALTest("GTiff", "byte_zstd_corrupted.tif", 1, -1)
@@ -4001,7 +3973,7 @@ def test_tiff_read_zstd_corrupted():
 # Test ZSTD compression
 
 
-@gdaltest.require_creation_option("GTiff", "ZSTD")
+@pytest.mark.require_creation_option("GTiff", "ZSTD")
 def test_tiff_read_zstd_corrupted2():
 
     ut = gdaltest.GDALTest("GTiff", "byte_zstd_corrupted2.tif", 1, -1)
@@ -4013,7 +3985,7 @@ def test_tiff_read_zstd_corrupted2():
 # Test WEBP compression
 
 
-@gdaltest.require_creation_option("GTiff", "WEBP")
+@pytest.mark.require_creation_option("GTiff", "WEBP")
 def test_tiff_read_webp():
 
     stats = (0, 215, 66.38, 47.186)
@@ -4027,7 +3999,7 @@ def test_tiff_read_webp():
 # Test WEBP compression
 
 
-@gdaltest.require_creation_option("GTiff", "WEBP")
+@pytest.mark.require_creation_option("GTiff", "WEBP")
 def test_tiff_read_webp_huge_single_strip():
 
     ds = gdal.Open("data/tif_webp_huge_single_strip.tif")
@@ -4047,7 +4019,7 @@ def test_tiff_read_1bit_2bands():
 # Test LERC compression
 
 
-@gdaltest.require_creation_option("GTiff", "LERC")
+@pytest.mark.require_creation_option("GTiff", "LERC")
 def test_tiff_read_lerc():
 
     ut = gdaltest.GDALTest("GTiff", "byte_lerc.tif", 1, 4672)
@@ -4567,7 +4539,7 @@ def test_tiff_read_unhandled_codec_unknown_name():
 # channel handling was not explicitly handled (#6393)
 
 
-@gdaltest.require_creation_option("GTiff", "JXL")
+@pytest.mark.require_creation_option("GTiff", "JXL")
 def test_tiff_jxl_read_for_files_created_before_6393():
     gdal.ErrorReset()
     with gdaltest.error_handler():

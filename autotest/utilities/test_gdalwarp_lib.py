@@ -1341,25 +1341,23 @@ def test_gdalwarp_lib_128():
         gdal.Unlink(cutlineDSName)
         return
 
-    gdal.SetConfigOption("GDALWARP_DENSIFY_CUTLINE", "ONLY_IF_INVALID")
-    ds = gdal.Warp(
-        "",
-        mem_ds,
-        format="MEM",
-        cutlineDSName=cutlineDSName,
-        dstSRS="EPSG:4326",
-        outputBounds=[7.2, 32.52, 7.217, 32.59],
-        xRes=0.000226555,
-        yRes=0.000226555,
-        transformerOptions=["RPC_DEM=data/test_gdalwarp_lib_128_dem.tif"],
-    )
-    gdal.SetConfigOption("GDALWARP_DENSIFY_CUTLINE", None)
+    with gdal.config_option("GDALWARP_DENSIFY_CUTLINE", "ONLY_IF_INVALID"):
+        ds = gdal.Warp(
+            "",
+            mem_ds,
+            format="MEM",
+            cutlineDSName=cutlineDSName,
+            dstSRS="EPSG:4326",
+            outputBounds=[7.2, 32.52, 7.217, 32.59],
+            xRes=0.000226555,
+            yRes=0.000226555,
+            transformerOptions=["RPC_DEM=data/test_gdalwarp_lib_128_dem.tif"],
+        )
     cs = ds.GetRasterBand(1).Checksum()
 
     assert cs == 4248, "bad checksum"
 
-    gdal.SetConfigOption("GDALWARP_DENSIFY_CUTLINE", "NO")
-    with pytest.raises(Exception):
+    with gdal.config_option("GDALWARP_DENSIFY_CUTLINE", "NO"), pytest.raises(Exception):
         gdal.Warp(
             "",
             mem_ds,
@@ -1371,7 +1369,6 @@ def test_gdalwarp_lib_128():
             yRes=0.000226555,
             transformerOptions=["RPC_DEM=data/test_gdalwarp_lib_128_dem.tif"],
         )
-    gdal.SetConfigOption("GDALWARP_DENSIFY_CUTLINE", None)
 
     gdal.Unlink(cutlineDSName)
 
@@ -2739,7 +2736,7 @@ def test_gdalwarp_lib_propagating_coordinate_epoch():
 # Test support for -s_coord_epoch
 
 
-@gdaltest.require_proj_version(7, 2)
+@pytest.mark.require_proj(7, 2)
 def test_gdalwarp_lib_s_coord_epoch():
 
     src_ds = gdal.GetDriverByName("MEM").Create("", 2, 2)
@@ -2763,7 +2760,7 @@ def test_gdalwarp_lib_s_coord_epoch():
 # Test support for -s_coord_epoch
 
 
-@gdaltest.require_proj_version(7, 2)
+@pytest.mark.require_proj(7, 2)
 def test_gdalwarp_lib_t_coord_epoch():
 
     src_ds = gdal.GetDriverByName("MEM").Create("", 2, 2)
@@ -2897,7 +2894,7 @@ def test_gdalwarp_lib_src_points_outside_of_earth():
 
 
 # Not completely sure about the minimum version to have ob_tran working fine.
-@gdaltest.require_proj_version(7)
+@pytest.mark.require_proj(7)
 def test_gdalwarp_lib_from_ob_tran_including_north_pole_to_geographic():
 
     ds = gdal.Warp(
@@ -3023,7 +3020,7 @@ def test_gdalwarp_lib_epsg_4326_to_esri_53037():
     "resampleAlg", ["average", "mode", "min", "max", "med", "q1", "q3", "sum", "rms"]
 )
 # 6.3.1 might not be the lowest bound, but 6.0.0 definitely doesn't work for that test
-@gdaltest.require_proj_version(6, 3, 1)
+@pytest.mark.require_proj(6, 3, 1)
 def test_gdalwarp_lib_epsg_4326_to_esri_102020(resampleAlg):
 
     # Scenario of https://github.com/OSGeo/gdal/issues/6155
@@ -3340,7 +3337,7 @@ def test_gdalwarp_lib_preserve_non_square_pixels_if_no_reprojection():
 ###############################################################################
 
 
-@gdaltest.require_proj_version(6, 3)
+@pytest.mark.require_proj(6, 3)
 def test_gdalwarp_lib_preserve_non_square_pixels_same_horizontal_crs():
 
     src_ds = gdal.GetDriverByName("MEM").Create("", 20, 10)

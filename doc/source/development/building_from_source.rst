@@ -753,6 +753,8 @@ detect the HDF5 library.
     be manually set when needed.
 
 
+.. _building_from_source_hdfs:
+
 HDFS
 ****
 
@@ -2104,6 +2106,8 @@ This can be done with:
     Set to OFF to disable loading of GDAL plugins. Default is ON.
 
 
+.. _building-python-bindings:
+
 Python bindings options
 +++++++++++++++++++++++
 
@@ -2238,7 +2242,7 @@ Cross-compiling for Android
 +++++++++++++++++++++++++++
 
 First refer to https://cmake.org/cmake/help/latest/manual/cmake-toolchains.7.html#cross-compiling-for-android
-and to https://github.com/OSGeo/gdal/blob/master/.github/workflows/android_cmake/start.sh for
+and to :source_file:`.github/workflows/android_cmake/start.sh` for
 an example of a build script to cross-compile from Ubuntu.
 
 

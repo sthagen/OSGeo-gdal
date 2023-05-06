@@ -1668,13 +1668,12 @@ def test_isis_30():
 
 def test_isis_31():
 
-    gdal.SetConfigOption("GDAL_FORCE_CACHING", "YES")
-    ds = gdal.GetDriverByName("ISIS3").Create(
-        "/vsimem/test.lbl", 1, 1, options=["DATA_LOCATION=GEOTIFF"]
-    )
-    ds.WriteRaster(0, 0, 1, 1, struct.pack("B" * 1, 1))
-    ds = None
-    gdal.SetConfigOption("GDAL_FORCE_CACHING", None)
+    with gdal.config_option("GDAL_FORCE_CACHING", "YES"):
+        ds = gdal.GetDriverByName("ISIS3").Create(
+            "/vsimem/test.lbl", 1, 1, options=["DATA_LOCATION=GEOTIFF"]
+        )
+        ds.WriteRaster(0, 0, 1, 1, struct.pack("B" * 1, 1))
+        ds = None
 
     ds = gdal.Open("/vsimem/test.lbl")
     cs = ds.GetRasterBand(1).Checksum()
@@ -2002,7 +2001,7 @@ def test_isis3_point_perspective_read():
     )
 
 
-@gdaltest.require_proj_version(7)
+@pytest.mark.require_proj(7)
 def test_isis3_point_perspective_write():
 
     sr = osr.SpatialReference()

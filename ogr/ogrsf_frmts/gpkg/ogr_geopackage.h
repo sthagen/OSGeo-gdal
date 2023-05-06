@@ -212,7 +212,7 @@ class GDALGeoPackageDataset final : public OGRSQLiteBaseDataSource,
     void
     WriteMetadata(CPLXMLNode *psXMLNode, /* will be destroyed by the method */
                   const char *pszTableName);
-    CPLErr FlushMetadata();
+    void FlushMetadata();
 
     int FindLayerIndex(const char *pszLayerName);
 
@@ -820,7 +820,8 @@ class OGRGeoPackageTableLayer final : public OGRGeoPackageLayer
 
     void RecomputeExtent();
 
-    void SetOpeningParameters(const char *pszObjectType, bool bIsInGpkgContents,
+    void SetOpeningParameters(const char *pszTableName,
+                              const char *pszObjectType, bool bIsInGpkgContents,
                               bool bIsSpatial, const char *pszGeomColName,
                               const char *pszGeomType, bool bHasZ, bool bHasM);
     void SetCreationParameters(OGRwkbGeometryType eGType,

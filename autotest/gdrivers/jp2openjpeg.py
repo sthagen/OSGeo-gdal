@@ -35,6 +35,7 @@ import sys
 
 import gdaltest
 import pytest
+import webserver
 from test_py_scripts import samples_path
 
 from osgeo import gdal, ogr, osr
@@ -482,13 +483,11 @@ def test_jp2openjpeg_16():
 
     assert gt == gt_expected, "did not get expected geotransform"
 
-    gdal.SetConfigOption("GTIFF_POINT_GEO_IGNORE", "TRUE")
+    with gdal.config_option("GTIFF_POINT_GEO_IGNORE", "TRUE"):
 
-    ds = gdal.Open("data/jpeg2000/byte_point.jp2")
-    gt = ds.GetGeoTransform()
-    ds = None
-
-    gdal.SetConfigOption("GTIFF_POINT_GEO_IGNORE", None)
+        ds = gdal.Open("data/jpeg2000/byte_point.jp2")
+        gt = ds.GetGeoTransform()
+        ds = None
 
     gt_expected = (440720.0, 60.0, 0.0, 3751320.0, 0.0, -60.0)
 
@@ -1664,7 +1663,6 @@ def test_jp2openjpeg_39():
     # No metadata
     src_ds = gdal.GetDriverByName("MEM").Create("", 20, 20)
     src_ds.SetGeoTransform([0, 60, 0, 0, 0, -60])
-    gdal.SetConfigOption("GMLJP2OVERRIDE", "/vsimem/override.gml")
     # This GML has srsName only on RectifiedGrid (taken from D.2.2.2 from DGIWG_Profile_of_JPEG2000_for_Georeferenced_Imagery.pdf)
     gdal.FileFromMemBuffer(
         "/vsimem/override.gml",
@@ -1715,10 +1713,10 @@ def test_jp2openjpeg_39():
   </gml:featureMember>
 </gml:FeatureCollection>""",
     )
-    out_ds = gdaltest.jp2openjpeg_drv.CreateCopy(
-        "/vsimem/jp2openjpeg_39.jp2", src_ds, options=["GeoJP2=NO"]
-    )
-    gdal.SetConfigOption("GMLJP2OVERRIDE", None)
+    with gdal.config_option("GMLJP2OVERRIDE", "/vsimem/override.gml"):
+        out_ds = gdaltest.jp2openjpeg_drv.CreateCopy(
+            "/vsimem/jp2openjpeg_39.jp2", src_ds, options=["GeoJP2=NO"]
+        )
     gdal.Unlink("/vsimem/override.gml")
     del out_ds
     ds = gdal.Open("/vsimem/jp2openjpeg_39.jp2")
@@ -1736,7 +1734,6 @@ def test_jp2openjpeg_40():
     # No metadata
     src_ds = gdal.GetDriverByName("MEM").Create("", 20, 20)
     src_ds.SetGeoTransform([0, 60, 0, 0, 0, -60])
-    gdal.SetConfigOption("GMLJP2OVERRIDE", "/vsimem/override.gml")
 
     gdal.FileFromMemBuffer(
         "/vsimem/override.gml",
@@ -1790,10 +1787,10 @@ def test_jp2openjpeg_40():
     </gmljp2:featureMember>
 </gmljp2:GMLJP2CoverageCollection>""",
     )
-    out_ds = gdaltest.jp2openjpeg_drv.CreateCopy(
-        "/vsimem/jp2openjpeg_40.jp2", src_ds, options=["GeoJP2=NO"]
-    )
-    gdal.SetConfigOption("GMLJP2OVERRIDE", None)
+    with gdal.config_option("GMLJP2OVERRIDE", "/vsimem/override.gml"):
+        out_ds = gdaltest.jp2openjpeg_drv.CreateCopy(
+            "/vsimem/jp2openjpeg_40.jp2", src_ds, options=["GeoJP2=NO"]
+        )
     gdal.Unlink("/vsimem/override.gml")
     del out_ds
     ds = gdal.Open("/vsimem/jp2openjpeg_40.jp2")
@@ -3295,26 +3292,25 @@ def test_jp2openjpeg_49():
         expected_srs,
         expected_gt,
     ) in tests:
-        gdal.SetConfigOption("GDAL_GEOREF_SOURCES", config_option_value)
-        gdal.FileFromMemBuffer(
-            "/vsimem/byte_nogeoref.jp2",
-            open("data/jpeg2000/byte_nogeoref.jp2", "rb").read(),
-        )
-        if copy_pam:
+        with gdal.config_option("GDAL_GEOREF_SOURCES", config_option_value):
             gdal.FileFromMemBuffer(
-                "/vsimem/byte_nogeoref.jp2.aux.xml",
-                open("data/jpeg2000/byte_nogeoref.jp2.aux.xml", "rb").read(),
+                "/vsimem/byte_nogeoref.jp2",
+                open("data/jpeg2000/byte_nogeoref.jp2", "rb").read(),
             )
-        if copy_worldfile:
-            gdal.FileFromMemBuffer(
-                "/vsimem/byte_nogeoref.j2w",
-                open("data/jpeg2000/byte_nogeoref.j2w", "rb").read(),
-            )
-        ds = gdal.Open("/vsimem/byte_nogeoref.jp2")
-        gt = ds.GetGeoTransform()
-        srs_wkt = ds.GetProjectionRef()
-        ds = None
-        gdal.SetConfigOption("GDAL_GEOREF_SOURCES", None)
+            if copy_pam:
+                gdal.FileFromMemBuffer(
+                    "/vsimem/byte_nogeoref.jp2.aux.xml",
+                    open("data/jpeg2000/byte_nogeoref.jp2.aux.xml", "rb").read(),
+                )
+            if copy_worldfile:
+                gdal.FileFromMemBuffer(
+                    "/vsimem/byte_nogeoref.j2w",
+                    open("data/jpeg2000/byte_nogeoref.j2w", "rb").read(),
+                )
+            ds = gdal.Open("/vsimem/byte_nogeoref.jp2")
+            gt = ds.GetGeoTransform()
+            srs_wkt = ds.GetProjectionRef()
+            ds = None
         gdal.Unlink("/vsimem/byte_nogeoref.jp2")
         gdal.Unlink("/vsimem/byte_nogeoref.jp2.aux.xml")
         gdal.Unlink("/vsimem/byte_nogeoref.j2w")
@@ -3556,7 +3552,7 @@ def test_jp2openjpeg_50():
 # Test CODEBLOCK_STYLE
 
 
-@gdaltest.require_creation_option("JP2OpenJPEG", "CODEBLOCK_STYLE")
+@pytest.mark.require_creation_option("JP2OpenJPEG", "CODEBLOCK_STYLE")
 def test_jp2openjpeg_codeblock_style():
 
     filename = "/vsimem/jp2openjpeg_codeblock_style.jp2"
@@ -3662,7 +3658,7 @@ def test_jp2openjpeg_odd_dimensions():
 ###############################################################################
 
 
-@gdaltest.require_creation_option("JP2OpenJPEG", "CODEBLOCK_STYLE")
+@pytest.mark.require_creation_option("JP2OpenJPEG", "CODEBLOCK_STYLE")
 def test_jp2openjpeg_odd_dimensions_overviews():
 
     # Check that we don't request outside of the full resolution coordinates
@@ -3699,7 +3695,7 @@ def test_jp2openjpeg_tilesize_16():
 # Test generation of PLT marker segments
 
 
-@gdaltest.require_creation_option(
+@pytest.mark.require_creation_option(
     "JP2OpenJPEG", "PLT"
 )  # Only try the test with openjpeg >= 2.4.0 that supports it
 def test_jp2openjpeg_generate_PLT():
@@ -3726,7 +3722,7 @@ def test_jp2openjpeg_generate_PLT():
 # Test generation of TLM marker segments
 
 
-@gdaltest.require_creation_option(
+@pytest.mark.require_creation_option(
     "JP2OpenJPEG", "TLM"
 )  # Only try the test with openjpeg >= 2.5.0 that supports it
 def test_jp2openjpeg_generate_TLM():
@@ -3753,7 +3749,7 @@ def test_jp2openjpeg_generate_TLM():
 # Test STRICT=NO open option
 
 
-@gdaltest.require_creation_option(
+@pytest.mark.require_creation_option(
     "JP2OpenJPEG", "'STRICT'"
 )  # Only try the test with openjpeg >= 2.5.0 that supports it
 def test_jp2openjpeg_STRICT_NO():
@@ -3812,3 +3808,42 @@ def test_jp2openjpeg_mosaic():
         assert vrt_ds.GetRasterBand(1).Checksum() == 57182
     for name in src_ds_names:
         gdal.Unlink(name)
+
+
+###############################################################################
+
+
+@pytest.mark.require_curl()
+def test_jp2openjpeg_vrt_protocol():
+
+    (webserver_process, webserver_port) = webserver.launch(
+        handler=webserver.DispatcherHttpHandler
+    )
+    if webserver_port == 0:
+        pytest.skip("cannot start HTTP server")
+
+    gdal.VSICurlClearCache()
+
+    try:
+        handler = webserver.FileHandler(
+            {"/byte.jp2": open("data/jpeg2000/byte.jp2", "rb").read()}
+        )
+        with webserver.install_http_handler(handler):
+            gdal.ErrorReset()
+            http_filename = "http://localhost:%d/byte.jp2" % webserver_port
+            ds = gdal.Open("vrt://" + http_filename)
+            assert gdal.GetLastErrorMsg() == ""
+
+            gdal.GetDriverByName("VRT").CreateCopy("/vsimem/out.vrt", ds)
+
+            fp = gdal.VSIFOpenL("/vsimem/out.vrt", "rb")
+            if fp is not None:
+                data = gdal.VSIFReadL(1, 100000, fp).decode("ascii")
+                gdal.VSIFCloseL(fp)
+            gdal.Unlink("/vsimem/out.vrt")
+            assert http_filename in data
+
+    finally:
+        webserver.server_stop(webserver_process, webserver_port)
+
+        gdal.VSICurlClearCache()

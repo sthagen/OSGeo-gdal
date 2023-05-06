@@ -66,11 +66,9 @@ def startup_and_cleanup():
     # This is to speed-up the runtime of tests on EXT4 filesystems
     # Do not use this for production environment if you care about data safety
     # w.r.t system/OS crashes, unless you know what you are doing.
-    gdal.SetConfigOption("OGR_SQLITE_SYNCHRONOUS", "OFF")
+    with gdal.config_option("OGR_SQLITE_SYNCHRONOUS", "OFF"):
 
-    yield
-
-    gdal.SetConfigOption("OGR_SQLITE_SYNCHRONOUS", None)
+        yield
 
     if gdal.ReadDir("/vsimem") is not None:
         print(gdal.ReadDir("/vsimem"))
@@ -1317,6 +1315,79 @@ def test_ogr_gpkg_SetSRID():
 
 
 ###############################################################################
+# Test ST_EnvIntersects() function
+
+
+def test_ogr_gpkg_ST_EnvIntersects():
+
+    filename = "/vsimem/test_ogr_gpkg_ST_EnvIntersects.gpkg"
+    ds = ogr.GetDriverByName("GPKG").CreateDataSource(filename)
+    lyr = ds.CreateLayer("foo")
+
+    f = ogr.Feature(lyr.GetLayerDefn())
+    f.SetGeometry(ogr.CreateGeometryFromWkt("LINESTRING(1 2,3 4)"))
+    lyr.CreateFeature(f)
+
+    f = ogr.Feature(lyr.GetLayerDefn())
+    f.SetGeometry(ogr.CreateGeometryFromWkt("LINESTRING(5 6,7 8)"))
+    lyr.CreateFeature(f)
+
+    sql_lyr = ds.ExecuteSQL(
+        "SELECT ST_EnvIntersects(geom, 0, 0, 0.99, 100),"
+        + "       ST_EnvIntersects(geom, 0, 4.01, 100, 100),"
+        + "       ST_EnvIntersects(geom, 3.01, 0, 100, 100),"
+        + "       ST_EnvIntersects(geom, 0, 0, 100, 1.99),"
+        + "       ST_EnvIntersects(geom, 0.99, 1.99, 1.01, 2.01),"
+        + "       ST_EnvIntersects(geom, 0.99, 3.99, 1.01, 4.01),"
+        + "       ST_EnvIntersects(geom, 2.99, 3.99, 3.01, 4.01),"
+        + "       ST_EnvIntersects(geom, 2.99, 1.99, 3.01, 2.01)"
+        + " FROM foo WHERE fid = 1"
+    )
+    f = sql_lyr.GetNextFeature()
+    try:
+        assert f.GetField(0) == 0
+        assert f.GetField(1) == 0
+        assert f.GetField(2) == 0
+        assert f.GetField(3) == 0
+        assert f.GetField(4) == 1
+        assert f.GetField(5) == 1
+        assert f.GetField(6) == 1
+        assert f.GetField(7) == 1
+    finally:
+        ds.ReleaseResultSet(sql_lyr)
+
+    sql_lyr = ds.ExecuteSQL(
+        "SELECT ST_EnvIntersects(a.geom, b.geom) FROM foo a, foo b WHERE a.fid = 1 AND b.fid = 1"
+    )
+    f = sql_lyr.GetNextFeature()
+    try:
+        assert f.GetField(0) == 1
+    finally:
+        ds.ReleaseResultSet(sql_lyr)
+
+    sql_lyr = ds.ExecuteSQL(
+        "SELECT ST_EnvIntersects(a.geom, b.geom) FROM foo a, foo b WHERE a.fid = 1 AND b.fid = 2"
+    )
+    f = sql_lyr.GetNextFeature()
+    try:
+        assert f.GetField(0) == 0
+    finally:
+        ds.ReleaseResultSet(sql_lyr)
+
+    sql_lyr = ds.ExecuteSQL(
+        "SELECT ST_EnvIntersects(a.geom, b.geom) FROM foo a, foo b WHERE a.fid = 2 AND b.fid = 1"
+    )
+    f = sql_lyr.GetNextFeature()
+    try:
+        assert f.GetField(0) == 0
+    finally:
+        ds.ReleaseResultSet(sql_lyr)
+
+    ds = None
+    gdal.Unlink("/vsimem/test_ogr_gpkg_ST_EnvIntersects.gpkg")
+
+
+###############################################################################
 # Test unknown extensions
 
 
@@ -1735,11 +1806,11 @@ def test_ogr_gpkg_20():
 
     ds.ExecuteSQL("DELETE FROM gpkg_spatial_ref_sys WHERE srs_id = 4326")
     ds = None
-    gdal.SetConfigOption("OGR_GPKG_FOREIGN_KEY_CHECK", "NO")
-    # Warning 1: unable to read srs_id '4326' from gpkg_spatial_ref_sys
-    with gdaltest.error_handler():
+    with gdal.config_option(
+        "OGR_GPKG_FOREIGN_KEY_CHECK", "NO"
+    ), gdaltest.error_handler():
+        # Warning 1: unable to read srs_id '4326' from gpkg_spatial_ref_sys
         ds = ogr.Open("/vsimem/ogr_gpkg_20.gpkg", update=1)
-    gdal.SetConfigOption("OGR_GPKG_FOREIGN_KEY_CHECK", None)
     ds = None
 
     gdal.Unlink("/vsimem/ogr_gpkg_20.gpkg")
@@ -1762,9 +1833,10 @@ def test_ogr_gpkg_20():
     )
     ds = None
 
-    gdal.SetConfigOption("OGR_GPKG_FOREIGN_KEY_CHECK", "NO")
     # Warning 1: null definition for srs_id '4326' in gpkg_spatial_ref_sys
-    with gdaltest.error_handler():
+    with gdal.config_option(
+        "OGR_GPKG_FOREIGN_KEY_CHECK", "NO"
+    ), gdaltest.error_handler():
         ds = ogr.Open("/vsimem/ogr_gpkg_20.gpkg", update=1)
     ds = None
 
@@ -2990,11 +3062,10 @@ def test_ogr_gpkg_32():
 
 def test_ogr_gpkg_33():
 
-    gdal.SetConfigOption("OGR_CURRENT_DATE", "2000-01-01T:00:00:00.000Z")
-    ds = gdaltest.gpkg_dr.CreateDataSource("/vsimem/ogr_gpkg_33.gpkg")
-    ds.CreateLayer("test", geom_type=ogr.wkbNone)
-    ds = None
-    gdal.SetConfigOption("OGR_CURRENT_DATE", None)
+    with gdal.config_option("OGR_CURRENT_DATE", "2000-01-01T:00:00:00.000Z"):
+        ds = gdaltest.gpkg_dr.CreateDataSource("/vsimem/ogr_gpkg_33.gpkg")
+        ds.CreateLayer("test", geom_type=ogr.wkbNone)
+        ds = None
 
     ds = ogr.Open("/vsimem/ogr_gpkg_33.gpkg")
     sql_lyr = ds.ExecuteSQL(
@@ -3999,11 +4070,10 @@ def test_ogr_gpkg_43():
 
 def test_ogr_gpkg_44():
 
-    gdal.SetConfigOption("CREATE_METADATA_TABLES", "NO")
-    ds = gdaltest.gpkg_dr.CreateDataSource("/vsimem/ogr_gpkg_44.gpkg")
-    ds.CreateLayer("foo")
-    ds = None
-    gdal.SetConfigOption("CREATE_METADATA_TABLES", None)
+    with gdal.config_option("CREATE_METADATA_TABLES", "NO"):
+        ds = gdaltest.gpkg_dr.CreateDataSource("/vsimem/ogr_gpkg_44.gpkg")
+        ds.CreateLayer("foo")
+        ds = None
 
     assert validate("/vsimem/ogr_gpkg_44.gpkg"), "validation failed"
 
@@ -4180,9 +4250,8 @@ def test_ogr_gpkg_47():
     assert gdal.GetLastErrorMsg() != ""
 
     gdal.ErrorReset()
-    gdal.SetConfigOption("GPKG_WARN_UNRECOGNIZED_APPLICATION_ID", "NO")
-    ogr.Open("/vsimem/ogr_gpkg_47.gpkg")
-    gdal.SetConfigOption("GPKG_WARN_UNRECOGNIZED_APPLICATION_ID", None)
+    with gdal.config_option("GPKG_WARN_UNRECOGNIZED_APPLICATION_ID", "NO"):
+        ogr.Open("/vsimem/ogr_gpkg_47.gpkg")
     assert gdal.GetLastErrorMsg() == ""
 
     gdaltest.gpkg_dr.CreateDataSource(
@@ -4202,9 +4271,8 @@ def test_ogr_gpkg_47():
     ds = None
 
     gdal.ErrorReset()
-    gdal.SetConfigOption("GPKG_WARN_UNRECOGNIZED_APPLICATION_ID", "NO")
-    ogr.Open("/vsimem/ogr_gpkg_47.gpkg")
-    gdal.SetConfigOption("GPKG_WARN_UNRECOGNIZED_APPLICATION_ID", None)
+    with gdal.config_option("GPKG_WARN_UNRECOGNIZED_APPLICATION_ID", "NO"):
+        ogr.Open("/vsimem/ogr_gpkg_47.gpkg")
     assert gdal.GetLastErrorMsg() == ""
 
     # Set GPKG 1.2.1
@@ -4226,9 +4294,8 @@ def test_ogr_gpkg_47():
     ds = None
 
     gdal.ErrorReset()
-    gdal.SetConfigOption("GPKG_WARN_UNRECOGNIZED_APPLICATION_ID", "NO")
-    ogr.Open("/vsimem/ogr_gpkg_47.gpkg")
-    gdal.SetConfigOption("GPKG_WARN_UNRECOGNIZED_APPLICATION_ID", None)
+    with gdal.config_option("GPKG_WARN_UNRECOGNIZED_APPLICATION_ID", "NO"):
+        ogr.Open("/vsimem/ogr_gpkg_47.gpkg")
     assert gdal.GetLastErrorMsg() == ""
 
     # Set GPKG 1.3.0
@@ -4248,9 +4315,8 @@ def test_ogr_gpkg_47():
     ds = None
 
     gdal.ErrorReset()
-    gdal.SetConfigOption("GPKG_WARN_UNRECOGNIZED_APPLICATION_ID", "NO")
-    ogr.Open("/vsimem/ogr_gpkg_47.gpkg")
-    gdal.SetConfigOption("GPKG_WARN_UNRECOGNIZED_APPLICATION_ID", None)
+    with gdal.config_option("GPKG_WARN_UNRECOGNIZED_APPLICATION_ID", "NO"):
+        ogr.Open("/vsimem/ogr_gpkg_47.gpkg")
     assert gdal.GetLastErrorMsg() == ""
 
     # Set GPKG 1.99.0
@@ -4270,9 +4336,8 @@ def test_ogr_gpkg_47():
     assert gdal.GetLastErrorMsg() != ""
 
     gdal.ErrorReset()
-    gdal.SetConfigOption("GPKG_WARN_UNRECOGNIZED_APPLICATION_ID", "NO")
-    ogr.Open("/vsimem/ogr_gpkg_47.gpkg")
-    gdal.SetConfigOption("GPKG_WARN_UNRECOGNIZED_APPLICATION_ID", None)
+    with gdal.config_option("GPKG_WARN_UNRECOGNIZED_APPLICATION_ID", "NO"):
+        ogr.Open("/vsimem/ogr_gpkg_47.gpkg")
     assert gdal.GetLastErrorMsg() == ""
 
     # Just for the sake of coverage testing in DEBUG mode
@@ -4398,9 +4463,8 @@ def test_ogr_gpkg_49():
 
 def test_ogr_gpkg_50():
 
-    gdal.SetConfigOption("GPKG_ADD_DEFINITION_12_063", "YES")
-    gdaltest.gpkg_dr.CreateDataSource("/vsimem/ogr_gpkg_50.gpkg")
-    gdal.SetConfigOption("GPKG_ADD_DEFINITION_12_063", None)
+    with gdal.config_option("GPKG_ADD_DEFINITION_12_063", "YES"):
+        gdaltest.gpkg_dr.CreateDataSource("/vsimem/ogr_gpkg_50.gpkg")
 
     ds = ogr.Open("/vsimem/ogr_gpkg_50.gpkg", update=1)
     srs32631 = osr.SpatialReference()
@@ -4709,34 +4773,97 @@ def test_ogr_gpkg_creation_fid():
 
 def test_ogr_gpkg_57():
 
-    if gdaltest.gpkg_dr.GetMetadataItem("ENABLE_SQL_GPKG_FORMAT") != "YES":
-        pytest.skip()
+    out_filename = "/vsimem/test_ogr_gpkg_57.gpkg"
+    ogr.GetDriverByName("GPKG").CreateDataSource(out_filename)
 
-    tmpfile = "/vsimem/tmp.gpkg.txt"
-    gdal.FileFromMemBuffer(
-        tmpfile,
-        """-- SQL GPKG
-CREATE TABLE gpkg_spatial_ref_sys (srs_name,srs_id,organization,organization_coordsys_id,definition,description);
-INSERT INTO "gpkg_spatial_ref_sys" VALUES('',0,'NONE',0,'undefined','');
-CREATE TABLE gpkg_contents (table_name,data_type,identifier,description,last_change,min_x, min_y,max_x, max_y,srs_id);
-INSERT INTO "gpkg_contents" VALUES('poly','features','poly','','',NULL,NULL,NULL,NULL,0);
-INSERT INTO "gpkg_contents" VALUES('poly','features','poly','','',NULL,NULL,NULL,NULL,0);
-CREATE TABLE gpkg_geometry_columns (table_name,column_name,geometry_type_name,srs_id,z,m);
-INSERT INTO "gpkg_geometry_columns" VALUES('poly','geom','POLYGON',0,0,0);
-CREATE TABLE "poly"("fid" INTEGER PRIMARY KEY, "geom" POLYGON);
-""",
+    ds = ogr.Open(out_filename, update=1)
+    ds.ExecuteSQL("DROP TABLE gpkg_contents")
+    ds.ExecuteSQL(
+        "CREATE TABLE gpkg_contents (table_name,data_type,identifier,description,last_change,min_x, min_y,max_x, max_y,srs_id)"
     )
+    ds.ExecuteSQL(
+        """INSERT INTO "gpkg_contents" VALUES('poly','features','poly','','',NULL,NULL,NULL,NULL,0)"""
+    )
+    ds.ExecuteSQL(
+        """INSERT INTO "gpkg_contents" VALUES('poly','features','poly','','',NULL,NULL,NULL,NULL,0)"""
+    )
+    ds.ExecuteSQL(
+        """INSERT INTO "gpkg_geometry_columns" VALUES('poly','geom','POLYGON',0,0,0)"""
+    )
+    ds.ExecuteSQL("""CREATE TABLE "poly"("fid" INTEGER PRIMARY KEY, "geom" POLYGON)""")
+    ds = None
 
     gdal.ErrorReset()
     with gdaltest.error_handler():
-        ds = ogr.Open(tmpfile)
+        ds = ogr.Open(out_filename)
     assert ds.GetLayerCount() == 1, "bad layer count"
-    assert (
-        gdal.GetLastErrorMsg().find("Table poly appearing several times") >= 0
-    ), "should NOT have warned"
+    assert gdal.GetLastErrorMsg() != ""
     ds = None
 
-    gdal.Unlink(tmpfile)
+    gdal.Unlink(out_filename)
+
+
+###############################################################################
+# Test opening a non-standard GeoPackage with multiple geometry columns
+
+
+def test_ogr_gpkg_multiple_geom_columns():
+
+    out_filename = "/vsimem/test_ogr_gpkg_multiple_geom_columns.gpkg"
+    ogr.GetDriverByName("GPKG").CreateDataSource(out_filename)
+
+    ds = ogr.Open(out_filename, update=1)
+    ds.ExecuteSQL("DROP TABLE gpkg_geometry_columns")
+    # Modified gpkg_geometry_columns definition with a UNIQUE constraint on both (table_name, column_name)
+    ds.ExecuteSQL(
+        """CREATE TABLE gpkg_geometry_columns (table_name TEXT NOT NULL,column_name TEXT NOT NULL,geometry_type_name TEXT NOT NULL,srs_id INTEGER NOT NULL,z TINYINT NOT NULL,m TINYINT NOT NULL,CONSTRAINT pk_geom_cols PRIMARY KEY (table_name, column_name),CONSTRAINT uk_gc_table_name_column_name UNIQUE (table_name, column_name),CONSTRAINT fk_gc_tn FOREIGN KEY (table_name) REFERENCES gpkg_contents(table_name),CONSTRAINT fk_gc_srs FOREIGN KEY (srs_id) REFERENCES gpkg_spatial_ref_sys (srs_id));"""
+    )
+    ds.ExecuteSQL(
+        """CREATE TABLE "test" ( "ogc_fid" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, "poly" POLYGON, "pt" POINT, "area" REAL, "eas_id" INTEGER, "prfedea" TEXT(16))"""
+    )
+    ds.ExecuteSQL(
+        "INSERT INTO test VALUES(1,X'4750000300000000000000401f401d41000000e05e511d4100000080322c5241000000001d2d52410103000000010000001b000000000000c01a481d4100000080072d5241000000e0814b1d41000000001d2d524100000040c44b1d41000000000f2d5241000000002c4c1d41000000a0002d524100000000774d1d41000000c0072d5241000000a0c44e1d4100000080112d52410000002008501d41000000c0172d5241000000e05e511d4100000020dd2c5241000000405e511d4100000040cf2c524100000000f0501d41000000c0ba2c52410000008084501d4100000020af2c524100000040a94f1d4100000000a42c524100000080744e1d41000000a09a2c524100000040014f1d41000000c0852c5241000000e0e04d1d4100000020872c524100000040f8441d41000000e0432c5241000000c012441d4100000080322c524100000000ff431d4100000020362c5241000000004b431d4100000080552c52410000000030431d41000000c05d2c5241000000c09b421d4100000000712c524100000080d6411d4100000080912c52410000008027411d4100000040b22c5241000000401f401d4100000040d62c5241000000a043441d4100000060f02c524100000060aa461d4100000080ff2c5241000000c01a481d4100000080072d5241',X'4750000100000000010100000000000000804b1d41000000001d2d5241',NULL,170,NULL);"
+    )
+    ds.ExecuteSQL(
+        "INSERT INTO gpkg_contents VALUES('test','features','test',NULL,'2023-04-21T13:53:59.009Z',478315.53124999999998,4762880.5,481645.3125,4765610.4999999999998,0);"
+    )
+    ds.ExecuteSQL(
+        "INSERT INTO gpkg_geometry_columns VALUES('test','poly','POLYGON',-1,0,0);"
+    )
+    ds.ExecuteSQL(
+        "INSERT INTO gpkg_geometry_columns VALUES('test','pt','POINT',4326,0,0);"
+    )
+    ds = None
+
+    gdal.ErrorReset()
+    with gdaltest.error_handler():
+        ds = ogr.Open(out_filename)
+    assert gdal.GetLastErrorMsg() != ""
+    assert ds.GetLayerCount() == 2
+
+    lyr = ds.GetLayerByName("test (poly)")
+    assert lyr.GetGeomType() == ogr.wkbPolygon
+    assert lyr.GetGeometryColumn() == "poly"
+    assert lyr.GetSpatialRef().GetName() == "Undefined Cartesian SRS"
+    assert lyr.GetLayerDefn().GetFieldCount() == 3
+    f = lyr.GetNextFeature()
+    assert f.GetFID() == 1
+    assert f["eas_id"] == 170
+    assert f.GetGeometryRef().ExportToWkt().startswith("POLYGON ((479750")
+
+    lyr = ds.GetLayerByName("test (pt)")
+    assert lyr.GetGeomType() == ogr.wkbPoint
+    assert lyr.GetGeometryColumn() == "pt"
+    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert lyr.GetLayerDefn().GetFieldCount() == 3
+    f = lyr.GetNextFeature()
+    assert f.GetFID() == 1
+    assert f["eas_id"] == 170
+    assert f.GetGeometryRef().ExportToWkt() == "POINT (479968 4764788)"
+
+    ds = None
+
+    gdal.Unlink(out_filename)
 
 
 ###############################################################################
@@ -7535,6 +7662,17 @@ def test_ogr_gpkg_arrow_stream_numpy():
         "datetime",
         "binary",
     }
+
+    # Check that OGR_GPKG_FillArrowArray_INTERNAL() function is no longer
+    # registered
+    with gdaltest.error_handler():
+        sql_lyr = ds.ExecuteSQL(
+            "SELECT 1 FROM pragma_function_list WHERE name=lower('OGR_GPKG_FillArrowArray_INTERNAL')"
+        )
+    if sql_lyr:
+        fc = sql_lyr.GetFeatureCount()
+        ds.ReleaseResultSet(sql_lyr)
+        assert fc == 0
 
     ds = None
 

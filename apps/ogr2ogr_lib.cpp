@@ -602,7 +602,7 @@ static std::unique_ptr<OGRGeometry> LoadGeometry(const std::string &osDS,
         if (poSrcGeom)
         {
             // Only take into account areal geometries.
-            if (poSrcGeom->getCoordinateDimension() == 2)
+            if (poSrcGeom->getDimension() == 2)
             {
                 if (!poSrcGeom->IsValid())
                 {
@@ -5783,7 +5783,8 @@ int LayerTranslator::Translate(OGRFeature *poFeatureIn, TargetLayerInfo *psInfo,
                     poDstFeature->GetFID() != nDesiredFID)
                 {
                     CPLError(CE_Warning, CPLE_AppDefined,
-                             "Feature id not preserved");
+                             "Feature id " CPL_FRMT_GIB " not preserved",
+                             nDesiredFID);
                 }
             }
             else if (!psOptions->bSkipFailures)

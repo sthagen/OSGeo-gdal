@@ -1086,17 +1086,13 @@ def test_netcdf_27():
 
     # test default config
     test = gdaltest.GDALTest("NETCDF", "netcdf/int16-nogeo.nc", 1, 4672)
-    config_bak = gdal.GetConfigOption("GDAL_NETCDF_BOTTOMUP")
-    gdal.SetConfigOption("GDAL_NETCDF_BOTTOMUP", None)
-    test.testOpen()
-    gdal.SetConfigOption("GDAL_NETCDF_BOTTOMUP", config_bak)
+    with gdal.config_option("GDAL_NETCDF_BOTTOMUP", None):
+        test.testOpen()
 
     # test GDAL_NETCDF_BOTTOMUP=NO
     test = gdaltest.GDALTest("NETCDF", "netcdf/int16-nogeo.nc", 1, 4855)
-    config_bak = gdal.GetConfigOption("GDAL_NETCDF_BOTTOMUP")
-    gdal.SetConfigOption("GDAL_NETCDF_BOTTOMUP", "NO")
-    test.testOpen()
-    gdal.SetConfigOption("GDAL_NETCDF_BOTTOMUP", config_bak)
+    with gdal.config_option("GDAL_NETCDF_BOTTOMUP", "NO"):
+        test.testOpen()
 
 
 ###############################################################################
@@ -1282,8 +1278,6 @@ def test_netcdf_32():
 
     ifile = "data/byte.tif"
     ofile = "tmp/netcdf_32.nc"
-
-    # gdal.SetConfigOption('CPL_DEBUG', 'ON')
 
     # test basic read/write
     netcdf_test_copy(ifile, 1, 4672, ofile, ["FORMAT=NC4"])
@@ -3047,18 +3041,17 @@ def test_netcdf_67():
         pytest.skip()
 
     # disable bottom-up mode to use the real file's blocks size
-    gdal.SetConfigOption("GDAL_NETCDF_BOTTOMUP", "NO")
-    # for the moment the next test using check_stat does not work, seems like
-    # the last pixel (9) of the image is not handled by stats...
-    #    tst = gdaltest.GDALTest( 'NetCDF', 'partial_block_ticket5950.nc', 1, 45 )
-    #    result = tst.testOpen( check_stat=(1, 9, 5, 2.582) )
-    # so for the moment compare the full image
-    ds = gdal.Open("data/netcdf/partial_block_ticket5950.nc", gdal.GA_ReadOnly)
-    ref = numpy.arange(1, 10).reshape((3, 3))
-    if not numpy.array_equal(ds.GetRasterBand(1).ReadAsArray(), ref):
-        pytest.fail()
-    ds = None
-    gdal.SetConfigOption("GDAL_NETCDF_BOTTOMUP", None)
+    with gdal.config_option("GDAL_NETCDF_BOTTOMUP", "NO"):
+        # for the moment the next test using check_stat does not work, seems like
+        # the last pixel (9) of the image is not handled by stats...
+        #    tst = gdaltest.GDALTest( 'NetCDF', 'partial_block_ticket5950.nc', 1, 45 )
+        #    result = tst.testOpen( check_stat=(1, 9, 5, 2.582) )
+        # so for the moment compare the full image
+        ds = gdal.Open("data/netcdf/partial_block_ticket5950.nc", gdal.GA_ReadOnly)
+        ref = numpy.arange(1, 10).reshape((3, 3))
+        if not numpy.array_equal(ds.GetRasterBand(1).ReadAsArray(), ref):
+            pytest.fail()
+        ds = None
 
 
 ###############################################################################
@@ -3307,7 +3300,7 @@ def test_netcdf_81():
 # Write netCDF file in rotated_pole projection
 
 
-@gdaltest.require_proj_version(7, 1)
+@pytest.mark.require_proj(7, 1)
 def test_netcdf_write_rotated_pole_from_method_proj():
 
     ds = gdal.GetDriverByName("netCDF").Create("tmp/rotated_pole.nc", 2, 2)
@@ -3340,7 +3333,7 @@ def test_netcdf_write_rotated_pole_from_method_proj():
 # Write netCDF file in rotated_pole projection
 
 
-@gdaltest.require_proj_version(8, 2)
+@pytest.mark.require_proj(8, 2)
 def test_netcdf_write_rotated_pole_from_method_netcdf_cf():
 
     expected_wkt = """GEOGCRS["Rotated_pole",BASEGEOGCRS["unknown",DATUM["unnamed",ELLIPSOID["Spheroid",6367470,594.313048347956,LENGTHUNIT["metre",1,ID["EPSG",9001]]]],PRIMEM["Greenwich",0,ANGLEUNIT["degree",0.0174532925199433,ID["EPSG",9122]]]],DERIVINGCONVERSION["Pole rotation (netCDF CF convention)",METHOD["Pole rotation (netCDF CF convention)"],PARAMETER["Grid north pole latitude (netCDF CF convention)",39.25,ANGLEUNIT["degree",0.0174532925199433,ID["EPSG",9122]]],PARAMETER["Grid north pole longitude (netCDF CF convention)",-162,ANGLEUNIT["degree",0.0174532925199433,ID["EPSG",9122]]],PARAMETER["North pole grid longitude (netCDF CF convention)",0,ANGLEUNIT["degree",0.0174532925199433,ID["EPSG",9122]]]],CS[ellipsoidal,2],AXIS["latitude",north,ORDER[1],ANGLEUNIT["degree",0.0174532925199433,ID["EPSG",9122]]],AXIS["longitude",east,ORDER[2],ANGLEUNIT["degree",0.0174532925199433,ID["EPSG",9122]]]]"""
@@ -3363,7 +3356,7 @@ def test_netcdf_write_rotated_pole_from_method_netcdf_cf():
 # Write netCDF file in rotated_pole projection
 
 
-@gdaltest.require_proj_version(7, 0)
+@pytest.mark.require_proj(7, 0)
 def test_netcdf_write_rotated_pole_from_method_grib():
 
     ds = gdal.GetDriverByName("netCDF").Create("tmp/rotated_pole.nc", 2, 2)

@@ -987,8 +987,7 @@ CPLErr GDALGeoPackageDataset::Close()
         if (GDALGeoPackageDataset::FlushCache(true) != CE_None)
             eErr = CE_Failure;
 
-        if (FlushMetadata() != CE_None)
-            eErr = CE_Failure;
+        FlushMetadata();
 
         if (eAccess == GA_Update || !m_bMetadataDirty)
         {
@@ -1670,13 +1669,13 @@ int GDALGeoPackageDataset::Open(GDALOpenInfo *poOpenInfo,
             m_papoLayers = static_cast<OGRGeoPackageTableLayer **>(CPLMalloc(
                 sizeof(OGRGeoPackageTableLayer *) * oResult->RowCount()));
 
-            std::set<CPLString> oSetTables;
+            std::map<std::string, int> oMapTableRefCount;
             for (int i = 0; i < oResult->RowCount(); i++)
             {
                 const char *pszTableName = oResult->GetValue(0, i);
                 if (pszTableName == nullptr)
                     continue;
-                if (oSetTables.find(pszTableName) != oSetTables.end())
+                if (++oMapTableRefCount[pszTableName] == 2)
                 {
                     // This should normally not happen if all constraints are
                     // properly set
@@ -1684,9 +1683,17 @@ int GDALGeoPackageDataset::Open(GDALOpenInfo *poOpenInfo,
                              "Table %s appearing several times in "
                              "gpkg_contents and/or gpkg_geometry_columns",
                              pszTableName);
-                    continue;
                 }
-                oSetTables.insert(pszTableName);
+            }
+
+            std::set<std::string> oExistingLayers;
+            for (int i = 0; i < oResult->RowCount(); i++)
+            {
+                const char *pszTableName = oResult->GetValue(0, i);
+                if (pszTableName == nullptr)
+                    continue;
+                const bool bTableHasSeveralGeomColumns =
+                    oMapTableRefCount[pszTableName] > 1;
                 bool bIsSpatial = CPL_TO_BOOL(oResult->GetValueAsInteger(2, i));
                 const char *pszGeomColName = oResult->GetValue(3, i);
                 const char *pszGeomType = oResult->GetValue(4, i);
@@ -1707,8 +1714,25 @@ int GDALGeoPackageDataset::Open(GDALOpenInfo *poOpenInfo,
                              pszTableName);
                     continue;
                 }
+                // Non-standard and undocumented behavior:
+                // if the same table appears to have several geometry columns,
+                // handle it for now as multiple layers named
+                // "table_name (geom_col_name)"
+                // The way we handle that might change in the future (e.g
+                // could be a single layer with multiple geometry columns)
+                const std::string osLayerNameWithGeomColName =
+                    pszGeomColName ? std::string(pszTableName) + " (" +
+                                         pszGeomColName + ')'
+                                   : std::string(pszTableName);
+                if (oExistingLayers.find(osLayerNameWithGeomColName) !=
+                    oExistingLayers.end())
+                    continue;
+                oExistingLayers.insert(osLayerNameWithGeomColName);
+                const std::string osLayerName = bTableHasSeveralGeomColumns
+                                                    ? osLayerNameWithGeomColName
+                                                    : std::string(pszTableName);
                 OGRGeoPackageTableLayer *poLayer =
-                    new OGRGeoPackageTableLayer(this, pszTableName);
+                    new OGRGeoPackageTableLayer(this, osLayerName.c_str());
                 bool bHasZ = pszZ && atoi(pszZ) > 0;
                 bool bHasM = pszM && atoi(pszM) > 0;
                 if (pszGeomType && EQUAL(pszGeomType, "GEOMETRY"))
@@ -1718,9 +1742,9 @@ int GDALGeoPackageDataset::Open(GDALOpenInfo *poOpenInfo,
                     if (pszM && atoi(pszM) == 2)
                         bHasM = false;
                 }
-                poLayer->SetOpeningParameters(pszObjectType, bIsInGpkgContents,
-                                              bIsSpatial, pszGeomColName,
-                                              pszGeomType, bHasZ, bHasM);
+                poLayer->SetOpeningParameters(
+                    pszTableName, pszObjectType, bIsInGpkgContents, bIsSpatial,
+                    pszGeomColName, pszGeomType, bHasZ, bHasM);
                 m_papoLayers[m_nLayers++] = poLayer;
             }
         }
@@ -4553,16 +4577,16 @@ bool GDALGeoPackageDataset::CreateMetadataTables()
 /*                            FlushMetadata()                           */
 /************************************************************************/
 
-CPLErr GDALGeoPackageDataset::FlushMetadata()
+void GDALGeoPackageDataset::FlushMetadata()
 {
     if (!m_bMetadataDirty || m_poParentDS != nullptr ||
         !CPLTestBool(CPLGetConfigOption("CREATE_METADATA_TABLES", "YES")))
-        return CE_None;
+        return;
     m_bMetadataDirty = false;
 
     if (eAccess == GA_ReadOnly)
     {
-        return CE_None;
+        return;
     }
 
     bool bCanWriteAreaOrPoint =
@@ -4831,8 +4855,6 @@ CPLErr GDALGeoPackageDataset::FlushMetadata()
 
         WriteMetadata(psXMLNode, m_papoLayers[i]->GetName());
     }
-
-    return CE_None;
 }
 
 /************************************************************************/
@@ -7524,16 +7546,16 @@ OGRErr GDALGeoPackageDataset::CreateExtensionsTableIfNecessary()
 
 static bool OGRGeoPackageGetHeader(sqlite3_context *pContext, int /*argc*/,
                                    sqlite3_value **argv, GPkgHeader *psHeader,
-                                   bool bNeedExtent)
+                                   bool bNeedExtent, int iGeomIdx = 0)
 {
-    if (sqlite3_value_type(argv[0]) != SQLITE_BLOB)
+    if (sqlite3_value_type(argv[iGeomIdx]) != SQLITE_BLOB)
     {
         sqlite3_result_null(pContext);
         return false;
     }
-    int nBLOBLen = sqlite3_value_bytes(argv[0]);
+    int nBLOBLen = sqlite3_value_bytes(argv[iGeomIdx]);
     const GByte *pabyBLOB =
-        reinterpret_cast<const GByte *>(sqlite3_value_blob(argv[0]));
+        reinterpret_cast<const GByte *>(sqlite3_value_blob(argv[iGeomIdx]));
 
     if (nBLOBLen < 8 ||
         GPkgHeaderFromWKB(pabyBLOB, nBLOBLen, psHeader) != OGRERR_NONE)
@@ -7689,6 +7711,79 @@ static void OGRGeoPackageSTGeometryType(sqlite3_context *pContext, int /*argc*/,
     else
         sqlite3_result_text(pContext, OGRToOGCGeomType(eGeometryType), -1,
                             SQLITE_TRANSIENT);
+}
+
+/************************************************************************/
+/*                 OGRGeoPackageSTEnvelopesIntersects()                 */
+/************************************************************************/
+
+static void OGRGeoPackageSTEnvelopesIntersects(sqlite3_context *pContext,
+                                               int argc, sqlite3_value **argv)
+{
+    GPkgHeader sHeader;
+    if (!OGRGeoPackageGetHeader(pContext, argc, argv, &sHeader, true))
+    {
+        sqlite3_result_int(pContext, FALSE);
+        return;
+    }
+    const double dfMinX = sqlite3_value_double(argv[1]);
+    if (sHeader.MaxX < dfMinX)
+    {
+        sqlite3_result_int(pContext, FALSE);
+        return;
+    }
+    const double dfMinY = sqlite3_value_double(argv[2]);
+    if (sHeader.MaxY < dfMinY)
+    {
+        sqlite3_result_int(pContext, FALSE);
+        return;
+    }
+    const double dfMaxX = sqlite3_value_double(argv[3]);
+    if (sHeader.MinX > dfMaxX)
+    {
+        sqlite3_result_int(pContext, FALSE);
+        return;
+    }
+    const double dfMaxY = sqlite3_value_double(argv[4]);
+    sqlite3_result_int(pContext, sHeader.MinY <= dfMaxY);
+}
+
+/************************************************************************/
+/*              OGRGeoPackageSTEnvelopesIntersectsTwoParams()           */
+/************************************************************************/
+
+static void
+OGRGeoPackageSTEnvelopesIntersectsTwoParams(sqlite3_context *pContext, int argc,
+                                            sqlite3_value **argv)
+{
+    GPkgHeader sHeader;
+    if (!OGRGeoPackageGetHeader(pContext, argc, argv, &sHeader, true, 0))
+    {
+        sqlite3_result_int(pContext, FALSE);
+        return;
+    }
+    GPkgHeader sHeader2;
+    if (!OGRGeoPackageGetHeader(pContext, argc, argv, &sHeader2, true, 1))
+    {
+        sqlite3_result_int(pContext, FALSE);
+        return;
+    }
+    if (sHeader.MaxX < sHeader2.MinX)
+    {
+        sqlite3_result_int(pContext, FALSE);
+        return;
+    }
+    if (sHeader.MaxY < sHeader2.MinY)
+    {
+        sqlite3_result_int(pContext, FALSE);
+        return;
+    }
+    if (sHeader.MinX > sHeader2.MaxX)
+    {
+        sqlite3_result_int(pContext, FALSE);
+        return;
+    }
+    sqlite3_result_int(pContext, sHeader.MinY <= sHeader2.MaxY);
 }
 
 /************************************************************************/
@@ -8792,6 +8887,20 @@ void GDALGeoPackageDataset::InstallSQLFunctions()
                             OGRGeoPackageTransform, nullptr, nullptr);
     sqlite3_create_function(hDB, "SridFromAuthCRS", 2, SQLITE_UTF8, this,
                             OGRGeoPackageSridFromAuthCRS, nullptr, nullptr);
+
+    sqlite3_create_function(
+        hDB, "ST_EnvIntersects", 2, SQLITE_UTF8 | SQLITE_DETERMINISTIC, nullptr,
+        OGRGeoPackageSTEnvelopesIntersectsTwoParams, nullptr, nullptr);
+    sqlite3_create_function(
+        hDB, "ST_EnvelopesIntersects", 2, SQLITE_UTF8 | SQLITE_DETERMINISTIC,
+        nullptr, OGRGeoPackageSTEnvelopesIntersectsTwoParams, nullptr, nullptr);
+
+    sqlite3_create_function(
+        hDB, "ST_EnvIntersects", 5, SQLITE_UTF8 | SQLITE_DETERMINISTIC, nullptr,
+        OGRGeoPackageSTEnvelopesIntersects, nullptr, nullptr);
+    sqlite3_create_function(
+        hDB, "ST_EnvelopesIntersects", 5, SQLITE_UTF8 | SQLITE_DETERMINISTIC,
+        nullptr, OGRGeoPackageSTEnvelopesIntersects, nullptr, nullptr);
 
     // Implementation that directly hacks the GeoPackage geometry blob header
     sqlite3_create_function(hDB, "SetSRID", 2,

@@ -153,7 +153,7 @@ def test_ogr_pgdump_2():
         ######################################################
         # Create Layer
         lyr = ds.CreateLayer(
-            'tp"oly',
+            'xx"yyy',
             geom_type=ogr.wkbPolygon,
             options=['SCHEMA=ano"ther_schema', "SRID=4326", 'GEOMETRY_NAME=the_"geom'],
         )
@@ -203,29 +203,29 @@ def test_ogr_pgdump_2():
         sql = sql[sql.find(needle) + len(needle) :]
 
     check_and_remove("""CREATE SCHEMA "ano""ther_schema";""")
-    check_and_remove("""DROP TABLE IF EXISTS "ano""ther_schema"."tp""oly" CASCADE;""")
+    check_and_remove("""DROP TABLE IF EXISTS "ano""ther_schema"."xx""yyy" CASCADE;""")
     check_and_remove("""BEGIN;""")
-    check_and_remove("""CREATE TABLE "ano""ther_schema"."tp""oly"();""")
+    check_and_remove("""CREATE TABLE "ano""ther_schema"."xx""yyy"();""")
     check_and_remove(
-        """ALTER TABLE "ano""ther_schema"."tp""oly" ADD COLUMN "ogc_fid" SERIAL CONSTRAINT "tp""oly_pk" PRIMARY KEY;"""
+        """ALTER TABLE "ano""ther_schema"."xx""yyy" ADD COLUMN "ogc_fid" SERIAL CONSTRAINT "xx""yyy_pk" PRIMARY KEY;"""
     )
     check_and_remove(
-        """SELECT AddGeometryColumn('ano"ther_schema','tp"oly','the_"geom',4326,'POLYGON',2);"""
+        """SELECT AddGeometryColumn('ano"ther_schema','xx"yyy','the_"geom',4326,'POLYGON',2);"""
     )
     check_and_remove(
-        """ALTER TABLE "ano""ther_schema"."tp""oly" ADD COLUMN "area" FLOAT8;"""
+        """ALTER TABLE "ano""ther_schema"."xx""yyy" ADD COLUMN "area" FLOAT8;"""
     )
     check_and_remove(
-        """ALTER TABLE "ano""ther_schema"."tp""oly" ADD COLUMN "eas_id" INTEGER;"""
+        """ALTER TABLE "ano""ther_schema"."xx""yyy" ADD COLUMN "eas_id" INTEGER;"""
     )
     check_and_remove(
-        """ALTER TABLE "ano""ther_schema"."tp""oly" ADD COLUMN "prfedea" VARCHAR;"""
+        """ALTER TABLE "ano""ther_schema"."xx""yyy" ADD COLUMN "prfedea" VARCHAR;"""
     )
     check_and_remove(
-        """ALTER TABLE "ano""ther_schema"."tp""oly" ADD COLUMN "shortname" VARCHAR(8);"""
+        """ALTER TABLE "ano""ther_schema"."xx""yyy" ADD COLUMN "shortname" VARCHAR(8);"""
     )
     check_and_remove(
-        """COPY "ano""ther_schema"."tp""oly" ("the_""geom", "area", "eas_id", "prfedea", "shortname") FROM STDIN;"""
+        """COPY "ano""ther_schema"."xx""yyy" ("the_""geom", "area", "eas_id", "prfedea", "shortname") FROM STDIN;"""
     )
     check_and_remove(
         """0103000020E61000000100000014000000000000602F491D41000000207F2D5241000000C028471D41000000E0922D5241000000007C461D4100000060AE2D524100000080C9471D4100000020B62D5241000000209C4C1D41000000E0D82D5241000000608D4C1D41000000A0DD2D5241000000207F4E1D41000000A0EA2D524100000020294F1D4100000080CA2D524100000000B4511D41000000E0552D5241000000C016521D4100000080452D5241000000E0174E1D41000000202E2D524100000020414D1D41000000E04C2D5241000000E04B4D1D41000000605E2D524100000040634D1D41000000E0742D5241000000A0EF4C1D41000000E08D2D5241000000E04E4C1D41000000E0A12D5241000000E0B04B1D4100000060B82D524100000080974A1D4100000080AE2D524100000080CF491D4100000080952D5241000000602F491D41000000207F2D5241\t215229.266\t168\t35043411\t\\N"""
@@ -234,7 +234,7 @@ def test_ogr_pgdump_2():
     # Check that there's no semi-column after above command
     assert sql.startswith("\n") or sql.startswith("\r\n")
     check_and_remove(
-        """CREATE INDEX "tp""oly_the_""geom_geom_idx" ON "ano""ther_schema"."tp""oly" USING GIST ("the_""geom");"""
+        """CREATE INDEX "xx""yyy_the_""geom_geom_idx" ON "ano""ther_schema"."xx""yyy" USING GIST ("the_""geom");"""
     )
     check_and_remove("""COMMIT;""")
 
@@ -547,37 +547,35 @@ def test_ogr_pgdump_6():
     field_defn.SetDefault("CURRENT_TIME")
     lyr.CreateField(field_defn)
 
-    gdal.SetConfigOption("PG_USE_COPY", "YES")
+    with gdal.config_option("PG_USE_COPY", "YES"):
 
-    f = ogr.Feature(lyr.GetLayerDefn())
-    f.SetField("field_string", "a")
-    f.SetField("field_int", 456)
-    f.SetField("field_real", 4.56)
-    f.SetField("field_datetime", "2015/06/30 12:34:56")
-    f.SetField("field_datetime2", "2015/06/30 12:34:56")
-    f.SetField("field_date", "2015/06/30")
-    f.SetField("field_time", "12:34:56")
-    lyr.CreateFeature(f)
-    f = None
+        f = ogr.Feature(lyr.GetLayerDefn())
+        f.SetField("field_string", "a")
+        f.SetField("field_int", 456)
+        f.SetField("field_real", 4.56)
+        f.SetField("field_datetime", "2015/06/30 12:34:56")
+        f.SetField("field_datetime2", "2015/06/30 12:34:56")
+        f.SetField("field_date", "2015/06/30")
+        f.SetField("field_time", "12:34:56")
+        lyr.CreateFeature(f)
+        f = None
 
-    # Transition from COPY to INSERT
-    f = ogr.Feature(lyr.GetLayerDefn())
-    lyr.CreateFeature(f)
-    f = None
+        # Transition from COPY to INSERT
+        f = ogr.Feature(lyr.GetLayerDefn())
+        lyr.CreateFeature(f)
+        f = None
 
-    # Transition from INSERT to COPY
-    f = ogr.Feature(lyr.GetLayerDefn())
-    f.SetField("field_string", "b")
-    f.SetField("field_int", 456)
-    f.SetField("field_real", 4.56)
-    f.SetField("field_datetime", "2015/06/30 12:34:56")
-    f.SetField("field_datetime2", "2015/06/30 12:34:56")
-    f.SetField("field_date", "2015/06/30")
-    f.SetField("field_time", "12:34:56")
-    lyr.CreateFeature(f)
-    f = None
-
-    gdal.SetConfigOption("PG_USE_COPY", None)
+        # Transition from INSERT to COPY
+        f = ogr.Feature(lyr.GetLayerDefn())
+        f.SetField("field_string", "b")
+        f.SetField("field_int", 456)
+        f.SetField("field_real", 4.56)
+        f.SetField("field_datetime", "2015/06/30 12:34:56")
+        f.SetField("field_datetime2", "2015/06/30 12:34:56")
+        f.SetField("field_date", "2015/06/30")
+        f.SetField("field_time", "12:34:56")
+        lyr.CreateFeature(f)
+        f = None
 
     ds = None
 
@@ -756,17 +754,15 @@ def test_ogr_pgdump_8():
     feat.SetField("str", "first string")
     feat.SetField("myfid", 10)
     feat.SetField("str2", "second string")
-    gdal.SetConfigOption("PG_USE_COPY", "YES")
-    ret = lyr.CreateFeature(feat)
-    gdal.SetConfigOption("PG_USE_COPY", None)
+    with gdal.config_option("PG_USE_COPY", "YES"):
+        ret = lyr.CreateFeature(feat)
     assert ret == 0
     assert feat.GetFID() == 10
 
     feat = ogr.Feature(lyr.GetLayerDefn())
     feat.SetField("str2", "second string")
-    gdal.SetConfigOption("PG_USE_COPY", "YES")
-    ret = lyr.CreateFeature(feat)
-    gdal.SetConfigOption("PG_USE_COPY", None)
+    with gdal.config_option("PG_USE_COPY", "YES"):
+        ret = lyr.CreateFeature(feat)
     assert ret == 0
     if feat.GetFID() < 0:
         feat.DumpReadable()
@@ -784,10 +780,8 @@ def test_ogr_pgdump_8():
     feat = ogr.Feature(lyr.GetLayerDefn())
     feat.SetFID(1)
     feat.SetField("myfid", 10)
-    with gdaltest.error_handler():
-        gdal.SetConfigOption("PG_USE_COPY", "YES")
+    with gdaltest.error_handler(), gdal.config_option("PG_USE_COPY", "YES"):
         ret = lyr.CreateFeature(feat)
-        gdal.SetConfigOption("PG_USE_COPY", None)
     assert ret != 0
 
     # gdal.PushErrorHandler()
@@ -809,9 +803,8 @@ def test_ogr_pgdump_8():
     feat.SetField("str", "first string")
     feat.SetField("myfid", 12)
     feat.SetField("str2", "second string")
-    gdal.SetConfigOption("PG_USE_COPY", "YES")
-    ret = lyr.CreateFeature(feat)
-    gdal.SetConfigOption("PG_USE_COPY", None)
+    with gdal.config_option("PG_USE_COPY", "YES"):
+        ret = lyr.CreateFeature(feat)
     assert ret == 0
     assert feat.GetFID() == 12
 
@@ -1248,11 +1241,10 @@ def test_ogr_pgdump_15():
 # Test sequence updating
 
 
-def test_ogr_pgdump_16():
+@pytest.mark.parametrize("pg_use_copy", ["YES", "NO"])
+def test_ogr_pgdump_16(pg_use_copy):
 
-    for pg_use_copy in ("YES", "NO"):
-
-        gdal.SetConfigOption("PG_USE_COPY", pg_use_copy)
+    with gdal.config_option("PG_USE_COPY", pg_use_copy):
         ds = ogr.GetDriverByName("PGDump").CreateDataSource(
             "/vsimem/ogr_pgdump_16.sql", options=["LINEFORMAT=LF"]
         )
@@ -1274,8 +1266,6 @@ def test_ogr_pgdump_16():
             """SELECT setval(pg_get_serial_sequence('"public"."test"', 'ogc_fid'), MAX("ogc_fid")) FROM "public"."test";"""
             in sql
         )
-
-    gdal.SetConfigOption("PG_USE_COPY", None)
 
 
 ###############################################################################
@@ -1543,6 +1533,50 @@ def test_ogr_pgdump_CREATE_TABLE_NO():
         """INSERT INTO "public"."test" ("str", "wkb_geometry") VALUES ('foo', '01010000000000000000000000000000000000F03F');"""
     )
     check_and_remove("""COMMIT;""")
+
+
+###############################################################################
+# Test long identifiers
+
+
+def test_ogr_pgdump_long_identifiers():
+
+    ds = ogr.GetDriverByName("PGDump").CreateDataSource(
+        "/vsimem/test_ogr_pgdump_long_identifiers.sql", options=["LINEFORMAT=LF"]
+    )
+
+    long_name = "test_" + ("X" * 64) + "_long_name"
+    short_name = "test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+    with gdaltest.error_handler():
+        lyr = ds.CreateLayer(long_name, geom_type=ogr.wkbPoint)
+    lyr.CreateField(ogr.FieldDefn("str", ogr.OFTString))
+    f = ogr.Feature(lyr.GetLayerDefn())
+    f["str"] = "foo"
+    f.SetGeometry(ogr.CreateGeometryFromWkt("POINT(0 1)"))
+    lyr.CreateFeature(f)
+    ds = None
+
+    f = gdal.VSIFOpenL("/vsimem/test_ogr_pgdump_long_identifiers.sql", "rb")
+    sql = gdal.VSIFReadL(1, 10000, f).decode("utf8")
+    gdal.VSIFCloseL(f)
+
+    gdal.Unlink("/vsimem/test_ogr_pgdump_long_identifiers.sql")
+
+    # print(sql)
+
+    def check_and_remove(needle):
+        nonlocal sql
+        assert needle in sql, sql
+        sql = sql[sql.find(needle) + len(needle) :]
+
+    check_and_remove(f"""CREATE TABLE "public"."{short_name}"();""")
+    check_and_remove(
+        f"""ALTER TABLE "public"."{short_name}" ADD COLUMN "ogc_fid" SERIAL CONSTRAINT "test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_pk" PRIMARY KEY;"""
+    )
+    check_and_remove(
+        f"""CREATE INDEX "test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_wkb_geometry_geom_idx" ON "public"."{short_name}" USING GIST ("wkb_geometry");"""
+    )
 
 
 ###############################################################################

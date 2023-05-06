@@ -821,7 +821,7 @@ def test_ogr2ogr_assign_coord_epoch():
 # Test -s_coord_epoch
 
 
-@gdaltest.require_proj_version(7, 2)
+@pytest.mark.require_proj(7, 2)
 def test_ogr2ogr_s_coord_epoch():
 
     src_ds = gdal.GetDriverByName("Memory").Create("", 0, 0, 0, gdal.GDT_Unknown)
@@ -847,7 +847,7 @@ def test_ogr2ogr_s_coord_epoch():
 # Test -t_coord_epoch
 
 
-@gdaltest.require_proj_version(7, 2)
+@pytest.mark.require_proj(7, 2)
 def test_ogr2ogr_t_coord_epoch():
 
     src_ds = gdal.GetDriverByName("Memory").Create("", 0, 0, 0, gdal.GDT_Unknown)
@@ -1208,6 +1208,51 @@ def test_ogr2ogr_lib_clipsrc_invalid_polygon():
 
     # Cleanup
     gdal.Unlink(clip_path)
+
+
+###############################################################################
+# Test -clipsrc with 3d clip layer
+
+
+@pytest.mark.require_driver("GPKG")
+@pytest.mark.require_geos(3, 8)
+def test_ogr2ogr_lib_clipsrc_3d_polygon():
+
+    srcDS = gdal.GetDriverByName("Memory").Create("", 0, 0, 0, gdal.GDT_Unknown)
+    srs = osr.SpatialReference()
+    srs.ImportFromEPSG(4326)
+    srcLayer = srcDS.CreateLayer("test", srs=srs, geom_type=ogr.wkbLineString)
+    f = ogr.Feature(srcLayer.GetLayerDefn())
+    f.SetGeometry(ogr.CreateGeometryFromWkt("LINESTRING (0 0, 10 10)"))
+    srcLayer.CreateFeature(f)
+    f = ogr.Feature(srcLayer.GetLayerDefn())
+    f.SetGeometry(ogr.CreateGeometryFromWkt("LINESTRING (0 10, 10 0)"))
+    srcLayer.CreateFeature(f)
+
+    # Prepare the data layers to clip with
+    clip_path = "/vsimem/clip_test.gpkg"
+    clip_ds = gdal.GetDriverByName("GPKG").Create(clip_path, 0, 0, 0, gdal.GDT_Unknown)
+    clip_layer = clip_ds.CreateLayer("cliptest", geom_type=ogr.wkbPolygon)
+    f = ogr.Feature(clip_layer.GetLayerDefn())
+    # 3d polygon
+    f.SetGeometry(
+        ogr.CreateGeometryFromWkt("POLYGON Z ((0 0 0, 10 0 10, 10 5 10, 0 5 0, 0 0 0))")
+    )
+    clip_layer.CreateFeature(f)
+    clip_ds = None
+
+    with gdaltest.error_handler():
+        ds = gdal.VectorTranslate("", srcDS, format="Memory", clipSrc=clip_path)
+    lyr = ds.GetLayer(0)
+    assert lyr.GetFeatureCount() == 2
+
+    feat = lyr.GetNextFeature()
+    assert ogrtest.check_feature_geometry(feat, "LINESTRING Z (0 0 0, 5 5 5)") == 0
+
+    feat = lyr.GetNextFeature()
+    assert ogrtest.check_feature_geometry(feat, "LINESTRING Z (5 5 5, 10 0 10)") == 0
+
+    ds = None
 
 
 ###############################################################################
