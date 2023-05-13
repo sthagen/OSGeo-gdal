@@ -193,6 +193,11 @@ public:
     return GDALGroupCreateGroup(self, name, options);
   }
 
+  CPLErr DeleteGroup( const char *name,
+                            char **options = 0 ) {
+    return GDALGroupDeleteGroup(self, name, options) ? CE_None : CE_Failure;
+  }
+
 %newobject CreateDimension;
   GDALDimensionHS *CreateDimension( const char *name,
                                     const char* type,
@@ -218,6 +223,11 @@ public:
 %clear (int nDimensions, GDALDimensionHS **dimensions);
 #endif
 
+  CPLErr DeleteMDArray( const char *name,
+                            char **options = 0 ) {
+    return GDALGroupDeleteMDArray(self, name, options) ? CE_None : CE_Failure;
+  }
+
 %newobject CreateAttribute;
 %apply (int nList, GUIntBig* pList) {(int nDimensions, GUIntBig *dimensions)};
   GDALAttributeHS *CreateAttribute( const char *name,
@@ -229,6 +239,15 @@ public:
     return GDALGroupCreateAttribute(self, name, nDimensions,
                                     (const GUInt64*)dimensions,
                                     data_type, options);
+  }
+
+  CPLErr DeleteAttribute( const char *name,
+                            char **options = 0 ) {
+    return GDALGroupDeleteAttribute(self, name, options) ? CE_None : CE_Failure;
+  }
+
+  CPLErr Rename( const char* newName ) {
+    return GDALGroupRename( self, newName ) ? CE_None : CE_Failure;
   }
 
 } /* extend */
@@ -847,6 +866,11 @@ public:
                                     data_type, options);
   }
 
+  CPLErr DeleteAttribute( const char *name,
+                            char **options = 0 ) {
+    return GDALMDArrayDeleteAttribute(self, name, options) ? CE_None : CE_Failure;
+  }
+
 #if defined(SWIGPYTHON)
 %apply ( void **outPythonObject ) { (void **buf ) };
   CPLErr GetNoDataValueAsRaw( void **buf) {
@@ -1130,6 +1154,10 @@ public:
       return GDALMDArrayCache(self, options);
   }
 
+  CPLErr Rename( const char* newName ) {
+    return GDALMDArrayRename( self, newName ) ? CE_None : CE_Failure;
+  }
+
 } /* extend */
 }; /* GDALMDArrayH */
 
@@ -1300,6 +1328,10 @@ public:
   }
 #endif
 
+  CPLErr Rename( const char* newName ) {
+    return GDALAttributeRename( self, newName ) ? CE_None : CE_Failure;
+  }
+
 } /* extend */
 }; /* GDALAttributeH */
 
@@ -1354,6 +1386,10 @@ public:
 
   bool SetIndexingVariable(GDALMDArrayHS* array) {
     return GDALDimensionSetIndexingVariable(self, array);
+  }
+
+  CPLErr Rename( const char* newName ) {
+    return GDALDimensionRename( self, newName ) ? CE_None : CE_Failure;
   }
 
 } /* extend */

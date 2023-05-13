@@ -2120,6 +2120,8 @@ CSLConstList CPL_DLL GDALGroupGetStructuralInfo(GDALGroupH hGroup);
 GDALGroupH CPL_DLL
 GDALGroupCreateGroup(GDALGroupH hGroup, const char *pszSubGroupName,
                      CSLConstList papszOptions) CPL_WARN_UNUSED_RESULT;
+bool CPL_DLL GDALGroupDeleteGroup(GDALGroupH hGroup, const char *pszName,
+                                  CSLConstList papszOptions);
 GDALDimensionH CPL_DLL GDALGroupCreateDimension(
     GDALGroupH hGroup, const char *pszName, const char *pszType,
     const char *pszDirection, GUInt64 nSize,
@@ -2128,10 +2130,15 @@ GDALMDArrayH CPL_DLL GDALGroupCreateMDArray(
     GDALGroupH hGroup, const char *pszName, size_t nDimensions,
     GDALDimensionH *pahDimensions, GDALExtendedDataTypeH hEDT,
     CSLConstList papszOptions) CPL_WARN_UNUSED_RESULT;
+bool CPL_DLL GDALGroupDeleteMDArray(GDALGroupH hGroup, const char *pszName,
+                                    CSLConstList papszOptions);
 GDALAttributeH CPL_DLL GDALGroupCreateAttribute(
     GDALGroupH hGroup, const char *pszName, size_t nDimensions,
     const GUInt64 *panDimensions, GDALExtendedDataTypeH hEDT,
     CSLConstList papszOptions) CPL_WARN_UNUSED_RESULT;
+bool CPL_DLL GDALGroupDeleteAttribute(GDALGroupH hGroup, const char *pszName,
+                                      CSLConstList papszOptions);
+bool CPL_DLL GDALGroupRename(GDALGroupH hGroup, const char *pszNewName);
 
 void CPL_DLL GDALMDArrayRelease(GDALMDArrayH hMDArray);
 const char CPL_DLL *GDALMDArrayGetName(GDALMDArrayH hArray);
@@ -2172,6 +2179,9 @@ GDALAttributeH CPL_DLL GDALMDArrayCreateAttribute(
     GDALMDArrayH hArray, const char *pszName, size_t nDimensions,
     const GUInt64 *panDimensions, GDALExtendedDataTypeH hEDT,
     CSLConstList papszOptions) CPL_WARN_UNUSED_RESULT;
+bool CPL_DLL GDALMDArrayDeleteAttribute(GDALMDArrayH hArray,
+                                        const char *pszName,
+                                        CSLConstList papszOptions);
 bool CPL_DLL GDALMDArrayResize(GDALMDArrayH hArray,
                                const GUInt64 *panNewDimSizes,
                                CSLConstList papszOptions);
@@ -2245,6 +2255,7 @@ GDALMDArrayGetCoordinateVariables(GDALMDArrayH hArray,
                                   size_t *pnCount) CPL_WARN_UNUSED_RESULT;
 void CPL_DLL GDALReleaseArrays(GDALMDArrayH *arrays, size_t nCount);
 int CPL_DLL GDALMDArrayCache(GDALMDArrayH hArray, CSLConstList papszOptions);
+bool CPL_DLL GDALMDArrayRename(GDALMDArrayH hArray, const char *pszNewName);
 
 void CPL_DLL GDALAttributeRelease(GDALAttributeH hAttr);
 void CPL_DLL GDALReleaseAttributes(GDALAttributeH *attributes, size_t nCount);
@@ -2278,6 +2289,7 @@ int CPL_DLL GDALAttributeWriteInt(GDALAttributeH hAttr, int);
 int CPL_DLL GDALAttributeWriteDouble(GDALAttributeH hAttr, double);
 int CPL_DLL GDALAttributeWriteDoubleArray(GDALAttributeH hAttr, const double *,
                                           size_t);
+bool CPL_DLL GDALAttributeRename(GDALAttributeH hAttr, const char *pszNewName);
 
 void CPL_DLL GDALDimensionRelease(GDALDimensionH hDim);
 void CPL_DLL GDALReleaseDimensions(GDALDimensionH *dims, size_t nCount);
@@ -2290,6 +2302,7 @@ GDALMDArrayH CPL_DLL GDALDimensionGetIndexingVariable(GDALDimensionH hDim)
     CPL_WARN_UNUSED_RESULT;
 int CPL_DLL GDALDimensionSetIndexingVariable(GDALDimensionH hDim,
                                              GDALMDArrayH hArray);
+bool CPL_DLL GDALDimensionRename(GDALDimensionH hDim, const char *pszNewName);
 
 CPL_C_END
 

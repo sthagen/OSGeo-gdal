@@ -26,6 +26,10 @@ for f in $FILES; do
 	# echo "Checking $f"
 	case "$f" in
 
+	*alg/internal_libqhull/*)
+	  continue
+	  ;;
+
 	*frmts/zlib/contrib/infback9/*)
 	  continue
 	  ;;
@@ -39,6 +43,10 @@ for f in $FILES; do
 	  ;;
 
 	*frmts/jpeg/libjpeg/*)
+	  continue
+	  ;;
+
+	*ogr/ogrsf_frmts/geojson/libjson*)
 	  continue
 	  ;;
 

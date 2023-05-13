@@ -311,6 +311,37 @@ std::shared_ptr<GDALAttribute> GDALIHasAttribute::CreateAttribute(
 }
 
 /************************************************************************/
+/*                          DeleteAttribute()                           */
+/************************************************************************/
+
+/** Delete an attribute from a GDALMDArray or GDALGroup.
+ *
+ * Optionally implemented.
+ *
+ * After this call, if a previously obtained instance of the deleted object
+ * is still alive, no method other than for freeing it should be invoked.
+ *
+ * Drivers known to implement it: MEM, netCDF
+ *
+ * This is the same as the C function GDALGroupDeleteAttribute() or
+ * GDALMDArrayDeleteAttribute()
+ *
+ * @param osName Attribute name.
+ * @param papszOptions Driver specific options determining how the attribute.
+ * should be deleted.
+ *
+ * @return true in case of success
+ * @since GDAL 3.8
+ */
+bool GDALIHasAttribute::DeleteAttribute(CPL_UNUSED const std::string &osName,
+                                        CPL_UNUSED CSLConstList papszOptions)
+{
+    CPLError(CE_Failure, CPLE_NotSupported,
+             "DeleteAttribute() not implemented");
+    return false;
+}
+
+/************************************************************************/
 /*                            GDALGroup()                               */
 /************************************************************************/
 
@@ -560,6 +591,35 @@ GDALGroup::CreateGroup(CPL_UNUSED const std::string &osName,
 }
 
 /************************************************************************/
+/*                          DeleteGroup()                               */
+/************************************************************************/
+
+/** Delete a sub-group from a group.
+ *
+ * Optionally implemented.
+ *
+ * After this call, if a previously obtained instance of the deleted object
+ * is still alive, no method other than for freeing it should be invoked.
+ *
+ * Drivers known to implement it: MEM, Zarr
+ *
+ * This is the same as the C function GDALGroupDeleteGroup().
+ *
+ * @param osName Sub-group name.
+ * @param papszOptions Driver specific options determining how the group.
+ * should be deleted.
+ *
+ * @return true in case of success
+ * @since GDAL 3.8
+ */
+bool GDALGroup::DeleteGroup(CPL_UNUSED const std::string &osName,
+                            CPL_UNUSED CSLConstList papszOptions)
+{
+    CPLError(CE_Failure, CPLE_NotSupported, "DeleteGroup() not implemented");
+    return false;
+}
+
+/************************************************************************/
 /*                            CreateDimension()                         */
 /************************************************************************/
 
@@ -632,6 +692,35 @@ std::shared_ptr<GDALMDArray> GDALGroup::CreateMDArray(
 {
     CPLError(CE_Failure, CPLE_NotSupported, "CreateMDArray() not implemented");
     return nullptr;
+}
+
+/************************************************************************/
+/*                          DeleteMDArray()                             */
+/************************************************************************/
+
+/** Delete an array from a group.
+ *
+ * Optionally implemented.
+ *
+ * After this call, if a previously obtained instance of the deleted object
+ * is still alive, no method other than for freeing it should be invoked.
+ *
+ * Drivers known to implement it: MEM, Zarr
+ *
+ * This is the same as the C function GDALGroupDeleteMDArray().
+ *
+ * @param osName Arrayname.
+ * @param papszOptions Driver specific options determining how the array.
+ * should be deleted.
+ *
+ * @return true in case of success
+ * @since GDAL 3.8
+ */
+bool GDALGroup::DeleteMDArray(CPL_UNUSED const std::string &osName,
+                              CPL_UNUSED CSLConstList papszOptions)
+{
+    CPLError(CE_Failure, CPLE_NotSupported, "DeleteMDArray() not implemented");
+    return false;
 }
 
 /************************************************************************/
@@ -763,12 +852,12 @@ bool GDALGroup::CopyFrom(const std::shared_ptr<GDALGroup> &poDstRootGroup,
                 return false;
         }
 
-        auto arrayNames = poSrcGroup->GetMDArrayNames();
-        for (const auto &name : arrayNames)
+        const auto CopyArray =
+            [this, &poSrcDS, &poDstRootGroup, &mapExistingDstDims,
+             &mapSrcVariableNameToIndexedDimName, pfnProgress, pProgressData,
+             papszOptions, bStrict, &nCurCost,
+             nTotalCost](const std::shared_ptr<GDALMDArray> &srcArray)
         {
-            auto srcArray = poSrcGroup->OpenMDArray(name);
-            EXIT_OR_CONTINUE_IF_NULL(srcArray);
-
             // Map source dimensions to target dimensions
             std::vector<std::shared_ptr<GDALDimension>> dstArrayDims;
             const auto &srcArrayDims(srcArray->GetDimensions());
@@ -797,8 +886,8 @@ bool GDALGroup::CopyFrom(const std::shared_ptr<GDALGroup> &poDstRootGroup,
                         }
                         else
                         {
-                            std::string newDimNamePrefix(name + '_' +
-                                                         dim->GetName());
+                            std::string newDimNamePrefix(srcArray->GetName() +
+                                                         '_' + dim->GetName());
                             newDimName = newDimNamePrefix;
                             int nIterCount = 2;
                             while (mapExistingDstDims.find(newDimName) !=
@@ -975,7 +1064,8 @@ bool GDALGroup::CopyFrom(const std::shared_ptr<GDALGroup> &poDstRootGroup,
                     CreateMDArray(srcArray->GetName(), dstArrayDims,
                                   GDALExtendedDataType::Create(eAutoScaleType),
                                   aosArrayCO.List());
-                EXIT_OR_CONTINUE_IF_NULL(dstArray);
+                if (!dstArray)
+                    return !bStrict;
 
                 if (srcArray->GetRawNoDataValue() != nullptr)
                 {
@@ -1020,7 +1110,8 @@ bool GDALGroup::CopyFrom(const std::shared_ptr<GDALGroup> &poDstRootGroup,
             {
                 dstArray = CreateMDArray(srcArray->GetName(), dstArrayDims,
                                          srcArrayType, aosArrayCO.List());
-                EXIT_OR_CONTINUE_IF_NULL(dstArray);
+                if (!dstArray)
+                    return !bStrict;
 
                 if (!dstArray->CopyFrom(poSrcDS, srcArray.get(), bStrict,
                                         nCurCost, nTotalCost, pfnProgress,
@@ -1044,9 +1135,43 @@ bool GDALGroup::CopyFrom(const std::shared_ptr<GDALGroup> &poDstRootGroup,
                         dstArray);
                 }
             }
+
+            return true;
+        };
+
+        const auto arrayNames = poSrcGroup->GetMDArrayNames();
+
+        // Start by copying arrays that are indexing variables of dimensions
+        for (const auto &name : arrayNames)
+        {
+            auto srcArray = poSrcGroup->OpenMDArray(name);
+            EXIT_OR_CONTINUE_IF_NULL(srcArray);
+
+            const auto oIterDimName =
+                mapSrcVariableNameToIndexedDimName.find(srcArray->GetName());
+            if (oIterDimName != mapSrcVariableNameToIndexedDimName.end())
+            {
+                if (!CopyArray(srcArray))
+                    return false;
+            }
         }
 
-        auto groupNames = poSrcGroup->GetGroupNames();
+        // Then copy regular arrays
+        for (const auto &name : arrayNames)
+        {
+            auto srcArray = poSrcGroup->OpenMDArray(name);
+            EXIT_OR_CONTINUE_IF_NULL(srcArray);
+
+            const auto oIterDimName =
+                mapSrcVariableNameToIndexedDimName.find(srcArray->GetName());
+            if (oIterDimName == mapSrcVariableNameToIndexedDimName.end())
+            {
+                if (!CopyArray(srcArray))
+                    return false;
+            }
+        }
+
+        const auto groupNames = poSrcGroup->GetGroupNames();
         for (const auto &name : groupNames)
         {
             auto srcSubGroup = poSrcGroup->OpenGroup(name);
@@ -1314,6 +1439,99 @@ void GDALGroup::ClearStatistics()
 }
 
 /************************************************************************/
+/*                            Rename()                                  */
+/************************************************************************/
+
+/** Rename the group.
+ *
+ * This is not implemented by all drivers.
+ *
+ * Drivers known to implement it: MEM, netCDF, ZARR.
+ *
+ * This is the same as the C function GDALGroupRename().
+ *
+ * @param osNewName New name.
+ *
+ * @return true in case of success
+ * @since GDAL 3.8
+ */
+bool GDALGroup::Rename(CPL_UNUSED const std::string &osNewName)
+{
+    CPLError(CE_Failure, CPLE_NotSupported, "Rename() not implemented");
+    return false;
+}
+
+/************************************************************************/
+/*                         BaseRename()                                 */
+/************************************************************************/
+
+//! @cond Doxygen_Suppress
+void GDALGroup::BaseRename(const std::string &osNewName)
+{
+    m_osFullName.resize(m_osFullName.size() - m_osName.size());
+    m_osFullName += osNewName;
+    m_osName = osNewName;
+
+    NotifyChildrenOfRenaming();
+}
+//! @endcond
+
+/************************************************************************/
+/*                        ParentRenamed()                               */
+/************************************************************************/
+
+//! @cond Doxygen_Suppress
+void GDALGroup::ParentRenamed(const std::string &osNewParentFullName)
+{
+    m_osFullName = osNewParentFullName;
+    m_osFullName += "/";
+    m_osFullName += m_osName;
+
+    NotifyChildrenOfRenaming();
+}
+//! @endcond
+
+/************************************************************************/
+/*                             Deleted()                                */
+/************************************************************************/
+
+//! @cond Doxygen_Suppress
+void GDALGroup::Deleted()
+{
+    m_bValid = false;
+
+    NotifyChildrenOfDeletion();
+}
+//! @endcond
+
+/************************************************************************/
+/*                        ParentDeleted()                               */
+/************************************************************************/
+
+//! @cond Doxygen_Suppress
+void GDALGroup::ParentDeleted()
+{
+    Deleted();
+}
+//! @endcond
+
+/************************************************************************/
+/*                     CheckValidAndErrorOutIfNot()                     */
+/************************************************************************/
+
+//! @cond Doxygen_Suppress
+bool GDALGroup::CheckValidAndErrorOutIfNot() const
+{
+    if (!m_bValid)
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "This object has been deleted. No action on it is possible");
+    }
+    return m_bValid;
+}
+//! @endcond
+
+/************************************************************************/
 /*                       ~GDALAbstractMDArray()                         */
 /************************************************************************/
 
@@ -1373,6 +1591,30 @@ GDALAbstractMDArray::GDALAbstractMDArray(const std::string &osParentName,
 size_t GDALAbstractMDArray::GetDimensionCount() const
 {
     return GetDimensions().size();
+}
+
+/************************************************************************/
+/*                            Rename()                                  */
+/************************************************************************/
+
+/** Rename the attribute/array.
+ *
+ * This is not implemented by all drivers.
+ *
+ * Drivers known to implement it: MEM, netCDF, Zarr.
+ *
+ * This is the same as the C functions GDALMDArrayRename() or
+ * GDALAttributeRename().
+ *
+ * @param osNewName New name.
+ *
+ * @return true in case of success
+ * @since GDAL 3.8
+ */
+bool GDALAbstractMDArray::Rename(CPL_UNUSED const std::string &osNewName)
+{
+    CPLError(CE_Failure, CPLE_NotSupported, "Rename() not implemented");
+    return false;
 }
 
 /************************************************************************/
@@ -2187,6 +2429,76 @@ GDALAbstractMDArray::GetProcessingChunkSize(size_t nMaxChunkMemory) const
     }
     return anChunkSize;
 }
+
+/************************************************************************/
+/*                         BaseRename()                                 */
+/************************************************************************/
+
+//! @cond Doxygen_Suppress
+void GDALAbstractMDArray::BaseRename(const std::string &osNewName)
+{
+    m_osFullName.resize(m_osFullName.size() - m_osName.size());
+    m_osFullName += osNewName;
+    m_osName = osNewName;
+
+    NotifyChildrenOfRenaming();
+}
+//! @endcond
+
+//! @cond Doxygen_Suppress
+/************************************************************************/
+/*                          ParentRenamed()                             */
+/************************************************************************/
+
+void GDALAbstractMDArray::ParentRenamed(const std::string &osNewParentFullName)
+{
+    m_osFullName = osNewParentFullName;
+    m_osFullName += "/";
+    m_osFullName += m_osName;
+
+    NotifyChildrenOfRenaming();
+}
+//! @endcond
+
+/************************************************************************/
+/*                             Deleted()                                */
+/************************************************************************/
+
+//! @cond Doxygen_Suppress
+void GDALAbstractMDArray::Deleted()
+{
+    m_bValid = false;
+
+    NotifyChildrenOfDeletion();
+}
+//! @endcond
+
+/************************************************************************/
+/*                        ParentDeleted()                               */
+/************************************************************************/
+
+//! @cond Doxygen_Suppress
+void GDALAbstractMDArray::ParentDeleted()
+{
+    Deleted();
+}
+//! @endcond
+
+/************************************************************************/
+/*                     CheckValidAndErrorOutIfNot()                     */
+/************************************************************************/
+
+//! @cond Doxygen_Suppress
+bool GDALAbstractMDArray::CheckValidAndErrorOutIfNot() const
+{
+    if (!m_bValid)
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "This object has been deleted. No action on it is possible");
+    }
+    return m_bValid;
+}
+//! @endcond
 
 /************************************************************************/
 /*                             SetUnit()                                */
@@ -7621,6 +7933,8 @@ class GDALDatasetFromArray final : public GDALDataset
                          size_t iXDim, size_t iYDim)
         : m_poArray(array), m_iXDim(iXDim), m_iYDim(iYDim)
     {
+        eAccess = array->IsWritable() ? GA_Update : GA_ReadOnly;
+
         const auto &dims(m_poArray->GetDimensions());
         const auto nDimCount = dims.size();
         nRasterYSize =
@@ -7696,6 +8010,23 @@ class GDALDatasetFromArray final : public GDALDataset
         }
         if (iDim > 0)
             goto lbl_return_to_caller;
+    }
+
+    ~GDALDatasetFromArray()
+    {
+        GDALDatasetFromArray::Close();
+    }
+
+    CPLErr Close() override
+    {
+        CPLErr eErr = CE_None;
+        if (nOpenFlags != OPEN_FLAGS_CLOSED)
+        {
+            if (GDALDatasetFromArray::FlushCache() != CE_None)
+                eErr = CE_Failure;
+            m_poArray.reset();
+        }
+        return eErr;
     }
 
     CPLErr GetGeoTransform(double *padfGeoTransform) override
@@ -8466,6 +8797,34 @@ GDALExtendedDataType::GDALExtendedDataType(const GDALExtendedDataType &other)
 /*                            operator= ()                              */
 /************************************************************************/
 
+/** Copy assignment. */
+GDALExtendedDataType &
+GDALExtendedDataType::operator=(const GDALExtendedDataType &other)
+{
+    if (this != &other)
+    {
+        m_osName = other.m_osName;
+        m_eClass = other.m_eClass;
+        m_eSubType = other.m_eSubType;
+        m_eNumericDT = other.m_eNumericDT;
+        m_nSize = other.m_nSize;
+        m_nMaxStringLength = other.m_nMaxStringLength;
+        m_aoComponents.clear();
+        if (m_eClass == GEDTC_COMPOUND)
+        {
+            for (const auto &elt : other.m_aoComponents)
+            {
+                m_aoComponents.emplace_back(new GDALEDTComponent(*elt));
+            }
+        }
+    }
+    return *this;
+}
+
+/************************************************************************/
+/*                            operator= ()                              */
+/************************************************************************/
+
 /** Move assignment. */
 GDALExtendedDataType &
 GDALExtendedDataType::operator=(GDALExtendedDataType &&other)
@@ -8838,6 +9197,67 @@ bool GDALDimension::SetIndexingVariable(
              "SetIndexingVariable() not implemented");
     return false;
 }
+
+/************************************************************************/
+/*                            Rename()                                  */
+/************************************************************************/
+
+/** Rename the dimension.
+ *
+ * This is not implemented by all drivers.
+ *
+ * Drivers known to implement it: MEM, netCDF, ZARR.
+ *
+ * This is the same as the C function GDALDimensionRename().
+ *
+ * @param osNewName New name.
+ *
+ * @return true in case of success
+ * @since GDAL 3.8
+ */
+bool GDALDimension::Rename(CPL_UNUSED const std::string &osNewName)
+{
+    CPLError(CE_Failure, CPLE_NotSupported, "Rename() not implemented");
+    return false;
+}
+
+/************************************************************************/
+/*                         BaseRename()                                 */
+/************************************************************************/
+
+//! @cond Doxygen_Suppress
+void GDALDimension::BaseRename(const std::string &osNewName)
+{
+    m_osFullName.resize(m_osFullName.size() - m_osName.size());
+    m_osFullName += osNewName;
+    m_osName = osNewName;
+}
+//! @endcond
+
+//! @cond Doxygen_Suppress
+/************************************************************************/
+/*                          ParentRenamed()                             */
+/************************************************************************/
+
+void GDALDimension::ParentRenamed(const std::string &osNewParentFullName)
+{
+    m_osFullName = osNewParentFullName;
+    m_osFullName += "/";
+    m_osFullName += m_osName;
+}
+
+//! @endcond
+
+//! @cond Doxygen_Suppress
+/************************************************************************/
+/*                          ParentDeleted()                             */
+/************************************************************************/
+
+void GDALDimension::ParentDeleted()
+{
+}
+
+//! @endcond
 
 /************************************************************************/
 /************************************************************************/
@@ -9685,6 +10105,29 @@ GDALGroupH GDALGroupCreateGroup(GDALGroupH hGroup, const char *pszSubGroupName,
 }
 
 /************************************************************************/
+/*                         GDALGroupDeleteGroup()                       */
+/************************************************************************/
+
+/** Delete a sub-group from a group.
+ *
+ * After this call, if a previously obtained instance of the deleted object
+ * is still alive, no method other than for freeing it should be invoked.
+ *
+ * This is the same as the C++ method GDALGroup::DeleteGroup().
+ *
+ * @return true in case of success.
+ * @since GDAL 3.8
+ */
+bool GDALGroupDeleteGroup(GDALGroupH hGroup, const char *pszSubGroupName,
+                          CSLConstList papszOptions)
+{
+    VALIDATE_POINTER1(hGroup, __func__, false);
+    VALIDATE_POINTER1(pszSubGroupName, __func__, false);
+    return hGroup->m_poImpl->DeleteGroup(std::string(pszSubGroupName),
+                                         papszOptions);
+}
+
+/************************************************************************/
 /*                      GDALGroupCreateDimension()                      */
 /************************************************************************/
 
@@ -9740,6 +10183,28 @@ GDALMDArrayH GDALGroupCreateMDArray(GDALGroupH hGroup, const char *pszName,
 }
 
 /************************************************************************/
+/*                         GDALGroupDeleteMDArray()                     */
+/************************************************************************/
+
+/** Delete an array from a group.
+ *
+ * After this call, if a previously obtained instance of the deleted object
+ * is still alive, no method other than for freeing it should be invoked.
+ *
+ * This is the same as the C++ method GDALGroup::DeleteMDArray().
+ *
+ * @return true in case of success.
+ * @since GDAL 3.8
+ */
+bool GDALGroupDeleteMDArray(GDALGroupH hGroup, const char *pszName,
+                            CSLConstList papszOptions)
+{
+    VALIDATE_POINTER1(hGroup, __func__, false);
+    VALIDATE_POINTER1(pszName, __func__, false);
+    return hGroup->m_poImpl->DeleteMDArray(std::string(pszName), papszOptions);
+}
+
+/************************************************************************/
 /*                      GDALGroupCreateAttribute()                      */
 /************************************************************************/
 
@@ -9766,6 +10231,51 @@ GDALAttributeH GDALGroupCreateAttribute(GDALGroupH hGroup, const char *pszName,
     if (!ret)
         return nullptr;
     return new GDALAttributeHS(ret);
+}
+
+/************************************************************************/
+/*                         GDALGroupDeleteAttribute()                   */
+/************************************************************************/
+
+/** Delete an attribute from a group.
+ *
+ * After this call, if a previously obtained instance of the deleted object
+ * is still alive, no method other than for freeing it should be invoked.
+ *
+ * This is the same as the C++ method GDALGroup::DeleteAttribute().
+ *
+ * @return true in case of success.
+ * @since GDAL 3.8
+ */
+bool GDALGroupDeleteAttribute(GDALGroupH hGroup, const char *pszName,
+                              CSLConstList papszOptions)
+{
+    VALIDATE_POINTER1(hGroup, __func__, false);
+    VALIDATE_POINTER1(pszName, __func__, false);
+    return hGroup->m_poImpl->DeleteAttribute(std::string(pszName),
+                                             papszOptions);
+}
+
+/************************************************************************/
+/*                          GDALGroupRename()                           */
+/************************************************************************/
+
+/** Rename the group.
+ *
+ * This is not implemented by all drivers.
+ *
+ * Drivers known to implement it: MEM, netCDF.
+ *
+ * This is the same as the C++ method GDALGroup::Rename()
+ *
+ * @return true in case of success
+ * @since GDAL 3.8
+ */
+bool GDALGroupRename(GDALGroupH hGroup, const char *pszNewName)
+{
+    VALIDATE_POINTER1(hGroup, __func__, false);
+    VALIDATE_POINTER1(pszNewName, __func__, false);
+    return hGroup->m_poImpl->Rename(pszNewName);
 }
 
 /************************************************************************/
@@ -10091,6 +10601,29 @@ GDALAttributeH GDALMDArrayCreateAttribute(GDALMDArrayH hArray,
     if (!ret)
         return nullptr;
     return new GDALAttributeHS(ret);
+}
+
+/************************************************************************/
+/*                       GDALMDArrayDeleteAttribute()                   */
+/************************************************************************/
+
+/** Delete an attribute from an array.
+ *
+ * After this call, if a previously obtained instance of the deleted object
+ * is still alive, no method other than for freeing it should be invoked.
+ *
+ * This is the same as the C++ method GDALMDArray::DeleteAttribute().
+ *
+ * @return true in case of success.
+ * @since GDAL 3.8
+ */
+bool GDALMDArrayDeleteAttribute(GDALMDArrayH hArray, const char *pszName,
+                                CSLConstList papszOptions)
+{
+    VALIDATE_POINTER1(hArray, __func__, false);
+    VALIDATE_POINTER1(pszName, __func__, false);
+    return hArray->m_poImpl->DeleteAttribute(std::string(pszName),
+                                             papszOptions);
 }
 
 /************************************************************************/
@@ -10936,6 +11469,28 @@ int GDALMDArrayCache(GDALMDArrayH hArray, CSLConstList papszOptions)
 }
 
 /************************************************************************/
+/*                       GDALMDArrayRename()                           */
+/************************************************************************/
+
+/** Rename the array.
+ *
+ * This is not implemented by all drivers.
+ *
+ * Drivers known to implement it: MEM, netCDF, Zarr.
+ *
+ * This is the same as the C++ method GDALAbstractMDArray::Rename()
+ *
+ * @return true in case of success
+ * @since GDAL 3.8
+ */
+bool GDALMDArrayRename(GDALMDArrayH hArray, const char *pszNewName)
+{
+    VALIDATE_POINTER1(hArray, __func__, false);
+    VALIDATE_POINTER1(pszNewName, __func__, false);
+    return hArray->m_poImpl->Rename(pszNewName);
+}
+
+/************************************************************************/
 /*                        GDALAttributeRelease()                        */
 /************************************************************************/
 
@@ -11381,6 +11936,28 @@ int GDALAttributeWriteDoubleArray(GDALAttributeH hAttr,
 }
 
 /************************************************************************/
+/*                      GDALAttributeRename()                           */
+/************************************************************************/
+
+/** Rename the attribute.
+ *
+ * This is not implemented by all drivers.
+ *
+ * Drivers known to implement it: MEM, netCDF.
+ *
+ * This is the same as the C++ method GDALAbstractMDArray::Rename()
+ *
+ * @return true in case of success
+ * @since GDAL 3.8
+ */
+bool GDALAttributeRename(GDALAttributeH hAttr, const char *pszNewName)
+{
+    VALIDATE_POINTER1(hAttr, __func__, false);
+    VALIDATE_POINTER1(pszNewName, __func__, false);
+    return hAttr->m_poImpl->Rename(pszNewName);
+}
+
+/************************************************************************/
 /*                        GDALDimensionRelease()                        */
 /************************************************************************/
 
@@ -11504,6 +12081,28 @@ int GDALDimensionSetIndexingVariable(GDALDimensionH hDim, GDALMDArrayH hArray)
     VALIDATE_POINTER1(hDim, __func__, FALSE);
     return hDim->m_poImpl->SetIndexingVariable(hArray ? hArray->m_poImpl
                                                       : nullptr);
+}
+
+/************************************************************************/
+/*                      GDALDimensionRename()                           */
+/************************************************************************/
+
+/** Rename the dimension.
+ *
+ * This is not implemented by all drivers.
+ *
+ * Drivers known to implement it: MEM, netCDF.
+ *
+ * This is the same as the C++ method GDALDimension::Rename()
+ *
+ * @return true in case of success
+ * @since GDAL 3.8
+ */
+bool GDALDimensionRename(GDALDimensionH hDim, const char *pszNewName)
+{
+    VALIDATE_POINTER1(hDim, __func__, false);
+    VALIDATE_POINTER1(pszNewName, __func__, false);
+    return hDim->m_poImpl->Rename(pszNewName);
 }
 
 /************************************************************************/

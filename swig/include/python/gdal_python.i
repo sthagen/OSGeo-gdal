@@ -1054,6 +1054,12 @@ CPLErr ReadRaster1( double xoff, double yoff, double xsize, double ysize,
         else:
             return self._SetGCPs2(gcps, wkt_or_spatial_ref)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        _gdal.delete_Dataset(self)
+        self.this = None
 %}
 
 %feature("shadow") ExecuteSQL %{
@@ -1185,6 +1191,26 @@ def ReleaseResultSet(self, sql_lyr):
 %}
 }
 
+%extend GDALGroupHS {
+
+%feature("shadow") GetGroupNames %{
+def GetGroupNames(self, options = []) -> "list[str]":
+    ret = $action(self, options)
+    if ret is None:
+        ret = []
+    return ret
+%}
+
+%feature("shadow") GetMDArrayNames %{
+def GetMDArrayNames(self, options = []) -> "list[str]":
+    ret = $action(self, options)
+    if ret is None:
+        ret = []
+    return ret
+%}
+
+}
+
 %extend GDALMDArrayHS {
 %pythoncode %{
   def Read(self,
@@ -1285,9 +1311,8 @@ def ReleaseResultSet(self, sql_lyr):
              ('i', 4): GDT_Int32,
              ('I', 4): GDT_UInt32,
              ('l', 4): GDT_Int32,
-             # ('l', 8): GDT_Int64,
-             # ('q', 8): GDT_Int64,
-             # ('Q', 8): GDT_UInt64,
+             ('q', 8): GDT_Int64,
+             ('Q', 8): GDT_UInt64,
              ('f', 4): GDT_Float32,
              ('d', 8): GDT_Float64
           }
