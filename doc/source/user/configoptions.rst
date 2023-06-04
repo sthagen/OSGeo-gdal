@@ -74,7 +74,7 @@ predefined files.
 The following locations are tried by :cpp:func:`CPLLoadConfigOptionsFromPredefinedFiles`:
 
  - the location pointed by the environment variable (or configuration option)
-   GDAL_CONFIG_FILE is attempted first. If it set, the next steps are not
+   :config:`GDAL_CONFIG_FILE` is attempted first. If it set, the next steps are not
    attempted
 
  - for Unix builds, the location pointed by ${sysconfdir}/gdal/gdalrc is first
@@ -196,17 +196,24 @@ Performance and caching
 
 -  .. config:: GDAL_NUM_THREADS
       :choices: ALL_CPUS, <integer>
-      :default: ALL_CPUS
 
       Sets the number of worker threads to be used by GDAL operations that support
-      multithreading.
+      multithreading. The default value depends on the context in which it is used.
 
 -  .. config:: GDAL_CACHEMAX
       :choices: <size>
       :default: 5%
 
-      This option controls the default GDAL raster block cache size. If its value
-      is small (less than 100000), it is assumed to be measured in megabytes,
+      Controls the default GDAL raster block cache size. When
+      blocks are read from disk, or written to disk, they are cached in a
+      global block cache by the :cpp:class:`GDALRasterBlock` class. Once this
+      cache exceeds :config:`GDAL_CACHEMAX` old blocks are flushed from the
+      cache.
+      This cache is mostly beneficial when needing to read or write blocks
+      several times. This could occur, for instance, in a scanline oriented
+      input file which is processed in multiple rectangular chunks by
+      :program:`gdalwarp`.
+      If its value is small (less than 100000), it is assumed to be measured in megabytes,
       otherwise in bytes. Alternatively, the value can be set to "X%" to mean X%
       of the usable physical RAM. Note that this value is only consulted the first
       time the cache size is requested.  To change this value programmatically
@@ -345,6 +352,12 @@ Driver management
       This option must be set before calling :cpp:func:`GDALAllRegister`, or an explicit call
       to :cpp:func:`GDALDriverManager::AutoLoadDrivers` will be required.
 
+-  .. config:: GDAL_PYTHON_DRIVER_PATH
+
+      A list of directories to search for ``.py`` files implementing GDAL drivers.
+      Like :config:`GDAL_DRIVER_PATH`, directory names should be separated by colons
+      on Unix or semi-colons on Windows. For more information, see :ref:`rfc-76`.
+
 General options
 ^^^^^^^^^^^^^^^
 
@@ -361,6 +374,11 @@ General options
       On some builds (Unix), the value can be hard-coded at compilation time to
       point to the path after installation (/usr/share/gdal/data for example). On
       Windows platform, this option must be generally declared.
+
+-  .. config:: GDAL_CONFIG_FILE
+      :since: 3.3
+
+      The location of the GDAL config file (see :ref:`gdal_configuration_file`).
 
 -  .. config:: CPL_TMPDIR
       :choices: <dirname>
@@ -445,6 +463,12 @@ General options
       CreateFileW(). This effectively restores the pre-GDAL1.8 behavior for
       handling filenames on Windows and might be appropriate for applications that
       treat filenames as being in the local encoding.
+
+-  .. config:: GDAL_MAX_BAND_COUNT
+      :choices: <integer>
+      :default: 65536
+
+      Defines the maximum number of bands to read from a single dataset.
 
 -  .. config:: GDAL_XML_VALIDATION
       :choices: YES, NO
@@ -554,6 +578,68 @@ Networking options
       :since: 2.3
 
       Filename of a text file with "key: value" HTTP headers.
+
+-  .. config:: GDAL_HTTP_CONNECTTIMEOUT
+      :choices: <seconds>
+      :since: 2.2
+
+      Maximum delay for connection to be established before being aborted.
+
+-  .. config:: GDAL_HTTP_COOKIE
+      :since: 2.0
+
+      Cookie(s) to send. See https://curl.se/libcurl/c/CURLOPT_COOKIE.html
+
+-  .. config:: GDAL_HTTP_COOKIEFILE
+      :since: 2.4.0
+
+      File name to read cookies from. See https://curl.se/libcurl/c/CURLOPT_COOKIEFILE.html
+
+-  .. config:: GDAL_HTTP_COOKIEJAR
+      :since: 2.4.0
+
+      File to which cookies should be written. See https://curl.se/libcurl/c/CURLOPT_COOKIEJAR.html
+
+-  .. config:: GDAL_HTTP_NETRC
+      :choices: YES, NO
+      :default: YES
+      :since: 1.11.0
+
+      Controls if an available ``.netrc`` file is used.
+
+-  .. config:: GDAL_HTTP_NETRC_FILE
+      :choices: <filename>
+      :since: 3.7.0
+
+      Sets the location of a ``.netrc`` file.
+
+-  .. config:: GDAL_HTTP_LOW_SPEED_LIMIT
+      :choices: <bytes/s>
+      :default: 0
+      :since: 2.1.0
+
+      Sets the transfer speed, averaged over :config:`GDAL_HTTP_LOW_SPEED_TIME`, below which a request should be cancelled.
+
+-  .. config:: GDAL_HTTP_LOW_SPEED_TIME
+      :choices: <seconds>
+      :default: 0
+      :since: 2.1.0
+
+      Sets the time window over which :config:`GDAL_HTTP_LOW_SPEED_LIMIT` should be evaluated.
+
+-  .. config:: GDAL_HTTP_SSL_VERIFYSTATUS
+      :choices: YES, NO
+      :default: NO
+      :since: 2.3.0
+
+      Whether to verify the status of SSL certificates. See https://curl.se/libcurl/c/CURLOPT_SSL_VERIFYSTATUS.html
+
+-  .. config:: GDAL_HTTP_USE_CAPI_STORE
+      :choices: YES, NO
+      :default: NO
+      :since: 2.3.0
+
+      (Windows only). Whether to use certificates from the Windows certificate store.
 
 -  .. config:: GDAL_HTTP_HEADERS
       :since: 3.6
