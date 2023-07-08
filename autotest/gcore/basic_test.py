@@ -534,6 +534,47 @@ def test_basic_test_16():
     assert "Invalid value for NUM_THREADS: INVALID" in gdal.GetLastErrorMsg()
 
 
+def test_basic_dict_open_options():
+
+    ds1 = gdal.Open("data/byte.tif")
+
+    ds2 = gdal.OpenEx("data/byte.tif", open_options={"GEOREF_SOURCES": "TABFILE"})
+
+    assert ds1.GetGeoTransform() != ds2.GetGeoTransform()
+
+
+def test_basic_dict_create_options():
+
+    with gdal.GetDriverByName("GTiff").Create(
+        "/vsimem/test_basic_dict_create_options.tif", 1, 1, options={"TFW": "YES"}
+    ) as ds:
+        gt = (0.0, 5.0, 0.0, 5.0, 0.0, -5.0)
+        ds.SetGeoTransform(gt)
+
+    assert gdal.VSIStatL("/vsimem/test_basic_dict_create_options.tfw") is not None
+
+    gdal.Unlink("/vsimem/test_basic_dict_create_options.tif")
+    gdal.Unlink("/vsimem/test_basic_dict_create_options.tfw")
+
+
+def test_basic_dict_create_copy_options():
+
+    src_ds = gdal.Open("data/byte.tif")
+
+    with gdal.GetDriverByName("GTiff").CreateCopy(
+        "/vsimem/test_basic_dict_create_copy_options.tif",
+        src_ds,
+        options={"TFW": "YES"},
+    ) as ds:
+        gt = (0.0, 5.0, 0.0, 5.0, 0.0, -5.0)
+        ds.SetGeoTransform(gt)
+
+    assert gdal.VSIStatL("/vsimem/test_basic_dict_create_copy_options.tfw") is not None
+
+    gdal.Unlink("/vsimem/test_basic_dict_create_copy_options.tif")
+    gdal.Unlink("/vsimem/test_basic_dict_create_copy_options.tfw")
+
+
 def test_gdal_getspatialref():
 
     ds = gdal.Open("data/byte.tif")
@@ -790,3 +831,26 @@ def test_band_use_after_dataset_close_2():
     # Make sure ds.__exit__() has invalidated "band" so we don't crash here
     with pytest.raises(Exception):
         band.Checksum()
+
+
+def test_mask_band_use_after_dataset_close():
+    with gdal.Open("data/byte.tif") as ds:
+        m1 = ds.GetRasterBand(1).GetMaskBand()
+        m2 = m1.GetMaskBand()
+
+    # Make sure ds.__exit__() invalidation has propagated to mask bands
+    with pytest.raises(Exception):
+        m1.Checksum()
+
+    with pytest.raises(Exception):
+        m2.Checksum()
+
+
+def test_ovr_band_use_after_dataset_close():
+    with gdal.Open("data/byte_with_ovr.tif") as ds:
+        ovr = ds.GetRasterBand(1).GetOverview(1)
+
+    # Make sure ds.__exit__() invalidation has propagated to overviews
+
+    with pytest.raises(Exception):
+        ovr.Checksum()
