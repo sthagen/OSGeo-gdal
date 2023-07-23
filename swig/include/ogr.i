@@ -619,7 +619,6 @@ typedef int OGRErr;
 %{
 #include "gdal.h"
 %}
-typedef int CPLErr;
 #define FROM_PYTHON_OGR_I
 %include MajorObject.i
 #undef FROM_PYTHON_OGR_I
@@ -3722,7 +3721,7 @@ public:
     OGR_FldDomain_SetMergePolicy(self, policy);
   }
 
-#ifdef SWIGPYTHON
+#if defined(SWIGPYTHON) || defined(SWIGJAVA)
   const OGRCodedValue* GetEnumeration() {
     return OGR_CodedFldDomain_GetEnumeration(self);
   }
@@ -3820,7 +3819,7 @@ public:
 
 }; /* class OGRFieldDomainShadow */
 
-#ifdef SWIGPYTHON
+#if defined(SWIGPYTHON) || defined(SWIGJAVA)
 %newobject CreateCodedFieldDomain;
 %apply Pointer NONNULL {const char* name};
 %inline %{
