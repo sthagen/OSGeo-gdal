@@ -533,8 +533,38 @@ TEST_F(test_ogr, OGRParseDate)
     ASSERT_EQ(OGRParseDate("12:34:56", &sField, 0), TRUE);
     ASSERT_EQ(OGRParseDate("12:34:56.789", &sField, 0), TRUE);
 
+    ASSERT_EQ(OGRParseDate("T12:34:56", &sField, 0), TRUE);
+    ASSERT_EQ(sField.Date.Year, 0);
+    ASSERT_EQ(sField.Date.Month, 0);
+    ASSERT_EQ(sField.Date.Day, 0);
+    ASSERT_EQ(sField.Date.Hour, 12);
+    ASSERT_EQ(sField.Date.Minute, 34);
+    ASSERT_EQ(sField.Date.Second, 56.0f);
+    ASSERT_EQ(sField.Date.TZFlag, 0);
+
+    ASSERT_EQ(OGRParseDate("T123456", &sField, 0), TRUE);
+    ASSERT_EQ(sField.Date.Year, 0);
+    ASSERT_EQ(sField.Date.Month, 0);
+    ASSERT_EQ(sField.Date.Day, 0);
+    ASSERT_EQ(sField.Date.Hour, 12);
+    ASSERT_EQ(sField.Date.Minute, 34);
+    ASSERT_EQ(sField.Date.Second, 56.0f);
+    ASSERT_EQ(sField.Date.TZFlag, 0);
+
+    ASSERT_EQ(OGRParseDate("T123456.789", &sField, 0), TRUE);
+    ASSERT_EQ(sField.Date.Year, 0);
+    ASSERT_EQ(sField.Date.Month, 0);
+    ASSERT_EQ(sField.Date.Day, 0);
+    ASSERT_EQ(sField.Date.Hour, 12);
+    ASSERT_EQ(sField.Date.Minute, 34);
+    ASSERT_EQ(sField.Date.Second, 56.789f);
+    ASSERT_EQ(sField.Date.TZFlag, 0);
+
     ASSERT_TRUE(!OGRParseDate("2017", &sField, 0));
     ASSERT_TRUE(!OGRParseDate("12:", &sField, 0));
+    ASSERT_TRUE(!OGRParseDate("12:3", &sField, 0));
+    ASSERT_TRUE(!OGRParseDate("1:23", &sField, 0));
+    ASSERT_TRUE(!OGRParseDate("12:34:5", &sField, 0));
     ASSERT_TRUE(!OGRParseDate("2017-a-31T12:34:56", &sField, 0));
     ASSERT_TRUE(!OGRParseDate("2017-00-31T12:34:56", &sField, 0));
     ASSERT_TRUE(!OGRParseDate("2017-13-31T12:34:56", &sField, 0));
@@ -2398,6 +2428,7 @@ TEST_F(test_ogr, OGRParseDateTimeYYYYMMDDTHHMMZ)
         // Invalid
         char szInput[] = "2023-07-11T17:2";
         OGRField sField;
+        // coverity[overrun-buffer-val]
         EXPECT_EQ(
             OGRParseDateTimeYYYYMMDDTHHMMZ(szInput, strlen(szInput), &sField),
             false);
@@ -2446,6 +2477,7 @@ TEST_F(test_ogr, OGRParseDateTimeYYYYMMDDTHHMMSSZ)
         // Invalid
         char szInput[] = "2023-07-11T17:27:3";
         OGRField sField;
+        // coverity[overrun-buffer-val]
         EXPECT_EQ(
             OGRParseDateTimeYYYYMMDDTHHMMSSZ(szInput, strlen(szInput), &sField),
             false);
@@ -2494,6 +2526,7 @@ TEST_F(test_ogr, OGRParseDateTimeYYYYMMDDTHHMMSSsssZ)
         // Invalid
         char szInput[] = "2023-07-11T17:27:34.12";
         OGRField sField;
+        // coverity[overrun-buffer-val]
         EXPECT_EQ(OGRParseDateTimeYYYYMMDDTHHMMSSsssZ(szInput, strlen(szInput),
                                                       &sField),
                   false);

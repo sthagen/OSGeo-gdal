@@ -3267,17 +3267,30 @@ def test_ogr_shape_74():
 def test_ogr_shape_75():
 
     ds = gdal.OpenEx("data/poly.shp")
-    assert ds.GetFileList() == [
+    filelist_PRJ = [
         "data/poly.shp",
         "data/poly.shx",
         "data/poly.dbf",
         "data/poly.PRJ",
-    ] or ds.GetFileList() == [
+    ]
+    filelist_prj = [
         "data/poly.shp",
         "data/poly.shx",
         "data/poly.dbf",
         "data/poly.prj",
     ]
+
+    if (
+        sys.platform in ("win32", "darwin")
+        and "poly.PRJ" in os.listdir("data")
+        and os.path.exists("data/poly.prj")
+    ):
+        # On Windows & Mac and if the filesystem is case insensitive (we detect
+        # this by checking for the lowercase name...), then expect the uppercase
+        # variant to be returned
+        assert ds.GetFileList() == filelist_PRJ
+    else:
+        assert ds.GetFileList() == filelist_PRJ or ds.GetFileList() == filelist_prj
     ds = None
 
     ds = gdal.OpenEx("data/idlink.dbf")
@@ -3301,6 +3314,48 @@ def test_ogr_shape_75():
         "data/shp/emptyshapefilewithsbn.sbx",
     ]
     ds = None
+
+    ds = gdal.OpenEx("data/shp/testpoly.shp")
+    assert ds.GetFileList() == [
+        "data/shp/testpoly.shp",
+        "data/shp/testpoly.shx",
+        "data/shp/testpoly.dbf",
+        "data/shp/testpoly.qix",
+    ]
+    ds = None
+
+    # Test that CreateLayer() + GetFileList() list the .prj file when it
+    # exists
+    src_ds = gdal.OpenEx("data/shp/Stacks.shp")
+    driver = gdal.GetDriverByName("ESRI Shapefile")
+    copy_ds = driver.CreateCopy("/vsimem/test_copy.shp", src_ds)
+    src_ds = None
+    try:
+        assert copy_ds.GetFileList() == [
+            "/vsimem/test_copy.shp",
+            "/vsimem/test_copy.shx",
+            "/vsimem/test_copy.dbf",
+            "/vsimem/test_copy.prj",
+        ]
+    finally:
+        copy_ds = None
+        driver.Delete("/vsimem/test_copy.shp")
+
+    # Test that CreateLayer() + GetFileList() don't list the .prj file when it
+    # doesn't exist.
+    src_ds = gdal.OpenEx("data/shp/testpoly.shp")
+    driver = gdal.GetDriverByName("ESRI Shapefile")
+    copy_ds = driver.CreateCopy("/vsimem/test_copy.shp", src_ds)
+    src_ds = None
+    try:
+        assert copy_ds.GetFileList() == [
+            "/vsimem/test_copy.shp",
+            "/vsimem/test_copy.shx",
+            "/vsimem/test_copy.dbf",
+        ]
+    finally:
+        copy_ds = None
+        driver.Delete("/vsimem/test_copy.shp")
 
 
 ###############################################################################
