@@ -65,6 +65,7 @@ def startup_and_cleanup():
         ("AZURE_NO_SIGN_REQUEST", None),
         ("AZURE_CONFIG_DIR", ""),
         ("AZURE_STORAGE_ACCESS_TOKEN", ""),
+        ("AZURE_FEDERATED_TOKEN_FILE", ""),
     ):
         options[var] = reset_val
 
@@ -516,7 +517,7 @@ def test_vsiaz_fake_write():
     # Simulate illegal read
     f = gdal.VSIFOpenL("/vsiaz/test_copy/file.tif", "wb")
     assert f is not None
-    with gdaltest.error_handler():
+    with gdal.quiet_errors():
         ret = gdal.VSIFReadL(1, 1, f)
     assert not ret
     gdal.VSIFCloseL(f)
@@ -524,7 +525,7 @@ def test_vsiaz_fake_write():
     # Simulate illegal seek
     f = gdal.VSIFOpenL("/vsiaz/test_copy/file.tif", "wb")
     assert f is not None
-    with gdaltest.error_handler():
+    with gdal.quiet_errors():
         ret = gdal.VSIFSeekL(f, 1, 0)
     assert ret != 0
     gdal.VSIFCloseL(f)
@@ -569,7 +570,7 @@ def test_vsiaz_fake_write():
         pytest.fail()
 
     with webserver.install_http_handler(handler):
-        with gdaltest.error_handler():
+        with gdal.quiet_errors():
             ret = gdal.VSIFCloseL(f)
         if ret == 0:
             gdal.VSIFCloseL(f)
@@ -712,7 +713,7 @@ def test_vsiaz_fake_write():
     handler.add("PUT", "/azure/blob/myaccount/test_copy/file.tif", custom_method=method)
 
     with webserver.install_http_handler(handler):
-        with gdaltest.error_handler():
+        with gdal.quiet_errors():
             ret = gdal.VSIFWriteL("0123456789abcdef", 1, 16, f)
         if ret != 0:
             gdal.VSIFCloseL(f)
@@ -728,7 +729,7 @@ def test_vsiaz_fake_write():
     handler.add("PUT", "/azure/blob/myaccount/test_copy/file.tif", 201)
     handler.add("PUT", "/azure/blob/myaccount/test_copy/file.tif?comp=appendblock", 403)
     with webserver.install_http_handler(handler):
-        with gdaltest.error_handler():
+        with gdal.quiet_errors():
             ret = gdal.VSIFWriteL("0123456789abcdef", 1, 16, f)
         if ret != 0:
             gdal.VSIFCloseL(f)
@@ -776,7 +777,7 @@ def test_vsiaz_write_blockblob_retry():
         handler.add(
             "PUT", "/azure/blob/myaccount/test_copy/file.bin", custom_method=method
         )
-        with gdaltest.error_handler():
+        with gdal.quiet_errors():
             with webserver.install_http_handler(handler):
                 assert gdal.VSIFWriteL("foo", 1, 3, f) == 3
                 gdal.VSIFCloseL(f)
@@ -821,7 +822,7 @@ def test_vsiaz_write_appendblob_retry():
             "PUT", "/azure/blob/myaccount/test_copy/file.bin?comp=appendblock", 201
         )
 
-        with gdaltest.error_handler():
+        with gdal.quiet_errors():
             with webserver.install_http_handler(handler):
                 assert gdal.VSIFWriteL("0123456789abcdef", 1, 16, f) == 16
                 gdal.VSIFCloseL(f)
@@ -869,7 +870,7 @@ def test_vsiaz_fake_unlink():
         {"Connection": "close"},
     )
     with webserver.install_http_handler(handler):
-        with gdaltest.error_handler():
+        with gdal.quiet_errors():
             ret = gdal.Unlink("/vsiaz/az_bucket_test_unlink/myfile")
     assert ret == -1
 
@@ -2160,6 +2161,210 @@ def test_vsiaz_imds_authentication_object_id_client_is_msi_res_id():
     finally:
         gdal.ClearPathSpecificOptions("/vsiaz/az_fake_bucket/")
         gdal.ClearPathSpecificOptions("/vsiaz/az_fake_bucket2/")
+
+
+###############################################################################
+# Get authentication for Workload Identity from simulated Azure VM
+
+
+def test_vsiaz_workload_identity_managed_authentication():
+
+    if gdaltest.webserver_port == 0:
+        pytest.skip()
+
+    gdal.VSICurlClearCache()
+
+    with gdaltest.config_options(
+        {
+            "AZURE_STORAGE_CONNECTION_STRING": "",
+            "AZURE_STORAGE_ACCOUNT": "myaccount",
+            "CPL_AZURE_ENDPOINT": "http://127.0.0.1:%d/azure/blob/myaccount"
+            % gdaltest.webserver_port,
+            "CPL_AZURE_USE_HTTPS": "NO",
+            "AZURE_AUTHORITY_HOST": "http://localhost:%d/" % gdaltest.webserver_port,
+            "AZURE_TENANT_ID": "tenant_id",
+            "AZURE_CLIENT_ID": "client_id_value",
+            "AZURE_FEDERATED_TOKEN_FILE": "/vsimem/AZURE_FEDERATED_TOKEN_FILE",
+        },
+        thread_local=False,
+    ), gdaltest.tempfile(
+        "/vsimem/AZURE_FEDERATED_TOKEN_FILE", "content_of_AZURE_FEDERATED_TOKEN_FILE"
+    ):
+
+        handler = webserver.SequentialHandler()
+        handler.add(
+            "POST",
+            "/tenant_id/oauth2/v2.0/token",
+            200,
+            {},
+            """{"access_token": "my_bearer", "expires_in": "100"}""",
+            expected_headers={"Content-Type": "application/x-www-form-urlencoded"},
+            expected_body=b"client_assertion=content_of_AZURE_FEDERATED_TOKEN_FILE&client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer&client_id=client_id_value&grant_type=client_credentials&scope=https://storage.azure.com/.default",
+        )
+
+        handler.add(
+            "GET",
+            "/azure/blob/myaccount/az_fake_bucket/resource",
+            200,
+            {"Content-Length": 3},
+            "foo",
+            expected_headers={
+                "Authorization": "Bearer my_bearer",
+                "x-ms-version": "2019-12-12",
+            },
+        )
+        with webserver.install_http_handler(handler):
+            f = open_for_read("/vsiaz/az_fake_bucket/resource")
+            assert f is not None
+            data = gdal.VSIFReadL(1, 4, f).decode("ascii")
+            gdal.VSIFCloseL(f)
+
+        assert data == "foo"
+
+    # Set a fake AZURE_FEDERATED_TOKEN_FILE to check that credentials re-use works
+    with gdaltest.config_options(
+        {
+            "AZURE_STORAGE_CONNECTION_STRING": "",
+            "AZURE_STORAGE_ACCOUNT": "myaccount",
+            "CPL_AZURE_ENDPOINT": "http://127.0.0.1:%d/azure/blob/myaccount"
+            % gdaltest.webserver_port,
+            "CPL_AZURE_USE_HTTPS": "NO",
+            "AZURE_AUTHORITY_HOST": "http://localhost:%d/" % gdaltest.webserver_port,
+            "AZURE_TENANT_ID": "tenant_id",
+            "AZURE_CLIENT_ID": "client_id_value",
+            "AZURE_FEDERATED_TOKEN_FILE": "****invalid******",
+        },
+        thread_local=False,
+    ):
+
+        handler = webserver.SequentialHandler()
+        handler.add(
+            "GET",
+            "/azure/blob/myaccount/az_fake_bucket/bar",
+            200,
+            {"Content-Length": 3},
+            "bar",
+            expected_headers={
+                "Authorization": "Bearer my_bearer",
+                "x-ms-version": "2019-12-12",
+            },
+        )
+        with webserver.install_http_handler(handler):
+            f = open_for_read("/vsiaz/az_fake_bucket/bar")
+            assert f is not None
+            data = gdal.VSIFReadL(1, 4, f).decode("ascii")
+            gdal.VSIFCloseL(f)
+
+        assert data == "bar"
+
+
+###############################################################################
+# Get authentication for Workload Identity from simulated Azure VM
+
+
+def test_vsiaz_workload_identity_managed_authentication_expiration():
+
+    if gdaltest.webserver_port == 0:
+        pytest.skip()
+
+    gdal.VSICurlClearCache()
+
+    with gdaltest.config_options(
+        {
+            "AZURE_STORAGE_CONNECTION_STRING": "",
+            "AZURE_STORAGE_ACCOUNT": "myaccount",
+            "CPL_AZURE_ENDPOINT": "http://127.0.0.1:%d/azure/blob/myaccount"
+            % gdaltest.webserver_port,
+            "CPL_AZURE_USE_HTTPS": "NO",
+            "AZURE_AUTHORITY_HOST": "http://localhost:%d/" % gdaltest.webserver_port,
+            "AZURE_TENANT_ID": "tenant_id",
+            "AZURE_CLIENT_ID": "client_id_value",
+            "AZURE_FEDERATED_TOKEN_FILE": "/vsimem/AZURE_FEDERATED_TOKEN_FILE",
+        },
+        thread_local=False,
+    ):
+
+        handler = webserver.SequentialHandler()
+
+        # Done once because of VSICurlClearCache()
+        handler.add(
+            "POST",
+            "/tenant_id/oauth2/v2.0/token",
+            200,
+            {},
+            """{"access_token": "my_bearer", "expires_in": "10"}""",
+            expected_headers={"Content-Type": "application/x-www-form-urlencoded"},
+            expected_body=b"client_assertion=content_of_AZURE_FEDERATED_TOKEN_FILE&client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer&client_id=client_id_value&grant_type=client_credentials&scope=https://storage.azure.com/.default",
+        )
+
+        # We have a security margin of 60 seconds over the expires_in delay
+        # so we will need to fetch the token again
+        handler.add(
+            "POST",
+            "/tenant_id/oauth2/v2.0/token",
+            200,
+            {},
+            """{"access_token": "my_bearer2", "expires_in": "10"}""",
+            expected_headers={"Content-Type": "application/x-www-form-urlencoded"},
+            expected_body=b"client_assertion=content_of_AZURE_FEDERATED_TOKEN_FILE&client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer&client_id=client_id_value&grant_type=client_credentials&scope=https://storage.azure.com/.default",
+        )
+
+        handler.add(
+            "GET",
+            "/azure/blob/myaccount/az_fake_bucket/resource",
+            200,
+            {"Content-Length": 3},
+            "foo",
+            expected_headers={
+                "Authorization": "Bearer my_bearer2",
+                "x-ms-version": "2019-12-12",
+            },
+        )
+        with webserver.install_http_handler(handler), gdaltest.tempfile(
+            "/vsimem/AZURE_FEDERATED_TOKEN_FILE",
+            "content_of_AZURE_FEDERATED_TOKEN_FILE",
+        ):
+            f = open_for_read("/vsiaz/az_fake_bucket/resource")
+            assert f is not None
+            data = gdal.VSIFReadL(1, 4, f).decode("ascii")
+            gdal.VSIFCloseL(f)
+
+        assert data == "foo"
+
+        # Check that AZURE_FEDERATED_TOKEN_FILE isn't actually read
+
+        handler = webserver.SequentialHandler()
+        handler.add(
+            "POST",
+            "/tenant_id/oauth2/v2.0/token",
+            200,
+            {},
+            """{"access_token": "my_bearer3", "expires_in": "100"}""",
+            expected_headers={"Content-Type": "application/x-www-form-urlencoded"},
+            expected_body=b"client_assertion=content_of_AZURE_FEDERATED_TOKEN_FILE&client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer&client_id=client_id_value&grant_type=client_credentials&scope=https://storage.azure.com/.default",
+        )
+
+        handler.add(
+            "GET",
+            "/azure/blob/myaccount/az_fake_bucket2/resource",
+            200,
+            {"Content-Length": 3},
+            "bar",
+            expected_headers={
+                "Authorization": "Bearer my_bearer3",
+                "x-ms-version": "2019-12-12",
+            },
+        )
+        with webserver.install_http_handler(handler), gdaltest.tempfile(
+            "/vsimem/AZURE_FEDERATED_TOKEN_FILE",
+            "another_content_of_AZURE_FEDERATED_TOKEN_FILE",
+        ):
+            f = open_for_read("/vsiaz/az_fake_bucket2/resource")
+            assert f is not None
+            data = gdal.VSIFReadL(1, 4, f).decode("ascii")
+            gdal.VSIFCloseL(f)
+
+        assert data == "bar"
 
 
 ###############################################################################

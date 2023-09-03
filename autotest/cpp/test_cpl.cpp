@@ -1025,6 +1025,15 @@ TEST_F(test_cpl, CPLsscanf)
     ASSERT_EQ(b, 2.0);
 }
 
+TEST_F(test_cpl, CPLsnprintf)
+{
+    {
+        char buf[32];
+        EXPECT_EQ(CPLsnprintf(buf, sizeof(buf), "a%.*fb", 1, 2.12), 5);
+        EXPECT_STREQ(buf, "a2.1b");
+    }
+}
+
 TEST_F(test_cpl, CPLSetErrorHandler)
 {
     CPLString oldVal = CPLGetConfigOption("CPL_DEBUG", "");
@@ -2586,6 +2595,50 @@ TEST_F(test_cpl, CPLJSONDocument)
         CPLPopErrorHandler();
     }
     {
+        CPLJSONObject oObj(nullptr);
+        EXPECT_EQ(oObj.GetType(), CPLJSONObject::Type::Null);
+    }
+    {
+        CPLJSONObject oObj(true);
+        EXPECT_EQ(oObj.GetType(), CPLJSONObject::Type::Boolean);
+        EXPECT_EQ(oObj.ToBool(), true);
+    }
+    {
+        CPLJSONObject oObj(1);
+        EXPECT_EQ(oObj.GetType(), CPLJSONObject::Type::Integer);
+        EXPECT_EQ(oObj.ToInteger(), 1);
+    }
+    {
+        CPLJSONObject oObj(static_cast<int64_t>(123) * 1024 * 1024 * 1024);
+        EXPECT_EQ(oObj.GetType(), CPLJSONObject::Type::Long);
+        EXPECT_EQ(oObj.ToLong(),
+                  static_cast<int64_t>(123) * 1024 * 1024 * 1024);
+    }
+    {
+        CPLJSONObject oObj(static_cast<uint64_t>(123) * 1024 * 1024 * 1024);
+        // Might be a string with older libjson versons
+        if (oObj.GetType() == CPLJSONObject::Type::Long)
+        {
+            EXPECT_EQ(oObj.ToLong(),
+                      static_cast<int64_t>(123) * 1024 * 1024 * 1024);
+        }
+    }
+    {
+        CPLJSONObject oObj(1.5);
+        EXPECT_EQ(oObj.GetType(), CPLJSONObject::Type::Double);
+        EXPECT_EQ(oObj.ToDouble(), 1.5);
+    }
+    {
+        CPLJSONObject oObj("ab");
+        EXPECT_EQ(oObj.GetType(), CPLJSONObject::Type::String);
+        EXPECT_STREQ(oObj.ToString().c_str(), "ab");
+    }
+    {
+        CPLJSONObject oObj(std::string("ab"));
+        EXPECT_EQ(oObj.GetType(), CPLJSONObject::Type::String);
+        EXPECT_STREQ(oObj.ToString().c_str(), "ab");
+    }
+    {
         CPLJSONObject oObj;
         oObj.Add("string", std::string("my_string"));
         ASSERT_EQ(oObj.GetString("string"), std::string("my_string"));
@@ -2638,12 +2691,16 @@ TEST_F(test_cpl, CPLJSONDocument)
         oObj.SetNull("null_field");
         ASSERT_TRUE(CPLJSONArray().GetChildren().empty());
         oObj.ToArray();
-        ASSERT_EQ(CPLJSONObject().Format(CPLJSONObject::PrettyFormat::Spaced),
-                  std::string("{ }"));
-        ASSERT_EQ(CPLJSONObject().Format(CPLJSONObject::PrettyFormat::Pretty),
-                  std::string("{\n}"));
-        ASSERT_EQ(CPLJSONObject().Format(CPLJSONObject::PrettyFormat::Plain),
-                  std::string("{}"));
+    }
+    {
+        CPLJSONObject oObj;
+        oObj.Set("foo", "bar");
+        EXPECT_STREQ(oObj.Format(CPLJSONObject::PrettyFormat::Spaced).c_str(),
+                     "{ \"foo\": \"bar\" }");
+        EXPECT_STREQ(oObj.Format(CPLJSONObject::PrettyFormat::Pretty).c_str(),
+                     "{\n  \"foo\":\"bar\"\n}");
+        EXPECT_STREQ(oObj.Format(CPLJSONObject::PrettyFormat::Plain).c_str(),
+                     "{\"foo\":\"bar\"}");
     }
     {
         CPLJSONArray oArrayConstructorString(std::string("foo"));
@@ -2655,7 +2712,8 @@ TEST_F(test_cpl, CPLJSONDocument)
         oArray.Add(1);
         oArray.Add(GINT64_MAX);
         oArray.Add(true);
-        ASSERT_EQ(oArray.Size(), 7);
+        oArray.AddNull();
+        ASSERT_EQ(oArray.Size(), 8);
 
         int nCount = 0;
         for (const auto &obj : oArray)
@@ -2664,7 +2722,7 @@ TEST_F(test_cpl, CPLJSONDocument)
                       oArray[nCount].GetInternalHandle());
             nCount++;
         }
-        ASSERT_EQ(nCount, 7);
+        ASSERT_EQ(nCount, 8);
     }
     {
         CPLJSONDocument oDocument;

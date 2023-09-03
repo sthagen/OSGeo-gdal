@@ -154,7 +154,7 @@ def create_tiledb_dataset(nullable, batch_size, include_bool, extra_feature=Fals
     f["int64field"] = -1234567890123456
     f["doublefield"] = 1.2345
     f["floatfield"] = 1.5
-    f.SetFieldBinaryFromHexString("binaryfield", "DEADBEEF")
+    f["binaryfield"] = b"\xDE\xAD\xBE\xEF"
     f["intlistfield"] = [-123456789, 123]
     f["int16listfield"] = [-32768, 32767]
     if include_bool:
@@ -173,7 +173,7 @@ def create_tiledb_dataset(nullable, batch_size, include_bool, extra_feature=Fals
     f["intfieldextra"] = 2
     f.SetGeometry(ogr.CreateGeometryFromWkt("POLYGON ((1 2,1 3,4 3,1 2))"))
     if not nullable:
-        with gdaltest.error_handler():
+        with gdal.quiet_errors():
             assert lyr.CreateFeature(f) == ogr.OGRERR_NONE
     else:
         assert lyr.CreateFeature(f) == ogr.OGRERR_NONE
@@ -190,7 +190,7 @@ def create_tiledb_dataset(nullable, batch_size, include_bool, extra_feature=Fals
     f["int64field"] = 1234567890123456
     f["doublefield"] = -1.2345
     f["floatfield"] = -1.5
-    f.SetFieldBinaryFromHexString("binaryfield", "BEEFDEAD")
+    f["binaryfield"] = b"\xBE\xEF\xDE\xAD"
     f["intlistfield"] = [123456789, -123]
     f["int16listfield"] = [32767, -32768]
     if include_bool:
@@ -218,7 +218,7 @@ def create_tiledb_dataset(nullable, batch_size, include_bool, extra_feature=Fals
         f["int64field"] = 9876543210123456
         f["doublefield"] = -1.2345
         f["floatfield"] = -1.5
-        f.SetFieldBinaryFromHexString("binaryfield", "DEAFBEEF")
+        f["binaryfield"] = b"\xDE\xAD\xBE\xEF"
         f["intlistfield"] = [-123456789, -123]
         f["int16listfield"] = [32767, -32768]
         if include_bool:

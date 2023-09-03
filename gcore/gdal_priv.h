@@ -2985,7 +2985,9 @@ class CPL_DLL GDALMDArray : virtual public GDALAbstractMDArray,
                const std::shared_ptr<GDALMDArray> &poYArray = nullptr,
                CSLConstList papszOptions = nullptr) const;
 
-    virtual GDALDataset *AsClassicDataset(size_t iXDim, size_t iYDim) const;
+    virtual GDALDataset *
+    AsClassicDataset(size_t iXDim, size_t iYDim,
+                     CSLConstList papszOptions = nullptr) const;
 
     virtual CPLErr GetStatistics(bool bApproxOK, bool bForce, double *pdfMin,
                                  double *pdfMax, double *pdfMean,
@@ -3629,7 +3631,7 @@ typedef CPLErr (*GDALResampleFunction)(
     int nChunkYOff, int nChunkYSize, int nDstXOff, int nDstXOff2, int nDstYOff,
     int nDstYOff2, GDALRasterBand *poOverview, void **ppDstBuffer,
     GDALDataType *peDstBufferDataType, const char *pszResampling,
-    int bHasNoData, float fNoDataValue, GDALColorTable *poColorTable,
+    bool bHasNoData, double dfNoDataValue, GDALColorTable *poColorTable,
     GDALDataType eSrcDataType, bool bPropagateNoData);
 
 GDALResampleFunction GDALGetResampleFunction(const char *pszResampling,

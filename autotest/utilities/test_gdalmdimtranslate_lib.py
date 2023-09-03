@@ -29,6 +29,7 @@
 # DEALINGS IN THE SOFTWARE.
 ###############################################################################
 
+import pathlib
 import struct
 
 import gdaltest
@@ -65,15 +66,17 @@ def test_gdalmdimtranslate_multidim_to_mem():
 ###############################################################################
 
 
-def test_gdalmdimtranslate_multidim_to_classic():
+def test_gdalmdimtranslate_multidim_to_classic(tmp_vsimem):
 
-    tmpfile = "/vsimem/out.tif"
+    tmpfile = tmp_vsimem / "out.tif"
 
     with pytest.raises(Exception):
         gdal.MultiDimTranslate(tmpfile, "data/mdim.vrt")
 
     assert gdal.MultiDimTranslate(
-        tmpfile, "data/mdim.vrt", arraySpecs=["/my_subgroup/array_in_subgroup"]
+        tmpfile,
+        pathlib.Path("data/mdim.vrt"),
+        arraySpecs=["/my_subgroup/array_in_subgroup"],
     )
 
     gdal.Unlink(tmpfile)
@@ -850,6 +853,21 @@ def test_gdalmdimtranslate_dims_with_same_name_different_size():
     )
     gdal.Unlink(tmpfile)
     gdal.Unlink(srcfile)
+
+
+@pytest.mark.require_driver("netCDF")
+def test_gdalmdimtranslate_array_with_view():
+    ds = gdal.MultiDimTranslate(
+        "",
+        "../gdrivers/data/netcdf/byte_no_cf.nc",
+        arraySpecs=["name=Band1,view=[::2,::4]"],
+        format="MEM",
+    )
+    rg = ds.GetRootGroup()
+    ar = rg.OpenMDArray("Band1")
+    dims = ar.GetDimensions()
+    assert dims[0].GetSize() == 10
+    assert dims[1].GetSize() == 5
 
 
 def XXXX_test_all():

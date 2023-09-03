@@ -1983,6 +1983,10 @@ public:
     OGR_F_DumpReadable(self, NULL);
   }
 
+  retStringAndCPLFree* DumpReadableAsString(char** options=NULL) {
+    return OGR_F_DumpReadableAsString(self, options);
+  }
+
   void UnsetField(int id) {
     OGR_F_UnsetField(self, id);
   }
@@ -2097,6 +2101,12 @@ public:
       OGR_F_SetFieldStringList(self, id, pList);
   }
 %clear char**pList;
+
+#if defined(SWIGPYTHON)
+  void _SetFieldBinary(int id, int nLen, char *pBuf) {
+      OGR_F_SetFieldBinary(self, id, nLen, pBuf);
+  }
+#endif
 
   void SetFieldBinaryFromHexString(int id, const char* pszValue)
   {

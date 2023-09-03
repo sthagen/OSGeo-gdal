@@ -1684,7 +1684,10 @@ def Info(ds, **kwargs):
         (opts, format, deserialize) = InfoOptions(**kwargs)
     else:
         (opts, format, deserialize) = kwargs['options']
-    if isinstance(ds, str):
+
+    import os
+
+    if isinstance(ds, (str, os.PathLike)):
         ds = Open(ds)
     ret = InfoInternal(ds, opts)
     if format == 'json' and deserialize:
@@ -1794,7 +1797,10 @@ def VectorInfo(ds, **kwargs):
         (opts, format, deserialize) = VectorInfoOptions(**kwargs)
     else:
         (opts, format, deserialize) = kwargs['options']
-    if isinstance(ds, str):
+
+    import os
+
+    if isinstance(ds, (str, os.PathLike)):
         ds = OpenEx(ds, OF_VERBOSE_ERROR | OF_VECTOR)
     ret = VectorInfoInternal(ds, opts)
     if format == 'json' and deserialize:
@@ -1845,7 +1851,10 @@ def MultiDimInfo(ds, **kwargs):
     else:
         opts = kwargs['options']
         as_text = True
-    if isinstance(ds, str):
+
+    import os
+
+    if isinstance(ds, (str, os.PathLike)):
         ds = OpenEx(ds, OF_VERBOSE_ERROR | OF_MULTIDIM_RASTER)
     ret = MultiDimInfoInternal(ds, opts)
     if not as_text:
@@ -1875,7 +1884,7 @@ def TranslateOptions(options=None, format=None,
               xRes = 0.0, yRes = 0.0,
               creationOptions=None, srcWin=None, projWin=None, projWinSRS=None, strict = False,
               unscale = False, scaleParams=None, exponents=None,
-              outputBounds=None, metadataOptions=None,
+              outputBounds=None, outputGeotransform=None, metadataOptions=None,
               outputSRS=None, nogcp=False, GCPs=None,
               noData=None, rgbExpand=None,
               stats = False, rat = True, xmp = True, resampleAlg=None,
@@ -1925,6 +1934,8 @@ def TranslateOptions(options=None, format=None,
         list of exponentiation parameters
     outputBounds:
         assigned output bounds: [ulx, uly, lrx, lry]
+    outputGeotransform:
+        assigned geotransform matrix (array of 6 values) (mutually exclusive with outputBounds)
     metadataOptions:
         list of metadata options
     outputSRS:
@@ -1999,6 +2010,13 @@ def TranslateOptions(options=None, format=None,
                 new_options += ['-exponent', _strHighPrec(exponent)]
         if outputBounds is not None:
             new_options += ['-a_ullr', _strHighPrec(outputBounds[0]), _strHighPrec(outputBounds[1]), _strHighPrec(outputBounds[2]), _strHighPrec(outputBounds[3])]
+        if outputGeotransform:
+            if outputBounds:
+                raise Exception("outputBounds and outputGeotransform are mutually exclusive")
+            assert len(outputGeotransform) == 6
+            new_options += ['-a_gt']
+            for val in outputGeotransform:
+                new_options += [_strHighPrec(val)]
         if metadataOptions is not None:
             if isinstance(metadataOptions, str):
                 new_options += ['-mo', metadataOptions]
@@ -2345,19 +2363,22 @@ def Warp(destNameOrDestDS, srcDSOrSrcDSTab, **kwargs):
         (opts, callback, callback_data) = WarpOptions(**kwargs)
     else:
         (opts, callback, callback_data) = kwargs['options']
-    if isinstance(srcDSOrSrcDSTab, str):
+
+    import os
+
+    if isinstance(srcDSOrSrcDSTab, (str, os.PathLike)):
         srcDSTab = [Open(srcDSOrSrcDSTab)]
     elif isinstance(srcDSOrSrcDSTab, list):
         srcDSTab = []
         for elt in srcDSOrSrcDSTab:
-            if isinstance(elt, str):
+            if isinstance(elt, (str, os.PathLike)):
                 srcDSTab.append(Open(elt))
             else:
                 srcDSTab.append(elt)
     else:
         srcDSTab = [srcDSOrSrcDSTab]
 
-    if isinstance(destNameOrDestDS, str):
+    if isinstance(destNameOrDestDS, (str, os.PathLike)):
         return wrapper_GDALWarpDestName(destNameOrDestDS, srcDSTab, opts, callback, callback_data)
     else:
         return wrapper_GDALWarpDestDS(destNameOrDestDS, srcDSTab, opts, callback, callback_data)
@@ -2689,10 +2710,13 @@ def VectorTranslate(destNameOrDestDS, srcDS, **kwargs):
         (opts, callback, callback_data) = VectorTranslateOptions(**kwargs)
     else:
         (opts, callback, callback_data) = kwargs['options']
-    if isinstance(srcDS, str):
+
+    import os
+
+    if isinstance(srcDS, (str, os.PathLike)):
         srcDS = OpenEx(srcDS, gdalconst.OF_VECTOR)
 
-    if isinstance(destNameOrDestDS, str):
+    if isinstance(destNameOrDestDS, (str, os.PathLike)):
         return wrapper_GDALVectorTranslateDestName(destNameOrDestDS, srcDS, opts, callback, callback_data)
     else:
         return wrapper_GDALVectorTranslateDestDS(destNameOrDestDS, srcDS, opts, callback, callback_data)
@@ -2920,10 +2944,13 @@ def Nearblack(destNameOrDestDS, srcDS, **kwargs):
         (opts, callback, callback_data) = NearblackOptions(**kwargs)
     else:
         (opts, callback, callback_data) = kwargs['options']
-    if isinstance(srcDS, str):
+
+    import os
+
+    if isinstance(srcDS, (str, os.PathLike)):
         srcDS = OpenEx(srcDS)
 
-    if isinstance(destNameOrDestDS, str):
+    if isinstance(destNameOrDestDS, (str, os.PathLike)):
         return wrapper_GDALNearblackDestName(destNameOrDestDS, srcDS, opts, callback, callback_data)
     else:
         return wrapper_GDALNearblackDestDS(destNameOrDestDS, srcDS, opts, callback, callback_data)
@@ -3233,14 +3260,16 @@ def Rasterize(destNameOrDestDS, srcDS, **kwargs):
 
     _WarnIfUserHasNotSpecifiedIfUsingExceptions()
 
+    import os
+
     if 'options' not in kwargs or isinstance(kwargs['options'], (list, str)):
         (opts, callback, callback_data) = RasterizeOptions(**kwargs)
     else:
         (opts, callback, callback_data) = kwargs['options']
-    if isinstance(srcDS, str):
+    if isinstance(srcDS, (str, os.PathLike)):
         srcDS = OpenEx(srcDS, gdalconst.OF_VECTOR)
 
-    if isinstance(destNameOrDestDS, str):
+    if isinstance(destNameOrDestDS, (str, os.PathLike)):
         return wrapper_GDALRasterizeDestName(destNameOrDestDS, srcDS, opts, callback, callback_data)
     else:
         return wrapper_GDALRasterizeDestDS(destNameOrDestDS, srcDS, opts, callback, callback_data)
@@ -3392,7 +3421,10 @@ def Footprint(destNameOrDestDS, srcDS, **kwargs):
         (opts, callback, callback_data) = FootprintOptions(**kwargs)
     else:
         (opts, callback, callback_data) = kwargs['options']
-    if isinstance(srcDS, str):
+
+    import os
+
+    if isinstance(srcDS, (str, os.PathLike)):
         srcDS = OpenEx(srcDS, gdalconst.OF_RASTER)
 
     if inline_geojson_requested or wkt_requested:
@@ -3426,7 +3458,9 @@ def Footprint(destNameOrDestDS, srcDS, **kwargs):
             if VSIStatL(temp_filename):
                 Unlink(temp_filename)
 
-    if isinstance(destNameOrDestDS, str):
+    import os
+
+    if isinstance(destNameOrDestDS, (str, os.PathLike)):
         return wrapper_GDALFootprintDestName(destNameOrDestDS, srcDS, opts, callback, callback_data)
     else:
         return wrapper_GDALFootprintDestDS(destNameOrDestDS, srcDS, opts, callback, callback_data)
@@ -3566,12 +3600,15 @@ def BuildVRT(destName, srcDSOrSrcDSTab, **kwargs):
 
     srcDSTab = []
     srcDSNamesTab = []
-    if isinstance(srcDSOrSrcDSTab, str):
-        srcDSNamesTab = [srcDSOrSrcDSTab]
+
+    import os
+
+    if isinstance(srcDSOrSrcDSTab, (str, os.PathLike)):
+        srcDSNamesTab = [str(srcDSOrSrcDSTab)]
     elif isinstance(srcDSOrSrcDSTab, list):
         for elt in srcDSOrSrcDSTab:
-            if isinstance(elt, str):
-                srcDSNamesTab.append(elt)
+            if isinstance(elt, (str, os.PathLike)):
+                srcDSNamesTab.append(str(elt))
             else:
                 srcDSTab.append(elt)
         if srcDSTab and srcDSNamesTab:
@@ -3663,7 +3700,10 @@ def MultiDimTranslate(destName, srcDSOrSrcDSTab, **kwargs):
         (opts, callback, callback_data) = MultiDimTranslateOptions(**kwargs)
     else:
         (opts, callback, callback_data) = kwargs['options']
-    if isinstance(srcDSOrSrcDSTab, str):
+
+    import os
+
+    if isinstance(srcDSOrSrcDSTab, (str, os.PathLike)):
         srcDSTab = [OpenEx(srcDSOrSrcDSTab, OF_VERBOSE_ERROR | OF_RASTER | OF_MULTIDIM_RASTER)]
     elif isinstance(srcDSOrSrcDSTab, list):
         srcDSTab = []

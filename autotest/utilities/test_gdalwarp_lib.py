@@ -46,7 +46,7 @@ from osgeo import gdal, ogr, osr
 def test_gdalwarp_lib_1(tmp_path):
 
     ds1 = gdal.Open("../gcore/data/byte.tif")
-    dstDS = gdal.Warp(f"{tmp_path}/testgdalwarp1.tif", ds1)
+    dstDS = gdal.Warp(tmp_path / "testgdalwarp1.tif", ds1)
 
     assert dstDS.GetRasterBand(1).Checksum() == 4672, "Bad checksum"
 
@@ -61,7 +61,7 @@ def test_gdalwarp_lib_2(tmp_path):
 
     ds1 = gdal.Open("../gcore/data/byte.tif")
     dstDS = gdal.Warp(
-        f"{tmp_path}/testgdalwarp2.tif".encode("ascii").decode("ascii"),
+        tmp_path / "testgdalwarp2.tif".encode("ascii").decode("ascii"),
         [ds1],
         format="GTiff",
     )
@@ -108,9 +108,7 @@ def test_gdalwarp_lib_4():
 @pytest.fixture(scope="module")
 def testgdalwarp_gcp_tif(tmp_path_factory):
 
-    testgdalwarp_gcp_tif_fname = str(
-        tmp_path_factory.mktemp("tmp") / "testgdalwarp_gcp.tif"
-    )
+    testgdalwarp_gcp_tif_fname = tmp_path_factory.mktemp("tmp") / "testgdalwarp_gcp.tif"
 
     ds = gdal.Open("../gcore/data/byte.tif")
     gcpList = [
@@ -405,7 +403,7 @@ def test_gdalwarp_lib_15(testgdalwarp_gcp_tif):
 def test_gdalwarp_lib_16(testgdalwarp_gcp_tif):
 
     ds = gdal.Warp(
-        "/vsimem/test_gdalwarp_lib_16.vrt", testgdalwarp_gcp_tif, format="VRT"
+        "/vsimem/test_gdalwarp_lib_16.vrt", [testgdalwarp_gcp_tif], format="VRT"
     )
     assert ds is not None
 
@@ -1217,7 +1215,7 @@ def test_gdalwarp_lib_121():
         gdal.wrapper_GDALWarpDestName("", [], None, gdal.TermProgress_nocb)
 
     # Null dest name
-    with gdaltest.error_handler():
+    with gdal.quiet_errors():
         with pytest.raises(Exception):
             gdal.wrapper_GDALWarpDestName(None, [], None)
 
@@ -2043,7 +2041,7 @@ def test_gdalwarp_lib_135p(gdalwarp_135_grid_gtx):
     src_ds.GetRasterBand(1).Fill(100)
     src_ds.GetRasterBand(1).SetUnitType("unhandled")
 
-    with gdaltest.error_handler():
+    with gdal.quiet_errors():
         ds = gdal.Warp("", src_ds, format="MEM", dstSRS="EPSG:4979")
     data = struct.unpack("B" * 1, ds.GetRasterBand(1).ReadRaster())[0]
     assert data == 120, "Bad value"
@@ -3324,7 +3322,7 @@ def test_gdalwarp_lib_srcBands():
     assert ds.GetRasterBand(2).Checksum() == 4672
 
     # Error: len(dstBands) != len(srcBands)
-    with gdaltest.error_handler():
+    with gdal.quiet_errors():
         with pytest.raises(Exception):
             assert (
                 gdal.Warp(
