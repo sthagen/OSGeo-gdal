@@ -33,7 +33,6 @@
 #include "ogr_p.h"
 #include "ogr_recordbatch.h"
 #include "ogr_swq.h"
-#include "ogr_wkb.h"
 
 #include <algorithm>
 #include <limits>
@@ -511,7 +510,6 @@ OGRLayer *OGRTileDBDataset::ICreateLayer(const char *pszName,
     poLayer->m_poFeatureDefn->GetGeomFieldDefn(0)->SetName(pszGeomColName);
 
     poLayer->m_eCurrentMode = OGRTileDBLayer::CurrentMode::WriteInProgress;
-    poLayer->m_nNextFID = 1;
 
     const char *pszTileDBStringType =
         CSLFetchNameValue(papszOptions, "TILEDB_STRING_TYPE");
@@ -1550,24 +1548,28 @@ template <class T> struct ResetArray
 };
 }  // namespace
 
+void OGRTileDBLayer::AllocateNewBuffers()
+{
+    m_anFIDs = std::make_shared<std::vector<int64_t>>();
+    m_adfXs = std::make_shared<std::vector<double>>();
+    m_adfYs = std::make_shared<std::vector<double>>();
+    m_adfZs = std::make_shared<std::vector<double>>();
+    m_abyGeometries = std::make_shared<std::vector<unsigned char>>();
+    m_anGeometryOffsets = std::make_shared<std::vector<uint64_t>>();
+
+    for (int i = 0; i < m_poFeatureDefn->GetFieldCount(); i++)
+    {
+        ProcessField<ResetArray>::exec(m_aeFieldTypes[i], m_aFieldValues[i]);
+
+        m_aFieldValueOffsets[i] = std::make_shared<std::vector<uint64_t>>();
+    }
+}
+
 bool OGRTileDBLayer::SetupQuery(tiledb::QueryCondition *queryCondition)
 {
     if (!m_bArrowBatchReleased)
     {
-        m_anFIDs = std::make_shared<std::vector<int64_t>>();
-        m_adfXs = std::make_shared<std::vector<double>>();
-        m_adfYs = std::make_shared<std::vector<double>>();
-        m_adfZs = std::make_shared<std::vector<double>>();
-        m_abyGeometries = std::make_shared<std::vector<unsigned char>>();
-        m_anGeometryOffsets = std::make_shared<std::vector<uint64_t>>();
-
-        for (int i = 0; i < m_poFeatureDefn->GetFieldCount(); i++)
-        {
-            ProcessField<ResetArray>::exec(m_aeFieldTypes[i],
-                                           m_aFieldValues[i]);
-
-            m_aFieldValueOffsets[i] = std::make_shared<std::vector<uint64_t>>();
-        }
+        AllocateNewBuffers();
     }
 
     m_anFIDs->clear();
@@ -4479,18 +4481,26 @@ template <class T> struct ClearArray
 
 void OGRTileDBLayer::ResetBuffers()
 {
-    // Reset buffers
-    m_anFIDs->clear();
-    m_adfXs->clear();
-    m_adfYs->clear();
-    m_adfZs->clear();
-    m_abyGeometries->clear();
-    m_anGeometryOffsets->clear();
-    for (int i = 0; i < m_poFeatureDefn->GetFieldCount(); i++)
+    if (!m_bArrowBatchReleased)
     {
-        m_aFieldValueOffsets[i]->clear();
-        m_aFieldValidity[i].clear();
-        ProcessField<ClearArray>::exec(m_aeFieldTypes[i], m_aFieldValues[i]);
+        AllocateNewBuffers();
+    }
+    else
+    {
+        // Reset buffers
+        m_anFIDs->clear();
+        m_adfXs->clear();
+        m_adfYs->clear();
+        m_adfZs->clear();
+        m_abyGeometries->clear();
+        m_anGeometryOffsets->clear();
+        for (int i = 0; i < m_poFeatureDefn->GetFieldCount(); i++)
+        {
+            m_aFieldValueOffsets[i]->clear();
+            m_aFieldValidity[i].clear();
+            ProcessField<ClearArray>::exec(m_aeFieldTypes[i],
+                                           m_aFieldValues[i]);
+        }
     }
 }
 
@@ -5181,9 +5191,11 @@ int OGRTileDBLayer::GetNextArrowArray(struct ArrowArrayStream *,
                 const auto nNextOffset =
                     static_cast<size_t>((*m_anGeometryOffsets)[i + 1]);
                 const auto nItemLen = nNextOffset - nSrcOffset;
-                if (OGRWKBGetBoundingBox(m_abyGeometries->data() + nSrcOffset,
-                                         nItemLen, sEnvelope) &&
-                    m_sFilterEnvelope.Intersects(sEnvelope))
+                const GByte *pabyWKB = m_abyGeometries->data() + nSrcOffset;
+                const size_t nWKBSize = nItemLen;
+                if (FilterWKBGeometry(pabyWKB, nWKBSize,
+                                      /* bEnvelopeAlreadySet=*/false,
+                                      sEnvelope))
                 {
                     abyValidityFromFilters[i] = true;
                     (*m_anGeometryOffsets)[nCountIntersecting] = nAccLen;

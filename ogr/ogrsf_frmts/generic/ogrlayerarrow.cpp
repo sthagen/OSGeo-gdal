@@ -1729,6 +1729,8 @@ void OGRLayer::ReleaseStream(struct ArrowArrayStream *stream)
         static_cast<ArrowArrayStreamPrivateDataSharedDataWrapper *>(
             stream->private_data);
     poPrivate->poShared->m_bArrowArrayStreamInProgress = false;
+    if (poPrivate->poShared->m_poLayer)
+        poPrivate->poShared->m_poLayer->ResetReading();
     delete poPrivate;
     stream->private_data = nullptr;
     stream->release = nullptr;
@@ -1864,8 +1866,6 @@ bool OGRLayer::GetArrowStream(struct ArrowArrayStream *out_stream,
         return false;
     }
     m_aosArrowArrayStreamOptions.Assign(CSLDuplicate(papszOptions), true);
-
-    ResetReading();
 
     out_stream->get_schema = OGRLayer::StaticGetArrowSchema;
     out_stream->get_next = OGRLayer::StaticGetNextArrowArray;
@@ -2379,8 +2379,7 @@ CompactFixedWidthArray(struct ArrowArray *array, int nWidth,
 
 template <class OffsetType>
 static size_t
-FillValidityArrayFromWKBArray(struct ArrowArray *array,
-                              const OGREnvelope &sFilterEnvelope,
+FillValidityArrayFromWKBArray(struct ArrowArray *array, const OGRLayer *poLayer,
                               std::vector<bool> &abyValidityFromFilters)
 {
     const size_t nLength = static_cast<size_t>(array->length);
@@ -2399,11 +2398,12 @@ FillValidityArrayFromWKBArray(struct ArrowArray *array,
     {
         if (!pabyValidity || TestBit(pabyValidity, i + nOffset))
         {
-            if (OGRWKBGetBoundingBox(
-                    pabyData + panOffsets[i],
-                    static_cast<size_t>(panOffsets[i + 1] - panOffsets[i]),
-                    sEnvelope) &&
-                sFilterEnvelope.Intersects(sEnvelope))
+            const GByte *pabyWKB = pabyData + panOffsets[i];
+            const size_t nWKBSize =
+                static_cast<size_t>(panOffsets[i + 1] - panOffsets[i]);
+            if (poLayer->FilterWKBGeometry(pabyWKB, nWKBSize,
+                                           /* bEnvelopeAlreadySet=*/false,
+                                           sEnvelope))
             {
                 abyValidityFromFilters[i] = true;
                 nCountIntersecting++;
@@ -2880,11 +2880,11 @@ void OGRLayer::PostFilterArrowArray(const struct ArrowSchema *schema,
     const size_t nCountIntersectingGeom =
         m_poFilterGeom ? (strcmp(schema->children[iGeomField]->format, "z") == 0
                               ? FillValidityArrayFromWKBArray<uint32_t>(
-                                    array->children[iGeomField],
-                                    m_sFilterEnvelope, abyValidityFromFilters)
+                                    array->children[iGeomField], this,
+                                    abyValidityFromFilters)
                               : FillValidityArrayFromWKBArray<uint64_t>(
-                                    array->children[iGeomField],
-                                    m_sFilterEnvelope, abyValidityFromFilters))
+                                    array->children[iGeomField], this,
+                                    abyValidityFromFilters))
                        : nLength;
     if (!m_poFilterGeom)
         abyValidityFromFilters.resize(nLength, true);

@@ -1486,6 +1486,10 @@ def test_vrt_protocol():
     ds = gdal.Open("vrt://data/float32.tif?if=AAIGrid,GTiff")
     assert ds is not None
 
+    ## separated if not allowed
+    with gdal.quiet_errors():
+        assert not gdal.Open("vrt://data/float32.tif?if=AAIGrid&if=GTiff")
+
     ## check exponent and scale
     ds = gdal.Open("vrt://data/float32.tif?scale=0,255,255,255")
     assert ds.GetRasterBand(1).Checksum() == 4873
@@ -1516,6 +1520,109 @@ def test_vrt_protocol():
     ds = gdal.Open("vrt://data/float32.tif?outsize=50%,25%")
     assert ds.GetRasterBand(1).XSize == 10
     assert ds.GetRasterBand(1).YSize == 5
+
+    with gdal.quiet_errors():
+        ds = gdal.Open("vrt://data/float32.tif?projwin=440840,441920,3750120")
+        assert ds is None
+
+    ds = gdal.Open("vrt://data/float32.tif?projwin=440840,3751080,441920,3750120")
+    assert ds.GetGeoTransform()[0] == 440840.0
+    assert ds.GetGeoTransform()[3] == 3751080.0
+    assert ds.GetRasterBand(1).XSize == 18
+    assert ds.GetRasterBand(1).YSize == 16
+
+    ## no op, simply ignored as with gdal_translate
+    ds = gdal.Open("vrt://data/float32.tif?projwin_srs=OGC:CRS84")
+    assert ds is not None
+
+    ds = gdal.Open(
+        "vrt://data/float32.tif?projwin_srs=OGC:CRS84&projwin=-117.6407,33.90027,-117.6292,33.89181"
+    )
+
+    assert ds.GetGeoTransform()[0] == 440840.0
+    assert ds.GetGeoTransform()[3] == 3751140.0
+    assert ds.GetRasterBand(1).XSize == 18
+    assert ds.GetRasterBand(1).YSize == 16
+
+    with gdal.quiet_errors():
+        ds = gdal.Open("vrt://data/float32.tif?tr=120")
+        assert ds is None
+
+    ds = gdal.Open("vrt://data/float32.tif?tr=120,240")
+
+    assert ds.GetGeoTransform()[0] == 440720.0
+    assert ds.GetGeoTransform()[1] == 120.0
+    assert ds.GetGeoTransform()[5] == -240.0
+    assert ds.GetRasterBand(1).XSize == 10
+    assert ds.GetRasterBand(1).YSize == 5
+
+    ds = gdal.Open("vrt://data/float32.tif?r=bilinear&tr=120,240")
+    assert struct.unpack("f", ds.ReadRaster(0, 0, 1, 1))[0] == pytest.approx(
+        128.95408630371094
+    )  ## check values changed via bilinear
+
+    with gdal.quiet_errors():
+        ds = gdal.Open("vrt://data/float32.tif?srcwin=0,0,3")
+        assert ds is None
+
+    ds = gdal.Open("vrt://data/float32.tif?srcwin=2,3,8,5")
+    assert ds.GetRasterBand(1).XSize == 8
+    assert ds.GetRasterBand(1).YSize == 5
+    assert struct.unpack("f", ds.ReadRaster(0, 0, 1, 1))[0] == pytest.approx(
+        123.0
+    )  ## check value is correct
+
+    with gdal.quiet_errors():
+        ds = gdal.Open("vrt://data/float32.tif?a_gt=1,0,0,0,1")
+        assert ds is None
+
+    ds = gdal.Open("vrt://data/float32.tif?a_gt=0,1,0,0,0,1")
+    gdaltest.check_geotransform(
+        (0, 1, 0, 0, 0, 1),
+        ds.GetGeoTransform(),
+        1e-9,
+    )
+
+    ## multiple open options
+    ds = gdal.Open(
+        "vrt://data/byte_with_ovr.tif?oo=GEOREF_SOURCES=TABFILE,OVERVIEW_LEVEL=0"
+    )
+    gdaltest.check_geotransform(
+        (0, 1, 0, 0, 0, 1),
+        ds.GetGeoTransform(),
+        1e-9,
+    )
+    assert ds.GetRasterBand(1).XSize == 10
+    assert ds.GetRasterBand(1).YSize == 10
+
+    ## separated oo instances not allowed
+    with gdal.quiet_errors():
+        assert not gdal.Open(
+            "vrt://data/byte_with_ovr.tif?oo=GEOREF_SOURCES=TABFILE&oo=OVERVIEW_LEVEL=0"
+        )
+
+    dsn_unscale = "/vsimem/scale2.tif"
+    gdal.Translate(dsn_unscale, "vrt://data/byte.tif?a_scale=2")
+    ds = gdal.Open("vrt://" + dsn_unscale + "?unscale=true&ot=int16")
+    assert struct.unpack("h", ds.GetRasterBand(1).ReadRaster(0, 0, 1, 1))[0] == 214
+
+    ds = gdal.Open("vrt://data/minfloat.tif?scale=true")
+    assert struct.unpack("f", ds.GetRasterBand(1).ReadRaster(2, 0, 1, 1))[
+        0
+    ] == pytest.approx(255.99899291992188)
+
+    ds = gdal.Open("vrt://data/minfloat.tif?scale_2=true&bands=1,1")
+    assert struct.unpack("f", ds.GetRasterBand(2).ReadRaster(2, 0, 1, 1))[
+        0
+    ] == pytest.approx(255.99899291992188)
+    assert struct.unpack("f", ds.GetRasterBand(1).ReadRaster(2, 0, 1, 1))[
+        0
+    ] == pytest.approx(5.0)
+
+    # test that 'key=value' form is used
+    with gdal.quiet_errors():
+        assert not gdal.Open("vrt://data/minfloat.tif?scale")
+        assert not gdal.Open("vrt://data/minfloat.tif?a_ullr=0,1,1,0&unscale&")
 
 
 @pytest.mark.require_driver("BMP")
@@ -2010,9 +2117,14 @@ def test_vrt_read_req_coordinates_almost_integer():
 
 
 @pytest.mark.parametrize("approx_ok,use_threads", [(False, True), (True, False)])
-def test_vrt_read_compute_statistics_mosaic_optimization(approx_ok, use_threads):
+def test_vrt_read_compute_statistics_mosaic_optimization(
+    tmp_vsimem, approx_ok, use_threads
+):
 
-    src_ds = gdal.Translate("", gdal.Open("data/byte.tif"), format="MEM")
+    # To avoid using a byte.aux.xml file with existing statistics
+    src_filename = str(tmp_vsimem / "byte.tif")
+    gdal.FileFromMemBuffer(src_filename, open("data/byte.tif", "rb").read())
+    src_ds = gdal.Translate("", src_filename, format="MEM")
     src_ds1 = gdal.Translate("", src_ds, options="-of MEM -srcwin 0 0 8 20")
     src_ds2 = gdal.Translate("", src_ds, options="-of MEM -srcwin 8 0 12 20")
     vrt_ds = gdal.BuildVRT("", [src_ds1, src_ds2])

@@ -167,7 +167,7 @@ class TileDBRasterDataset final : public TileDBDataset
     int nBlockYSize = -1;
     int nBlocksX = 0;
     int nBlocksY = 0;
-    int nBandStart = 1;
+    uint64_t nBandStart = 1;
     bool bHasSubDatasets = false;
     int nSubDataCount = 0;
     char **papszSubDatasets = nullptr;
@@ -184,8 +184,8 @@ class TileDBRasterDataset final : public TileDBDataset
     CPLErr CreateAttribute(GDALDataType eType, const CPLString &osAttrName,
                            const int nSubRasterCount = 1);
 
-    CPLErr AddDimensions(tiledb::Domain &domain, tiledb::Dimension &y,
-                         tiledb::Dimension &x,
+    CPLErr AddDimensions(tiledb::Domain &domain, const char *pszAttrName,
+                         tiledb::Dimension &y, tiledb::Dimension &x,
                          tiledb::Dimension *poBands = nullptr);
 
   public:
@@ -264,7 +264,7 @@ class OGRTileDBLayer final : public OGRLayer,
     bool m_bInitialized = false;
     OGRFeatureDefn *m_poFeatureDefn = nullptr;
     std::string m_osFIDColumn{};
-    GIntBig m_nNextFID = -1;
+    GIntBig m_nNextFID = 1;
     int64_t m_nTotalFeatureCount = -1;
     bool m_bStats = false;
     bool m_bQueryComplete = false;
@@ -345,6 +345,7 @@ class OGRTileDBLayer final : public OGRLayer,
     const char *GetDatabaseGeomColName();
     void InitializeSchemaAndArray();
     void FlushArrays();
+    void AllocateNewBuffers();
     void ResetBuffers();
     void SwitchToReadingMode();
     void SwitchToWritingMode();
