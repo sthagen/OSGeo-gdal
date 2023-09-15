@@ -1337,6 +1337,18 @@ GDALDataset *VRTDataset::OpenVRTProtocol(const char *pszSpec)
                     argv.AddString("-unscale");
                 }
             }
+            else if (EQUAL(pszKey, "a_coord_epoch"))
+            {
+                argv.AddString("-a_coord_epoch");
+                argv.AddString(pszValue);
+            }
+            else if (EQUAL(pszKey, "nogcp"))
+            {
+                if (CPLTestBool(pszValue))
+                {
+                    argv.AddString("-nogcp");
+                }
+            }
 
             else
             {
