@@ -293,7 +293,7 @@ OGRErr OGRGeoPackageTableLayer::FeatureBindParameters(
         if (iField == m_iFIDAsRegularColumnIndex ||
             m_abGeneratedColumns[iField])
             continue;
-        if (!poFeature->IsFieldSet(iField))
+        if (!poFeature->IsFieldSetUnsafe(iField))
         {
             if (bBindUnsetFields)
             {
@@ -308,28 +308,37 @@ OGRErr OGRGeoPackageTableLayer::FeatureBindParameters(
             continue;
         }
 
-        const OGRFieldDefn *poFieldDefn = poFeatureDefn->GetFieldDefn(iField);
+        const OGRFieldDefn *poFieldDefn =
+            poFeatureDefn->GetFieldDefnUnsafe(iField);
         int err = SQLITE_OK;
 
-        if (!poFeature->IsFieldNull(iField))
+        if (!poFeature->IsFieldNullUnsafe(iField))
         {
-            switch (SQLiteFieldFromOGR(poFieldDefn->GetType()))
+            const auto eType = poFieldDefn->GetType();
+            switch (eType)
             {
-                case SQLITE_INTEGER:
+                case OFTInteger:
+                {
+                    err = sqlite3_bind_int(
+                        poStmt, nColCount++,
+                        poFeature->GetFieldAsIntegerUnsafe(iField));
+                    break;
+                }
+                case OFTInteger64:
                 {
                     err = sqlite3_bind_int64(
                         poStmt, nColCount++,
-                        poFeature->GetFieldAsInteger64(iField));
+                        poFeature->GetFieldAsInteger64Unsafe(iField));
                     break;
                 }
-                case SQLITE_FLOAT:
+                case OFTReal:
                 {
                     err = sqlite3_bind_double(
                         poStmt, nColCount++,
-                        poFeature->GetFieldAsDouble(iField));
+                        poFeature->GetFieldAsDoubleUnsafe(iField));
                     break;
                 }
-                case SQLITE_BLOB:
+                case OFTBinary:
                 {
                     int szBlob = 0;
                     GByte *pabyBlob =
@@ -343,7 +352,7 @@ OGRErr OGRGeoPackageTableLayer::FeatureBindParameters(
                     const char *pszVal = "";
                     int nValLengthBytes = -1;
                     sqlite3_destructor_type destructorType = SQLITE_TRANSIENT;
-                    if (poFieldDefn->GetType() == OFTDate)
+                    if (eType == OFTDate)
                     {
                         destructorType = SQLITE_STATIC;
                         const auto psFieldRaw =
@@ -383,7 +392,7 @@ OGRErr OGRGeoPackageTableLayer::FeatureBindParameters(
                             nInsertionBufferPos += 10;
                         }
                     }
-                    else if (poFieldDefn->GetType() == OFTDateTime)
+                    else if (eType == OFTDateTime)
                     {
                         destructorType = SQLITE_STATIC;
                         const auto psFieldRaw =
@@ -439,9 +448,9 @@ OGRErr OGRGeoPackageTableLayer::FeatureBindParameters(
                         }
                         nInsertionBufferPos += nValLengthBytes;
                     }
-                    else if (poFieldDefn->GetType() == OFTString)
+                    else if (eType == OFTString)
                     {
-                        pszVal = poFeature->GetFieldAsString(iField);
+                        pszVal = poFeature->GetFieldAsStringUnsafe(iField);
                         if (poFieldDefn->GetWidth() > 0)
                         {
                             if (!CPLIsUTF8(pszVal, -1))
@@ -2277,10 +2286,10 @@ OGRErr OGRGeoPackageTableLayer::CreateOrUpsertFeature(OGRFeature *poFeature,
     const int nFieldCount = m_poFeatureDefn->GetFieldCount();
     for (int iField = 0; iField < nFieldCount; iField++)
     {
-        if (poFeature->IsFieldSet(iField))
+        if (poFeature->IsFieldSetUnsafe(iField))
             continue;
         const char *pszDefault =
-            poFeature->GetFieldDefnRef(iField)->GetDefault();
+            m_poFeatureDefn->GetFieldDefnUnsafe(iField)->GetDefault();
         if (pszDefault != nullptr)
         {
             bHasDefaultValue = true;
@@ -7169,6 +7178,103 @@ OGRErr OGRGeoPackageTableLayer::ReorderFields(int *panMap)
 }
 
 /************************************************************************/
+/*                   OGR_GPKG_GeometryTypeAggregate()                   */
+/************************************************************************/
+
+namespace
+{
+struct GeometryTypeAggregateContext
+{
+    sqlite3 *m_hDB = nullptr;
+    int m_nFlags = 0;
+    bool m_bIsGeometryTypeAggregateInterrupted = false;
+    std::string m_osGeometryTypeAggregateResult{};
+    std::map<OGRwkbGeometryType, int64_t> m_oMapCount{};
+    std::set<OGRwkbGeometryType> m_oSetNotNull{};
+
+    explicit GeometryTypeAggregateContext(sqlite3 *hDB, int nFlags)
+        : m_hDB(hDB), m_nFlags(nFlags)
+    {
+    }
+    GeometryTypeAggregateContext(const GeometryTypeAggregateContext &) = delete;
+    GeometryTypeAggregateContext &
+    operator=(const GeometryTypeAggregateContext &) = delete;
+
+    void SetGeometryTypeAggregateInterrupted(bool b)
+    {
+        m_bIsGeometryTypeAggregateInterrupted = b;
+        if (b)
+            sqlite3_interrupt(m_hDB);
+    }
+};
+
+}  // namespace
+
+static void OGR_GPKG_GeometryTypeAggregate_Step(sqlite3_context *pContext,
+                                                int /*argc*/,
+                                                sqlite3_value **argv)
+{
+    const GByte *pabyBLOB =
+        reinterpret_cast<const GByte *>(sqlite3_value_blob(argv[0]));
+
+    auto poContext = static_cast<GeometryTypeAggregateContext *>(
+        sqlite3_user_data(pContext));
+
+    OGRwkbGeometryType eGeometryType = wkbNone;
+    OGRErr err = OGRERR_FAILURE;
+    if (pabyBLOB != nullptr)
+    {
+        GPkgHeader sHeader;
+        const int nBLOBLen = sqlite3_value_bytes(argv[0]);
+        if (GPkgHeaderFromWKB(pabyBLOB, nBLOBLen, &sHeader) == OGRERR_NONE &&
+            static_cast<size_t>(nBLOBLen) >= sHeader.nHeaderLen + 5)
+        {
+            err = OGRReadWKBGeometryType(pabyBLOB + sHeader.nHeaderLen,
+                                         wkbVariantIso, &eGeometryType);
+            if (eGeometryType == wkbGeometryCollection25D &&
+                (poContext->m_nFlags & OGR_GGT_GEOMCOLLECTIONZ_TINZ) != 0)
+            {
+                auto poGeom = std::unique_ptr<OGRGeometry>(
+                    GPkgGeometryToOGR(pabyBLOB, nBLOBLen, nullptr));
+                if (poGeom)
+                {
+                    const auto poGC = poGeom->toGeometryCollection();
+                    if (poGC->getNumGeometries() > 0)
+                    {
+                        auto eSubGeomType =
+                            poGC->getGeometryRef(0)->getGeometryType();
+                        if (eSubGeomType == wkbTINZ)
+                            eGeometryType = wkbTINZ;
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        // NULL geometry
+        err = OGRERR_NONE;
+    }
+    if (err == OGRERR_NONE)
+    {
+        ++poContext->m_oMapCount[eGeometryType];
+        if (eGeometryType != wkbNone &&
+            (poContext->m_nFlags & OGR_GGT_STOP_IF_MIXED) != 0)
+        {
+            poContext->m_oSetNotNull.insert(eGeometryType);
+            if (poContext->m_oSetNotNull.size() == 2)
+            {
+                poContext->SetGeometryTypeAggregateInterrupted(true);
+            }
+        }
+    }
+}
+
+static void OGR_GPKG_GeometryTypeAggregate_Finalize(sqlite3_context *)
+{
+}
+
+/************************************************************************/
 /*                         GetGeometryTypes()                           */
 /************************************************************************/
 
@@ -7249,27 +7355,39 @@ OGRGeometryTypeCounter *OGRGeoPackageTableLayer::GetGeometryTypes(
     CPL_IGNORE_RET_VAL(pProgressData);
 #endif
 
-    char **papszResult = nullptr;
-    char *pszErrMsg = nullptr;
-    int nRowCount = 0;
-    int nColCount = 0;
+    // For internal use only
+
+    GeometryTypeAggregateContext sContext(m_poDS->hDB, nFlagsGGT);
+
+    CPLString osFuncName;
+    osFuncName.Printf("OGR_GPKG_GeometryTypeAggregate_INTERNAL_%p", &sContext);
+
+    sqlite3_create_function(m_poDS->hDB, osFuncName.c_str(), 1, SQLITE_UTF8,
+                            &sContext, nullptr,
+                            OGR_GPKG_GeometryTypeAggregate_Step,
+                            OGR_GPKG_GeometryTypeAggregate_Finalize);
+
     // Using this aggregate function is slightly faster than using
     // sqlite3_step() to loop over each geometry blob (650 ms vs 750ms on a 1.6
     // GB db with 3.3 million features)
     char *pszSQL = sqlite3_mprintf(
-        "SELECT OGR_GPKG_GeometryTypeAggregate_INTERNAL(\"%w\", %d) FROM "
-        "\"%w\"%s",
-        poDefn->GetGeomFieldDefn(iGeomField)->GetNameRef(), nFlagsGGT,
-        m_pszTableName,
+        "SELECT %s(\"%w\") FROM \"%w\"%s", osFuncName.c_str(),
+        poDefn->GetGeomFieldDefn(iGeomField)->GetNameRef(), m_pszTableName,
         m_soFilter.empty() ? "" : (" WHERE " + m_soFilter).c_str());
-    const int rc = sqlite3_get_table(m_poDS->hDB, pszSQL, &(papszResult),
-                                     &(nRowCount), &(nColCount), &(pszErrMsg));
-    if (rc != SQLITE_OK && !m_poDS->IsGeometryTypeAggregateInterrupted())
+    char *pszErrMsg = nullptr;
+    const int rc =
+        sqlite3_exec(m_poDS->hDB, pszSQL, nullptr, nullptr, &(pszErrMsg));
+
+    // Delete function
+    sqlite3_create_function(m_poDS->GetDB(), osFuncName.c_str(), 1, SQLITE_UTF8,
+                            nullptr, nullptr, nullptr, nullptr);
+
+    if (rc != SQLITE_OK && !sContext.m_bIsGeometryTypeAggregateInterrupted)
     {
         if (rc != SQLITE_INTERRUPT)
         {
-            CPLError(CE_Failure, CPLE_AppDefined,
-                     "sqlite3_get_table(%s) failed: %s", pszSQL, pszErrMsg);
+            CPLError(CE_Failure, CPLE_AppDefined, "sqlite3_exec(%s) failed: %s",
+                     pszSQL, pszErrMsg);
         }
         sqlite3_free(pszErrMsg);
         sqlite3_free(pszSQL);
@@ -7279,28 +7397,16 @@ OGRGeometryTypeCounter *OGRGeoPackageTableLayer::GetGeometryTypes(
     sqlite3_free(pszErrMsg);
     sqlite3_free(pszSQL);
 
-    const char *pszRes = m_poDS->IsGeometryTypeAggregateInterrupted()
-                             ? m_poDS->GetGeometryTypeAggregateResult().c_str()
-                         : nRowCount == 1 && nColCount == 1 ? papszResult[1]
-                                                            : nullptr;
-    const CPLStringList aosList(pszRes ? CSLTokenizeString2(pszRes, ",", 0)
-                                       : nullptr);
-    sqlite3_free_table(papszResult);
-
     // Format result
-    nEntryCountOut = static_cast<int>(aosList.size());
+    nEntryCountOut = static_cast<int>(sContext.m_oMapCount.size());
     OGRGeometryTypeCounter *pasRet = static_cast<OGRGeometryTypeCounter *>(
         CPLCalloc(1 + nEntryCountOut, sizeof(OGRGeometryTypeCounter)));
-    for (int i = 0; i < nEntryCountOut; ++i)
+    int i = 0;
+    for (const auto &sEntry : sContext.m_oMapCount)
     {
-        const CPLStringList aosTokens(CSLTokenizeString2(aosList[i], ":", 0));
-        if (aosTokens.size() == 2)
-        {
-            pasRet[i].eGeomType =
-                static_cast<OGRwkbGeometryType>(atoi(aosTokens[0]));
-            pasRet[i].nCount =
-                static_cast<int64_t>(std::strtoll(aosTokens[1], nullptr, 0));
-        }
+        pasRet[i].eGeomType = sEntry.first;
+        pasRet[i].nCount = sEntry.second;
+        ++i;
     }
     return pasRet;
 }
@@ -7585,7 +7691,8 @@ void OGR_GPKG_FillArrowArray_Step(sqlite3_context *pContext, int /*argc*/,
                         pszTxt, &ogrField, poFieldDefn, nFID))
                 {
                     psHelper->SetDateTime(
-                        psArray, iFeat, psFillArrowArray->brokenDown, ogrField);
+                        psArray, iFeat, psFillArrowArray->brokenDown,
+                        psHelper->anTZFlags[iField], ogrField);
                 }
                 break;
             }

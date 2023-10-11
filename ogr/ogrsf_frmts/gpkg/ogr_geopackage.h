@@ -279,9 +279,6 @@ class GDALGeoPackageDataset final : public OGRSQLiteBaseDataSource,
     bool ValidateRelationship(const GDALRelationship *poRelationship,
                               std::string &failureReason);
 
-    bool m_bIsGeometryTypeAggregateInterrupted = false;
-    std::string m_osGeometryTypeAggregateResult{};
-
     // Used by GDALGeoPackageDataset::GetRasterLayerDataset()
     std::map<std::string, std::unique_ptr<GDALDataset>> m_oCachedRasterDS{};
 
@@ -326,7 +323,7 @@ class GDALGeoPackageDataset final : public OGRSQLiteBaseDataSource,
     OGRLayer *GetLayer(int iLayer) override;
     OGRErr DeleteLayer(int iLayer) override;
     OGRLayer *ICreateLayer(const char *pszLayerName,
-                           OGRSpatialReference *poSpatialRef,
+                           const OGRSpatialReference *poSpatialRef,
                            OGRwkbGeometryType eGType,
                            char **papszOptions) override;
     int TestCapability(const char *) override;
@@ -404,25 +401,6 @@ class GDALGeoPackageDataset final : public OGRSQLiteBaseDataSource,
                                    void *pProgressData);
 
     static std::string GetCurrentDateEscapedSQL();
-
-    bool IsGeometryTypeAggregateInterrupted() const
-    {
-        return m_bIsGeometryTypeAggregateInterrupted;
-    }
-    void SetGeometryTypeAggregateInterrupted(bool b)
-    {
-        m_bIsGeometryTypeAggregateInterrupted = b;
-        if (b)
-            sqlite3_interrupt(hDB);
-    }
-    void SetGeometryTypeAggregateResult(const std::string &s)
-    {
-        m_osGeometryTypeAggregateResult = s;
-    }
-    const std::string &GetGeometryTypeAggregateResult() const
-    {
-        return m_osGeometryTypeAggregateResult;
-    }
 
     GDALDataset *GetRasterLayerDataset(const char *pszLayerName);
 
@@ -579,6 +557,8 @@ class OGRGeoPackageLayer CPL_NON_FINAL : public OGRLayer,
     {
         return m_poDS;
     }
+    virtual bool GetArrowStream(struct ArrowArrayStream *out_stream,
+                                CSLConstList papszOptions = nullptr) override;
     virtual int GetNextArrowArray(struct ArrowArrayStream *,
                                   struct ArrowArray *out_array) override;
 

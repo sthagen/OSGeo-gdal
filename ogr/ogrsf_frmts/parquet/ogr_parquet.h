@@ -270,6 +270,8 @@ class OGRParquetWriterLayer final : public OGRArrowWriterLayer
     virtual bool
     IsSupportedGeometryType(OGRwkbGeometryType eGType) const override;
 
+    virtual void FixupWKBGeometryBeforeWriting(GByte *pabyWKB,
+                                               size_t nLen) override;
     virtual void FixupGeometryBeforeWriting(OGRGeometry *poGeom) override;
     virtual bool IsSRSRequired() const override
     {
@@ -287,11 +289,15 @@ class OGRParquetWriterLayer final : public OGRArrowWriterLayer
     ~OGRParquetWriterLayer() override;
 
     bool SetOptions(CSLConstList papszOptions,
-                    OGRSpatialReference *poSpatialRef,
+                    const OGRSpatialReference *poSpatialRef,
                     OGRwkbGeometryType eGType);
 
     OGRErr CreateGeomField(OGRGeomFieldDefn *poField,
                            int bApproxOK = TRUE) override;
+
+    bool WriteArrowBatch(const struct ArrowSchema *schema,
+                         struct ArrowArray *array,
+                         CSLConstList papszOptions = nullptr) override;
 };
 
 /************************************************************************/
@@ -325,7 +331,7 @@ class OGRParquetWriterDataset final : public GDALPamDataset
 
   protected:
     OGRLayer *ICreateLayer(const char *pszName,
-                           OGRSpatialReference *poSpatialRef = nullptr,
+                           const OGRSpatialReference *poSpatialRef = nullptr,
                            OGRwkbGeometryType eGType = wkbUnknown,
                            char **papszOptions = nullptr) override;
 };
