@@ -1374,15 +1374,13 @@ OGRErr OGRFlatGeobufLayer::parseFeature(OGRFeature *poFeature)
 int OGRFlatGeobufLayer::GetNextArrowArray(struct ArrowArrayStream *stream,
                                           struct ArrowArray *out_array)
 {
-    if (m_poAttrQuery != nullptr ||
-        (m_poFilterGeom != nullptr &&
-         !(m_poHeader != nullptr && m_poHeader->index_node_size() > 0)) ||
-        CPLTestBool(
+    if (CPLTestBool(
             CPLGetConfigOption("OGR_FLATGEOBUF_STREAM_BASE_IMPL", "NO")))
     {
         return OGRLayer::GetNextArrowArray(stream, out_array);
     }
 
+begin:
     int errorErrno = EIO;
     memset(out_array, 0, sizeof(*out_array));
 
@@ -1886,10 +1884,29 @@ int OGRFlatGeobufLayer::GetNextArrowArray(struct ArrowArrayStream *stream,
 
     sHelper.Shrink(iFeat);
 
-    if (iFeat == 0)
+    if (out_array->length != 0 && m_poAttrQuery)
+    {
+        struct ArrowSchema schema;
+        stream->get_schema(stream, &schema);
+        CPLAssert(schema.release != nullptr);
+        CPLAssert(schema.n_children == out_array->n_children);
+        // Spatial filter already evaluated
+        auto poFilterGeomBackup = m_poFilterGeom;
+        m_poFilterGeom = nullptr;
+        PostFilterArrowArray(&schema, out_array, nullptr);
+        schema.release(&schema);
+        m_poFilterGeom = poFilterGeomBackup;
+    }
+
+    if (out_array->length == 0)
     {
         out_array->release(out_array);
         memset(out_array, 0, sizeof(*out_array));
+
+        if (m_poAttrQuery || m_poFilterGeom)
+        {
+            goto begin;
+        }
     }
 
     return 0;
@@ -1934,7 +1951,8 @@ OGRErr OGRFlatGeobufLayer::ICreateFeature(OGRFeature *poNewFeature)
 
     const auto fieldCount = m_poFeatureDefn->GetFieldCount();
 
-    std::vector<uint8_t> properties;
+    std::vector<uint8_t> &properties = m_writeProperties;
+    properties.clear();
     properties.reserve(1024 * 4);
     FlatBufferBuilder fbb;
     fbb.TrackMinAlign(8);
@@ -2279,8 +2297,7 @@ int OGRFlatGeobufLayer::TestCapability(const char *pszCap)
         return m_poHeader != nullptr && m_poHeader->index_node_size() > 0;
     else if (EQUAL(pszCap, OLCStringsAsUTF8))
         return true;
-    else if (EQUAL(pszCap, OLCFastGetArrowStream) && m_poAttrQuery == nullptr &&
-             m_poFilterGeom == nullptr)
+    else if (EQUAL(pszCap, OLCFastGetArrowStream))
         return true;
     else
         return false;
