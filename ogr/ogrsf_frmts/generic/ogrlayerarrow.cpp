@@ -1503,7 +1503,8 @@ FillDateTimeArray(struct ArrowArray *psChild,
                 // Convert for psRawField->Date.TZFlag to nFieldTZFlag
                 const int TZOffset =
                     (psRawField->Date.TZFlag - nFieldTZFlag) * 15;
-                nVal -= TZOffset * 60 * 1000;
+                const int TZOffsetMS = TZOffset * 60 * 1000;
+                nVal -= TZOffsetMS;
             }
             else if (nFieldTZFlag == OGR_TZFLAG_MIXED_TZ &&
                      psRawField->Date.TZFlag > OGR_TZFLAG_MIXED_TZ)
@@ -1511,7 +1512,8 @@ FillDateTimeArray(struct ArrowArray *psChild,
                 // Convert for psRawField->Date.TZFlag to UTC
                 const int TZOffset =
                     (psRawField->Date.TZFlag - OGR_TZFLAG_UTC) * 15;
-                nVal -= TZOffset * 60 * 1000;
+                const int TZOffsetMS = TZOffset * 60 * 1000;
+                nVal -= TZOffsetMS;
             }
             panValues[iFeat] = nVal;
         }
@@ -3004,7 +3006,7 @@ static void ArrowTimestampToOGRDateTime(int64_t nTimestamp,
     int nTZFlag = 0;
     const size_t nTZLen = strlen(pszTZ);
     if ((nTZLen == 3 && strcmp(pszTZ, "UTC") == 0) ||
-        (nTZLen == 7 && strcmp(pszTZ, "Etc/UTC") == 7))
+        (nTZLen == 7 && strcmp(pszTZ, "Etc/UTC") == 0))
     {
         nTZFlag = 100;
     }
@@ -5765,6 +5767,22 @@ FillFieldBinary(const struct ArrowArray *array, int iOGRFieldIdx,
     if (asFieldInfo[iArrowIdx].bIsGeomCol)
     {
         size_t nBytesConsumedOut = 0;
+
+        // Check if we can reuse the existing geometry, to save dynamic memory
+        // allocations.
+        if (nLen >= 5 && pabyData[0] == wkbNDR && pabyData[1] <= wkbTriangle &&
+            pabyData[2] == 0 && pabyData[3] == 0 && pabyData[4] == 0)
+        {
+            const auto poExistingGeom = oFeature.GetGeomFieldRef(iOGRFieldIdx);
+            if (poExistingGeom &&
+                poExistingGeom->getGeometryType() == pabyData[1])
+            {
+                poExistingGeom->importFromWkb(pabyData, nLen, wkbVariantIso,
+                                              nBytesConsumedOut);
+                return true;
+            }
+        }
+
         OGRGeometry *poGeometry = nullptr;
         OGRGeometryFactory::createFromWkb(pabyData, nullptr, &poGeometry, nLen,
                                           wkbVariantIso, nBytesConsumedOut);
