@@ -30,6 +30,8 @@
 ###############################################################################
 
 
+import json
+
 import gdaltest
 import ogrtest
 import pytest
@@ -866,6 +868,23 @@ def test_ogr_mem_arrow_stream_numpy():
     assert batch["binary"][1] == b"\xDE\xAD"
     assert len(batch["wkb_geometry"][1]) == 21
 
+    # Test fast FID filtering
+    lyr.SetAttributeFilter("FID IN (1, -2, 1, 0)")
+    stream = lyr.GetArrowStreamAsNumPy(options=["USE_MASKED_ARRAYS=NO"])
+    batches = [batch for batch in stream]
+    lyr.SetAttributeFilter(None)
+    assert len(batches) == 1
+    batch = batches[0]
+    assert len(batch["OGC_FID"]) == 2
+    assert batch["OGC_FID"][0] == 1
+    assert batch["OGC_FID"][1] == 0
+
+    lyr.SetAttributeFilter("FID = 2")
+    stream = lyr.GetArrowStreamAsNumPy(options=["USE_MASKED_ARRAYS=NO"])
+    batches = [batch for batch in stream]
+    lyr.SetAttributeFilter(None)
+    assert len(batches) == 0
+
 
 ###############################################################################
 # Test optimization to save memory on string fields with huge strings compared
@@ -930,6 +949,46 @@ def test_ogr_mem_arrow_stream_pyarrow():
     assert len(batches) == 1
     arrays = batches[0].flatten()
     assert len(arrays) == 2
+
+
+###############################################################################
+
+
+def test_ogr_mem_arrow_stream_pyarrow_geoarrow_no_crs_metadata():
+    pytest.importorskip("pyarrow")
+
+    ds = ogr.GetDriverByName("Memory").CreateDataSource("")
+    lyr = ds.CreateLayer("foo")
+
+    stream = lyr.GetArrowStreamAsPyArrow(["GEOMETRY_METADATA_ENCODING=GEOARROW"])
+    assert str(stream.schema) == "struct<OGC_FID: int64 not null, wkb_geometry: binary>"
+    md = stream.schema["wkb_geometry"].metadata
+    assert b"ARROW:extension:name" in md
+    assert md[b"ARROW:extension:name"] == b"geoarrow.wkb"
+    assert b"ARROW:extension:metadata" not in md
+
+
+###############################################################################
+
+
+@pytest.mark.require_proj(6, 2)
+def test_ogr_mem_arrow_stream_pyarrow_geoarrow_metadata():
+    pytest.importorskip("pyarrow")
+
+    ds = ogr.GetDriverByName("Memory").CreateDataSource("")
+    srs = osr.SpatialReference()
+    srs.ImportFromEPSG(32631)
+    lyr = ds.CreateLayer("foo", srs=srs)
+
+    stream = lyr.GetArrowStreamAsPyArrow(["GEOMETRY_METADATA_ENCODING=GEOARROW"])
+    assert str(stream.schema) == "struct<OGC_FID: int64 not null, wkb_geometry: binary>"
+    md = stream.schema["wkb_geometry"].metadata
+    assert b"ARROW:extension:name" in md
+    assert md[b"ARROW:extension:name"] == b"geoarrow.wkb"
+    assert b"ARROW:extension:metadata" in md
+    metadata = json.loads(md[b"ARROW:extension:metadata"])
+    assert "crs" in metadata
+    assert metadata["crs"]["id"] == {"authority": "EPSG", "code": 32631}
 
 
 ###############################################################################

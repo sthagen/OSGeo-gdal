@@ -31,6 +31,7 @@
 #include "cpl_float.h"
 #include "cpl_json.h"
 #include "cpl_time.h"
+#include "ogrlayerarrow.h"
 #include "ogr_p.h"
 #include "ogr_swq.h"
 #include "ogr_wkb.h"
@@ -603,11 +604,19 @@ inline OGRwkbGeometryType OGRArrowLayer::ComputeGeometryColumnTypeProcessBatch(
     const auto array = poBatch->column(iBatchCol);
     const auto castBinaryArray =
         (m_aeGeomEncoding[iGeomCol] == OGRArrowGeomEncoding::WKB)
-            ? std::static_pointer_cast<arrow::BinaryArray>(array)
+            ? std::dynamic_pointer_cast<arrow::BinaryArray>(array)
+            : nullptr;
+    const auto castLargeBinaryArray =
+        (m_aeGeomEncoding[iGeomCol] == OGRArrowGeomEncoding::WKB)
+            ? std::dynamic_pointer_cast<arrow::LargeBinaryArray>(array)
             : nullptr;
     const auto castStringArray =
         (m_aeGeomEncoding[iGeomCol] == OGRArrowGeomEncoding::WKT)
-            ? std::static_pointer_cast<arrow::StringArray>(array)
+            ? std::dynamic_pointer_cast<arrow::StringArray>(array)
+            : nullptr;
+    const auto castLargeStringArray =
+        (m_aeGeomEncoding[iGeomCol] == OGRArrowGeomEncoding::WKT)
+            ? std::dynamic_pointer_cast<arrow::LargeStringArray>(array)
             : nullptr;
     for (int64_t i = 0; i < poBatch->num_rows(); i++)
     {
@@ -624,10 +633,30 @@ inline OGRwkbGeometryType OGRArrowLayer::ComputeGeometryColumnTypeProcessBatch(
                     OGRReadWKBGeometryType(data, wkbVariantIso, &eThisGeomType);
                 }
             }
+            else if (m_aeGeomEncoding[iGeomCol] == OGRArrowGeomEncoding::WKB &&
+                     castLargeBinaryArray)
+            {
+                arrow::LargeBinaryArray::offset_type out_length = 0;
+                const uint8_t *data =
+                    castLargeBinaryArray->GetValue(i, &out_length);
+                if (out_length >= 5)
+                {
+                    OGRReadWKBGeometryType(data, wkbVariantIso, &eThisGeomType);
+                }
+            }
             else if (m_aeGeomEncoding[iGeomCol] == OGRArrowGeomEncoding::WKT &&
                      castStringArray)
             {
                 const auto osWKT = castStringArray->GetString(i);
+                if (!osWKT.empty())
+                {
+                    OGRReadWKTGeometryType(osWKT.c_str(), &eThisGeomType);
+                }
+            }
+            else if (m_aeGeomEncoding[iGeomCol] == OGRArrowGeomEncoding::WKT &&
+                     castLargeStringArray)
+            {
+                const auto osWKT = castLargeStringArray->GetString(i);
                 if (!osWKT.empty())
                 {
                     OGRReadWKTGeometryType(osWKT.c_str(), &eThisGeomType);
@@ -758,10 +787,13 @@ inline bool OGRArrowLayer::IsValidGeometryEncoding(
 
     if (osEncoding == "WKT" ||  // As used in Parquet geo metadata
         osEncoding ==
-            "ogc.wkt"  // As used in ARROW:extension:name field metadata
+            "ogc.wkt" ||  // As used in ARROW:extension:name field metadata
+        osEncoding ==
+            "geoarrow.wkt"  // As used in ARROW:extension:name field metadata
     )
     {
-        if (fieldTypeId != arrow::Type::STRING)
+        if (fieldTypeId != arrow::Type::LARGE_STRING &&
+            fieldTypeId != arrow::Type::STRING)
         {
             CPLError(CE_Warning, CPLE_AppDefined,
                      "Geometry column %s has a non String type: %s. "
@@ -775,10 +807,13 @@ inline bool OGRArrowLayer::IsValidGeometryEncoding(
 
     if (osEncoding == "WKB" ||  // As used in Parquet geo metadata
         osEncoding ==
-            "ogc.wkb"  // As used in ARROW:extension:name field metadata
+            "ogc.wkb" ||  // As used in ARROW:extension:name field metadata
+        osEncoding ==
+            "geoarrow.wkb"  // As used in ARROW:extension:name field metadata
     )
     {
-        if (fieldTypeId != arrow::Type::BINARY)
+        if (fieldTypeId != arrow::Type::LARGE_BINARY &&
+            fieldTypeId != arrow::Type::BINARY)
         {
             CPLError(CE_Warning, CPLE_AppDefined,
                      "Geometry column %s has a non Binary type: %s. "
@@ -2108,11 +2143,28 @@ inline OGRGeometry *OGRArrowLayer::ReadGeometry(int iGeomField,
     {
         case OGRArrowGeomEncoding::WKB:
         {
-            CPLAssert(array->type_id() == arrow::Type::BINARY);
-            const auto castArray =
-                static_cast<const arrow::BinaryArray *>(array);
             int out_length = 0;
-            const uint8_t *data = castArray->GetValue(nIdxInBatch, &out_length);
+            const uint8_t *data;
+            if (array->type_id() == arrow::Type::BINARY)
+            {
+                const auto castArray =
+                    static_cast<const arrow::BinaryArray *>(array);
+                data = castArray->GetValue(nIdxInBatch, &out_length);
+            }
+            else
+            {
+                CPLAssert(array->type_id() == arrow::Type::LARGE_BINARY);
+                const auto castArray =
+                    static_cast<const arrow::LargeBinaryArray *>(array);
+                int64_t out_length64 = 0;
+                data = castArray->GetValue(nIdxInBatch, &out_length64);
+                if (out_length64 > INT_MAX)
+                {
+                    CPLError(CE_Failure, CPLE_AppDefined, "Too large geometry");
+                    return nullptr;
+                }
+                out_length = static_cast<int>(out_length64);
+            }
             if (OGRGeometryFactory::createFromWkb(
                     data, poGeomFieldDefn->GetSpatialRef(), &poGeometry,
                     out_length) == OGRERR_NONE)
@@ -2132,12 +2184,25 @@ inline OGRGeometry *OGRArrowLayer::ReadGeometry(int iGeomField,
 
         case OGRArrowGeomEncoding::WKT:
         {
-            CPLAssert(array->type_id() == arrow::Type::STRING);
-            const auto castArray =
-                static_cast<const arrow::StringArray *>(array);
-            const auto osWKT = castArray->GetString(nIdxInBatch);
-            OGRGeometryFactory::createFromWkt(
-                osWKT.c_str(), poGeomFieldDefn->GetSpatialRef(), &poGeometry);
+            if (array->type_id() == arrow::Type::STRING)
+            {
+                const auto castArray =
+                    static_cast<const arrow::StringArray *>(array);
+                const auto osWKT = castArray->GetString(nIdxInBatch);
+                OGRGeometryFactory::createFromWkt(
+                    osWKT.c_str(), poGeomFieldDefn->GetSpatialRef(),
+                    &poGeometry);
+            }
+            else
+            {
+                CPLAssert(array->type_id() == arrow::Type::LARGE_STRING);
+                const auto castArray =
+                    static_cast<const arrow::LargeStringArray *>(array);
+                const auto osWKT = castArray->GetString(nIdxInBatch);
+                OGRGeometryFactory::createFromWkt(
+                    osWKT.c_str(), poGeomFieldDefn->GetSpatialRef(),
+                    &poGeometry);
+            }
             break;
         }
 
@@ -3143,6 +3208,7 @@ OGRArrowLayer::SetBatch(const std::shared_ptr<arrow::RecordBatch> &poBatch)
     m_poBatch = poBatch;
     m_poBatchColumns.clear();
     m_poArrayWKB = nullptr;
+    m_poArrayWKBLarge = nullptr;
     m_poArrayBBOX = nullptr;
     m_poArrayMinX = nullptr;
     m_poArrayMinY = nullptr;
@@ -3167,8 +3233,15 @@ OGRArrowLayer::SetBatch(const std::shared_ptr<arrow::RecordBatch> &poBatch)
             m_aeGeomEncoding[m_iGeomFieldFilter] == OGRArrowGeomEncoding::WKB)
         {
             const arrow::Array *poArrayWKB = m_poBatchColumns[iCol].get();
-            CPLAssert(poArrayWKB->type_id() == arrow::Type::BINARY);
-            m_poArrayWKB = static_cast<const arrow::BinaryArray *>(poArrayWKB);
+            if (poArrayWKB->type_id() == arrow::Type::BINARY)
+                m_poArrayWKB =
+                    static_cast<const arrow::BinaryArray *>(poArrayWKB);
+            else
+            {
+                CPLAssert(poArrayWKB->type_id() == arrow::Type::LARGE_BINARY);
+                m_poArrayWKBLarge =
+                    static_cast<const arrow::LargeBinaryArray *>(poArrayWKB);
+            }
 
             if (m_iBBOXMinXField >= 0 && m_iBBOXMinYField >= 0 &&
                 m_iBBOXMaxXField >= 0 && m_iBBOXMaxYField >= 0 &&
@@ -3284,13 +3357,15 @@ inline OGRFeature *OGRArrowLayer::GetNextRawFeature()
         if (iCol >= 0 &&
             m_aeGeomEncoding[m_iGeomFieldFilter] == OGRArrowGeomEncoding::WKB)
         {
-            CPLAssert(m_poArrayWKB);
+            CPLAssert(m_poArrayWKB || m_poArrayWKBLarge);
             OGREnvelope sEnvelope;
 
             while (true)
             {
                 bool bSkipToNextFeature = false;
-                if (m_poArrayWKB->IsNull(m_nIdxInBatch))
+                if ((m_poArrayWKB && m_poArrayWKB->IsNull(m_nIdxInBatch)) ||
+                    (m_poArrayWKBLarge &&
+                     m_poArrayWKBLarge->IsNull(m_nIdxInBatch)))
                 {
                     bSkipToNextFeature = true;
                 }
@@ -3310,12 +3385,27 @@ inline OGRFeature *OGRArrowLayer::GetNextRawFeature()
                             bSkipToNextFeature = true;
                         }
                     }
-                    else
+                    else if (m_poArrayWKB)
                     {
                         int out_length = 0;
                         const uint8_t *data =
                             m_poArrayWKB->GetValue(m_nIdxInBatch, &out_length);
                         if (OGRWKBGetBoundingBox(data, out_length, sEnvelope) &&
+                            !m_sFilterEnvelope.Intersects(sEnvelope))
+                        {
+                            bSkipToNextFeature = true;
+                        }
+                    }
+                    else
+                    {
+                        CPLAssert(m_poArrayWKBLarge);
+                        int64_t out_length64 = 0;
+                        const uint8_t *data = m_poArrayWKBLarge->GetValue(
+                            m_nIdxInBatch, &out_length64);
+                        if (out_length64 < INT_MAX &&
+                            OGRWKBGetBoundingBox(data,
+                                                 static_cast<int>(out_length64),
+                                                 sEnvelope) &&
                             !m_sFilterEnvelope.Intersects(sEnvelope))
                         {
                             bSkipToNextFeature = true;
@@ -3569,7 +3659,7 @@ inline void OGRArrowLayer::SetSpatialFilter(int iGeomField,
         InvalidateCachedBatches();
 
     m_bSpatialFilterIntersectsLayerExtent = true;
-    if (iGeomField >= 0 && iGeomField < GetLayerDefn()->GetGeomFieldCount())
+    if (iGeomField < GetLayerDefn()->GetGeomFieldCount())
     {
         m_iGeomFieldFilter = iGeomField;
         if (InstallFilter(poGeomIn))
@@ -3673,19 +3763,42 @@ inline OGRErr OGRArrowLayer::GetExtent(int iGeomField, OGREnvelope *psExtent,
         *psExtent = OGREnvelope();
 
         auto array = m_poBatchColumns[iCol];
-        CPLAssert(array->type_id() == arrow::Type::BINARY);
-        auto castArray = std::static_pointer_cast<arrow::BinaryArray>(array);
+        std::shared_ptr<arrow::BinaryArray> smallArray;
+        std::shared_ptr<arrow::LargeBinaryArray> largeArray;
+        if (array->type_id() == arrow::Type::BINARY)
+            smallArray = std::static_pointer_cast<arrow::BinaryArray>(array);
+        else
+        {
+            CPLAssert(array->type_id() == arrow::Type::LARGE_BINARY);
+            largeArray =
+                std::static_pointer_cast<arrow::LargeBinaryArray>(array);
+        }
         OGREnvelope sEnvelope;
         while (true)
         {
             if (!array->IsNull(m_nIdxInBatch))
             {
-                int out_length = 0;
-                const uint8_t *data =
-                    castArray->GetValue(m_nIdxInBatch, &out_length);
-                if (OGRWKBGetBoundingBox(data, out_length, sEnvelope))
+                if (smallArray)
                 {
-                    psExtent->Merge(sEnvelope);
+                    int out_length = 0;
+                    const uint8_t *data =
+                        smallArray->GetValue(m_nIdxInBatch, &out_length);
+                    if (OGRWKBGetBoundingBox(data, out_length, sEnvelope))
+                    {
+                        psExtent->Merge(sEnvelope);
+                    }
+                }
+                else
+                {
+                    int64_t out_length = 0;
+                    const uint8_t *data =
+                        largeArray->GetValue(m_nIdxInBatch, &out_length);
+                    if (out_length < INT_MAX &&
+                        OGRWKBGetBoundingBox(data, static_cast<int>(out_length),
+                                             sEnvelope))
+                    {
+                        psExtent->Merge(sEnvelope);
+                    }
                 }
             }
 
@@ -3705,8 +3818,16 @@ inline OGRErr OGRArrowLayer::GetExtent(int iGeomField, OGREnvelope *psExtent,
                     return OGRERR_FAILURE;
                 }
                 array = m_poBatchColumns[iCol];
-                CPLAssert(array->type_id() == arrow::Type::BINARY);
-                castArray = std::static_pointer_cast<arrow::BinaryArray>(array);
+                if (array->type_id() == arrow::Type::BINARY)
+                    smallArray =
+                        std::static_pointer_cast<arrow::BinaryArray>(array);
+                else
+                {
+                    CPLAssert(array->type_id() == arrow::Type::LARGE_BINARY);
+                    largeArray =
+                        std::static_pointer_cast<arrow::LargeBinaryArray>(
+                            array);
+                }
             }
         }
     }
@@ -3991,6 +4112,26 @@ OGRArrowLayer::GetArrowSchemaInternal(struct ArrowSchema *out_schema) const
     int j = 0;
     const char *pszReqGeomEncoding =
         m_aosArrowArrayStreamOptions.FetchNameValueDef("GEOMETRY_ENCODING", "");
+
+    const char *pszExtensionName = EXTENSION_NAME_OGC_WKB;
+    if (EQUAL(pszReqGeomEncoding, "WKB") || EQUAL(pszReqGeomEncoding, ""))
+    {
+        const char *const pszGeometryMetadataEncoding =
+            m_aosArrowArrayStreamOptions.FetchNameValue(
+                "GEOMETRY_METADATA_ENCODING");
+        if (pszGeometryMetadataEncoding)
+        {
+            if (EQUAL(pszGeometryMetadataEncoding, "OGC"))
+                pszExtensionName = EXTENSION_NAME_OGC_WKB;
+            else if (EQUAL(pszGeometryMetadataEncoding, "GEOARROW"))
+                pszExtensionName = EXTENSION_NAME_GEOARROW_WKB;
+            else
+                CPLError(CE_Warning, CPLE_NotSupported,
+                         "Unsupported GEOMETRY_METADATA_ENCODING value: %s",
+                         pszGeometryMetadataEncoding);
+        }
+    }
+
     for (int i = 0; i < out_schema->n_children; ++i)
     {
         if (fieldDesc[i].nIdx < 0)
@@ -4036,8 +4177,8 @@ OGRArrowLayer::GetArrowSchemaInternal(struct ArrowSchema *out_schema) const
                         m_poFeatureDefn->GetGeomFieldDefn(iGeomField);
                     CPLAssert(strcmp(out_schema->children[i]->name,
                                      poGeomFieldDefn->GetNameRef()) == 0);
-                    auto poSchema =
-                        CreateSchemaForWKBGeometryColumn(poGeomFieldDefn, "z");
+                    auto poSchema = CreateSchemaForWKBGeometryColumn(
+                        poGeomFieldDefn, "z", pszExtensionName);
                     out_schema->children[i]->release(out_schema->children[i]);
                     *(out_schema->children[j]) = *poSchema;
                     CPLFree(poSchema);
@@ -4074,7 +4215,7 @@ OGRArrowLayer::GetArrowSchemaInternal(struct ArrowSchema *out_schema) const
                         m_poFeatureDefn->GetGeomFieldDefn(iGeomField);
                     // Set ARROW:extension:name = ogc:wkb
                     auto poSchema = CreateSchemaForWKBGeometryColumn(
-                        poGeomFieldDefn, pszFormat);
+                        poGeomFieldDefn, pszFormat, pszExtensionName);
                     out_schema->children[i]->release(out_schema->children[i]);
                     *(out_schema->children[j]) = *poSchema;
                     CPLFree(poSchema);
@@ -4124,7 +4265,9 @@ inline int OGRArrowLayer::GetNextArrowArray(struct ArrowArrayStream *stream,
             }
         }
 
-        auto status = arrow::ExportRecordBatch(*m_poBatch, out_array, nullptr);
+        struct ArrowSchema schema;
+        memset(&schema, 0, sizeof(schema));
+        auto status = arrow::ExportRecordBatch(*m_poBatch, out_array, &schema);
         m_nIdxInBatch = m_poBatch->num_rows();
         if (!status.ok())
         {
@@ -4153,7 +4296,11 @@ inline int OGRArrowLayer::GetNextArrowArray(struct ArrowArrayStream *stream,
                                 : m_anMapGeomFieldIndexToArrowColumn[i];
                         auto sourceArray = out_array->children[nArrayIdx];
                         auto targetArray =
-                            CreateWKTArrayFromWKBArray(sourceArray);
+                            strcmp(schema.children[nArrayIdx]->format, "u") == 0
+                                ? CreateWKBArrayFromWKTArray<uint32_t>(
+                                      sourceArray)
+                                : CreateWKBArrayFromWKTArray<uint64_t>(
+                                      sourceArray);
                         if (targetArray)
                         {
                             sourceArray->release(sourceArray);
@@ -4164,6 +4311,8 @@ inline int OGRArrowLayer::GetNextArrowArray(struct ArrowArrayStream *stream,
                         {
                             out_array->release(out_array);
                             memset(out_array, 0, sizeof(*out_array));
+                            if (schema.release)
+                                schema.release(&schema);
                             return ENOMEM;
                         }
                     }
@@ -4176,6 +4325,9 @@ inline int OGRArrowLayer::GetNextArrowArray(struct ArrowArrayStream *stream,
                 }
             }
         }
+
+        if (schema.release)
+            schema.release(&schema);
 
         OverrideArrowRelease(m_poArrowDS, out_array);
 
@@ -4263,11 +4415,12 @@ class OGRArrowLayerAppendBuffer : public OGRAppendBuffer
 };
 
 /************************************************************************/
-/*                    CreateWKTArrayFromWKBArray()                      */
+/*                    CreateWKBArrayFromWKTArray()                      */
 /************************************************************************/
 
+template <typename SourceOffset>
 inline struct ArrowArray *
-OGRArrowLayer::CreateWKTArrayFromWKBArray(const struct ArrowArray *sourceArray)
+OGRArrowLayer::CreateWKBArrayFromWKTArray(const struct ArrowArray *sourceArray)
 {
     CPLAssert(sourceArray->n_buffers == 3);
     CPLAssert(sourceArray->buffers[1] != nullptr);
@@ -4337,7 +4490,7 @@ OGRArrowLayer::CreateWKTArrayFromWKBArray(const struct ArrowArray *sourceArray)
     OGRWKTToWKBTranslator oTranslator(oOGRAppendBuffer);
 
     const auto sourceOffsets =
-        static_cast<const uint32_t *>(sourceArray->buffers[1]) + nOffset;
+        static_cast<const SourceOffset *>(sourceArray->buffers[1]) + nOffset;
     auto sourceBytes =
         static_cast<char *>(const_cast<void *>(sourceArray->buffers[2]));
     auto targetOffsets =

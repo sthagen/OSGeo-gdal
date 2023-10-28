@@ -2187,3 +2187,135 @@ def test_ogr2ogr_lib_OGR2OGR_USE_ARROW_API_YES(limit):
     assert (
         out_lyr.GetFeatureCount() == (limit if limit else src_lyr.GetFeatureCount()) + 2
     )
+
+
+###############################################################################
+# Test JSON types roundtrip
+
+
+@pytest.mark.require_driver("GeoJSON")
+@pytest.mark.require_driver("GPKG")
+def test_json_types(tmp_vsimem):
+    """Test JSON types"""
+
+    def test_extended_types(lyr):
+        assert lyr.GetFeatureCount() == 1
+        f = lyr.GetNextFeature()
+
+        fd = f.GetFieldDefnRef(0)
+        assert fd.GetType() == ogr.OFTString
+        assert fd.GetSubType() == ogr.OFSTNone
+
+        fd = f.GetFieldDefnRef(1)
+        assert fd.GetType() == ogr.OFTIntegerList
+        assert fd.GetSubType() == ogr.OFSTNone
+
+        fd = f.GetFieldDefnRef(2)
+        assert fd.GetType() == ogr.OFTString
+        assert fd.GetSubType() == ogr.OFSTJSON
+
+        fd = f.GetFieldDefnRef(3)
+        assert fd.GetType() == ogr.OFTInteger
+        assert fd.GetSubType() == ogr.OFSTNone
+
+    def test_types(lyr):
+        assert lyr.GetFeatureCount() == 1
+        f = lyr.GetNextFeature()
+
+        fd = f.GetFieldDefnRef(0)
+        assert fd.GetType() == ogr.OFTString
+        assert fd.GetSubType() == ogr.OFSTNone
+
+        fd = f.GetFieldDefnRef(1)
+        assert fd.GetType() == ogr.OFTString
+        assert fd.GetSubType() == ogr.OFSTJSON
+
+        fd = f.GetFieldDefnRef(2)
+        assert fd.GetType() == ogr.OFTString
+        assert fd.GetSubType() == ogr.OFSTJSON
+
+        fd = f.GetFieldDefnRef(3)
+        assert fd.GetType() == ogr.OFTInteger
+        assert fd.GetSubType() == ogr.OFSTNone
+
+    with gdal.ExceptionMgr(useExceptions=True):
+
+        src = str(tmp_vsimem / "test_json.geojson")
+        dst = str(tmp_vsimem / "test_json.gpkg")
+
+        data = """{
+                "type": "FeatureCollection",
+                "features": [
+                    { "type": "Feature", "properties": { "str": "[5]", "int_list": [5], "map": {"foo": "bar", "baz": 5}, "int_lit": 5 }, "geometry": {"type": "Point", "coordinates": [ 1, 2 ]} }
+                ]
+            }"""
+        f = gdal.VSIFOpenL(src, "wb")
+        gdal.VSIFWriteL(data, 1, len(data), f)
+        gdal.VSIFCloseL(f)
+
+        with gdal.OpenEx(src, gdal.OF_VECTOR | gdal.OF_READONLY) as ds:
+            lyr = ds.GetLayer(0)
+            test_extended_types(lyr)
+
+        options = gdal.VectorTranslateOptions(layerName="test")
+
+        ds_output = gdal.VectorTranslate(
+            srcDS=src, destNameOrDestDS=dst, options=options
+        )
+        lyr = ds_output.GetLayerByName("test")
+
+        test_types(lyr)
+
+        # Write it back to json
+        round_trip_dst = str(tmp_vsimem / "test_json_back.geojson")
+
+        options = gdal.VectorTranslateOptions(
+            layerCreationOptions={"AUTODETECT_JSON_STRINGS": "FALSE"}
+        )
+        gdal.VectorTranslate(
+            srcDS=dst, destNameOrDestDS=round_trip_dst, options=options
+        )
+
+        with gdal.OpenEx(round_trip_dst, gdal.OF_VECTOR | gdal.OF_READONLY) as ds:
+            lyr = ds.GetLayer(0)
+            test_extended_types(lyr)
+
+
+###############################################################################
+
+
+@pytest.mark.parametrize("enable_exceptions", [True, False])
+@pytest.mark.parametrize("enable_debug", [True, False])
+@pytest.mark.require_driver("GPKG")
+def test_ogr2ogr_lib_accumulerated_errors(tmp_vsimem, enable_exceptions, enable_debug):
+
+    src_ds = gdal.GetDriverByName("Memory").Create("", 0, 0, 0, gdal.GDT_Unknown)
+    src_lyr = src_ds.CreateLayer("test")
+    f = ogr.Feature(src_lyr.GetLayerDefn())
+    f.SetFID(1)
+    src_lyr.CreateFeature(f)
+
+    out_filename = str(tmp_vsimem / "test_ogr2ogr_lib_accumulerated_errors.gpkg")
+    gdal.VectorTranslate(out_filename, src_ds)
+
+    def my_handler(errorClass, errno, msg):
+        pass
+
+    with gdaltest.error_handler(my_handler if enable_debug else None):
+        with gdaltest.config_option("CPL_DEBUG", "ON" if enable_debug else "OFF"):
+            with gdal.ExceptionMgr(useExceptions=enable_exceptions):
+                if enable_exceptions:
+                    with pytest.raises(
+                        Exception,
+                        match=r"Unable to write feature 1 from layer test\.\nMay be caused by: failed to execute insert : UNIQUE constraint failed: test\.fid",
+                    ):
+                        gdal.VectorTranslate(
+                            out_filename, src_ds, options="-preserve_fid -append"
+                        )
+                else:
+                    assert (
+                        gdal.VectorTranslate(
+                            out_filename, src_ds, options="-preserve_fid -append"
+                        )
+                        is None
+                    )
