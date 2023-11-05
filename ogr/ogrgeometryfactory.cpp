@@ -2839,17 +2839,22 @@ static void AddOffsetToLon(OGRGeometry *poGeom, double dfOffset)
     switch (wkbFlatten(poGeom->getGeometryType()))
     {
         case wkbPolygon:
+        {
+            for (auto poSubGeom : *(poGeom->toPolygon()))
+            {
+                AddOffsetToLon(poSubGeom, dfOffset);
+            }
+
+            break;
+        }
+
         case wkbMultiLineString:
         case wkbMultiPolygon:
         case wkbGeometryCollection:
         {
-            const int nSubGeomCount =
-                OGR_G_GetGeometryCount(OGRGeometry::ToHandle(poGeom));
-            for (int iGeom = 0; iGeom < nSubGeomCount; iGeom++)
+            for (auto poSubGeom : *(poGeom->toGeometryCollection()))
             {
-                AddOffsetToLon(OGRGeometry::FromHandle(OGR_G_GetGeometryRef(
-                                   OGRGeometry::ToHandle(poGeom), iGeom)),
-                               dfOffset);
+                AddOffsetToLon(poSubGeom, dfOffset);
             }
 
             break;
@@ -2898,15 +2903,8 @@ static void AddSimpleGeomToMulti(OGRGeometryCollection *poMulti,
         case wkbMultiPolygon:
         case wkbGeometryCollection:
         {
-            // TODO(schwehr): Can the const_casts be removed or improved?
-            const int nSubGeomCount = OGR_G_GetGeometryCount(
-                OGRGeometry::ToHandle(const_cast<OGRGeometry *>(poGeom)));
-            for (int iGeom = 0; iGeom < nSubGeomCount; iGeom++)
+            for (const auto poSubGeom : *(poGeom->toGeometryCollection()))
             {
-                OGRGeometry *poSubGeom = OGRGeometry::FromHandle(
-                    OGR_G_GetGeometryRef(OGRGeometry::ToHandle(
-                                             const_cast<OGRGeometry *>(poGeom)),
-                                         iGeom));
                 AddSimpleGeomToMulti(poMulti, poSubGeom);
             }
             break;
@@ -2940,7 +2938,7 @@ static void CutGeometryOnDateLineAndAddToMulti(OGRGeometryCollection *poMulti,
 
             // Naive heuristics... Place to improve.
 #ifdef HAVE_GEOS
-            OGRGeometry *poDupGeom = nullptr;
+            std::unique_ptr<OGRGeometry> poDupGeom;
             bool bWrapDateline = false;
 #endif
 
@@ -2994,7 +2992,7 @@ static void CutGeometryOnDateLineAndAddToMulti(OGRGeometryCollection *poMulti,
                             CPLError(CE_Failure, CPLE_NotSupported,
                                      "GEOS support not enabled.");
 #else
-                            poDupGeom = poGeom->clone();
+                            poDupGeom.reset(poGeom->clone());
                             FixPolygonCoordinatesAtDateLine(
                                 poDupGeom->toPolygon(), dfDateLineOffset);
 
@@ -3016,7 +3014,8 @@ static void CutGeometryOnDateLineAndAddToMulti(OGRGeometryCollection *poMulti,
 #ifdef HAVE_GEOS
             else if (bWrapDateline)
             {
-                const OGRGeometry *poWorkGeom = poDupGeom ? poDupGeom : poGeom;
+                const OGRGeometry *poWorkGeom =
+                    poDupGeom ? poDupGeom.get() : poGeom;
                 OGRGeometry *poRectangle1 = nullptr;
                 OGRGeometry *poRectangle2 = nullptr;
                 const char *pszWKT1 =
@@ -3032,25 +3031,24 @@ static void CutGeometryOnDateLineAndAddToMulti(OGRGeometryCollection *poMulti,
                                                   &poRectangle1);
                 OGRGeometryFactory::createFromWkt(pszWKT2, nullptr,
                                                   &poRectangle2);
-                OGRGeometry *poGeom1 = poWorkGeom->Intersection(poRectangle1);
-                OGRGeometry *poGeom2 = poWorkGeom->Intersection(poRectangle2);
+                auto poGeom1 = std::unique_ptr<OGRGeometry>(
+                    poWorkGeom->Intersection(poRectangle1));
+                auto poGeom2 = std::unique_ptr<OGRGeometry>(
+                    poWorkGeom->Intersection(poRectangle2));
                 delete poRectangle1;
                 delete poRectangle2;
 
                 if (poGeom1 != nullptr && poGeom2 != nullptr)
                 {
-                    AddSimpleGeomToMulti(poMulti, poGeom1);
-                    AddOffsetToLon(poGeom2, !bAroundMinus180 ? -360.0 : 360.0);
-                    AddSimpleGeomToMulti(poMulti, poGeom2);
+                    AddSimpleGeomToMulti(poMulti, poGeom1.get());
+                    AddOffsetToLon(poGeom2.get(),
+                                   !bAroundMinus180 ? -360.0 : 360.0);
+                    AddSimpleGeomToMulti(poMulti, poGeom2.get());
                 }
                 else
                 {
                     AddSimpleGeomToMulti(poMulti, poGeom);
                 }
-
-                delete poGeom1;
-                delete poGeom2;
-                delete poDupGeom;
             }
 #endif
             else
@@ -3064,15 +3062,8 @@ static void CutGeometryOnDateLineAndAddToMulti(OGRGeometryCollection *poMulti,
         case wkbMultiPolygon:
         case wkbGeometryCollection:
         {
-            // TODO(schwehr): Fix the const_cast.
-            int nSubGeomCount = OGR_G_GetGeometryCount(
-                OGRGeometry::ToHandle(const_cast<OGRGeometry *>(poGeom)));
-            for (int iGeom = 0; iGeom < nSubGeomCount; iGeom++)
+            for (const auto poSubGeom : *(poGeom->toGeometryCollection()))
             {
-                OGRGeometry *poSubGeom = OGRGeometry::FromHandle(
-                    OGR_G_GetGeometryRef(OGRGeometry::ToHandle(
-                                             const_cast<OGRGeometry *>(poGeom)),
-                                         iGeom));
                 CutGeometryOnDateLineAndAddToMulti(poMulti, poSubGeom,
                                                    dfDateLineOffset);
             }

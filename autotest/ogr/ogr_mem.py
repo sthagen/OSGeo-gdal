@@ -494,6 +494,7 @@ def test_ogr_mem_16(mem_ds):
     f.SetFID(100000000)
     ret = lyr.CreateFeature(f)
     assert ret == 0
+    assert lyr.GetNextFeature() is None
 
     f = ogr.Feature(lyr.GetLayerDefn())
     f.SetFID(100000000)
@@ -1039,6 +1040,18 @@ def test_ogr_mem_arrow_stream_numpy_memlimit(limited_field):
     assert len(batches) == 2
     assert [x for x in batches[0]["OGC_FID"]] == [0, 1]
     assert [x for x in batches[1]["OGC_FID"]] == [2]
+
+    if limited_field not in ("binary_fixed_width", "geometry"):
+        lyr.SetNextByIndex(2)
+        with gdaltest.config_option("OGR_ARROW_MEM_LIMIT", "99", thread_local=False):
+            stream = lyr.GetArrowStreamAsNumPy(options=["USE_MASKED_ARRAYS=NO"])
+            with gdaltest.enable_exceptions():
+                with pytest.raises(
+                    Exception,
+                    match="Too large feature: not even a single feature can be returned",
+                ):
+                    batches = [batch for batch in stream]
+                    assert len(batches) == 0
 
     with gdaltest.config_option("OGR_ARROW_MEM_LIMIT", "1", thread_local=False):
 
