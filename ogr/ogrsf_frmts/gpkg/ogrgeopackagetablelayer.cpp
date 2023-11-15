@@ -296,6 +296,7 @@ OGRErr OGRGeoPackageTableLayer::FeatureBindParameters(
     {
         const int iField =
             nUpdatedFieldsCount < 0 ? idx : panUpdatedFieldsIdx[idx];
+        assert(iField >= 0);
         if (iField == m_iFIDAsRegularColumnIndex ||
             m_abGeneratedColumns[iField])
             continue;
@@ -2977,6 +2978,13 @@ OGRErr OGRGeoPackageTableLayer::ISetFeature(OGRFeature *poFeature)
     if (!RunDeferredSpatialIndexUpdate())
         return OGRERR_FAILURE;
 
+    const sqlite3_int64 nTotalChangesBefore =
+#if SQLITE_VERSION_NUMBER >= 3036000L
+        sqlite3_total_changes64(m_poDS->GetDB());
+#else
+        sqlite3_total_changes(m_poDS->GetDB());
+#endif
+
     CheckGeometryType(poFeature);
 
     if (!m_osUpdateStatementSQL.empty())
@@ -3031,8 +3039,15 @@ OGRErr OGRGeoPackageTableLayer::ISetFeature(OGRFeature *poFeature)
     sqlite3_reset(m_poUpdateStatement);
     sqlite3_clear_bindings(m_poUpdateStatement);
 
+    const sqlite3_int64 nTotalChangesAfter =
+#if SQLITE_VERSION_NUMBER >= 3036000L
+        sqlite3_total_changes64(m_poDS->GetDB());
+#else
+        sqlite3_total_changes(m_poDS->GetDB());
+#endif
+
     /* Only update the envelope if we changed something */
-    OGRErr eErr = (sqlite3_changes(m_poDS->GetDB()) > 0)
+    OGRErr eErr = nTotalChangesAfter != nTotalChangesBefore
                       ? OGRERR_NONE
                       : OGRERR_NON_EXISTING_FEATURE;
     if (eErr == OGRERR_NONE)
@@ -3230,6 +3245,13 @@ OGRErr OGRGeoPackageTableLayer::IUpdateFeature(
         return OGRERR_FAILURE;
     }
 
+    const sqlite3_int64 nTotalChangesBefore =
+#if SQLITE_VERSION_NUMBER >= 3036000L
+        sqlite3_total_changes64(m_poDS->GetDB());
+#else
+        sqlite3_total_changes(m_poDS->GetDB());
+#endif
+
     /* From here execute the statement and check errors */
     int err = sqlite3_step(m_poUpdateStatement);
     if (!(err == SQLITE_OK || err == SQLITE_DONE))
@@ -3244,8 +3266,15 @@ OGRErr OGRGeoPackageTableLayer::IUpdateFeature(
     sqlite3_reset(m_poUpdateStatement);
     sqlite3_clear_bindings(m_poUpdateStatement);
 
+    const sqlite3_int64 nTotalChangesAfter =
+#if SQLITE_VERSION_NUMBER >= 3036000L
+        sqlite3_total_changes64(m_poDS->GetDB());
+#else
+        sqlite3_total_changes(m_poDS->GetDB());
+#endif
+
     /* Only update the envelope if we changed something */
-    OGRErr eErr = (sqlite3_changes(m_poDS->GetDB()) > 0)
+    OGRErr eErr = nTotalChangesAfter != nTotalChangesBefore
                       ? OGRERR_NONE
                       : OGRERR_NON_EXISTING_FEATURE;
     if (eErr == OGRERR_NONE)
@@ -3570,10 +3599,24 @@ OGRErr OGRGeoPackageTableLayer::DeleteFeature(GIntBig nFID)
                  SQLEscapeName(m_pszTableName).c_str(),
                  SQLEscapeName(m_pszFidColumn).c_str(), nFID);
 
+    const sqlite3_int64 nTotalChangesBefore =
+#if SQLITE_VERSION_NUMBER >= 3036000L
+        sqlite3_total_changes64(m_poDS->GetDB());
+#else
+        sqlite3_total_changes(m_poDS->GetDB());
+#endif
+
     OGRErr eErr = SQLCommand(m_poDS->GetDB(), soSQL.c_str());
     if (eErr == OGRERR_NONE)
     {
-        eErr = (sqlite3_changes(m_poDS->GetDB()) > 0)
+        const sqlite3_int64 nTotalChangesAfter =
+#if SQLITE_VERSION_NUMBER >= 3036000L
+            sqlite3_total_changes64(m_poDS->GetDB());
+#else
+            sqlite3_total_changes(m_poDS->GetDB());
+#endif
+
+        eErr = nTotalChangesAfter != nTotalChangesBefore
                    ? OGRERR_NONE
                    : OGRERR_NON_EXISTING_FEATURE;
 
@@ -7962,7 +8005,7 @@ int OGRGeoPackageTableLayer::GetNextArrowArrayAsynchronous(
         return 0;
     }
 
-    auto psHelper = cpl::make_unique<OGRArrowArrayHelper>(
+    auto psHelper = std::make_unique<OGRArrowArrayHelper>(
         m_poDS, m_poFeatureDefn, m_aosArrowArrayStreamOptions, out_array);
     if (out_array->release == nullptr)
     {
@@ -7972,7 +8015,7 @@ int OGRGeoPackageTableLayer::GetNextArrowArrayAsynchronous(
     if (m_poFillArrowArray == nullptr)
     {
         m_poFillArrowArray =
-            cpl::make_unique<OGRGPKGTableLayerFillArrowArray>();
+            std::make_unique<OGRGPKGTableLayerFillArrowArray>();
         m_poFillArrowArray->psHelper = std::move(psHelper);
         m_poFillArrowArray->nCountRows = 0;
         m_poFillArrowArray->bErrorOccurred = false;
@@ -8386,11 +8429,11 @@ int OGRGeoPackageTableLayer::GetNextArrowArray(struct ArrowArrayStream *stream,
         oOpenInfo.nOpenFlags = GDAL_OF_VECTOR;
         for (int iTask = 0; iTask < nMaxTasks; ++iTask)
         {
-            auto task = cpl::make_unique<ArrowArrayPrefetchTask>();
+            auto task = std::make_unique<ArrowArrayPrefetchTask>();
             task->m_iStartShapeId =
                 m_iNextShapeId +
                 static_cast<GIntBig>(iTask + 1) * nMaxBatchSize;
-            task->m_poDS = cpl::make_unique<GDALGeoPackageDataset>();
+            task->m_poDS = std::make_unique<GDALGeoPackageDataset>();
             if (!task->m_poDS->Open(&oOpenInfo, m_poDS->m_osFilenameInZip))
             {
                 break;
@@ -8412,7 +8455,7 @@ int OGRGeoPackageTableLayer::GetNextArrowArray(struct ArrowArrayStream *stream,
             }
 
             task->m_poLayer = poOtherLayer;
-            task->m_psArrowArray = cpl::make_unique<struct ArrowArray>();
+            task->m_psArrowArray = std::make_unique<struct ArrowArray>();
             memset(task->m_psArrowArray.get(), 0, sizeof(struct ArrowArray));
 
             poOtherLayer->m_nTotalFeatureCount = m_nTotalFeatureCount;
@@ -8499,7 +8542,7 @@ int OGRGeoPackageTableLayer::GetNextArrowArrayInternal(
         return 0;
     }
 
-    auto psHelper = cpl::make_unique<OGRArrowArrayHelper>(
+    auto psHelper = std::make_unique<OGRArrowArrayHelper>(
         m_poDS, m_poFeatureDefn, m_aosArrowArrayStreamOptions, out_array);
     if (out_array->release == nullptr)
     {
