@@ -4417,14 +4417,8 @@ def test_ogr_geojson_open_with_non_C_locale():
 # Test geometry validity fixing due to limited coordinate precision
 
 
+@pytest.mark.require_geos
 def test_ogr_geojson_write_geometry_validity_fixing_rfc7946(tmp_vsimem):
-
-    # Check if MakeValid() is available
-    g = ogr.CreateGeometryFromWkt("POLYGON ((0 0,10 10,0 10,10 0,0 0))")
-    with gdaltest.error_handler(), gdaltest.disable_exceptions():
-        make_valid_available = g.MakeValid() is not None
-    if not make_valid_available:
-        pytest.skip("MakeValid() not available")
 
     filename = str(
         tmp_vsimem / "test_ogr_geojson_write_geometry_validity_fixing.geojson"
@@ -4454,14 +4448,8 @@ def test_ogr_geojson_write_geometry_validity_fixing_rfc7946(tmp_vsimem):
 # Test geometry validity fixing due to limited coordinate precision
 
 
+@pytest.mark.require_geos
 def test_ogr_geojson_write_geometry_validity_fixing(tmp_vsimem):
-
-    # Check if MakeValid() is available
-    g = ogr.CreateGeometryFromWkt("POLYGON ((0 0,10 10,0 10,10 0,0 0))")
-    with gdaltest.error_handler(), gdaltest.disable_exceptions():
-        make_valid_available = g.MakeValid() is not None
-    if not make_valid_available:
-        pytest.skip("MakeValid() not available")
 
     filename = str(
         tmp_vsimem / "test_ogr_geojson_write_geometry_validity_fixing.geojson"
@@ -4810,9 +4798,7 @@ def test_ogr_json_getextent3d(tmp_vsimem):
     ext2d = lyr.GetExtent()
     assert ext2d == (1.0, 2.0, 1.0, 2.0)
     ext3d = lyr.GetExtent3D()
-    assert ext3d[:4] == (1.0, 2.0, 1.0, 2.0)
-    assert math.isnan(ext3d[4])
-    assert math.isnan(ext3d[5])
+    assert ext3d == (1.0, 2.0, 1.0, 2.0, float("inf"), float("-inf"))
 
     # Test mixed 2D
     gdal.FileFromMemBuffer(
