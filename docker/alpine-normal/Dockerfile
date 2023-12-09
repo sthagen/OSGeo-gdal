@@ -104,11 +104,12 @@ RUN mkdir proj \
         export PROJ_DB_CACHE_DIR="$HOME/.ccache"; \
         ccache -M 100M; \
     fi \
+    # IPO disabled since it crashes with gcc 13.2.1
     && cmake . \
         -DBUILD_SHARED_LIBS=ON \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr \
-        -DENABLE_IPO=ON \
+        -DENABLE_IPO=OFF \
         -DBUILD_TESTING=OFF \
     && make -j$(nproc) \
     && make install \
@@ -292,7 +293,7 @@ RUN apk add --no-cache \
         qhull \
         unixodbc \
         libpq \
-        apache-arrow \
+        libarrow libparquet libarrow_dataset \
         libaec \
     # Remove /usr/lib/libopenjp2.so.2.3.0 since we are building v2.3.1 manually
     # && rm -f /usr/lib/libopenjp2.so.2.3.0 \
@@ -304,9 +305,7 @@ RUN apk add --no-cache \
     && rm -f /usr/lib/libwebpmux.so* /usr/lib/libwebpdemux.so* /usr/lib/libwebpdecoder.so*
 
 # Install Pillow for -antialias option of gdal2tiles
-RUN apk add --no-cache py3-pip \
-    && pip3 install Pillow \
-    && apk del py3-pip
+RUN apk add --no-cache py3-pillow
 
 # Order layers starting with less frequently varying ones
 COPY --from=builder  /build_thirdparty/usr/ /usr/
