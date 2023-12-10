@@ -710,6 +710,16 @@ def test_ogr_gpkg_9(gpkg_ds):
     extent = lyr.GetExtent()
     assert extent == (5.0, 10.0, 5.0, 10.0), "got bad extent"
 
+    extent = lyr.GetExtent3D()
+    assert extent == (
+        5.0,
+        10.0,
+        5.0,
+        10.0,
+        float("inf"),
+        float("-inf"),
+    ), "got bad extent"
+
     fcount = lyr.GetFeatureCount()
     assert fcount == 10, "got bad featurecount"
 
@@ -6622,9 +6632,9 @@ def test_ogr_gpkg_spatial_view_computed_geom_column(tmp_vsimem, tmp_path):
         ds = None
         pytest.skip("spatialite missing")
 
-    lyr = ds.CreateLayer("foo", geom_type=ogr.wkbPoint)
+    lyr = ds.CreateLayer("foo", geom_type=ogr.wkbPoint25D)
     f = ogr.Feature(lyr.GetLayerDefn())
-    f.SetGeometry(ogr.CreateGeometryFromWkt("POINT(1 2)"))
+    f.SetGeometry(ogr.CreateGeometryFromWkt("POINT Z (1 2 3)"))
     lyr.CreateFeature(f)
 
     ds.ExecuteSQL(
@@ -6634,7 +6644,7 @@ def test_ogr_gpkg_spatial_view_computed_geom_column(tmp_vsimem, tmp_path):
         "INSERT INTO gpkg_contents (table_name, identifier, data_type, srs_id) VALUES ( 'geom_view', 'geom_view', 'features', 4326 )"
     )
     ds.ExecuteSQL(
-        "INSERT INTO gpkg_geometry_columns (table_name, column_name, geometry_type_name, srs_id, z, m) values ('geom_view', 'my_geom', 'MULTIPOINT', 4326, 0, 0)"
+        "INSERT INTO gpkg_geometry_columns (table_name, column_name, geometry_type_name, srs_id, z, m) values ('geom_view', 'my_geom', 'MULTIPOINT', 4326, 1, 0)"
     )
     ds.ExecuteSQL(
         "INSERT INTO gpkg_extensions VALUES('geom_view', 'my_geom', 'gdal_spatialite_computed_geom_column', 'https://gdal.org/drivers/vector/gpkg_spatialite_computed_column.html', 'read-write')"
@@ -6661,10 +6671,12 @@ def test_ogr_gpkg_spatial_view_computed_geom_column(tmp_vsimem, tmp_path):
     ds = ogr.Open(filename)
 
     lyr = ds.GetLayerByName("geom_view")
-    assert lyr.GetGeomType() == ogr.wkbMultiPoint
+    assert lyr.GetGeomType() == ogr.wkbMultiPoint25D
     assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4326"
     f = lyr.GetNextFeature()
-    assert f.GetGeometryRef().ExportToWkt() == "MULTIPOINT (1 2)"
+    assert f.GetGeometryRef().ExportToIsoWkt() == "MULTIPOINT Z ((1 2 3))"
+    assert lyr.GetExtent() == (1, 1, 2, 2)
+    assert lyr.GetExtent3D() == (1, 1, 2, 2, 3, 3)
 
     ds = None
 
@@ -9840,3 +9852,18 @@ def test_ogr_gpkg_extent3d_envelope_variants(file_name):
     lyr = ds.GetLayerByName("foo")
     ext3d = lyr.GetExtent3D()
     assert ext3d == (0.0, 3.0, 0.0, 3.0, 0.0, 3.0)
+
+    lyr.SetAttributeFilter("1 = 1")
+    ext3d = lyr.GetExtent3D()
+    assert ext3d == (0.0, 3.0, 0.0, 3.0, 0.0, 3.0)
+
+    lyr.SetAttributeFilter("1 = 0")
+    ext3d = lyr.GetExtent3D()
+    assert ext3d == (
+        float("inf"),
+        float("-inf"),
+        float("inf"),
+        float("-inf"),
+        float("inf"),
+        float("-inf"),
+    )
