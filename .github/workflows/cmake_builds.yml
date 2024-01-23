@@ -33,7 +33,7 @@ jobs:
     - name: Checkout GDAL
       uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
     - name: Setup cache
-      uses: actions/cache@704facf57e6136b1bc63b828d79edcd491f0ee84 # v3.3.2
+      uses: actions/cache@13aacd865c20de90d75de3b17ebe84f7a17d57d2 # v4.0.0
       id: cache
       with:
           path: ${{ github.workspace }}/.ccache
@@ -315,7 +315,7 @@ jobs:
       - name: Checkout GDAL
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: Install development packages
-        uses: msys2/setup-msys2@76b1bed68bac51ebe46cb431077217d4b98e2b7b # v2.21.0
+        uses: msys2/setup-msys2@cc11e9188b693c2b100158c3322424c4cc1dadea # v2.22.0
         with:
           msystem: MINGW64
           update: true
@@ -328,7 +328,7 @@ jobs:
             mingw-w64-x86_64-libgeotiff mingw-w64-x86_64-libpng mingw-w64-x86_64-libtiff mingw-w64-x86_64-openjpeg2
             mingw-w64-x86_64-python-pip mingw-w64-x86_64-python-numpy mingw-w64-x86_64-python-pytest mingw-w64-x86_64-python-setuptools mingw-w64-x86_64-python-lxml mingw-w64-x86_64-swig mingw-w64-x86_64-python-psutil
       - name: Setup cache
-        uses: actions/cache@704facf57e6136b1bc63b828d79edcd491f0ee84 # v3.3.2
+        uses: actions/cache@13aacd865c20de90d75de3b17ebe84f7a17d57d2 # v4.0.0
         id: cache
         with:
           path: ${{ github.workspace }}\.ccache
@@ -571,7 +571,7 @@ jobs:
     - name: Checkout GDAL
       uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
     - name: Setup cache
-      uses: actions/cache@704facf57e6136b1bc63b828d79edcd491f0ee84 # v3.3.2
+      uses: actions/cache@13aacd865c20de90d75de3b17ebe84f7a17d57d2 # v4.0.0
       id: cache
       with:
           path: ${{ github.workspace }}/.ccache
