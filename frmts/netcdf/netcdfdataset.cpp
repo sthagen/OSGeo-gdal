@@ -3431,14 +3431,14 @@ void netCDFDataset::SetProjectionFromVar(
         for (unsigned int i = 0;
              i < strlen(poDS->papszDimName[poDS->nXDimID]) && i < 3; i++)
         {
-            szDimNameX[i] =
-                (char)tolower((poDS->papszDimName[poDS->nXDimID])[i]);
+            szDimNameX[i] = (char)tolower(static_cast<unsigned char>(
+                (poDS->papszDimName[poDS->nXDimID])[i]));
         }
         szDimNameX[3] = '\0';
         // for( unsigned int i = 0;
         //      (i < strlen(poDS->papszDimName[poDS->nYDimID])
         //                        && i < 3 ); i++ ) {
-        //    szDimNameY[i]=(char)tolower((poDS->papszDimName[poDS->nYDimID])[i]);
+        //    szDimNameY[i]=(char)tolower(static_cast<unsigned char>((poDS->papszDimName[poDS->nYDimID])[i]));
         // }
         // szDimNameY[3] = '\0';
     }
@@ -4800,7 +4800,7 @@ void netCDFDataset::SetProjectionFromVar(
                         SET_FROM_USER_INPUT_LIMITATIONS_get()) == OGRERR_NONE &&
                 AreSRSEqualThroughProj4String(oSRS, oSRSFromGBCRS))
             {
-                oSRS = oSRSFromGBCRS;
+                oSRS = std::move(oSRSFromGBCRS);
                 SetSpatialRefNoUpdate(&oSRS);
             }
         }
@@ -11092,9 +11092,10 @@ static void NCDFAddHistory(int fpImage, const char *pszAddHist,
     time_t tp = time(nullptr);
     if (tp != -1)
     {
-        struct tm *ltime = localtime(&tp);
+        struct tm ltime;
+        VSILocalTime(&tp, &ltime);
         (void)strftime(strtime, sizeof(strtime),
-                       "%a %b %d %H:%M:%S %Y: ", ltime);
+                       "%a %b %d %H:%M:%S %Y: ", &ltime);
     }
 
     // status = nc_get_att_text(fpImage, NC_GLOBAL,
@@ -13307,7 +13308,7 @@ CPLErr netCDFDataset::FilterVars(
 // Create vector layers from given potentially identified vector variables
 // resulting from the scanning of a NetCDF (or group) ID.
 CPLErr netCDFDataset::CreateGrpVectorLayers(
-    int nCdfId, CPLString osFeatureType,
+    int nCdfId, const CPLString &osFeatureType,
     const std::vector<int> &anPotentialVectorVarID,
     const std::map<int, int> &oMapDimIdToCount, int nVarXId, int nVarYId,
     int nVarZId, int nProfileDimId, int nParentIndexVarID, bool bKeepRasters)

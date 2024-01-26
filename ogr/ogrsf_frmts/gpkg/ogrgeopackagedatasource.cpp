@@ -1279,7 +1279,8 @@ GDALGeoPackageDataset::GetContents()
                 oDesc.osMaxX = pszMaxX;
             if (pszMaxY)
                 oDesc.osMaxY = pszMaxY;
-            m_oMapTableToContents[CPLString(pszTableName).toupper()] = oDesc;
+            m_oMapTableToContents[CPLString(pszTableName).toupper()] =
+                std::move(oDesc);
         }
     }
 
@@ -7069,7 +7070,8 @@ OGRLayer *GDALGeoPackageDataset::ExecuteSQL(const char *pszSQLCommand,
 
     FlushMetadata();
 
-    while (*pszSQLCommand != '\0' && isspace(*pszSQLCommand))
+    while (*pszSQLCommand != '\0' &&
+           isspace(static_cast<unsigned char>(*pszSQLCommand)))
         pszSQLCommand++;
 
     CPLString osSQLCommand(pszSQLCommand);

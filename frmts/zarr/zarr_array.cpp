@@ -372,7 +372,7 @@ void ZarrArray::DeallocateDecodedTileData()
         const size_t nDTSize = m_oType.GetSize();
         GByte *pDst = &m_abyDecodedTileData[0];
         const size_t nValues = m_abyDecodedTileData.size() / nDTSize;
-        for (auto &elt : m_aoDtypeElts)
+        for (const auto &elt : m_aoDtypeElts)
         {
             if (elt.nativeType == DtypeElt::NativeType::STRING_ASCII ||
                 elt.nativeType == DtypeElt::NativeType::STRING_UNICODE)
@@ -764,7 +764,7 @@ lbl_next_depth:
 void ZarrArray::DecodeSourceElt(const std::vector<DtypeElt> &elts,
                                 const GByte *pSrc, GByte *pDst)
 {
-    for (auto &elt : elts)
+    for (const auto &elt : elts)
     {
         if (elt.nativeType == DtypeElt::NativeType::STRING_UNICODE)
         {
@@ -2064,7 +2064,7 @@ ZarrArray::OpenTilePresenceCache(bool bCanCreate) const
     if (poTilePresenceArray)
     {
         bool ok = true;
-        const auto apoDimsCache = poTilePresenceArray->GetDimensions();
+        const auto &apoDimsCache = poTilePresenceArray->GetDimensions();
         if (poTilePresenceArray->GetDataType() != eByteDT ||
             apoDimsCache.size() != m_aoDims.size())
         {
@@ -2202,7 +2202,7 @@ bool ZarrArray::CacheTilePresence()
     const std::vector<size_t> anCount(m_aoDims.size(), 1);
     const std::vector<GInt64> anArrayStep(m_aoDims.size(), 0);
     const std::vector<GPtrDiff_t> anBufferStride(m_aoDims.size(), 0);
-    const auto apoDimsCache = poTilePresenceArray->GetDimensions();
+    const auto &apoDimsCache = poTilePresenceArray->GetDimensions();
     const auto eByteDT = GDALExtendedDataType::Create(GDT_Byte);
 
     CPLDebug(ZARR_DEBUG_KEY,

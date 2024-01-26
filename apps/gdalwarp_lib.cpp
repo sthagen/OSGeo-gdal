@@ -1402,7 +1402,7 @@ GDALDatasetH GDALWarp(const char *pszDest, GDALDatasetH hDstDS, int nSrcCount,
     {
         if (psOptions->osFormat.empty())
         {
-            CPLString osFormat = GetOutputDriverForRaster(pszDest);
+            const std::string osFormat = GetOutputDriverForRaster(pszDest);
             if (osFormat.empty())
             {
                 return nullptr;
@@ -5448,7 +5448,7 @@ GDALWarpAppOptionsNew(char **papszArgv,
                 return nullptr;
             }
             if (i < nArgc - 1 && atoi(papszArgv[i + 1]) >= 0 &&
-                isdigit(papszArgv[i + 1][0]))
+                isdigit(static_cast<unsigned char>(papszArgv[i + 1][0])))
             {
                 psOptions->aosTransformerOptions.SetNameValue(
                     "REFINE_MINIMUM_GCPS", papszArgv[++i]);
