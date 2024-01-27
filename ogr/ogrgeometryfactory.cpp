@@ -4539,7 +4539,7 @@ OGRGeometryH OGR_G_ForceToLineString(OGRGeometryH hGeom)
  * @param poGeom the input geometry - ownership is passed to the method.
  * @param eTargetType target output geometry type.
  * @param papszOptions options as a null-terminated list of strings or NULL.
- * @return new geometry.
+ * @return new geometry, or nullptr in case of error.
  *
  * @since GDAL 2.0
  */
@@ -4970,8 +4970,11 @@ OGRGeometry *OGRGeometryFactory::forceTo(OGRGeometry *poGeom,
     else if (eTargetTypeFlat == wkbPolygon)
     {
         poGeom = forceToPolygon(poGeom);
-        poGeom->set3D(OGR_GT_HasZ(eTargetType));
-        poGeom->setMeasured(OGR_GT_HasM(eTargetType));
+        if (poGeom)
+        {
+            poGeom->set3D(OGR_GT_HasZ(eTargetType));
+            poGeom->setMeasured(OGR_GT_HasM(eTargetType));
+        }
     }
     else if (eTargetTypeFlat == wkbMultiPolygon)
     {
