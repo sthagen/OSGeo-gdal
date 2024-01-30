@@ -379,6 +379,10 @@ bool GDALGeoPackageDataset::ConvertGpkgSpatialRefSysToExtensionWkt2(
     if (!oResultTable)
         return false;
 
+    // Temporary remove foreign key checks
+    const GPKGTemporaryForeignKeyCheckDisabler
+        oGPKGTemporaryForeignKeyCheckDisabler(this);
+
     bool bRet = SoftStartTransaction() == OGRERR_NONE;
 
     if (bRet)
@@ -1866,7 +1870,7 @@ int GDALGeoPackageDataset::Open(GDALOpenInfo *poOpenInfo,
         FixupWrongMedataReferenceColumnNameUpdate();
     }
 
-    SetPamFlags(0);
+    SetPamFlags(GetPamFlags() & ~GPF_DIRTY);
 
     return bRet;
 }
@@ -3247,7 +3251,8 @@ CPLErr GDALGeoPackageDataset::FinalizeRasterRegistration()
         m_adfGeoTransform[0] + nRasterXSize * m_adfGeoTransform[1];
     double dfGDALMaxY = m_adfGeoTransform[3];
 
-    SoftStartTransaction();
+    if (SoftStartTransaction() != OGRERR_NONE)
+        return CE_Failure;
 
     const char *pszCurrentDate =
         CPLGetConfigOption("OGR_CURRENT_DATE", nullptr);
@@ -3270,7 +3275,10 @@ CPLErr GDALGeoPackageDataset::FinalizeRasterRegistration()
     eErr = SQLCommand(hDB, pszSQL);
     sqlite3_free(pszSQL);
     if (eErr != OGRERR_NONE)
+    {
+        SoftRollbackTransaction();
         return CE_Failure;
+    }
 
     double dfTMSMaxX = m_dfTMSMinX + nTileXCountZoomLevel0 * nTileWidth *
                                          dfPixelXSizeZoomLevel0;
@@ -3286,7 +3294,10 @@ CPLErr GDALGeoPackageDataset::FinalizeRasterRegistration()
     eErr = SQLCommand(hDB, pszSQL);
     sqlite3_free(pszSQL);
     if (eErr != OGRERR_NONE)
+    {
+        SoftRollbackTransaction();
         return CE_Failure;
+    }
 
     m_papoOverviewDS = static_cast<GDALGeoPackageDataset **>(
         CPLCalloc(sizeof(GDALGeoPackageDataset *), m_nZoomLevel));
@@ -3323,7 +3334,10 @@ CPLErr GDALGeoPackageDataset::FinalizeRasterRegistration()
         eErr = SQLCommand(hDB, pszSQL);
         sqlite3_free(pszSQL);
         if (eErr != OGRERR_NONE)
+        {
+            SoftRollbackTransaction();
             return CE_Failure;
+        }
 
         if (i < m_nZoomLevel)
         {
@@ -3336,6 +3350,18 @@ CPLErr GDALGeoPackageDataset::FinalizeRasterRegistration()
                                 dfGDALMinY, dfGDALMaxX, dfGDALMaxY);
 
             m_papoOverviewDS[m_nZoomLevel - 1 - i] = poOvrDS;
+        }
+    }
+
+    if (!m_osSQLInsertIntoGpkg2dGriddedCoverageAncillary.empty())
+    {
+        eErr = SQLCommand(
+            hDB, m_osSQLInsertIntoGpkg2dGriddedCoverageAncillary.c_str());
+        m_osSQLInsertIntoGpkg2dGriddedCoverageAncillary.clear();
+        if (eErr != OGRERR_NONE)
+        {
+            SoftRollbackTransaction();
+            return CE_Failure;
         }
     }
 
@@ -3358,7 +3384,7 @@ CPLErr GDALGeoPackageDataset::FlushCache(bool bAtClosing)
 
     if (eAccess == GA_Update || !m_bMetadataDirty)
     {
-        SetPamFlags(0);
+        SetPamFlags(GetPamFlags() & ~GPF_DIRTY);
     }
 
     if (m_bRemoveOGREmptyTable)
@@ -3376,7 +3402,7 @@ CPLErr GDALGeoPackageDataset::FlushCache(bool bAtClosing)
         // Needed again as above IFlushCacheWithErrCode()
         // may have call GDALGeoPackageRasterBand::InvalidateStatistics()
         // which modifies metadata
-        SetPamFlags(0);
+        SetPamFlags(GetPamFlags() & ~GPF_DIRTY);
     }
 
     return eErr;
@@ -5842,7 +5868,7 @@ bool GDALGeoPackageDataset::CreateTileGriddedTable(char **papszOptions)
         m_dfOffset, m_dfPrecision, osGridCellEncoding.c_str(),
         osUom.empty() ? nullptr : osUom.c_str(), osFieldName.c_str(),
         osQuantityDefinition.c_str());
-    osSQL += pszSQL;
+    m_osSQLInsertIntoGpkg2dGriddedCoverageAncillary = pszSQL;
     sqlite3_free(pszSQL);
 
     // Requirement 3 /gpkg-spatial-ref-sys-row
@@ -5991,7 +6017,7 @@ GDALDataset *GDALGeoPackageDataset::CreateCopy(const char *pszFilename,
             }
         }
         if (poDS)
-            poDS->SetPamFlags(0);
+            poDS->SetPamFlags(poDS->GetPamFlags() & ~GPF_DIRTY);
         return poDS;
     }
 
@@ -6371,7 +6397,7 @@ GDALDataset *GDALGeoPackageDataset::CreateCopy(const char *pszFilename,
     GDALDestroyWarpOptions(psWO);
 
     if (poDS)
-        poDS->SetPamFlags(0);
+        poDS->SetPamFlags(poDS->GetPamFlags() & ~GPF_DIRTY);
 
     return poDS;
 }
@@ -6729,6 +6755,10 @@ int GDALGeoPackageDataset::FindLayerIndex(const char *pszLayerName)
 
 OGRErr GDALGeoPackageDataset::DeleteLayerCommon(const char *pszLayerName)
 {
+    // Temporary remove foreign key checks
+    const GPKGTemporaryForeignKeyCheckDisabler
+        oGPKGTemporaryForeignKeyCheckDisabler(this);
+
     char *pszSQL = sqlite3_mprintf(
         "DELETE FROM gpkg_contents WHERE lower(table_name) = lower('%q')",
         pszLayerName);
@@ -6858,6 +6888,10 @@ OGRErr GDALGeoPackageDataset::DeleteLayer(int iLayer)
 
     CPLDebug("GPKG", "DeleteLayer(%s)", osLayerName.c_str());
 
+    // Temporary remove foreign key checks
+    const GPKGTemporaryForeignKeyCheckDisabler
+        oGPKGTemporaryForeignKeyCheckDisabler(this);
+
     OGRErr eErr = SoftStartTransaction();
 
     if (eErr == OGRERR_NONE)
@@ -6924,6 +6958,9 @@ OGRErr GDALGeoPackageDataset::DeleteLayer(int iLayer)
 
 OGRErr GDALGeoPackageDataset::DeleteRasterLayer(const char *pszLayerName)
 {
+    // Temporary remove foreign key checks
+    const GPKGTemporaryForeignKeyCheckDisabler
+        oGPKGTemporaryForeignKeyCheckDisabler(this);
 
     OGRErr eErr = SoftStartTransaction();
 
