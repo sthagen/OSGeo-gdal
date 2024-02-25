@@ -116,13 +116,15 @@ projection,including GCP-based transformations.
 
 .. option:: <srcfile>
 
-    File with source projection definition or GCP's. If
-    not given, source projection is read from the command-line :option:`-s_srs`
-    or :option:`-gcp` parameters
+    Raster dataset with source projection definition or GCPs. If
+    not given, source projection/GCPs are read from the command-line :option:`-s_srs`
+    or :option:`-gcp` parameters.
+
+    Note that only the SRS and/or GCPs of this input file is taken into account, and not its pixel content.
 
 .. option:: <dstfile>
 
-    File with destination projection definition.
+    Raster dataset with destination projection definition.
 
 Coordinates are read as pairs, triples (for 3D,) or (since GDAL 3.0.0,) quadruplets
 (for X,Y,Z,time) of numbers per line from standard
