@@ -1516,7 +1516,6 @@ CPLErr ReadRaster1( double xoff, double yoff, double xsize, double ysize,
     self.thisown = 0
     self.this = None
     self._invalidate_children()
-    return val
 %}
 
 %feature("shadow") ExecuteSQL %{
@@ -4746,4 +4745,15 @@ def quiet_errors():
         yield
     finally:
         PopErrorHandler()
+%}
+
+
+%feature("pythonappend") IsLineOfSightVisible %{
+    is_visible, col_intersection, row_intersection = val
+    import collections
+    tuple = collections.namedtuple('IsLineOfSightVisibleResult', ['is_visible', 'col_intersection', 'row_intersection'])
+    tuple.is_visible = is_visible
+    tuple.col_intersection = col_intersection
+    tuple.row_intersection = row_intersection
+    val = tuple
 %}
