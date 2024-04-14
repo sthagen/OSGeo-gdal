@@ -243,11 +243,8 @@ struct GDALVectorTranslateOptions
      * has been to disable fields. */
     bool bSelFieldsSet = false;
 
-    /*! list of fields from input layer to copy to the new layer. A field is
-       skipped if mentioned previously in the list even if the input layer has
-       duplicate field names. (Defaults to all; any field is skipped if a
-       subsequent field with same name is found.) Geometry fields can also be
-       specified in the list. */
+    /*! list of fields from input layer to copy to the new layer.
+     * Geometry fields can also be specified in the list. */
     CPLStringList aosSelFields{};
 
     /*! SQL statement to execute. The resulting table/layer will be saved to the
@@ -6653,7 +6650,8 @@ static std::unique_ptr<GDALArgumentParser> GDALVectorTranslateOptionsGetParser(
     argParser->add_description(
         _("Converts simple features data between file formats."));
 
-    argParser->add_epilog(_("https://gdal.org/programs/ogr2ogr.html"));
+    argParser->add_epilog(
+        _("For more details, consult https://gdal.org/programs/ogr2ogr.html"));
 
     argParser->add_output_format_argument(psOptions->osFormat);
 
@@ -6776,7 +6774,7 @@ static std::unique_ptr<GDALArgumentParser> GDALVectorTranslateOptionsGetParser(
             {
                 psOptions->bSelFieldsSet = true;
                 psOptions->aosSelFields =
-                    CSLTokenizeStringComplex(s.c_str(), " ,", FALSE, FALSE);
+                    CSLTokenizeStringComplex(s.c_str(), ",", TRUE, FALSE);
             })
         .help(_("Comma-delimited list of fields from input layer to copy to "
                 "the new layer."));
@@ -7377,25 +7375,9 @@ static std::unique_ptr<GDALArgumentParser> GDALVectorTranslateOptionsGetParser(
         .help(_("Display progress on terminal. Only works if input layers have "
                 "the 'fast feature count' capability."));
 
-    argParser->add_argument("-if")
-        .append()
-        .metavar("<format>")
-        .action(
-            [psOptionsForBinary](const std::string &s)
-            {
-                if (psOptionsForBinary)
-                {
-                    if (GDALGetDriverByName(s.c_str()) == nullptr)
-                    {
-                        CPLError(CE_Warning, CPLE_AppDefined,
-                                 "%s is not a recognized driver", s.c_str());
-                    }
-                    psOptionsForBinary->aosAllowInputDrivers.AddString(
-                        s.c_str());
-                }
-            })
-        .help(
-            _("Format/driver name(s) to be attempted to open the input file."));
+    argParser->add_input_format_argument(
+        psOptionsForBinary ? &psOptionsForBinary->aosAllowInputDrivers
+                           : nullptr);
 
     argParser->add_open_options_argument(
         psOptionsForBinary ? &(psOptionsForBinary->aosOpenOptions) : nullptr);
