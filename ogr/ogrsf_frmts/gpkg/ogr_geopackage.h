@@ -374,6 +374,8 @@ class GDALGeoPackageDataset final : public OGRSQLiteBaseDataSource,
         return nSoftTransactionLevel > 0;
     }
 
+    static std::string LaunderName(const std::string &osStr);
+
     // At least 100000 to avoid conflicting with EPSG codes
     static constexpr int FIRST_CUSTOM_SRSID = 100000;
 
@@ -707,6 +709,7 @@ class OGRGeoPackageTableLayer final : public OGRGeoPackageLayer
     bool m_bTruncateFields = false;
     bool m_bDeferredCreation = false;
     bool m_bTableCreatedInTransaction = false;
+    bool m_bLaunder = false;
     int m_iFIDAsRegularColumnIndex = -1;
     std::string m_osInsertionBuffer{};  // used by FeatureBindParameters to
                                         // store datetime values
@@ -977,6 +980,11 @@ class OGRGeoPackageTableLayer final : public OGRGeoPackageLayer
         m_bTruncateFields = CPL_TO_BOOL(bFlag);
     }
 
+    void SetLaunder(bool bFlag)
+    {
+        m_bLaunder = bFlag;
+    }
+
     OGRErr RunDeferredCreationIfNecessary();
     bool RunDeferredDropRTreeTableIfNecessary();
     bool DoJobAtTransactionCommit();
@@ -1163,6 +1171,16 @@ class OGRGeoPackageSelectLayer final : public OGRGeoPackageLayer,
                                  int bForce) override
     {
         return OGRGeoPackageLayer::GetExtent(iGeomField, psExtent, bForce);
+    }
+
+    bool
+    ValidateGeometryFieldIndexForSetSpatialFilter(int iGeomField,
+                                                  const OGRGeometry *poGeomIn,
+                                                  bool bIsSelectLayer) override
+    {
+        return OGRGeoPackageLayer::
+            ValidateGeometryFieldIndexForSetSpatialFilter(iGeomField, poGeomIn,
+                                                          bIsSelectLayer);
     }
 };
 
