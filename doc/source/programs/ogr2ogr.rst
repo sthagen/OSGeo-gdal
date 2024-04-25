@@ -34,11 +34,13 @@ Synopsis
            [-dim layer_dim|2|XY|3|XYZ|XYM|XYZM] [-s_coord_epoch <epoch>] [-a_coord_epoch <epoch>]
            [-t_coord_epoch <epoch>] [-ct <pipeline_def>] [-spat_srs <srs_def>] [-geomfield <name>]
            [-segmentize <max_dist>] [-simplify <tolerance>] [-makevalid] [-wrapdateline]
-           [-datelineoffset <val_in_degree>] [-clipsrc [<xmin> <ymin> <xmax> <ymax>]|<WKT>|<datasource>|spat_extent]
+           [-datelineoffset <val_in_degree>]
+           [-clipsrc [<xmin> <ymin> <xmax> <ymax>]|<WKT>|<datasource>|spat_extent]
            [-clipsrcsql <sql_statement>] [-clipsrclayer <layername>] [-clipsrcwhere <expression>]
            [-clipdst [<xmin> <ymin> <xmax> <ymax>]|<WKT>|<datasource>] [-clipdstsql <sql_statement>]
            [-clipdstlayer <layername>] [-clipdstwhere <expression>] [-explodecollections] [-zfield <name>]
-           [-gcp <ungeoref_x> <ungeoref_y> <georef_x> <georef_y> [<elevation>]]... [-tps] [-order 1|2|3]
+           [-gcp <ungeoref_x> <ungeoref_y> <georef_x> <georef_y> [<elevation>]]...
+           [-tps] [-order 1|2|3]
            [-xyRes <val>[ m|mm|deg]] [-zRes <val>[ m|mm]] [-mRes <val>] [-unsetCoordPrecision]
 
     Other options:
@@ -509,8 +511,13 @@ output coordinate system or even reprojecting the features during translation.
 
 .. option:: -gcp <ungeoref_x> <ungeoref_y> <georef_x> <georef_y> [<elevation>]
 
-    Add the indicated ground control point. This option may be provided
-    multiple times to provide a set of GCPs.
+    Use the indicated ground control point to compute a coordinate transformation.
+    The transformation method can be selected by specifying the :option:`-order`
+    or :option:`-tps` options.
+    Note that unlike raster tools such as gdal_edit or gdal_translate, GCPs
+    are not added to the output dataset.
+    This option may be provided multiple times to provide a set of GCPs (at
+    least 2 GCPs are needed).
 
 .. option:: -order <n>
 
