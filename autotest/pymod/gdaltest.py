@@ -49,7 +49,7 @@ from threading import Thread
 
 import pytest
 
-from osgeo import gdal, ogr, osr
+from osgeo import gdal, osr
 
 jp2kak_drv = None
 jpeg2000_drv = None
@@ -1912,6 +1912,8 @@ def gdalurlopen(url, timeout=10):
 
         urllib.request.install_opener(opener)
 
+    import http.client
+
     try:
         handle = urllib.request.urlopen(url)
         socket.setdefaulttimeout(old_timeout)
@@ -1930,6 +1932,10 @@ def gdalurlopen(url, timeout=10):
         return None
     except socket.timeout:
         print(f"HTTP service for {url} timed out")
+        socket.setdefaulttimeout(old_timeout)
+        return None
+    except http.client.RemoteDisconnected as e:
+        print(f"HTTP service for {url} is not available: RemoteDisconnected : {e}")
         socket.setdefaulttimeout(old_timeout)
         return None
 
@@ -2094,9 +2100,6 @@ def reopen(ds, update=False, open_options=None):
     ds_drv = ds.GetDriver()
 
     ds.Close()
-
-    if isinstance(ds, ogr.DataSource) and open_options is None:
-        return ogr.Open(ds_loc, update)
 
     flags = 0
     if update:
