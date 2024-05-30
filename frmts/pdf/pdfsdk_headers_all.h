@@ -1,11 +1,11 @@
 /******************************************************************************
  *
- * Project:  GDAL TileDB Driver
- * Purpose:  Include tiledb headers
- * Author:   TileDB, Inc
+ * Project:  GDAL
+ * Purpose:  Includes PDF SDK headers
+ * Author:   Even Rouault <even dot rouault at spatialys dot com>
  *
  ******************************************************************************
- * Copyright (c) 2019, TileDB, Inc
+ * Copyright (c) 2015, Even Rouault <even dot rouault at spatialys dot com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -24,36 +24,17 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
- ****************************************************************************/
+ *****************************************************************************/
 
-#ifndef INCLUDE_TILEDB_H
-#define INCLUDE_TILEDB_H
+#ifndef PDFSDK_HEADERS_ALL_H
+#define PDFSDK_HEADERS_ALL_H
 
-#include "cpl_port.h"
-
-#ifdef HAVE_GCC_SYSTEM_HEADER
+#if defined(__GNUC__) && !defined(_MSC_VER)
 #pragma GCC system_header
 #endif
 
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable : 4996) /* XXXX was deprecated */
-#endif
+#include "pdfsdk_headers_poppler.h"
+#include "pdfsdk_headers_podofo.h"
+#include "pdfsdk_headers_pdfium.h"
 
-#ifdef INCLUDE_ONLY_TILEDB_VERSION
-#include "tiledb/tiledb_version.h"
-#else
-#include "tiledb/tiledb"
-#include "tiledb/tiledb_experimental"
-#endif
-
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
-
-#if TILEDB_VERSION_MAJOR > 2 ||                                                \
-    (TILEDB_VERSION_MAJOR == 2 && TILEDB_VERSION_MINOR >= 21)
-#define HAS_TILEDB_GEOM_WKB_WKT
-#endif
-
-#endif  // INCLUDE_TILEDB_H
+#endif  // PDFSDK_HEADERS_ALL_H
