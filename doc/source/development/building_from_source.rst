@@ -4,6 +4,29 @@
 Building GDAL from source
 ================================================================================
 
+.. _build_requirements:
+
+Build requirements
+--------------------------------------------------------------------------------
+
+The minimum requirements to build GDAL are:
+
+- CMake >= 3.16, and an associated build system (make, ninja, Visual Studio, etc.)
+- C99 compiler
+- C++17 compiler since GDAL 3.9 (C++11 in previous versions)
+- PROJ >= 6.3.1
+
+Additional requirements to run the GDAL test suite are:
+
+- SWIG >= 4, for building bindings to other programming languages
+- Python >= 3.8
+- Python packages listed in `autotest/requirements.txt`
+
+A number of optional libraries are also strongly recommended for most builds:
+SQLite3, expat, libcurl, zlib, libtiff, libgeotiff, libpng, libjpeg, etc.
+Consult :ref:`raster_drivers` and :ref:`vector_drivers` pages for information
+on dependencies of optional drivers.
+
 CMake (GDAL versions >= 3.5.0)
 --------------------------------------------------------------------------------
 
@@ -2485,7 +2508,7 @@ How do I get PROJ ?
 
 PROJ is the only required build-time dependency of GDAL that is not vendorized
 in the GDAL source code tree. Consequently, the PROJ header and library must be available
-when configuring GDAL's CMake. Consult `PROJ installation <https://proj.org/install.html>`.
+when configuring GDAL's CMake. Consult `PROJ installation <https://proj.org/install.html>`__.
 
 Conflicting PROJ libraries
 **************************
