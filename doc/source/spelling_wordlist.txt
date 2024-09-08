@@ -200,6 +200,7 @@ BBoxOrder
 bc
 bCatchDebug
 bCopy
+bDelete
 bDstToSrc
 bedrijven
 behaviours
@@ -660,6 +661,7 @@ dfTargetHeight
 dfTimeout
 dfTolerance
 dfURY
+dfValue
 dfVisibleVal
 dfXOff
 dfXSize
