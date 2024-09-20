@@ -614,6 +614,7 @@ describedby
 deserialization
 deserialize
 deserialized
+deserializing
 desirabled
 dest
 destructor
@@ -984,6 +985,7 @@ gdalbuildvrt
 gdalcompare
 gdalconst
 gdaldata
+GDALDataset
 gdaldem
 gdaldriver
 gdalenhance
@@ -1013,6 +1015,7 @@ gdalrasterblock
 gdalrc
 gdalsrsinfo
 gdaltest
+GDALThreadLocalDatasetCache
 gdaltindex
 gdaltransform
 gdalvirtualmem
@@ -1392,6 +1395,7 @@ InfoFormat
 InfoOptions
 Informatisé
 Informix
+InfraRed
 ing
 ini
 init
@@ -1508,6 +1512,7 @@ KShortest
 kslikebase
 KSpread
 ktx
+Ku
 Kubernetes
 Kumar
 Kuratomi
@@ -1850,6 +1855,7 @@ MultiPolygon
 multipolygons
 multiproc
 multiprocess
+multireadtest
 multirecords
 multispectral
 multistring
@@ -2047,6 +2053,7 @@ nRecurseDepth
 nRefCount
 nReqOrder
 nSampleStep
+nScopeFlags
 nSecond
 nSize
 nSrcBufferAllocSize
