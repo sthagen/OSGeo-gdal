@@ -29,7 +29,7 @@
 
 #include "cpl_port.h"
 #include "cpl_json.h"
-#include "ogrgeojsonreader.h"
+#include "ogrlibjsonutils.h"
 #include "cpl_string.h"
 #include "gdal_utils.h"
 #include "gdal_utils_priv.h"
@@ -55,7 +55,7 @@ struct GDALVectorInfoOptions
     GDALVectorInfoFormat eFormat = FORMAT_TEXT;
     std::string osWHERE{};
     CPLStringList aosLayers{};
-    std::unique_ptr<OGRGeometry> poSpatialFilter;
+    std::unique_ptr<OGRGeometry> poSpatialFilter{};
     bool bAllLayers = false;
     std::string osSQLStatement{};
     std::string osDialect{};

@@ -29,8 +29,7 @@
 #include "gdal_priv.h"
 #include "cpl_http.h"
 #include "cpl_conv.h"
-#include "ogrgeojsonreader.h"
-#include "ogrgeojsonwriter.h"
+#include "ogrlibjsonutils.h"
 #include "eeda.h"
 
 #include <algorithm>
@@ -1558,6 +1557,10 @@ void GDALRegister_EEDAI()
         "   </Option>"
         "  <Option name='BLOCK_SIZE' type='integer' "
         "description='Size of a block' default='256'/>"
+        "  <Option name='VSI_PATH_FOR_AUTH' type='string' "
+        "description='/vsigs/... path onto which a "
+        "GOOGLE_APPLICATION_CREDENTIALS path specific "
+        "option is set'/>"
         "</OpenOptionList>");
     poDriver->SetMetadataItem(GDAL_DMD_SUBDATASETS, "YES");
 

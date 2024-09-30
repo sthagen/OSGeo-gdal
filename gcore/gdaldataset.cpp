@@ -4683,6 +4683,7 @@ void GDALDataset::ReportErrorV(const char *pszDSName, CPLErr eErrClass,
 /************************************************************************/
 char **GDALDataset::GetMetadata(const char *pszDomain)
 {
+#ifndef WITHOUT_DERIVED
     if (pszDomain != nullptr && EQUAL(pszDomain, "DERIVED_SUBDATASETS"))
     {
         oDerivedMetadataList.Clear();
@@ -4735,6 +4736,7 @@ char **GDALDataset::GetMetadata(const char *pszDomain)
         }
         return oDerivedMetadataList.List();
     }
+#endif
 
     return GDALMajorObject::GetMetadata(pszDomain);
 }
@@ -10244,7 +10246,7 @@ CPLErr GDALDatasetReadCompressedData(GDALDatasetH hDS, const char *pszFormat,
  *                       If set to true, the dataset from which they have been
  *                       cloned from must remain opened during the lifetime of
  *                       its clones.
- * @return true if the Clone() method is expecte to succeed with the same values
+ * @return true if the Clone() method is expected to succeed with the same values
  *         of nScopeFlags and bCanShareState.
  */
 bool GDALDataset::CanBeCloned(int nScopeFlags,

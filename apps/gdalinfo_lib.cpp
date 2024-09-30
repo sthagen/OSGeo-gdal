@@ -58,7 +58,8 @@
 #include "ogr_api.h"
 #include "ogr_srs_api.h"
 #include "ogr_spatialref.h"
-#include "ogrgeojsonreader.h"
+#include "ogrlibjsonutils.h"
+#include "ogrgeojsongeometry.h"
 #include "ogrgeojsonwriter.h"
 
 using std::vector;
@@ -135,7 +136,7 @@ struct GDALInfoOptions
     /*! report metadata for the specified domains. "all" can be used to report
         metadata in all domains.
         */
-    CPLStringList aosExtraMDDomains;
+    CPLStringList aosExtraMDDomains{};
 
     /*! WKT format used for SRS */
     std::string osWKTFormat = "WKT2";

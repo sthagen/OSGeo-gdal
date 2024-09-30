@@ -795,6 +795,7 @@ def test_gdalwarp_lib_45():
 
 
 @pytest.mark.require_driver("CSV")
+@pytest.mark.require_driver("GeoJSON")
 def test_gdalwarp_lib_46(tmp_vsimem):
 
     ds = gdal.Warp(
@@ -891,6 +892,7 @@ def test_gdalwarp_lib_46(tmp_vsimem):
 # Test -crop_to_cutline -tr X Y -wo CUTLINE_ALL_TOUCHED=YES (fixes for #1360)
 
 
+@pytest.mark.require_driver("GeoJSON")
 def test_gdalwarp_lib_cutline_all_touched_single_pixel(tmp_vsimem):
 
     cutlineDSName = (
@@ -941,6 +943,7 @@ def test_gdalwarp_lib_cutline_all_touched_single_pixel(tmp_vsimem):
 
 
 @pytest.mark.require_driver("CSV")
+@pytest.mark.require_driver("GeoJSON")
 def test_gdalwarp_lib_crop_to_cutline_slightly_shifted_wrt_pixel_boundaries(tmp_vsimem):
 
     cutlineDSName = (
@@ -1505,6 +1508,7 @@ def test_gdalwarp_lib_dstnodata(dstNodata):
 # Test automatic densification of cutline (#6375)
 
 
+@pytest.mark.require_driver("GeoJSON")
 def test_gdalwarp_lib_128(tmp_vsimem):
 
     mem_ds = gdal.GetDriverByName("MEM").Create("", 1177, 4719)
@@ -1599,7 +1603,12 @@ def test_gdalwarp_lib_128(tmp_vsimem):
 # to an invalid geometry (#6375)
 
 
+@pytest.mark.skipif(
+    not gdaltest.vrt_has_open_support(),
+    reason="VRT driver open missing",
+)
 @pytest.mark.require_geos
+@pytest.mark.require_driver("GeoJSON")
 def test_gdalwarp_lib_129(tmp_vsimem):
 
     mem_ds = gdal.GetDriverByName("MEM").Create("", 1000, 2000)
@@ -2069,6 +2078,10 @@ def test_gdalwarp_lib_135h(gdalwarp_135_grid_gtx, gdalwarp_135_grid2_gtx):
     assert data == pytest.approx(115 / (1200.0 / 3937)), "Bad value"
 
 
+@pytest.mark.skipif(
+    not gdaltest.vrt_has_open_support(),
+    reason="VRT driver open missing",
+)
 @pytest.mark.require_driver("GTX")
 def test_gdalwarp_lib_135i(
     gdalwarp_135_src_ds, gdalwarp_135_grid_gtx, gdalwarp_135_grid2_gtx, tmp_path
@@ -3058,6 +3071,7 @@ def test_gdalwarp_lib_scale_offset():
 # Test cutline with zero-width sliver
 
 
+@pytest.mark.require_driver("GeoJSON")
 def test_gdalwarp_lib_cutline_zero_width_sliver(tmp_vsimem):
 
     # Geometry valid in EPSG:4326, but that has a zero-width sliver
@@ -3079,6 +3093,7 @@ def test_gdalwarp_lib_cutline_zero_width_sliver(tmp_vsimem):
 # Test cutline with zero-width sliver
 
 
+@pytest.mark.require_driver("GeoJSON")
 def test_gdalwarp_lib_cutline_zero_width_sliver_remove_empty_polygon(tmp_vsimem):
 
     geojson = {
@@ -3120,6 +3135,7 @@ def test_gdalwarp_lib_cutline_zero_width_sliver_remove_empty_polygon(tmp_vsimem)
 # Test cutline with zero-width sliver
 
 
+@pytest.mark.require_driver("GeoJSON")
 def test_gdalwarp_lib_cutline_zero_width_sliver_remove_empty_inner_ring(tmp_vsimem):
 
     geojson = {
@@ -3324,6 +3340,10 @@ def test_gdalwarp_lib_src_nodata_with_dstalpha():
 # Test warping from a dataset with points outside of Earth (fixes #4934)
 
 
+@pytest.mark.skipif(
+    not gdaltest.vrt_has_open_support(),
+    reason="VRT driver open missing",
+)
 def test_gdalwarp_lib_src_points_outside_of_earth():
     class MyHandler:
         def __init__(self):
@@ -3913,6 +3933,7 @@ def test_gdalwarp_lib_working_data_type_with_source_dataset_of_different_types()
 
 
 @pytest.mark.require_geos
+@pytest.mark.require_driver("GeoJSON")
 def test_gdalwarp_lib_cutline_crossing_antimeridian_in_EPSG_32601_and_raster_in_EPSG_4326(
     tmp_vsimem,
 ):
@@ -4287,3 +4308,22 @@ def test_gdalwarp_lib_blank_edge_one_by_one(with_tap):
         assert gt == pytest.approx(
             (769234.6506516202, 1000.0, 0.0, 5698603.782217737, 0.0, -1000.0)
         )
+
+
+###############################################################################
+# Test bugfix for https://github.com/OSGeo/gdal/issues/10892
+
+
+def test_gdalwarp_lib_average_ten_ten_to_one_one():
+
+    src_ds = gdal.GetDriverByName("MEM").Create("", 10, 10)
+    src_ds.SetGeoTransform([0, 1, 0, 0, 0, -1])
+    srs = osr.SpatialReference()
+    srs.SetFromUserInput("WGS84")
+    srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+    src_ds.SetSpatialRef(srs)
+    src_ds.GetRasterBand(1).Fill(1)
+    out_ds = gdal.Warp(
+        "", src_ds, width=1, height=1, resampleAlg=gdal.GRIORA_Average, format="MEM"
+    )
+    assert out_ds.GetRasterBand(1).ComputeRasterMinMax() == (1, 1)

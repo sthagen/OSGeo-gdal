@@ -1115,7 +1115,7 @@ std::unique_ptr<GDALDataset> MEMDataset::Clone(int nScopeFlags,
                 poNewBand->psPam->CopyFrom(*(poSrcMEMBand->psPam));
             }
 
-            // Instanciates a mask band when needed.
+            // Instantiates a mask band when needed.
             if ((poSrcMEMBand->nMaskFlags &
                  (GMF_ALL_VALID | GMF_ALPHA | GMF_NODATA)) == 0)
             {
@@ -1154,6 +1154,20 @@ GDALDataset *MEMDataset::Open(GDALOpenInfo *poOpenInfo)
     if (!STARTS_WITH_CI(poOpenInfo->pszFilename, "MEM:::") ||
         poOpenInfo->fpL != nullptr)
         return nullptr;
+
+#ifndef GDAL_MEM_ENABLE_OPEN
+    if (!CPLTestBool(CPLGetConfigOption("GDAL_MEM_ENABLE_OPEN", "NO")))
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "Opening a MEM dataset with the MEM:::DATAPOINTER= syntax "
+                 "is no longer supported by default for security reasons. "
+                 "If you want to allow it, define the "
+                 "GDAL_MEM_ENABLE_OPEN "
+                 "configuration option to YES, or build GDAL with the "
+                 "GDAL_MEM_ENABLE_OPEN compilation definition");
+        return nullptr;
+    }
+#endif
 
     char **papszOptions =
         CSLTokenizeStringComplex(poOpenInfo->pszFilename + 6, ",", TRUE, FALSE);
