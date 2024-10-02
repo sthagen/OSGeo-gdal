@@ -36,7 +36,19 @@ gdal_dependent_format(jpeg "JPEG image format" "GDAL_USE_JPEG OR GDAL_USE_JPEG_I
 # base driver provide frmt core functions
 gdal_optional_format(raw "Raw formats:EOSAT FAST Format, FARSITE LCP and Vexcel MFF2 Image")
 # JPEG must be defined before GTiff
-gdal_format(gtiff "GeoTIFF image format")
+
+# Exception to the rule: enable the GTiff driver by default, even if
+# GDAL_BUILD_OPTIONAL_DRIVERS=OFF.
+if (NOT DEFINED GDAL_ENABLE_DRIVER_GTIFF AND
+    DEFINED GDAL_BUILD_OPTIONAL_DRIVERS AND
+    NOT GDAL_BUILD_OPTIONAL_DRIVERS AND
+    (GDAL_USE_TIFF OR GDAL_USE_TIFF_INTERNAL) AND
+    (GDAL_USE_GEOTIFF OR GDAL_USE_GEOTIFF_INTERNAL))
+    message(WARNING "Enabling GDAL_ENABLE_DRIVER_GTIFF=ON, despite GDAL_BUILD_OPTIONAL_DRIVERS=OFF. You can of course override this choice by setting GDAL_ENABLE_DRIVER_GTIFF=OFF")
+    option(GDAL_ENABLE_DRIVER_GTIFF "Set ON to build GeoTIFF image format format" ON)
+endif()
+
+gdal_dependent_format(gtiff "GeoTIFF image format" "GDAL_USE_TIFF OR GDAL_USE_TIFF_INTERNAL;GDAL_USE_GEOTIFF OR GDAL_USE_GEOTIFF_INTERNAL")
 set_package_properties(TIFF PROPERTIES PURPOSE "gdal_GTIFF: GeoTIFF image format")
 gdal_format(mem "Read/write data in Memory")
 
@@ -67,7 +79,7 @@ if (CMAKE_BUILD_TYPE MATCHES "Debug" OR GDAL_ENABLE_DRIVER_NULL)
   gdal_optional_format(null "NULL dummy driver")
 endif ()
 
-gdal_format(hfa "Erdas Imagine .img")
+gdal_optional_format(hfa "Erdas Imagine .img")
 gdal_optional_format(sdts "SDTS translator")
 gdal_optional_format(nitf "National Imagery Transmission Format")
 gdal_optional_format(gxf "GXF")

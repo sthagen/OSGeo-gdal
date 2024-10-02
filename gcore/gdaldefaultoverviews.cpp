@@ -851,6 +851,11 @@ CPLErr GDALDefaultOverviews::BuildOverviews(
         pScaledOverviewWithoutMask);
     if (bOvrIsAux)
     {
+#ifdef NO_HFA_SUPPORT
+        CPLError(CE_Failure, CPLE_NotSupported,
+                 "This build does not support creating .aux overviews");
+        eErr = CE_Failure;
+#else
         if (nNewOverviews == 0)
         {
             /* if we call HFAAuxBuildOverviews() with nNewOverviews == 0 */
@@ -873,6 +878,7 @@ CPLErr GDALDefaultOverviews::BuildOverviews(
             if (abValidLevel[j])
                 abRequireRefresh[j] = true;
         }
+#endif
     }
 
     /* -------------------------------------------------------------------- */
@@ -887,6 +893,7 @@ CPLErr GDALDefaultOverviews::BuildOverviews(
             poODS = nullptr;
         }
 
+#ifdef HAVE_TIFF
         eErr = GTIFFBuildOverviews(
             osOvrFilename, nBands, pahBands, nNewOverviews, panNewOverviewList,
             pszResampling, GDALScaledProgress, pScaledProgress, papszOptions);
@@ -914,6 +921,11 @@ CPLErr GDALDefaultOverviews::BuildOverviews(
             if (poODS == nullptr)
                 eErr = CE_Failure;
         }
+#else
+        CPLError(CE_Failure, CPLE_NotSupported,
+                 "Cannot build TIFF overviews due to GeoTIFF driver missing");
+        eErr = CE_Failure;
+#endif
     }
 
     GDALDestroyScaledProgress(pScaledProgress);
