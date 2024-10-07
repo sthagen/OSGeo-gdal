@@ -23,7 +23,8 @@ curl -L -fsS "https://github.com/${GDAL_REPOSITORY}/archive/${GDAL_VERSION}.tar.
 
     if test "${RSYNC_REMOTE:-}" != ""; then
         echo "Downloading cache..."
-        rsync -ra "${RSYNC_REMOTE}/gdal/${GCC_ARCH}/" "$HOME/"
+        mkdir -p "$HOME/.cache/"
+        rsync -ra "${RSYNC_REMOTE}/gdal/${GCC_ARCH}/" "$HOME/.cache/"
         echo "Finished"
 
         # Little trick to avoid issues with Python bindings
@@ -64,6 +65,7 @@ curl -L -fsS "https://github.com/${GDAL_REPOSITORY}/archive/${GDAL_VERSION}.tar.
     fi
     echo "${GDAL_CMAKE_EXTRA_OPTS}"
     cmake .. \
+        -G Ninja \
         -DCMAKE_INSTALL_PREFIX=/usr \
         -DGDAL_FIND_PACKAGE_PROJ_MODE=MODULE \
         -DBUILD_TESTING=OFF \
@@ -76,8 +78,8 @@ curl -L -fsS "https://github.com/${GDAL_REPOSITORY}/archive/${GDAL_VERSION}.tar.
         -DOpenDrive_DIR=/usr/lib/ \
         -DOGR_ENABLE_DRIVER_XODR_PLUGIN=TRUE \
 
-    make "-j$(nproc)"
-    make install DESTDIR="/build"
+    ninja
+    DESTDIR="/build" ninja install
 
     cd ..
 
@@ -85,7 +87,7 @@ curl -L -fsS "https://github.com/${GDAL_REPOSITORY}/archive/${GDAL_VERSION}.tar.
         ccache -s
 
         echo "Uploading cache..."
-        rsync -ra --delete "$HOME/.cache" "${RSYNC_REMOTE}/gdal/${GCC_ARCH}/"
+        rsync -ra --delete "$HOME/.cache/" "${RSYNC_REMOTE}/gdal/${GCC_ARCH}/"
         echo "Finished"
 
         rm -rf "$HOME/.cache"
