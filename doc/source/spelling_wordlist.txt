@@ -19,6 +19,7 @@ acl
 ACL
 actinia
 ActiveX
+adbc
 addalpha
 addCurve
 addfields
@@ -1018,6 +1019,7 @@ GDALThreadLocalDatasetCache
 gdaltindex
 gdaltransform
 gdalvirtualmem
+gdalvsi
 gdalwarp
 gdalwmscache
 gdb
@@ -3455,6 +3457,7 @@ vsiaz
 vsicached
 vsicrypt
 vsicurl
+VSIFile
 VSIFOpen
 vsigs
 vsigz
