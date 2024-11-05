@@ -520,7 +520,7 @@ RUN if test "$(uname -p)" = "x86_64"; then \
 
 # Install libduckdb
 RUN if test "$(uname -p)" = "x86_64"; then \
-    curl -LO -fsS https://github.com/duckdb/duckdb/releases/download/v1.1.2/libduckdb-linux-amd64.zip \
+    curl -LO -fsS https://github.com/duckdb/duckdb/releases/download/v1.1.3/libduckdb-linux-amd64.zip \
     && unzip libduckdb-linux-amd64.zip libduckdb.so \
     && mv libduckdb.so /usr/lib/x86_64-linux-gnu \
     && rm -f libduckdb-linux-amd64.zip; \
@@ -545,3 +545,8 @@ COPY --from=builder  /build_gdal_python/usr/ /usr/
 COPY --from=builder  /build_gdal_version_changing/usr/ /usr/
 
 RUN ldconfig
+
+# Install duckdb_spatial
+RUN if test "$(uname -p)" = "x86_64"; then \
+    ogrinfo ADBC::memory: -oo ADBC_DRIVER=duckdb -oo PRELUDE_STATEMENTS="INSTALL spatial"; \
+    fi
