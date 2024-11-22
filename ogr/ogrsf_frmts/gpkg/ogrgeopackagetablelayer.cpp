@@ -343,6 +343,7 @@ OGRErr OGRGeoPackageTableLayer::FeatureBindParameters(
                 default:
                 {
                     const char *pszVal = "";
+                    CPL_IGNORE_RET_VAL(pszVal);  // Make CSA happy
                     int nValLengthBytes = -1;
                     sqlite3_destructor_type destructorType = SQLITE_TRANSIENT;
                     if (eType == OFTDate)
@@ -6034,7 +6035,7 @@ OGRErr OGRGeoPackageTableLayer::RunDeferredCreationIfNecessary()
 
         pszSQL = sqlite3_mprintf(
             "INSERT INTO gpkg_ogr_contents (table_name, feature_count) "
-            "VALUES ('%q', NULL)",
+            "VALUES ('%q', 0)",
             pszLayerName);
         err = SQLCommand(m_poDS->GetDB(), pszSQL);
         sqlite3_free(pszSQL);
