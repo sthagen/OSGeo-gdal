@@ -397,7 +397,7 @@ CPLErr GTiffDataset::FillEmptyTiles()
                 }
 
                 vsi_l_offset nOffset = 0;
-                if (!IsBlockAvailable(iBlock, &nOffset, &nRawSize))
+                if (!IsBlockAvailable(iBlock, &nOffset, &nRawSize, nullptr))
                     break;
 
                 // When using compression, get back the compressed block
@@ -614,7 +614,7 @@ bool GTiffDataset::WriteEncodedTile(uint32_t tile, GByte *pabyData,
     /* -------------------------------------------------------------------- */
     if (!m_bWriteEmptyTiles && IsFirstPixelEqualToNoData(pabyData))
     {
-        if (!IsBlockAvailable(tile))
+        if (!IsBlockAvailable(tile, nullptr, nullptr, nullptr))
         {
             const int nComponents =
                 m_nPlanarConfig == PLANARCONFIG_CONTIG ? nBands : 1;
@@ -800,7 +800,7 @@ bool GTiffDataset::WriteEncodedStrip(uint32_t strip, GByte *pabyData,
     /* -------------------------------------------------------------------- */
     if (!m_bWriteEmptyTiles && IsFirstPixelEqualToNoData(pabyData))
     {
-        if (!IsBlockAvailable(strip))
+        if (!IsBlockAvailable(strip, nullptr, nullptr, nullptr))
         {
             const int nComponents =
                 m_nPlanarConfig == PLANARCONFIG_CONTIG ? nBands : 1;
@@ -2709,7 +2709,10 @@ bool GTiffDataset::GetOverviewParameters(
     /* -------------------------------------------------------------------- */
     /*      Determine photometric tag                                       */
     /* -------------------------------------------------------------------- */
-    nPhotometric = m_nPhotometric;
+    if (m_nPhotometric == PHOTOMETRIC_YCBCR && nCompression != COMPRESSION_JPEG)
+        nPhotometric = PHOTOMETRIC_RGB;
+    else
+        nPhotometric = m_nPhotometric;
     const char *pszPhotometric =
         GetOptionValue("PHOTOMETRIC", "PHOTOMETRIC_OVERVIEW", &pszOptionKey);
     if (!GTIFFUpdatePhotometric(pszPhotometric, pszOptionKey, nCompression,
