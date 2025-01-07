@@ -194,6 +194,12 @@ bool CPL_DLL GDALAlgorithmArgSetAsDatasetValue(GDALAlgorithmArgH hArg,
 
 bool CPL_DLL GDALAlgorithmArgSetDataset(GDALAlgorithmArgH hArg, GDALDatasetH);
 
+bool CPL_DLL GDALAlgorithmArgSetDatasets(GDALAlgorithmArgH hArg, size_t nCount,
+                                         GDALDatasetH *);
+
+bool CPL_DLL GDALAlgorithmArgSetDatasetNames(GDALAlgorithmArgH hArg,
+                                             CSLConstList);
+
 bool CPL_DLL GDALAlgorithmArgSetAsInteger(GDALAlgorithmArgH, int);
 
 bool CPL_DLL GDALAlgorithmArgSetAsDouble(GDALAlgorithmArgH, double);
@@ -305,10 +311,7 @@ class GDALAlgorithmArg;
 
 /** Value for an argument that points to a GDALDataset.
  *
- * This is the value of arguments of type GAAT_DATASET, GAAT_RASTER_DATASET,
- * GAAT_VECTOR_DATASET, GAAT_MULTIDIM_DATASET, GAAT_DATASET_LIST,
- * GAAT_RASTER_DATASET_LIST, GAAT_VECTOR_DATASET_LIST,
- * GAAT_MULTIDIM_DATASET_LIST
+ * This is the value of arguments of type GAAT_DATASET or GAAT_DATASET_LIST.
  */
 class CPL_DLL GDALArgDatasetValue final
 {
@@ -741,6 +744,15 @@ class CPL_DLL GDALAlgorithmArgDecl final
         return *this;
     }
 
+    /** Sets whether the dataset should be opened automatically by
+     * GDALAlgorithm. Only applies to GAAT_DATASET and GAAT_DATASET_LIST.
+     */
+    GDALAlgorithmArgDecl &SetAutoOpenDataset(bool autoOpen)
+    {
+        m_autoOpenDataset = autoOpen;
+        return *this;
+    }
+
     /** Return the (long) name */
     inline const std::string &GetName() const
     {
@@ -921,6 +933,14 @@ class CPL_DLL GDALAlgorithmArgDecl final
         return m_removeSQLComments;
     }
 
+    /** Returns whether the dataset should be opened automatically by
+     * GDALAlgorithm. Only applies to GAAT_DATASET and GAAT_DATASET_LIST.
+     */
+    bool AutoOpenDataset() const
+    {
+        return m_autoOpenDataset;
+    }
+
     /** Get user-defined metadata. */
     inline const std::map<std::string, std::vector<std::string>>
     GetMetadata() const
@@ -944,14 +964,11 @@ class CPL_DLL GDALAlgorithmArgDecl final
      * - int for GAAT_INTEGER
      * - double for GAAT_REAL
      * - std::string for GAAT_STRING
-     * - GDALArgDatasetValue for GAAT_DATASET, GAAT_RASTER_DATASET,
-     *   GAAT_VECTOR_DATASET, GAAT_MULTIDIM_DATASET
+     * - GDALArgDatasetValue for GAAT_DATASET
      * - std::vector<int> for GAAT_INTEGER_LIST
      * - std::vector<double for GAAT_REAL_LIST
      * - std::vector<std::string> for GAAT_STRING_LIST
-     * - std::vector<GDALArgDatasetValue> for GAAT_DATASET_LIST,
-     *   GAAT_RASTER_DATASET_LIST, GAAT_VECTOR_DATASET_LIST,
-     *   GAAT_MULTIDIM_DATASET_LIST
+     * - std::vector<GDALArgDatasetValue> for GAAT_DATASET_LIST
      */
     template <class T> inline const T &GetDefault() const
     {
@@ -980,6 +997,7 @@ class CPL_DLL GDALAlgorithmArgDecl final
     bool m_displayHintAboutRepetition = true;
     bool m_readFromFileAtSyntaxAllowed = false;
     bool m_removeSQLComments = false;
+    bool m_autoOpenDataset = true;
     std::map<std::string, std::vector<std::string>> m_metadata{};
     std::vector<std::string> m_aliases{};
     std::vector<std::string> m_hiddenAliases{};
@@ -1109,6 +1127,17 @@ class CPL_DLL GDALAlgorithmArg /* non-final */
         return m_decl.GetChoices();
     }
 
+    /** Return auto completion choices, if a auto completion function has been
+     * registered.
+     */
+    inline std::vector<std::string>
+    GetAutoCompleteChoices(const std::string &currentValue) const
+    {
+        if (m_autoCompleteFunction)
+            return m_autoCompleteFunction(currentValue);
+        return {};
+    }
+
     /** Return whether the argument value has been explicitly set with Set() */
     inline bool IsExplicitlySet() const
     {
@@ -1183,6 +1212,12 @@ class CPL_DLL GDALAlgorithmArg /* non-final */
         return m_decl.GetDefault<T>();
     }
 
+    /** Alias for GDALAlgorithmArgDecl::AutoOpenDataset() */
+    inline bool AutoOpenDataset() const
+    {
+        return m_decl.AutoOpenDataset();
+    }
+
     /** Return the value of the argument, which is by decreasing order of priority:
      * - the value set through Set().
      * - the default value set through SetDefault().
@@ -1193,14 +1228,11 @@ class CPL_DLL GDALAlgorithmArg /* non-final */
      * - int for GAAT_INTEGER
      * - double for GAAT_REAL
      * - std::string for GAAT_STRING
-     * - GDALArgDatasetValue for GAAT_DATASET, GAAT_RASTER_DATASET,
-     *   GAAT_VECTOR_DATASET, GAAT_MULTIDIM_DATASET
+     * - GDALArgDatasetValue for GAAT_DATASET
      * - std::vector<int> for GAAT_INTEGER_LIST
      * - std::vector<double for GAAT_REAL_LIST
      * - std::vector<std::string> for GAAT_STRING_LIST
-     * - std::vector<GDALArgDatasetValue> for GAAT_DATASET_LIST,
-     *   GAAT_RASTER_DATASET_LIST, GAAT_VECTOR_DATASET_LIST,
-     *   GAAT_MULTIDIM_DATASET_LIST
+     * - std::vector<GDALArgDatasetValue> for GAAT_DATASET_LIST
      */
     template <class T> inline T &Get()
     {
@@ -1217,14 +1249,11 @@ class CPL_DLL GDALAlgorithmArg /* non-final */
      * - int for GAAT_INTEGER
      * - double for GAAT_REAL
      * - std::string for GAAT_STRING
-     * - GDALArgDatasetValue for GAAT_DATASET, GAAT_RASTER_DATASET,
-     *   GAAT_VECTOR_DATASET, GAAT_MULTIDIM_DATASET
+     * - GDALArgDatasetValue for GAAT_DATASET
      * - std::vector<int> for GAAT_INTEGER_LIST
      * - std::vector<double for GAAT_REAL_LIST
      * - std::vector<std::string> for GAAT_STRING_LIST
-     * - std::vector<GDALArgDatasetValue> for GAAT_DATASET_LIST,
-     *   GAAT_RASTER_DATASET_LIST, GAAT_VECTOR_DATASET_LIST,
-     *   GAAT_MULTIDIM_DATASET_LIST
+     * - std::vector<GDALArgDatasetValue> for GAAT_DATASET_LIST
      */
     template <class T> inline const T &Get() const
     {
@@ -1316,8 +1345,7 @@ class CPL_DLL GDALAlgorithmArg /* non-final */
      */
     bool Set(const std::vector<double> &value);
 
-    /** Set the value for a GAAT_DATASET_LIST, GAAT_RASTER_DATASET_LIST,
-     * GAAT_VECTOR_DATASET_LIST or GAAT_MULTIDIM_DATASET_LIST argument.
+    /** Set the value for a GAAT_DATASET_LIST argument.
      * It cannot be called several times for a given argument.
      * Validation checks and other actions are run.
      * Return true if success.
@@ -1367,6 +1395,9 @@ class CPL_DLL GDALAlgorithmArg /* non-final */
     std::vector<std::function<void()>> m_actions{};
     /** Validation actions */
     std::vector<std::function<bool()>> m_validationActions{};
+    /** Autocompletion function */
+    std::function<std::vector<std::string>(const std::string &)>
+        m_autoCompleteFunction{};
 
   private:
     bool m_skipIfAlreadySet = false;
@@ -1548,6 +1579,13 @@ class CPL_DLL GDALInConstructionAlgorithmArg final : public GDALAlgorithmArg
         return *this;
     }
 
+    /** Alias for GDALAlgorithmArgDecl::SetAutoOpenDataset() */
+    GDALInConstructionAlgorithmArg &SetAutoOpenDataset(bool autoOpen)
+    {
+        m_decl.SetAutoOpenDataset(autoOpen);
+        return *this;
+    }
+
     /** Alias for GDALAlgorithmArgDecl::SetMutualExclusionGroup() */
     GDALInConstructionAlgorithmArg &
     SetMutualExclusionGroup(const std::string &group)
@@ -1580,6 +1618,16 @@ class CPL_DLL GDALInConstructionAlgorithmArg final : public GDALAlgorithmArg
     GDALInConstructionAlgorithmArg &AddValidationAction(std::function<bool()> f)
     {
         m_validationActions.push_back(f);
+        return *this;
+    }
+
+    /** Register a function that will return a list of valid choices for
+     * the value of the argument. This is typically used for autocompletion.
+     */
+    GDALInConstructionAlgorithmArg &SetAutoCompleteFunction(
+        std::function<std::vector<std::string>(const std::string &)> f)
+    {
+        m_autoCompleteFunction = f;
         return *this;
     }
 
@@ -1773,19 +1821,15 @@ class CPL_DLL GDALAlgorithmRegistry
         return m_args;
     }
 
-    /** Return an argument from its (long) name */
+    /** Return an argument from its long name, short name or an alias */
     GDALAlgorithmArg *GetArg(const std::string &osName)
     {
-        auto oIter = m_mapLongNameToArg.find(osName);
-        return oIter != m_mapLongNameToArg.end() ? oIter->second : nullptr;
+        return const_cast<GDALAlgorithmArg *>(
+            const_cast<const GDALAlgorithm *>(this)->GetArg(osName));
     }
 
-    /** Return an argument from its (long) name */
-    const GDALAlgorithmArg *GetArg(const std::string &osName) const
-    {
-        auto oIter = m_mapLongNameToArg.find(osName);
-        return oIter != m_mapLongNameToArg.end() ? oIter->second : nullptr;
-    }
+    /** Return an argument from its long name, short name or an alias */
+    const GDALAlgorithmArg *GetArg(const std::string &osName) const;
 
     /** Set the calling path to this algorithm.
      *
@@ -1795,6 +1839,15 @@ class CPL_DLL GDALAlgorithmRegistry
     void SetCallPath(const std::vector<std::string> &path)
     {
         m_callPath = path;
+    }
+
+    /** Set hint before calling ParseCommandLineArguments() that it must
+     * try to be be graceful when possible, e.g. accepting
+     * "gdal raster convert in.tif out.tif --co"
+     */
+    void SetParseForAutoCompletion()
+    {
+        m_parseForAutoCompletion = true;
     }
 
     /** Parse a command line argument, which does not include the algorithm
@@ -1900,6 +1953,10 @@ class CPL_DLL GDALAlgorithmRegistry
         }
         return false;
     }
+
+    /** Return auto completion suggestions */
+    virtual std::vector<std::string>
+    GetAutoComplete(std::vector<std::string> &args, bool showAllOptions);
 
   protected:
     friend class GDALInConstructionAlgorithmArg;
@@ -2107,12 +2164,16 @@ class CPL_DLL GDALAlgorithmRegistry
     bool m_helpRequested = false;
     bool m_JSONUsageRequested = false;
     bool m_dummyBoolean = false;  // Used for --version
+    bool m_parseForAutoCompletion = false;
+    std::vector<std::string> m_dummyConfigOptions{};
     std::vector<std::unique_ptr<GDALAlgorithmArg>> m_args{};
     std::map<std::string, GDALAlgorithmArg *> m_mapLongNameToArg{};
     std::map<std::string, GDALAlgorithmArg *> m_mapShortNameToArg{};
     std::vector<GDALAlgorithmArg *> m_positionalArgs{};
     GDALAlgorithmRegistry m_subAlgRegistry{};
     std::unique_ptr<GDALAlgorithm> m_shortCutAlg{};
+    std::function<std::vector<std::string>(const std::vector<std::string> &)>
+        m_autoCompleteFunction{};
 
     GDALInConstructionAlgorithmArg &
     AddArg(std::unique_ptr<GDALInConstructionAlgorithmArg> arg);
@@ -2128,6 +2189,13 @@ class CPL_DLL GDALAlgorithmRegistry
     bool ValidateFormat(const GDALAlgorithmArg &arg) const;
 
     virtual bool RunImpl(GDALProgressFunc pfnProgress, void *pProgressData) = 0;
+
+    /** Extract the last option and its potential value from the provided
+     * argument list, and remove them from the list.
+     */
+    void ExtractLastOptionAndValue(std::vector<std::string> &args,
+                                   std::string &option,
+                                   std::string &value) const;
 
     GDALAlgorithm(const GDALAlgorithm &) = delete;
     GDALAlgorithm &operator=(const GDALAlgorithm &) = delete;
