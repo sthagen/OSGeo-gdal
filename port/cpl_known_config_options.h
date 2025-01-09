@@ -475,6 +475,7 @@ constexpr static const char* const apszKnownConfigOptions[] =
    "GRIB_CACHEMAX", // from gribdataset.cpp
    "GRIB_DEFAULT_SEMI_MAJOR", // from gribdataset.cpp
    "GRIB_DEFAULT_SEMI_MINOR", // from gribdataset.cpp
+   "GRIB_LATITUDE_OF_FIRST_GRID_POINT_IS_SOUTHERN_MOST", // from gribdataset.cpp
    "GRIB_NORMALIZE_UNITS", // from gribdataset.cpp
    "GRIB_PDS_ALL_BANDS", // from gribdataset.cpp
    "GRIB_RESOURCE_DIR", // from metaname.cpp
@@ -663,7 +664,7 @@ constexpr static const char* const apszKnownConfigOptions[] =
    "OGR_API_SPY_SNAPSHOT_PATH", // from ograpispy.cpp
    "OGR_APPLY_GEOM_SET_PRECISION", // from ogr2ogr_lib.cpp, ogrlayer.cpp
    "OGR_ARC_MAX_GAP", // from ogrgeometryfactory.cpp
-   "OGR_ARC_STEPSIZE", // from gml2ogrgeometry.cpp, ogrdgnv8layer.cpp, ogrgeometryfactory.cpp, ogrili1datasource.cpp, ogrili1layer.cpp, ogrpgeogeometry.cpp
+   "OGR_ARC_STEPSIZE", // from ogrgeometryfactory.cpp
    "OGR_ARROW_COMPUTE_GEOMETRY_TYPE", // from ogrfeatherlayer.cpp
    "OGR_ARROW_LOAD_FILE_SYSTEM_FACTORIES", // from ogrfeatherdriver.cpp
    "OGR_ARROW_MEM_LIMIT", // from ograrrowarrayhelper.cpp
