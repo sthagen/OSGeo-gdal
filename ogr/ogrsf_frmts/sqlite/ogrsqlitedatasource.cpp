@@ -1913,8 +1913,8 @@ bool OGRSQLiteDataSource::Create(const char *pszNameIn, char **papszOptions)
     if (bUseTempFile)
     {
         m_osFinalFilename = pszNameIn;
-        m_pszFilename =
-            CPLStrdup(CPLGenerateTempFilename(CPLGetFilename(pszNameIn)));
+        m_pszFilename = CPLStrdup(
+            CPLGenerateTempFilenameSafe(CPLGetFilename(pszNameIn)).c_str());
         CPLDebug("SQLITE", "Creating temporary file %s", m_pszFilename);
     }
     else
@@ -4023,6 +4023,12 @@ OGRErr OGRSQLiteBaseDataSource::StartTransaction(CPL_UNUSED int bForce)
         return OGRERR_FAILURE;
     }
 
+    for (int i = 0; i < GetLayerCount(); i++)
+    {
+        OGRLayer *poLayer = GetLayer(i);
+        poLayer->PrepareStartTransaction();
+    }
+
     OGRErr eErr = SoftStartTransaction();
     if (eErr != OGRERR_NONE)
         return eErr;
@@ -4041,8 +4047,6 @@ OGRErr OGRSQLiteDataSource::StartTransaction(int bForce)
                 cpl::down_cast<OGRSQLiteTableLayer *>(poLayer.get());
             poTableLayer->RunDeferredCreationIfNecessary();
         }
-
-        poLayer->PrepareStartTransaction();
     }
 
     return OGRSQLiteBaseDataSource::StartTransaction(bForce);
