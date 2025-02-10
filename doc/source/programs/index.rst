@@ -26,6 +26,7 @@ single :program:`gdal` program that accepts commands and subcommands.
    :hidden:
 
    migration_guide_to_gdal_cli
+   gdal_cli_from_python
    gdal
    gdal_info
    gdal_convert
@@ -46,10 +47,12 @@ single :program:`gdal` program that accepts commands and subcommands.
    gdal_vector_clip
    gdal_vector_convert
    gdal_vector_pipeline
+   gdal_vector_sql
 
 .. only:: html
 
     - :ref:`migration_guide_to_gdal_cli`: Migration guide to "gdal" command line interface
+    - :ref:`gdal_cli_from_python`: How to use "gdal" CLI algorithms from Python
     - :ref:`gdal_program`: Main "gdal" entry point
     - :ref:`gdal_info_command`: Get information on a dataset
     - :ref:`gdal_convert_command`: Convert a dataset
@@ -70,6 +73,7 @@ single :program:`gdal` program that accepts commands and subcommands.
     - :ref:`gdal_vector_clip_subcommand`: Clip a vector dataset
     - :ref:`gdal_vector_convert_subcommand`: Convert a vector dataset
     - :ref:`gdal_vector_pipeline_subcommand`: Process a vector dataset
+    - :ref:`gdal_vector_sql_subcommand`: Apply SQL statement(s) to a dataset
 
 
 "Traditional" applications
