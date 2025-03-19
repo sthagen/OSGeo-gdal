@@ -1890,9 +1890,16 @@ static void NotifyOtherComponentsConfigOptionChanged(const char *pszKey,
                                                      const char *pszValue,
                                                      bool bThreadLocal)
 {
-    // Hack
-    if (STARTS_WITH_CI(pszKey, "AWS_"))
+    // When changing authentication parameters of virtual file systems,
+    // partially invalidate cached state about file availability.
+    if (STARTS_WITH_CI(pszKey, "AWS_") || STARTS_WITH_CI(pszKey, "GS_") ||
+        STARTS_WITH_CI(pszKey, "GOOGLE_") ||
+        STARTS_WITH_CI(pszKey, "GDAL_HTTP_HEADER_FILE") ||
+        STARTS_WITH_CI(pszKey, "AZURE_") ||
+        (STARTS_WITH_CI(pszKey, "SWIFT_") && !EQUAL(pszKey, "SWIFT_MAX_KEYS")))
+    {
         VSICurlAuthParametersChanged();
+    }
 
     if (!gSetConfigOptionSubscribers.empty())
     {
@@ -2038,8 +2045,8 @@ static void CPLSetConfigOptionDetectUnknownConfigOption(const char *pszKey,
  * value provided during the last call will be used.
  *
  * Options can also be passed on the command line of most GDAL utilities
- * with '--config KEY VALUE' (or '--config KEY=VALUE' since GDAL 3.10).
- * For example, ogrinfo --config CPL_DEBUG ON ~/data/test/point.shp
+ * with '\--config KEY VALUE' (or '\--config KEY=VALUE' since GDAL 3.10).
+ * For example, ogrinfo \--config CPL_DEBUG ON ~/data/test/point.shp
  *
  * This function can also be used to clear a setting by passing NULL as the
  * value (note: passing NULL will not unset an existing environment variable;
@@ -2454,7 +2461,7 @@ void CPLLoadConfigOptionsFromFile(const char *pszFilename, int bOverrideEnvVars)
  *
  * Otherwise, for Unix builds, CPLLoadConfigOptionsFromFile() will be called
  * with ${sysconfdir}/gdal/gdalrc first where ${sysconfdir} evaluates
- * to ${prefix}/etc, unless the --sysconfdir switch of configure has been
+ * to ${prefix}/etc, unless the \--sysconfdir switch of configure has been
  * invoked.
  *
  * Then CPLLoadConfigOptionsFromFile() will be called with $(HOME)/.gdal/gdalrc
