@@ -606,15 +606,6 @@ static char *CPLLoadSchemaStr(const char *pszXSDFilename)
 }
 
 /************************************************************************/
-/*                     CPLLibXMLInputStreamCPLFree()                    */
-/************************************************************************/
-
-static void CPLLibXMLInputStreamCPLFree(xmlChar *pszBuffer)
-{
-    CPLFree(pszBuffer);
-}
-
-/************************************************************************/
 /*                           CPLFindLocalXSD()                          */
 /************************************************************************/
 
@@ -878,16 +869,15 @@ static xmlParserInputPtr CPLExternalEntityLoader(const char *URL,
         osModURL = URL;
     }
 
-    xmlChar *pszBuffer =
-        reinterpret_cast<xmlChar *>(CPLLoadSchemaStr(osModURL));
-    if (pszBuffer == nullptr)
+    char *pszSchema = CPLLoadSchemaStr(osModURL);
+    if (!pszSchema)
         return nullptr;
 
-    xmlParserInputPtr poInputStream =
-        xmlNewStringInputStream(context, pszBuffer);
-    if (poInputStream != nullptr)
-        poInputStream->free = CPLLibXMLInputStreamCPLFree;
-    return poInputStream;
+    xmlParserInputPtr parser = xmlNewStringInputStream(
+        context, reinterpret_cast<const xmlChar *>(pszSchema));
+    CPLFree(pszSchema);
+
+    return parser;
 }
 
 /************************************************************************/
