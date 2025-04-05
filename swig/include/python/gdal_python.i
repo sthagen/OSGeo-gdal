@@ -3078,6 +3078,7 @@ def VectorTranslateOptions(options=None, format=None,
          accessMode=None,
          srcSRS=None, dstSRS=None, reproject=True,
          coordinateOperation=None,
+         coordinateOperationOptions=None,
          SQLStatement=None, SQLDialect=None, where=None, selectFields=None,
          addFields=False,
          relaxedFieldNameMatch=False,
@@ -3134,6 +3135,8 @@ def VectorTranslateOptions(options=None, format=None,
         output SRS (with reprojection if reproject = True)
     coordinateOperation:
         coordinate operation as a PROJ string or WKT string
+    coordinateOperationOptions:
+        list or dict of coordinate operation options (ALLOW_BALLPARK=NO, ONLY_BEST=YES, WARN_ABOUT_DIFFERENT_COORD_OP=NO)
     reproject:
         whether to do reprojection
     SQLStatement:
@@ -3276,6 +3279,15 @@ def VectorTranslateOptions(options=None, format=None,
                 new_options += ['-a_srs', str(dstSRS)]
         if coordinateOperation is not None:
             new_options += ['-ct', coordinateOperation]
+
+        if coordinateOperationOptions is not None:
+            if isinstance(coordinateOperationOptions, dict):
+                for k, v in coordinateOperationOptions.items():
+                    new_options += ['-ct_opt', f'{k}={v}']
+            else:
+                for opt in coordinateOperationOptions:
+                    new_options += ['-ct_opt', opt]
+
         if SQLStatement is not None:
             new_options += ['-sql', str(SQLStatement)]
         if SQLDialect is not None:
@@ -5545,7 +5557,10 @@ class VSIFile(BytesIO):
         if type == GAAT_BOOLEAN:
             return self.SetAsBoolean(value)
         if type == GAAT_STRING:
-            return self.SetAsString(value)
+            if isinstance(value, str) or isinstance(value, int) or isinstance(value, float):
+                return self.SetAsString(str(value))
+            else:
+                raise "Unexpected value type %s for an argument of type String" % str(type(value))
         if type == GAAT_INTEGER:
             return self.SetAsInteger(value)
         if type == GAAT_REAL:
@@ -5562,8 +5577,10 @@ class VSIFile(BytesIO):
         if type == GAAT_STRING_LIST:
             if isinstance(value, list):
                 return self.SetAsStringList([str(v) for v in value])
+            elif isinstance(value, dict):
+                return self.SetAsStringList([f"{k}={str(value[k])}" for k in value])
             else:
-                return self.SetAsStringList([str(v)])
+                return self.SetAsStringList([str(value)])
         if type == GAAT_INTEGER_LIST:
             return self.SetAsIntegerList(value)
         if type == GAAT_REAL_LIST:
@@ -5573,6 +5590,8 @@ class VSIFile(BytesIO):
                 return self.SetDatasetNames([str(v) for v in value])
             elif isinstance(value[0], Dataset):
                 return self.SetDatasets(value)
+            else:
+                raise "Unexpected value type %s for an argument of type DatasetList" % str(type(value))
         raise Exception("Unhandled algorithm argument data type")
 
 %}
