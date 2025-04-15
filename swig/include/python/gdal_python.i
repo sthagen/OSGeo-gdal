@@ -5557,7 +5557,13 @@ class VSIFile(BytesIO):
         if type == GAAT_BOOLEAN:
             return self.SetAsBoolean(value)
         if type == GAAT_STRING:
-            if isinstance(value, str) or isinstance(value, int) or isinstance(value, float):
+            if isinstance(value, int):
+                metadata_item = self.GetMetadataItem("type")
+                if metadata_item and ("GDALDataType" in metadata_item) and value >= GDT_Byte and value < GDT_TypeCount:
+                    return self.SetAsString(GetDataTypeName(value))
+                else:
+                    return self.SetAsString(str(value))
+            elif isinstance(value, str) or isinstance(value, float):
                 return self.SetAsString(str(value))
             else:
                 raise "Unexpected value type %s for an argument of type String" % str(type(value))

@@ -31,7 +31,7 @@
 #include "ogr_core.h"
 #include "ogr_feature.h"
 #include "ogr_geometry.h"
-#include "ogr_mem.h"
+#include "memdataset.h"
 #include "ogrsf_frmts.h"
 #include "ogr_swq.h"
 
@@ -1792,7 +1792,7 @@ OGRLayer *OGROpenFileGDBDataSource::ExecuteSQL(const char *pszSQLCommand,
         bool bSuccess = true;
         for (auto &poLayer : m_apoLayers)
         {
-            if (!poLayer->Repack())
+            if (!poLayer->Repack(nullptr, nullptr))
                 bSuccess = false;
         }
         return new OGROpenFileGDBSingleFeatureLayer(
@@ -1804,7 +1804,7 @@ OGRLayer *OGROpenFileGDBDataSource::ExecuteSQL(const char *pszSQLCommand,
         auto poLayer = GetLayerByName(pszLayerName);
         if (poLayer)
         {
-            const bool bSuccess = poLayer->Repack();
+            const bool bSuccess = poLayer->Repack(nullptr, nullptr);
             return new OGROpenFileGDBSingleFeatureLayer(
                 "result", bSuccess ? "true" : "false");
         }
