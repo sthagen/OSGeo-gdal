@@ -23,15 +23,18 @@ Available sub-commands
 - :ref:`gdal_raster_info_subcommand`
 - :ref:`gdal_raster_aspect_subcommand`
 - :ref:`gdal_raster_calc_subcommand`
+- :ref:`gdal_raster_clean_collar_subcommand`
 - :ref:`gdal_raster_clip_subcommand`
 - :ref:`gdal_raster_color_map_subcommand`
 - :ref:`gdal_raster_convert_subcommand`
 - :ref:`gdal_raster_create_subcommand`
+- :ref:`gdal_raster_footprint_subcommand`
 - :ref:`gdal_raster_hillshade_subcommand`
 - :ref:`gdal_raster_index_subcommand`
 - :ref:`gdal_raster_mosaic_subcommand`
 - :ref:`gdal_raster_overview_subcommand`
 - :ref:`gdal_raster_pipeline_subcommand`
+- :ref:`gdal_raster_polygonize_subcommand`
 - :ref:`gdal_raster_reproject_subcommand`
 - :ref:`gdal_raster_resize_subcommand`
 - :ref:`gdal_raster_roughness_subcommand`
@@ -42,6 +45,7 @@ Available sub-commands
 - :ref:`gdal_raster_tpi_subcommand`
 - :ref:`gdal_raster_tri_subcommand`
 - :ref:`gdal_raster_unscale_subcommand`
+- :ref:`gdal_raster_viewshed_subcommand`
 
 Examples
 --------

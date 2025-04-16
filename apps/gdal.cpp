@@ -123,7 +123,10 @@ MAIN_START(argc, argv)
 
     if (!alg->ParseCommandLineArguments(args))
     {
-        fprintf(stderr, "%s", alg->GetUsageForCLI(true).c_str());
+        if (strstr(CPLGetLastErrorMsg(), "Do you mean") == nullptr)
+        {
+            fprintf(stderr, "%s", alg->GetUsageForCLI(true).c_str());
+        }
         return 1;
     }
 
@@ -136,6 +139,8 @@ MAIN_START(argc, argv)
     GDALProgressFunc pfnProgress =
         alg->IsProgressBarRequested() ? GDALTermProgress : nullptr;
     void *pProgressData = nullptr;
+
+    alg->SetCalledFromCommandLine();
 
     int ret = 0;
     if (alg->Run(pfnProgress, pProgressData) && alg->Finalize())

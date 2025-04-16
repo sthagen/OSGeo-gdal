@@ -2759,13 +2759,19 @@ def Translate(destName, srcDS, **kwargs):
 
     _WarnIfUserHasNotSpecifiedIfUsingExceptions()
 
+    filenamePrefix = ""
     if 'options' not in kwargs or isinstance(kwargs['options'], (list, str)):
         (opts, callback, callback_data) = TranslateOptions(**kwargs)
+        if "format" in kwargs and kwargs["format"].upper() == "ZARR" and "creationOptions" in kwargs:
+            for opt in kwargs["creationOptions"]:
+                if opt.upper() in ("CONVERT_TO_KERCHUNK_PARQUET_REFERENCE=YES", "CONVERT_TO_KERCHUNK_PARQUET_REFERENCE=ON", "CONVERT_TO_KERCHUNK_PARQUET_REFERENCE=TRUE"):
+                    filenamePrefix = "ZARR_DUMMY:"
+
     else:
         (opts, callback, callback_data) = kwargs['options']
 
     if isinstance(srcDS, (str, os.PathLike)):
-        srcDS = Open(srcDS)
+        srcDS = Open(filenamePrefix + str(srcDS))
 
     return TranslateInternal(destName, srcDS, opts, callback, callback_data)
 
@@ -5605,9 +5611,15 @@ class VSIFile(BytesIO):
             else:
                 return self.SetAsStringList([str(value)])
         if type == GAAT_INTEGER_LIST:
-            return self.SetAsIntegerList(value)
+            if isinstance(value, int):
+                return self.SetAsIntegerList([value])
+            else:
+                return self.SetAsIntegerList(value)
         if type == GAAT_REAL_LIST:
-            return self.SetAsDoubleList(value)
+            if isinstance(value, int) or isinstance(value, float):
+                return self.SetAsDoubleList([float(value)])
+            else:
+                return self.SetAsDoubleList(value)
         if type == GAAT_DATASET_LIST:
             if isinstance(value, list) and (isinstance(value[0], str) or isinstance(value[0], os.PathLike)):
                 return self.SetDatasetNames([str(v) for v in value])

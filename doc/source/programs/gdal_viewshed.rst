@@ -140,6 +140,10 @@ Byte. With the -mode flag can also return a minimum visible height raster of typ
 
   DEM and GROUND will return a raster of type Float64 containing the minimum target
   height for target to be visible from the DEM surface or ground level respectively.
+  That is to say, if the minimum target height for the target to be visible at a
+  point is ``h`` and the value of the input raster at that point is ``E``,
+  for ``DEM``, ``E + h`` will be the output value.
+  For ``ground``, ``h`` will be output value.
   Flags -tz, -iv and -vv will be ignored.
 
   Cumulative (ACCUM) mode will create an eight bit raster the same size as the input raster
@@ -154,7 +158,7 @@ Byte. With the -mode flag can also return a minimum visible height raster of typ
 
 .. option:: -j <value>
 
-   Relative number of jobs to run at once. (only supported in cumulative mode) Default: 3
+   Number of jobs to run at once. (only supported in cumulative mode) Default: 3
 
 
 C API

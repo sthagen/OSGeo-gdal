@@ -18,16 +18,19 @@ add_library(
   gdalalg_raster_aspect.cpp
   gdalalg_raster_astype.cpp
   gdalalg_raster_calc.cpp
+  gdalalg_raster_clean_collar.cpp
   gdalalg_raster_clip.cpp
   gdalalg_raster_color_map.cpp
   gdalalg_raster_convert.cpp
   gdalalg_raster_create.cpp
   gdalalg_raster_edit.cpp
   gdalalg_raster_contour.cpp
+  gdalalg_raster_footprint.cpp
   gdalalg_raster_hillshade.cpp
   gdalalg_raster_index.cpp
   gdalalg_raster_mosaic.cpp
   gdalalg_raster_pipeline.cpp
+  gdalalg_raster_polygonize.cpp
   gdalalg_raster_overview_add.cpp
   gdalalg_raster_overview_delete.cpp
   gdalalg_raster_read.cpp
@@ -41,10 +44,12 @@ add_library(
   gdalalg_raster_tpi.cpp
   gdalalg_raster_tri.cpp
   gdalalg_raster_unscale.cpp
+  gdalalg_raster_viewshed.cpp
   gdalalg_raster_write.cpp
   gdalalg_vector.cpp
   gdalalg_vector_info.cpp
   gdalalg_vector_clip.cpp
+  gdalalg_vector_concat.cpp
   gdalalg_vector_convert.cpp
   gdalalg_vector_edit.cpp
   gdalalg_vector_pipeline.cpp
@@ -71,10 +76,11 @@ add_library(
   gdalalg_vector_select.cpp
   gdalalg_vector_sql.cpp
   gdalalg_vector_write.cpp
-  gdalalg_vfs.cpp
-  gdalalg_vfs_copy.cpp
-  gdalalg_vfs_delete.cpp
-  gdalalg_vfs_list.cpp
+  gdalalg_vsi.cpp
+  gdalalg_vsi_copy.cpp
+  gdalalg_vsi_delete.cpp
+  gdalalg_vsi_list.cpp
+  gdalalg_vsi_sozip.cpp
   gdalinfo_lib.cpp
   gdalbuildvrt_lib.cpp
   gdal_grid_lib.cpp

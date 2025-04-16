@@ -23,6 +23,7 @@
 #include "cpl_error.h"
 #include "cpl_float.h"
 #include "cpl_hash_set.h"
+#include "cpl_levenshtein.h"
 #include "cpl_list.h"
 #include "cpl_mask.h"
 #include "cpl_sha256.h"
@@ -5794,6 +5795,62 @@ TEST_F(test_cpl, CPLGreatestCommonDivisor)
     EXPECT_EQ(CPLGreatestCommonDivisor(2.999999, 3.0), 0);
     EXPECT_EQ(CPLGreatestCommonDivisor(2.9999999, 3.0), 0);
     EXPECT_EQ(CPLGreatestCommonDivisor(2.99999999, 3.0), 2.99999999);
+}
+
+TEST_F(test_cpl, CPLLevenshteinDistance)
+{
+    EXPECT_EQ(CPLLevenshteinDistance("", "", false), 0);
+    EXPECT_EQ(CPLLevenshteinDistance("a", "a", false), 0);
+    EXPECT_EQ(CPLLevenshteinDistance("a", "b", false), 1);
+    EXPECT_EQ(CPLLevenshteinDistance("a", "", false), 1);
+    EXPECT_EQ(CPLLevenshteinDistance("abc", "ac", false), 1);
+    EXPECT_EQ(CPLLevenshteinDistance("ac", "abc", false), 1);
+    EXPECT_EQ(CPLLevenshteinDistance("0ab1", "0xy1", false), 2);
+    EXPECT_EQ(CPLLevenshteinDistance("0ab1", "0xy1", true), 2);
+    EXPECT_EQ(CPLLevenshteinDistance("0ab1", "0ba1", false), 2);
+    EXPECT_EQ(CPLLevenshteinDistance("0ab1", "0ba1", true), 1);
+
+    std::string longStr(32768, 'x');
+    EXPECT_EQ(CPLLevenshteinDistance(longStr.c_str(), longStr.c_str(), true),
+              0);
+    EXPECT_EQ(CPLLevenshteinDistance(longStr.c_str(), "another_one", true),
+              std::numeric_limits<size_t>::max());
+}
+
+TEST_F(test_cpl, CPLLockFileEx)
+{
+    const std::string osLockFilename = CPLGenerateTempFilename(".lock");
+
+    ASSERT_EQ(CPLLockFileEx(nullptr, nullptr, nullptr), CLFS_API_MISUSE);
+
+    ASSERT_EQ(CPLLockFileEx(osLockFilename.c_str(), nullptr, nullptr),
+              CLFS_API_MISUSE);
+
+    CPLLockFileHandle hLockFileHandle = nullptr;
+
+    ASSERT_EQ(CPLLockFileEx(osLockFilename.c_str(), &hLockFileHandle, nullptr),
+              CLFS_OK);
+    ASSERT_NE(hLockFileHandle, nullptr);
+
+    // Check the lock file has been created
+    VSIStatBufL sStat;
+    ASSERT_EQ(VSIStatL(osLockFilename.c_str(), &sStat), 0);
+
+    {
+        CPLStringList aosOptions;
+        aosOptions.SetNameValue("WAIT_TIME", "0.1");
+        CPLLockFileHandle hLockFileHandle2 = nullptr;
+        ASSERT_EQ(CPLLockFileEx(osLockFilename.c_str(), &hLockFileHandle2,
+                                aosOptions.List()),
+                  CLFS_LOCK_BUSY);
+    }
+
+    CPLUnlockFileEx(hLockFileHandle);
+
+    // Check the lock file has been deleted
+    ASSERT_EQ(VSIStatL(osLockFilename.c_str(), &sStat), -1);
+
+    CPLUnlockFileEx(nullptr);
 }
 
 }  // namespace

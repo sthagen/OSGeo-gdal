@@ -40,12 +40,14 @@ single :program:`gdal` program that accepts commands and subcommands.
    gdal_raster_aspect
    gdal_raster_astype
    gdal_raster_calc
+   gdal_raster_clean_collar
    gdal_raster_clip
    gdal_raster_color_map
    gdal_raster_contour
    gdal_raster_convert
    gdal_raster_create
    gdal_raster_edit
+   gdal_raster_footprint
    gdal_raster_hillshade
    gdal_raster_index
    gdal_raster_mosaic
@@ -53,6 +55,7 @@ single :program:`gdal` program that accepts commands and subcommands.
    gdal_raster_overview_add
    gdal_raster_overview_delete
    gdal_raster_pipeline
+   gdal_raster_polygonize
    gdal_raster_reproject
    gdal_raster_resize
    gdal_raster_roughness
@@ -63,9 +66,11 @@ single :program:`gdal` program that accepts commands and subcommands.
    gdal_raster_tpi
    gdal_raster_tri
    gdal_raster_unscale
+   gdal_raster_viewshed
    gdal_vector
    gdal_vector_info
    gdal_vector_clip
+   gdal_vector_concat
    gdal_vector_convert
    gdal_vector_edit
    gdal_vector_filter
@@ -83,10 +88,11 @@ single :program:`gdal` program that accepts commands and subcommands.
    gdal_vector_reproject
    gdal_vector_select
    gdal_vector_sql
-   gdal_vfs
-   gdal_vfs_copy
-   gdal_vfs_delete
-   gdal_vfs_list
+   gdal_vsi
+   gdal_vsi_copy
+   gdal_vsi_delete
+   gdal_vsi_list
+   gdal_vsi_sozip
 
 .. only:: html
 
@@ -105,12 +111,14 @@ single :program:`gdal` program that accepts commands and subcommands.
     - :ref:`gdal_raster_aspect_subcommand`: Generate an aspect map.
     - :ref:`gdal_raster_astype_subcommand`: Modify the data type of bands of a raster dataset
     - :ref:`gdal_raster_calc_subcommand`: Perform raster algebra
+    - :ref:`gdal_raster_clean_collar_subcommand`: Clean the collar of a raster dataset, removing noise
     - :ref:`gdal_raster_clip_subcommand`: Clip a raster dataset
     - :ref:`gdal_raster_color_map_subcommand`: Generate a RGB or RGBA dataset from a single band, using a color map
     - :ref:`gdal_raster_convert_subcommand`: Convert a raster dataset
     - :ref:`gdal_raster_contour_subcommand`: Builds vector contour lines from a raster elevation model
     - :ref:`gdal_raster_create_subcommand`: Create a new raster dataset
     - :ref:`gdal_raster_edit_subcommand`: Edit in place a raster dataset
+    - :ref:`gdal_raster_footprint_subcommand`: Compute the footprint of a raster dataset.
     - :ref:`gdal_raster_hillshade_subcommand`: Generate a shaded relief map
     - :ref:`gdal_raster_index_subcommand`: Create a vector index of raster datasets
     - :ref:`gdal_raster_mosaic_subcommand`: Build a mosaic, either virtual (VRT) or materialized.
@@ -118,6 +126,7 @@ single :program:`gdal` program that accepts commands and subcommands.
     - :ref:`gdal_raster_overview_add_subcommand`: Add overviews to a raster dataset
     - :ref:`gdal_raster_overview_delete_subcommand`: Remove overviews of a raster dataset
     - :ref:`gdal_raster_pipeline_subcommand`: Process a raster dataset
+    - :ref:`gdal_raster_polygonize_subcommand`: Create a polygon feature dataset from a raster band
     - :ref:`gdal_raster_reproject_subcommand`: Reproject a raster dataset
     - :ref:`gdal_raster_resize_subcommand`: Resize a raster dataset without changing the georeferenced extents
     - :ref:`gdal_raster_roughness_subcommand`: Generate a roughness map.
@@ -128,9 +137,12 @@ single :program:`gdal` program that accepts commands and subcommands.
     - :ref:`gdal_raster_tpi_subcommand`: Generate a Topographic Position Index (TPI) map.
     - :ref:`gdal_raster_tri_subcommand`: Generate a Terrain Ruggedness Index (TRI) map.
     - :ref:`gdal_raster_unscale_subcommand`: Convert scaled values of a raster dataset into unscaled values.
+    - :ref:`gdal_raster_viewshed_subcommand`: Compute the viewshed of a raster dataset.
     - :ref:`gdal_vector_command`: Entry point for vector commands
     - :ref:`gdal_vector_info_subcommand`: Get information on a vector dataset
     - :ref:`gdal_vector_clip_subcommand`: Clip a vector dataset
+    - :ref:`gdal_vector_concat_subcommand`: Concatenate vector datasets
+    - :ref:`gdal_vector_convert_subcommand`: Convert a vector dataset
     - :ref:`gdal_vector_edit_subcommand`: Edit metadata of a vector dataset
     - :ref:`gdal_vector_filter_subcommand`: Filter a vector dataset
     - :ref:`gdal_vector_geom_subcommand`: Geometry operations on a vector dataset
@@ -148,10 +160,11 @@ single :program:`gdal` program that accepts commands and subcommands.
     - :ref:`gdal_vector_select_subcommand`: Select a subset of fields from a vector dataset.
     - :ref:`gdal_vector_rasterize_subcommand`: Burns vector geometries into a raster
     - :ref:`gdal_vector_sql_subcommand`: Apply SQL statement(s) to a dataset
-    - :ref:`gdal_vfs_command`: Entry point for GDAL Virtual file system (VSI) commands
-    - :ref:`gdal_vfs_copy_subcommand`: Copy files located on GDAL Virtual file systems (VSI)
-    - :ref:`gdal_vfs_delete_subcommand`: Delete files located on GDAL Virtual file systems (VSI)
-    - :ref:`gdal_vfs_list_subcommand`: List files of one of the GDAL Virtual file systems (VSI)
+    - :ref:`gdal_vsi_command`: Entry point for GDAL Virtual System Interface (VSI) commands
+    - :ref:`gdal_vsi_copy_subcommand`: Copy files located on GDAL Virtual System Interface (VSI)
+    - :ref:`gdal_vsi_delete_subcommand`: Delete files located on GDAL Virtual System Interface (VSI)
+    - :ref:`gdal_vsi_list_subcommand`: List files of one of the GDAL Virtual System Interface (VSI)
+    - :ref:`gdal_vsi_sozip_subcommand`: SOZIP (Seek-Optimized ZIP) related commands
 
 
 "Traditional" applications

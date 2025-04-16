@@ -228,7 +228,7 @@ def test_gdalalg_vector_pipeline_help_doc():
 
     assert "Usage: gdal vector pipeline [OPTIONS] <PIPELINE>" in out
     assert (
-        "<PIPELINE> is of the form: read [READ-OPTIONS] ( ! <STEP-NAME> [STEP-OPTIONS] )* ! write [WRITE-OPTIONS]"
+        "<PIPELINE> is of the form: read|concat [READ-OPTIONS] ( ! <STEP-NAME> [STEP-OPTIONS] )* ! write [WRITE-OPTIONS]"
         in out
     )
 
@@ -362,6 +362,35 @@ def test_gdalalg_vector_pipeline_read_read():
         )
 
 
+def test_gdalalg_vector_pipeline_read_read_several_input():
+
+    pipeline = get_pipeline_alg()
+    with pytest.raises(
+        Exception,
+        match="read: Positional values starting at '../ogr/data/poly.dbf' are not expected.",
+    ):
+        pipeline.ParseRunAndFinalize(
+            [
+                "read",
+                "../ogr/data/poly.shp",
+                "../ogr/data/poly.dbf",
+                "!",
+                "write",
+                "/vsimem/poly.shp",
+            ]
+        )
+
+    pipeline = get_pipeline_alg()
+    pipeline["input"] = ["../ogr/data/poly.shp", "../ogr/data/poly.dbf"]
+    pipeline["output"] = "/vsimem/poly.shp"
+    pipeline["pipeline"] = "read ! write"
+    with pytest.raises(
+        Exception,
+        match="read: 2 values have been specified for argument 'input', whereas exactly 1 was expected.",
+    ):
+        pipeline.Run()
+
+
 def test_gdalalg_vector_pipeline_write_write():
 
     pipeline = get_pipeline_alg()
@@ -412,9 +441,7 @@ def test_gdalalg_vector_pipeline_invalid_step_during_parsing(tmp_vsimem):
     out_filename = str(tmp_vsimem / "out.shp")
 
     pipeline = get_pipeline_alg()
-    with pytest.raises(
-        Exception, match="write: Long name option '--invalid' is unknown"
-    ):
+    with pytest.raises(Exception, match="write: Option '--invalid' is unknown"):
         pipeline.ParseRunAndFinalize(
             ["read", "../ogr/data/poly.shp", "!", "write", "--invalid", out_filename]
         )

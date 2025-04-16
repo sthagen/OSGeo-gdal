@@ -441,6 +441,7 @@ ComplexSource
 compoundcurves
 compressiblity
 compressions
+concat
 conceptualhelp
 cond
 conda
@@ -2430,6 +2431,7 @@ pgRouting
 pgsql
 pgw
 phGeometry
+phLockFileHandle
 Photogrammetric
 photometric
 photooverlay

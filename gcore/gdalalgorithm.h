@@ -338,7 +338,8 @@ class CPL_DLL GDALArgDatasetValue final
     GDALArgDatasetValue() = default;
 
     /** Constructor by dataset name. */
-    explicit GDALArgDatasetValue(const std::string &name) : m_name(name)
+    explicit GDALArgDatasetValue(const std::string &name)
+        : m_name(name), m_nameSet(true)
     {
     }
 
@@ -616,15 +617,51 @@ class CPL_DLL GDALAlgorithmArgDecl final
     template <class T> GDALAlgorithmArgDecl &SetDefault(const T &value)
     {
         m_hasDefaultValue = true;
-        if constexpr (std::is_same_v<T, int>)
+        if constexpr (std::is_same_v<T, std::string>)
+        {
+            if (m_type == GAAT_STRING_LIST)
+            {
+                m_defaultValue = std::vector<std::string>{value};
+                return *this;
+            }
+        }
+        else if constexpr (std::is_same_v<T, int>)
         {
             if (m_type == GAAT_REAL)
             {
                 m_defaultValue = static_cast<double>(value);
                 return *this;
             }
+            else if (m_type == GAAT_INTEGER_LIST)
+            {
+                m_defaultValue = std::vector<int>{value};
+                return *this;
+            }
+            else if (m_type == GAAT_REAL_LIST)
+            {
+                m_defaultValue =
+                    std::vector<double>{static_cast<double>(value)};
+                return *this;
+            }
         }
-        m_defaultValue = value;
+        else if constexpr (std::is_same_v<T, double>)
+        {
+            if (m_type == GAAT_REAL_LIST)
+            {
+                m_defaultValue = std::vector<double>{value};
+                return *this;
+            }
+        }
+        try
+        {
+            m_defaultValue = value;
+        }
+        catch (const std::bad_variant_access &)
+        {
+            CPLError(CE_Failure, CPLE_AppDefined,
+                     "Argument %s: SetDefault(): unexpected type for value",
+                     GetName().c_str());
+        }
         return *this;
     }
 
@@ -1695,11 +1732,41 @@ class CPL_DLL GDALInConstructionAlgorithmArg final : public GDALAlgorithmArg
     GDALInConstructionAlgorithmArg &SetDefault(const T &value)
     {
         m_decl.SetDefault(value);
+
         if constexpr (!std::is_same_v<T, GDALArgDatasetValue> &&
                       !std::is_same_v<T, std::vector<GDALArgDatasetValue>>)
         {
-            if (m_decl.HasDefaultValue())
-                *std::get<T *>(m_value) = value;
+            switch (m_decl.GetType())
+            {
+                case GAAT_BOOLEAN:
+                    *std::get<bool *>(m_value) = m_decl.GetDefault<bool>();
+                    break;
+                case GAAT_STRING:
+                    *std::get<std::string *>(m_value) =
+                        m_decl.GetDefault<std::string>();
+                    break;
+                case GAAT_INTEGER:
+                    *std::get<int *>(m_value) = m_decl.GetDefault<int>();
+                    break;
+                case GAAT_REAL:
+                    *std::get<double *>(m_value) = m_decl.GetDefault<double>();
+                    break;
+                case GAAT_STRING_LIST:
+                    *std::get<std::vector<std::string> *>(m_value) =
+                        m_decl.GetDefault<std::vector<std::string>>();
+                    break;
+                case GAAT_INTEGER_LIST:
+                    *std::get<std::vector<int> *>(m_value) =
+                        m_decl.GetDefault<std::vector<int>>();
+                    break;
+                case GAAT_REAL_LIST:
+                    *std::get<std::vector<double> *>(m_value) =
+                        m_decl.GetDefault<std::vector<double>>();
+                    break;
+                case GAAT_DATASET:
+                case GAAT_DATASET_LIST:
+                    break;
+            }
         }
         return *this;
     }
@@ -2062,7 +2129,8 @@ class CPL_DLL GDALAlgorithmRegistry
 
     /** Instantiate an algorithm by its name (or its alias). */
     std::unique_ptr<GDALAlgorithm>
-    InstantiateSubAlgorithm(const std::string &name) const;
+    InstantiateSubAlgorithm(const std::string &name,
+                            bool suggestionAllowed = true) const;
 
     /** Return the potential arguments of the algorithm. */
     const std::vector<std::unique_ptr<GDALAlgorithmArg>> &GetArgs() const
@@ -2076,15 +2144,21 @@ class CPL_DLL GDALAlgorithmRegistry
         return m_args;
     }
 
+    /** Return a likely matching argument using a Damerau-Levenshtein distance */
+    std::string GetSuggestionForArgumentName(const std::string &osName) const;
+
     /** Return an argument from its long name, short name or an alias */
-    GDALAlgorithmArg *GetArg(const std::string &osName)
+    GDALAlgorithmArg *GetArg(const std::string &osName,
+                             bool suggestionAllowed = true)
     {
         return const_cast<GDALAlgorithmArg *>(
-            const_cast<const GDALAlgorithm *>(this)->GetArg(osName));
+            const_cast<const GDALAlgorithm *>(this)->GetArg(osName,
+                                                            suggestionAllowed));
     }
 
     /** Return an argument from its long name, short name or an alias */
-    const GDALAlgorithmArg *GetArg(const std::string &osName) const;
+    const GDALAlgorithmArg *GetArg(const std::string &osName,
+                                   bool suggestionAllowed = true) const;
 
     /** Set the calling path to this algorithm.
      *
@@ -2173,8 +2247,11 @@ class CPL_DLL GDALAlgorithmRegistry
         bool isPipelineStep;
         /** Maximum width of the names of the options */
         size_t maxOptLen;
+        /** Whether this is a pipeline main */
+        bool isPipelineMain;
 
-        UsageOptions() : isPipelineStep(false), maxOptLen(0)
+        UsageOptions()
+            : isPipelineStep(false), maxOptLen(0), isPipelineMain(false)
         {
         }
     };
@@ -2247,6 +2324,7 @@ class CPL_DLL GDALAlgorithmRegistry
      */
     bool PropagateSpecialActionTo(GDALAlgorithm *target)
     {
+        target->m_calledFromCommandLine = m_calledFromCommandLine;
         target->m_progressBarRequested = m_progressBarRequested;
         if (m_specialActionRequested)
         {
@@ -2263,6 +2341,18 @@ class CPL_DLL GDALAlgorithmRegistry
     virtual std::vector<std::string>
     GetAutoComplete(std::vector<std::string> &args, bool lastWordIsComplete,
                     bool showAllOptions);
+
+    /** Set whether the algorithm is called from the command line. */
+    void SetCalledFromCommandLine()
+    {
+        m_calledFromCommandLine = true;
+    }
+
+    /** Return whether the algorithm is called from the command line. */
+    bool IsCalledFromCommandLine() const
+    {
+        return m_calledFromCommandLine;
+    }
 
   protected:
     friend class GDALInConstructionAlgorithmArg;
@@ -2418,6 +2508,10 @@ class CPL_DLL GDALAlgorithmRegistry
     GDALInConstructionAlgorithmArg &
     AddUpdateArg(bool *pValue, const char *helpMessage = nullptr);
 
+    /** Add \--append argument. */
+    GDALInConstructionAlgorithmArg &
+    AddAppendUpdateArg(bool *pValue, const char *helpMessage = nullptr);
+
     /** Add (non-CLI) output-string argument. */
     GDALInConstructionAlgorithmArg &
     AddOutputStringArg(std::string *pValue, const char *helpMessage = nullptr);
@@ -2544,6 +2638,10 @@ class CPL_DLL GDALAlgorithmRegistry
     std::pair<std::vector<std::pair<GDALAlgorithmArg *, std::string>>, size_t>
     GetArgNamesForCLI() const;
 
+    //! @cond Doxygen_Suppress
+    std::string GetUsageForCLIEnd() const;
+    //! @endcond
+
   private:
     const std::string m_name{};
     const std::string m_description{};
@@ -2553,6 +2651,7 @@ class CPL_DLL GDALAlgorithmRegistry
     bool m_displayInJSONUsage = true;
     bool m_specialActionRequested = false;
     bool m_helpRequested = false;
+    bool m_calledFromCommandLine = false;
 
     // Used by program-output directives in .rst files
     bool m_helpDocRequested = false;
