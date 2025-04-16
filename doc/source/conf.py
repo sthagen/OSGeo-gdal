@@ -288,6 +288,13 @@ man_pages = [
         1,
     ),
     (
+        "programs/gdal_raster_create",
+        "gdal-raster-create",
+        "Create a new raster dataset",
+        [author_evenr],
+        1,
+    ),
+    (
         "programs/gdal_raster_edit",
         "gdal-raster-edit",
         "Edit in place a raster dataset",
@@ -298,6 +305,13 @@ man_pages = [
         "programs/gdal_raster_hillshade",
         "gdal-raster-hillshade",
         "Generate a shaded relief map",
+        [author_evenr],
+        1,
+    ),
+    (
+        "programs/gdal_raster_index",
+        "gdal-raster-index",
+        "Create a vector index of raster datasets",
         [author_evenr],
         1,
     ),

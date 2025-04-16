@@ -705,7 +705,43 @@ bool GDALAlgorithmArg::RunValidationActions()
         }
     }
 
-    if (GetType() == GAAT_INTEGER)
+    if (GetType() == GAAT_STRING)
+    {
+        const int nMinCharCount = GetMinCharCount();
+        if (nMinCharCount > 0)
+        {
+            const auto &val = Get<std::string>();
+            if (val.size() < static_cast<size_t>(nMinCharCount))
+            {
+                CPLError(
+                    CE_Failure, CPLE_IllegalArg,
+                    "Value of argument '%s' is '%s', but should have at least "
+                    "%d character(s)",
+                    GetName().c_str(), val.c_str(), nMinCharCount);
+                ret = false;
+            }
+        }
+    }
+    else if (GetType() == GAAT_STRING_LIST)
+    {
+        const int nMinCharCount = GetMinCharCount();
+        if (nMinCharCount > 0)
+        {
+            for (const auto &val : Get<std::vector<std::string>>())
+            {
+                if (val.size() < static_cast<size_t>(nMinCharCount))
+                {
+                    CPLError(
+                        CE_Failure, CPLE_IllegalArg,
+                        "Value of argument '%s' is '%s', but should have at "
+                        "least %d character(s)",
+                        GetName().c_str(), val.c_str(), nMinCharCount);
+                    ret = false;
+                }
+            }
+        }
+    }
+    else if (GetType() == GAAT_INTEGER)
     {
         ret = ValidateIntRange(Get<int>()) && ret;
     }
@@ -3078,6 +3114,42 @@ GDALAlgorithm::AddOutputDataTypeArg(std::string *pValue,
 }
 
 /************************************************************************/
+/*                 GDALAlgorithm::AddNodataDataTypeArg()                */
+/************************************************************************/
+
+GDALInConstructionAlgorithmArg &
+GDALAlgorithm::AddNodataDataTypeArg(std::string *pValue, bool noneAllowed,
+                                    const std::string &optionName,
+                                    const char *helpMessage)
+{
+    auto &arg =
+        AddArg(optionName, 0,
+               MsgOrDefault(helpMessage,
+                            _("Assign a specified nodata value to output bands "
+                              "('none', numeric value, 'nan', 'inf', '-inf')")),
+               pValue);
+    arg.AddValidationAction(
+        [this, pValue, noneAllowed, optionName]()
+        {
+            if (!(noneAllowed && EQUAL(pValue->c_str(), "none")))
+            {
+                char *endptr = nullptr;
+                CPLStrtod(pValue->c_str(), &endptr);
+                if (endptr != pValue->c_str() + pValue->size())
+                {
+                    ReportError(CE_Failure, CPLE_IllegalArg,
+                                "Value of '%s' should be 'none', a "
+                                "numeric value, 'nan', 'inf' or '-inf'",
+                                optionName.c_str());
+                    return false;
+                }
+            }
+            return true;
+        });
+    return arg;
+}
+
+/************************************************************************/
 /*                 GDALAlgorithm::AddOutputStringArg()                  */
 /************************************************************************/
 
@@ -4193,6 +4265,18 @@ std::string GDALAlgorithm::GetUsageAsJSON() const
         jArg.Add("name", arg->GetName());
         jArg.Add("type", GDALAlgorithmArgTypeName(arg->GetType()));
         jArg.Add("description", arg->GetDescription());
+
+        const auto &metaVar = arg->GetMetaVar();
+        if (!metaVar.empty() && metaVar != CPLString(arg->GetName()).toupper())
+        {
+            if (metaVar.front() == '<' && metaVar.back() == '>' &&
+                metaVar.substr(1, metaVar.size() - 2).find('>') ==
+                    std::string::npos)
+                jArg.Add("metavar", metaVar.substr(1, metaVar.size() - 2));
+            else
+                jArg.Add("metavar", metaVar);
+        }
+
         const auto &choices = arg->GetChoices();
         if (!choices.empty())
         {

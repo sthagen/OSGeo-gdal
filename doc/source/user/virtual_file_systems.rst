@@ -17,6 +17,8 @@ Example:
 
     gdalinfo /vsizip/my.zip/my.tif
 
+The leading vsi in /vsiPREFIX/ stands for Virtual System Interface.
+
 Chaining
 --------
 
@@ -443,6 +445,11 @@ Starting with GDAL 3.7, the following configuration options control support for 
 More generally options of :cpp:func:`CPLHTTPFetch` available through configuration options are available.
 Starting with GDAL 3.7, the above configuration options can also be specified
 as path-specific options with :cpp:func:`VSISetPathSpecificOption`.
+
+Starting with GDAL 3.11, the following configuration options control the number of HTTP connections:
+
+- :config:`GDAL_HTTP_MAX_CACHED_CONNECTIONS` = integer_number. Maximum amount of connections that libcurl may keep alive in its connection cache after use. Cf https://curl.se/libcurl/c/CURLMOPT_MAXCONNECTS.html
+- :config:`GDAL_HTTP_MAX_TOTAL_CONNECTIONS` = integer_number. Maximum number of simultaneously open connections in total. Cf https://curl.se/libcurl/c/CURLMOPT_MAX_TOTAL_CONNECTIONS.html
 
 The file can be cached in RAM by setting the configuration option :config:`VSI_CACHE` to ``TRUE``. The cache size defaults to 25 MB, but can be modified by setting the configuration option :config:`VSI_CACHE_SIZE` (in bytes). Content in that cache is discarded when the file handle is closed.
 

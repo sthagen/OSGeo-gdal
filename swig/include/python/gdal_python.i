@@ -982,7 +982,13 @@ def ComputeRasterMinMax(self, *args, **kwargs):
         kwargs["can_return_none"] = kwargs["can_return_null"];
         del kwargs["can_return_null"]
 
-    return $action(self, *args, **kwargs)
+    if "can_return_none" in kwargs and kwargs["can_return_none"]:
+        try:
+            return $action(self, *args, **kwargs)
+        except Exception:
+            return None
+    else:
+        return $action(self, *args, **kwargs)
 %}
 
 }
@@ -5486,9 +5492,17 @@ class VSIFile(BytesIO):
         """
 
         if self.HasSubAlgorithms():
-            return self.InstantiateSubAlgorithm(key)
+            subalg = self.InstantiateSubAlgorithm(key)
+            if not subalg:
+                raise Exception(f"'{key}' is not a valid sub-algorithm of '{self.GetName()}'")
+            return subalg
         else:
-            return self.GetActualAlgorithm().GetArg(key).Get()
+            actual_alg = self.GetActualAlgorithm()
+            arg = actual_alg.GetArg(key)
+            if not arg:
+                raise Exception(f"'{key}' is not a valid argument of '{actual_alg.GetName()}'")
+            return arg.Get()
+
 
     def __setitem__(self, key, value):
         """Set the value of an argument.
@@ -5515,8 +5529,11 @@ class VSIFile(BytesIO):
            >>> alg["input"] = [one_ds, two_ds]
         """
 
-        if not self.GetArg(key).Set(value):
-            raise Exception(f"Cannot set argument {key} to {value}")
+        arg = self.GetArg(key)
+        if not arg:
+            raise Exception(f"'{key}' is not a valid argument of '{self.GetName()}'")
+        if not arg.Set(value):
+            raise Exception(f"Cannot set argument '{key}' to '{value}'")
 %}
 }
 
@@ -5592,10 +5609,14 @@ class VSIFile(BytesIO):
         if type == GAAT_REAL_LIST:
             return self.SetAsDoubleList(value)
         if type == GAAT_DATASET_LIST:
-            if isinstance(value[0], str) or isinstance(value[0], os.PathLike):
+            if isinstance(value, list) and (isinstance(value[0], str) or isinstance(value[0], os.PathLike)):
                 return self.SetDatasetNames([str(v) for v in value])
-            elif isinstance(value[0], Dataset):
+            elif isinstance(value, list) and isinstance(value[0], Dataset):
                 return self.SetDatasets(value)
+            elif isinstance(value, str) or isinstance(value, os.PathLike):
+                return self.SetDatasetNames([str(value)])
+            elif isinstance(value, Dataset):
+                return self.SetDatasets([value])
             else:
                 raise "Unexpected value type %s for an argument of type DatasetList" % str(type(value))
         raise Exception("Unhandled algorithm argument data type")
