@@ -16,6 +16,7 @@
 #include "cpl_string.h"
 #include "gdalalgorithm.h"
 #include "gdal_priv.h"
+#include "ogr_spatialref.h"
 
 #include "test_data.h"
 
@@ -119,43 +120,78 @@ TEST_F(test_gdal_algorithm, GDALAlgorithmArg_Set)
         }
 
         arg.Set(false);
+        EXPECT_EQ(val, false);
 
+        arg.Set(1);
+        EXPECT_EQ(val, true);
+
+        arg.Set(0);
+        EXPECT_EQ(val, false);
+
+        arg.Set("1");
+        EXPECT_EQ(val, true);
+
+        arg.Set("0");
+        EXPECT_EQ(val, false);
+
+        arg.Set("yes");
+        EXPECT_EQ(val, true);
+
+        arg.Set("no");
+        EXPECT_EQ(val, false);
+
+        arg.Set("true");
+        EXPECT_EQ(val, true);
+
+        arg.Set("false");
+        EXPECT_EQ(val, false);
+
+        arg.Set("on");
+        EXPECT_EQ(val, true);
+
+        arg.Set("off");
+        EXPECT_EQ(val, false);
+
+        arg = true;
+        EXPECT_EQ(val, true);
+
+        arg.Set(false);
         {
             CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
             CPLErrorReset();
-            arg.Set(1);
+            arg.Set(2);
             EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
-            EXPECT_EQ(arg.Get<bool>(), false);
+            EXPECT_EQ(val, false);
 
             CPLErrorReset();
             arg.Set(1.5);
             EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
-            EXPECT_EQ(arg.Get<bool>(), false);
+            EXPECT_EQ(val, false);
 
             CPLErrorReset();
             arg.Set("foo");
             EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
-            EXPECT_EQ(arg.Get<bool>(), false);
+            EXPECT_EQ(val, false);
 
             CPLErrorReset();
             arg.Set(std::vector<std::string>());
             EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
-            EXPECT_EQ(arg.Get<bool>(), false);
+            EXPECT_EQ(val, false);
 
             CPLErrorReset();
             arg.Set(std::vector<int>());
             EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
-            EXPECT_EQ(arg.Get<bool>(), false);
+            EXPECT_EQ(val, false);
 
             CPLErrorReset();
             arg.Set(std::vector<double>());
             EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
-            EXPECT_EQ(arg.Get<bool>(), false);
+            EXPECT_EQ(val, false);
 
             CPLErrorReset();
             arg.Set(std::vector<GDALArgDatasetValue>());
             EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
-            EXPECT_EQ(arg.Get<bool>(), false);
+            EXPECT_EQ(val, false);
 
             auto poDS = std::unique_ptr<GDALDataset>(
                 GetGDALDriverManager()->GetDriverByName("MEM")->Create(
@@ -163,7 +199,7 @@ TEST_F(test_gdal_algorithm, GDALAlgorithmArg_Set)
             CPLErrorReset();
             arg.Set(std::move(poDS));
             EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
-            EXPECT_EQ(arg.Get<bool>(), false);
+            EXPECT_EQ(val, false);
         }
 
         {
@@ -191,13 +227,52 @@ TEST_F(test_gdal_algorithm, GDALAlgorithmArg_Set)
         arg2.SetFrom(arg);
         EXPECT_EQ(arg2.Get<int>(), 1);
 
+        arg.Set("2");
+        EXPECT_EQ(val, 2);
+
+        arg.Set(3.0);
+        EXPECT_EQ(val, 3);
+
+        arg.Set(std::vector<int>{1});
+        EXPECT_EQ(val, 1);
+
+        arg.Set(std::vector<double>{2.0});
+        EXPECT_EQ(val, 2);
+
+        arg.Set(std::vector<std::string>{"3"});
+        EXPECT_EQ(val, 3);
+
+        arg = 4;
+        EXPECT_EQ(val, 4);
+
         arg.Set(0);
         {
             CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
             CPLErrorReset();
+
             arg.Set(true);
             EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
-            EXPECT_EQ(arg.Get<int>(), 0);
+            EXPECT_EQ(val, 0);
+
+            arg.Set(1.5);
+            EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
+            EXPECT_EQ(val, 0);
+
+            arg.Set("12345679812346798123456");
+            EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
+            EXPECT_EQ(val, 0);
+
+            arg.Set("foo");
+            EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
+            EXPECT_EQ(val, 0);
+
+            arg.Set(std::vector<std::string>{"12345679812346798123456"});
+            EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
+            EXPECT_EQ(val, 0);
+
+            arg.Set(std::vector<int>{1, 2});
+            EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
+            EXPECT_EQ(val, 0);
         }
     }
     {
@@ -214,15 +289,39 @@ TEST_F(test_gdal_algorithm, GDALAlgorithmArg_Set)
         auto arg2 = GDALAlgorithmArg(
             GDALAlgorithmArgDecl("", 0, "", GAAT_REAL).SetDefault(-1.5), &val2);
         arg2.SetFrom(arg);
-        EXPECT_EQ(arg2.Get<double>(), 1);
+        EXPECT_EQ(val2, 1);
+
+        arg.Set("2.5");
+        EXPECT_EQ(val, 2.5);
+
+        arg.Set(std::vector<int>{1});
+        EXPECT_EQ(val, 1);
+
+        arg.Set(std::vector<double>{2.5});
+        EXPECT_EQ(val, 2.5);
+
+        arg.Set(std::vector<std::string>{"3.5"});
+        EXPECT_EQ(val, 3.5);
+
+        arg = 4.5;
+        EXPECT_EQ(val, 4.5);
 
         arg.Set(0);
         {
             CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
             CPLErrorReset();
+
             arg.Set(true);
             EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
-            EXPECT_EQ(arg.Get<double>(), 0);
+            EXPECT_EQ(val, 0);
+
+            arg.Set("foo");
+            EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
+            EXPECT_EQ(val, 0);
+
+            arg.Set(std::vector<int>{1, 2});
+            EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
+            EXPECT_EQ(val, 0);
         }
     }
     {
@@ -239,26 +338,63 @@ TEST_F(test_gdal_algorithm, GDALAlgorithmArg_Set)
         arg2.SetFrom(arg);
         EXPECT_STREQ(arg2.Get<std::string>().c_str(), "foo");
 
+        arg.Set(1);
+        EXPECT_STREQ(val.c_str(), "1");
+
+        arg.Set(1.5);
+        EXPECT_EQ(CPLAtof(val.c_str()), 1.5);
+
+        arg.Set(std::vector<int>{1});
+        EXPECT_STREQ(val.c_str(), "1");
+
+        arg.Set(std::vector<double>{1.5});
+        EXPECT_EQ(CPLAtof(val.c_str()), 1.5);
+
+        arg.Set(std::vector<std::string>{"bar"});
+        EXPECT_STREQ(val.c_str(), "bar");
+
+        arg = "x";
+        EXPECT_STREQ(val.c_str(), "x");
+
+        arg = std::string("y");
+        EXPECT_STREQ(val.c_str(), "y");
+
+        arg = GDT_Byte;
+        EXPECT_STREQ(val.c_str(), "Byte");
+
+        OGRSpatialReference srs;
+        srs.SetFromUserInput("WGS84");
+        arg = srs;
+        EXPECT_EQ(val.find("GEOGCRS["), 0);
+
+        arg.Set("foo");
         {
             CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
             CPLErrorReset();
             arg.Set(true);
             EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
-            EXPECT_STREQ(arg.Get<std::string>().c_str(), "foo");
+            EXPECT_STREQ(val.c_str(), "foo");
         }
         {
             CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
             CPLErrorReset();
             arg.Set(static_cast<GDALDataset *>(nullptr));
             EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
-            EXPECT_STREQ(arg.Get<std::string>().c_str(), "foo");
+            EXPECT_STREQ(val.c_str(), "foo");
+        }
+        {
+            CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+            CPLErrorReset();
+            arg.Set(std::vector<std::string>{"bar", "foo"});
+            EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
+            EXPECT_STREQ(val.c_str(), "foo");
         }
         {
             CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
             CPLErrorReset();
             arg.SetDatasetName("bar");
             EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
-            EXPECT_STREQ(arg.Get<std::string>().c_str(), "foo");
+            EXPECT_STREQ(val.c_str(), "foo");
         }
         {
             CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
@@ -266,7 +402,7 @@ TEST_F(test_gdal_algorithm, GDALAlgorithmArg_Set)
             GDALArgDatasetValue dsValue;
             arg.SetFrom(dsValue);
             EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
-            EXPECT_STREQ(arg.Get<std::string>().c_str(), "foo");
+            EXPECT_STREQ(val.c_str(), "foo");
         }
     }
     {
@@ -351,69 +487,248 @@ TEST_F(test_gdal_algorithm, GDALAlgorithmArg_Set)
         std::vector<std::string> val;
         auto arg = GDALAlgorithmArg(
             GDALAlgorithmArgDecl("", 0, "", GAAT_STRING_LIST), &val);
-        const std::vector<std::string> expected{"foo", "bar"};
-        arg.Set(expected);
-        EXPECT_EQ(arg.Get<std::vector<std::string>>(), expected);
-        EXPECT_EQ(val, expected);
+        {
+            const std::vector<std::string> expected{"foo", "bar"};
+            arg.Set(expected);
+            EXPECT_EQ(arg.Get<std::vector<std::string>>(), expected);
+            EXPECT_EQ(val, expected);
 
-        std::vector<std::string> val2;
-        auto arg2 = GDALAlgorithmArg(
-            GDALAlgorithmArgDecl("", 0, "", GAAT_STRING_LIST), &val2);
-        arg2.SetFrom(arg);
-        EXPECT_EQ(arg2.Get<std::vector<std::string>>(), expected);
+            std::vector<std::string> val2;
+            auto arg2 = GDALAlgorithmArg(
+                GDALAlgorithmArgDecl("", 0, "", GAAT_STRING_LIST), &val2);
+            arg2.SetFrom(arg);
+            EXPECT_EQ(arg2.Get<std::vector<std::string>>(), expected);
+
+            {
+                CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+                CPLErrorReset();
+                arg.Set(true);
+                EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
+                EXPECT_EQ(val, expected);
+            }
+        }
 
         {
-            CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
-            CPLErrorReset();
-            arg.Set(true);
-            EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
-            EXPECT_EQ(arg.Get<std::vector<std::string>>(), expected);
+            arg.Set(1);
+            const std::vector<std::string> expected{"1"};
+            EXPECT_EQ(val, expected);
+        }
+
+        {
+            arg.Set("1");
+            const std::vector<std::string> expected{"1"};
+            EXPECT_EQ(val, expected);
+        }
+
+        {
+            arg.Set(std::vector<int>{1, 2});
+            const std::vector<std::string> expected{"1", "2"};
+            EXPECT_EQ(val, expected);
+        }
+
+        {
+            arg.Set(3.5);
+            ASSERT_EQ(val.size(), 1);
+            EXPECT_EQ(CPLAtof(val[0].c_str()), 3.5);
+        }
+
+        {
+            arg.Set(std::vector<double>{1.5, 2.5});
+            ASSERT_EQ(val.size(), 2);
+            EXPECT_EQ(CPLAtof(val[0].c_str()), 1.5);
+            EXPECT_EQ(CPLAtof(val[1].c_str()), 2.5);
+        }
+
+        {
+            arg = std::vector<std::string>{"foo", "bar"};
+            const std::vector<std::string> expected{"foo", "bar"};
+            EXPECT_EQ(val, expected);
         }
     }
     {
         std::vector<int> val;
         auto arg = GDALAlgorithmArg(
             GDALAlgorithmArgDecl("", 0, "", GAAT_INTEGER_LIST), &val);
-        const std::vector<int> expected{1, 2};
-        arg.Set(expected);
-        EXPECT_EQ(arg.Get<std::vector<int>>(), expected);
-        EXPECT_EQ(val, expected);
+        {
+            const std::vector<int> expected{1, 2};
+            arg.Set(expected);
+            EXPECT_EQ(arg.Get<std::vector<int>>(), expected);
+            EXPECT_EQ(val, expected);
 
-        std::vector<int> val2;
-        auto arg2 = GDALAlgorithmArg(
-            GDALAlgorithmArgDecl("", 0, "", GAAT_INTEGER_LIST), &val2);
-        arg2.SetFrom(arg);
-        EXPECT_EQ(arg2.Get<std::vector<int>>(), expected);
+            std::vector<int> val2;
+            auto arg2 = GDALAlgorithmArg(
+                GDALAlgorithmArgDecl("", 0, "", GAAT_INTEGER_LIST), &val2);
+            arg2.SetFrom(arg);
+            EXPECT_EQ(arg2.Get<std::vector<int>>(), expected);
+
+            {
+                CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+                CPLErrorReset();
+                arg.Set(true);
+                EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
+                EXPECT_EQ(val, expected);
+            }
+        }
+
+        {
+            arg.Set(3);
+            const std::vector<int> expected{3};
+            EXPECT_EQ(val, expected);
+        }
+
+        {
+            arg.Set(4.0);
+            const std::vector<int> expected{4};
+            EXPECT_EQ(val, expected);
+        }
+
+        {
+            arg.Set("5");
+            const std::vector<int> expected{5};
+            EXPECT_EQ(val, expected);
+        }
+
+        {
+            arg.Set(std::vector<double>{6.0});
+            const std::vector<int> expected{6};
+            EXPECT_EQ(val, expected);
+        }
+
+        {
+            arg.Set(std::vector<std::string>{"7"});
+            const std::vector<int> expected{7};
+            EXPECT_EQ(val, expected);
+        }
+
+        {
+            arg = std::vector<int>{4, 5};
+            const std::vector<int> expected{4, 5};
+            EXPECT_EQ(val, expected);
+        }
 
         {
             CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
             CPLErrorReset();
-            arg.Set(true);
+
+            arg.Set(6.5);
             EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
-            EXPECT_EQ(arg.Get<std::vector<int>>(), expected);
+        }
+
+        {
+            CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+            CPLErrorReset();
+
+            arg.Set("foo");
+            EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
+        }
+
+        {
+            CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+            CPLErrorReset();
+
+            arg.Set("12345679812346798123456");
+            EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
+        }
+
+        {
+            CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+            CPLErrorReset();
+
+            arg.Set(std::vector<double>{6.5});
+            EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
+        }
+
+        {
+            CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+            CPLErrorReset();
+
+            arg.Set(std::vector<std::string>{"foo"});
+            EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
+        }
+
+        {
+            CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+            CPLErrorReset();
+
+            arg.Set(std::vector<std::string>{"12345679812346798123456"});
+            EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
         }
     }
     {
         std::vector<double> val;
         auto arg = GDALAlgorithmArg(
             GDALAlgorithmArgDecl("", 0, "", GAAT_REAL_LIST), &val);
-        const std::vector<double> expected{1.5, 2.5};
-        arg.Set(expected);
-        EXPECT_EQ(arg.Get<std::vector<double>>(), expected);
-        EXPECT_EQ(val, expected);
+        {
+            const std::vector<double> expected{1.5, 2.5};
+            arg.Set(expected);
+            EXPECT_EQ(arg.Get<std::vector<double>>(), expected);
+            EXPECT_EQ(val, expected);
 
-        std::vector<double> val2;
-        auto arg2 = GDALAlgorithmArg(
-            GDALAlgorithmArgDecl("", 0, "", GAAT_REAL_LIST), &val2);
-        arg2.SetFrom(arg);
-        EXPECT_EQ(arg2.Get<std::vector<double>>(), expected);
+            std::vector<double> val2;
+            auto arg2 = GDALAlgorithmArg(
+                GDALAlgorithmArgDecl("", 0, "", GAAT_REAL_LIST), &val2);
+            arg2.SetFrom(arg);
+            EXPECT_EQ(arg2.Get<std::vector<double>>(), expected);
+
+            {
+                CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+                CPLErrorReset();
+                arg.Set(true);
+                EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
+                EXPECT_EQ(arg.Get<std::vector<double>>(), expected);
+            }
+        }
+
+        {
+            arg.Set(3);
+            const std::vector<double> expected{3.0};
+            EXPECT_EQ(val, expected);
+        }
+
+        {
+            arg.Set("4.5");
+            const std::vector<double> expected{4.5};
+            EXPECT_EQ(val, expected);
+        }
+
+        {
+            arg.Set(std::vector<int>{5});
+            const std::vector<double> expected{5.0};
+            EXPECT_EQ(val, expected);
+        }
+
+        {
+            arg.Set(std::vector<double>{6.5});
+            const std::vector<double> expected{6.5};
+            EXPECT_EQ(val, expected);
+        }
+
+        {
+            arg.Set(std::vector<std::string>{"7.5"});
+            const std::vector<double> expected{7.5};
+            EXPECT_EQ(val, expected);
+        }
+
+        {
+            arg = std::vector<double>{4, 5};
+            const std::vector<double> expected{4, 5};
+            EXPECT_EQ(val, expected);
+        }
 
         {
             CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
             CPLErrorReset();
-            arg.Set(true);
+
+            arg.Set("foo");
             EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
-            EXPECT_EQ(arg.Get<std::vector<double>>(), expected);
+        }
+
+        {
+            CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+            CPLErrorReset();
+
+            arg.Set(std::vector<std::string>{"foo"});
+            EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
         }
     }
     {
@@ -604,6 +919,29 @@ TEST_F(test_gdal_algorithm, GDALInConstructionAlgorithmArg_AddAlias)
     EXPECT_NE(alg.GetArg("alias"), nullptr);
     EXPECT_EQ(alg.GetArg("invalid"), nullptr);
     EXPECT_EQ(alg.GetArg("-"), nullptr);
+
+    EXPECT_STREQ(alg["flag"].GetName().c_str(), "flag");
+
+    alg["flag"] = true;
+    EXPECT_EQ(alg.m_flag, true);
+
+    EXPECT_STREQ(const_cast<const MyAlgorithm &>(alg)["flag"].GetName().c_str(),
+                 "flag");
+
+    {
+        CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+        CPLErrorReset();
+        EXPECT_STREQ(alg["invalid"].GetName().c_str(), "dummy");
+        EXPECT_NE(CPLGetLastErrorType(), CE_None);
+    }
+    {
+        CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+        CPLErrorReset();
+        EXPECT_STREQ(
+            const_cast<const MyAlgorithm &>(alg)["invalid"].GetName().c_str(),
+            "dummy");
+        EXPECT_NE(CPLGetLastErrorType(), CE_None);
+    }
 
     {
         CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
