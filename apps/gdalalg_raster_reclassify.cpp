@@ -17,8 +17,6 @@
 #include "gdal_utils.h"
 #include "../frmts/vrt/vrtdataset.h"
 
-#include <optional>
-
 //! @cond Doxygen_Suppress
 
 #ifndef _
@@ -40,41 +38,6 @@ GDALRasterReclassifyAlgorithm::GDALRasterReclassifyAlgorithm(
            &m_mapping)
         .SetRequired();
     AddOutputDataTypeArg(&m_type);
-}
-
-/************************************************************************/
-/*                      GetNoDataValueAsString                          */
-/************************************************************************/
-
-static std::optional<std::string> GetNoDataValueAsString(GDALRasterBand &band)
-{
-    int hasNoData;
-    if (band.GetRasterDataType() == GDT_UInt64)
-    {
-        std::uint64_t noData = band.GetNoDataValueAsUInt64(&hasNoData);
-        if (hasNoData)
-        {
-            return std::to_string(noData);
-        }
-    }
-    else if (band.GetRasterDataType() == GDT_Int64)
-    {
-        std::int64_t noData = band.GetNoDataValueAsInt64(&hasNoData);
-        if (hasNoData)
-        {
-            return std::to_string(noData);
-        }
-    }
-    else
-    {
-        double noData = band.GetNoDataValue(&hasNoData);
-        if (hasNoData)
-        {
-            return std::to_string(noData);
-        }
-    }
-
-    return std::nullopt;
 }
 
 /************************************************************************/
@@ -109,42 +72,6 @@ GDALReclassifyCreateVRTDerived(GDALDataset &input, const std::string &mappings,
         CPLXMLNode *arguments =
             CPLCreateXMLNode(band, CXT_Element, "PixelFunctionArguments");
         CPLAddXMLAttributeAndValue(arguments, "mapping", mappings.c_str());
-
-        CPLXMLNode *source =
-            CPLCreateXMLNode(band, CXT_Element, "SimpleSource");
-
-        CPLXMLNode *sourceFilename =
-            CPLCreateXMLNode(source, CXT_Element, "SourceFilename");
-        CPLAddXMLAttributeAndValue(sourceFilename, "relativeToVRT", "0");
-        CPLCreateXMLNode(sourceFilename, CXT_Text, input.GetDescription());
-
-        CPLXMLNode *sourceBand =
-            CPLCreateXMLNode(source, CXT_Element, "SourceBand");
-        CPLCreateXMLNode(sourceBand, CXT_Text, std::to_string(iBand).c_str());
-
-        CPLXMLNode *srcRect = CPLCreateXMLNode(source, CXT_Element, "SrcRect");
-        CPLAddXMLAttributeAndValue(srcRect, "xOff", "0");
-        CPLAddXMLAttributeAndValue(srcRect, "yOff", "0");
-        CPLAddXMLAttributeAndValue(srcRect, "xSize",
-                                   std::to_string(nX).c_str());
-        CPLAddXMLAttributeAndValue(srcRect, "ySize",
-                                   std::to_string(nY).c_str());
-
-        CPLXMLNode *dstRect = CPLCreateXMLNode(source, CXT_Element, "DstRect");
-        CPLAddXMLAttributeAndValue(dstRect, "xOff", "0");
-        CPLAddXMLAttributeAndValue(dstRect, "yOff", "0");
-        CPLAddXMLAttributeAndValue(dstRect, "xSize",
-                                   std::to_string(nX).c_str());
-        CPLAddXMLAttributeAndValue(dstRect, "ySize",
-                                   std::to_string(nY).c_str());
-
-        auto noData = GetNoDataValueAsString(*input.GetRasterBand(iBand));
-        if (noData.has_value())
-        {
-            CPLXMLNode *noDataNode =
-                CPLCreateXMLNode(band, CXT_Element, "NoDataValue");
-            CPLCreateXMLNode(noDataNode, CXT_Text, noData.value().c_str());
-        }
     }
 
     auto ds = std::make_unique<VRTDataset>(nX, nY);
@@ -153,9 +80,18 @@ GDALReclassifyCreateVRTDerived(GDALDataset &input, const std::string &mappings,
         return nullptr;
     };
 
+    for (int iBand = 1; iBand <= input.GetRasterCount(); ++iBand)
+    {
+        auto poSrcBand = input.GetRasterBand(iBand);
+        auto poDstBand =
+            cpl::down_cast<VRTDerivedRasterBand *>(ds->GetRasterBand(iBand));
+        GDALCopyNoDataValue(poDstBand, poSrcBand);
+        poDstBand->AddSimpleSource(poSrcBand);
+    }
+
     std::array<double, 6> gt;
-    input.GetGeoTransform(gt.data());
-    ds->SetGeoTransform(gt.data());
+    if (input.GetGeoTransform(gt.data()) == CE_None)
+        ds->SetGeoTransform(gt.data());
     ds->SetSpatialRef(input.GetSpatialRef());
 
     return ds;
@@ -167,15 +103,17 @@ GDALReclassifyCreateVRTDerived(GDALDataset &input, const std::string &mappings,
 
 bool GDALRasterReclassifyAlgorithm::RunStep(GDALProgressFunc, void *)
 {
-    CPLAssert(m_inputDataset.GetDatasetRef());
+    const auto poSrcDS = m_inputDataset.GetDatasetRef();
+    CPLAssert(poSrcDS);
     CPLAssert(m_outputDataset.GetName().empty());
     CPLAssert(!m_outputDataset.GetDatasetRef());
 
     // Already validated by argument parser
-    GDALDataType eDstType =
+    const GDALDataType eDstType =
         m_type.empty() ? GDT_Unknown : GDALGetDataTypeByName(m_type.c_str());
 
-    if (m_mapping.size() > 0 && m_mapping[0] == '@')
+    const auto nErrorCount = CPLGetErrorCounter();
+    if (!m_mapping.empty() && m_mapping[0] == '@')
     {
         auto f =
             VSIVirtualHandleUniquePtr(VSIFOpenL(m_mapping.c_str() + 1, "r"));
@@ -186,46 +124,57 @@ bool GDALRasterReclassifyAlgorithm::RunStep(GDALProgressFunc, void *)
             return false;
         }
 
-        std::string mappings_from_file;
-        while (const char *line = CPLReadLineL(f.get()))
+        m_mapping.clear();
+        try
         {
-            while (isspace(*line))
+            constexpr int MAX_CHARS_PER_LINE = 1000 * 1000;
+            constexpr size_t MAX_MAPPING_SIZE = 10 * 1000 * 1000;
+            while (const char *line =
+                       CPLReadLine2L(f.get(), MAX_CHARS_PER_LINE, nullptr))
             {
-                line++;
-            }
+                while (isspace(*line))
+                {
+                    line++;
+                }
 
-            if (strlen(line) == 0)
-            {
-                continue;
-            }
+                if (line[0])
+                {
+                    if (!m_mapping.empty())
+                    {
+                        m_mapping.append(";");
+                    }
 
-            if (!mappings_from_file.empty())
-            {
-                mappings_from_file.append(";");
+                    const char *comment = strchr(line, '#');
+                    if (!comment)
+                    {
+                        m_mapping.append(line);
+                    }
+                    else
+                    {
+                        m_mapping.append(line,
+                                         static_cast<size_t>(comment - line));
+                    }
+                    if (m_mapping.size() > MAX_MAPPING_SIZE)
+                    {
+                        ReportError(CE_Failure, CPLE_AppDefined,
+                                    "Too large mapping size");
+                        return false;
+                    }
+                }
             }
-
-            char *comment = const_cast<char *>(strchr(line, '#'));
-            if (comment != nullptr)
-            {
-                *comment = '\0';
-            }
-
-            mappings_from_file.append(line);
         }
-
-        m_mapping = mappings_from_file;
+        catch (const std::exception &)
+        {
+            ReportError(CE_Failure, CPLE_OutOfMemory,
+                        "Out of memory while ingesting mapping file");
+        }
     }
-
-    auto vrt = GDALReclassifyCreateVRTDerived(*m_inputDataset.GetDatasetRef(),
-                                              m_mapping, eDstType);
-
-    if (vrt == nullptr)
+    if (nErrorCount == CPLGetErrorCounter())
     {
-        return false;
+        m_outputDataset.Set(
+            GDALReclassifyCreateVRTDerived(*poSrcDS, m_mapping, eDstType));
     }
-
-    m_outputDataset.Set(std::move(vrt));
-    return true;
+    return m_outputDataset.GetDatasetRef() != nullptr;
 }
 
 //! @endcond

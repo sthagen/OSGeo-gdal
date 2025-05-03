@@ -150,14 +150,7 @@ GDALRasterTileAlgorithm::GDALRasterTileAlgorithm()
            &m_auxXML);
     AddArg("resume", 0, _("Generate only missing files"), &m_resume);
 
-    const char *pszThreads = CPLGetConfigOption("GDAL_NUM_THREADS", "ALL_CPUS");
-    if (EQUAL(pszThreads, "ALL_CPUS"))
-        m_maxThreads = CPLGetNumCPUs();
-
-    AddArg("num-threads", 'j', _("Number of computation threads to use"),
-           &m_numThreads)
-        .SetDefault(m_maxThreads)
-        .SetMinValueIncluded(0);
+    AddNumThreadsArg(&m_numThreads, &m_numThreadsStr);
 
     constexpr const char *PUBLICATION_CATEGORY = "Publication";
     AddArg("webviewer", 0, _("Web viewer to generate"), &m_webviewers)
@@ -1386,14 +1379,14 @@ static void GenerateOpenLayers(
     }
     else
     {
-        const double base_res = tms.tileMatrixList()[0].mResX;
-        substs["maxres"] = CPLSPrintf("%d", nMinZoom);
+        substs["maxres"] =
+            CPLSPrintf(pszFmt, tms.tileMatrixList()[nMinZoom].mResX);
         std::string resolutions = "[";
         for (int i = 0; i <= nMaxZoom; ++i)
         {
             if (i > 0)
                 resolutions += ",";
-            resolutions += CPLSPrintf(pszFmt, base_res / (1 << i));
+            resolutions += CPLSPrintf(pszFmt, tms.tileMatrixList()[i].mResX);
         }
         resolutions += "]";
         substs["resolutions"] = std::move(resolutions);
@@ -2410,8 +2403,6 @@ bool GDALRasterTileAlgorithm::RunImpl(GDALProgressFunc pfnProgress,
                     m_outputDirectory.c_str());
         return false;
     }
-
-    m_numThreads = std::min(m_numThreads, m_maxThreads);
 
     CPLWorkerThreadPool oThreadPool;
 
