@@ -1433,18 +1433,11 @@ GDALAlgorithm::GDALAlgorithm(const std::string &name,
            &m_helpDocRequested)
         .SetHidden()
         .AddAction([this]() { m_specialActionRequested = true; });
-    AddArg("version", 0, _("Display GDAL version and exit"), &m_dummyBoolean)
-        .SetOnlyForCLI()
-        .SetCategory(GAAC_COMMON);
     AddArg("json-usage", 0, _("Display usage as JSON document and exit"),
            &m_JSONUsageRequested)
         .SetOnlyForCLI()
         .SetCategory(GAAC_COMMON)
         .AddAction([this]() { m_specialActionRequested = true; });
-    AddArg("drivers", 0, _("Display driver list as JSON document and exit"),
-           &m_dummyBoolean)
-        .SetOnlyForCLI()
-        .SetCategory(GAAC_COMMON);
     AddArg("config", 0, _("Configuration option"), &m_dummyConfigOptions)
         .SetMetaVar("<KEY>=<VALUE>")
         .SetOnlyForCLI()
@@ -2178,6 +2171,8 @@ bool GDALAlgorithm::ProcessDatasetArg(GDALAlgorithmArg *arg,
             osDatasetName = GDALDataset::BuildFilename(
                 osDatasetName.c_str(), m_referencePath.c_str(), true);
         }
+        if (osDatasetName == "-" && (flags & GDAL_OF_UPDATE) == 0)
+            osDatasetName = "/vsistdin/";
 
         auto poDS =
             GDALDataset::Open(osDatasetName.c_str(), flags,
@@ -2937,6 +2932,14 @@ GDALInConstructionAlgorithmArg &GDALAlgorithm::AddInputDatasetArg(
 
     SetAutoCompleteFunctionForFilename(arg, type);
 
+    AddValidationAction(
+        [pValue]()
+        {
+            if (pValue->GetName() == "-")
+                pValue->Set("/vsistdin/");
+            return true;
+        });
+
     return arg;
 }
 
@@ -2956,6 +2959,17 @@ GDALInConstructionAlgorithmArg &GDALAlgorithm::AddInputDatasetArg(
         pValue, type);
     if (positionalAndRequired)
         arg.SetPositional().SetRequired();
+
+    AddValidationAction(
+        [pValue]()
+        {
+            for (auto &val : *pValue)
+            {
+                if (val.GetName() == "-")
+                    val.Set("/vsistdin/");
+            }
+            return true;
+        });
     return arg;
 }
 
@@ -2984,6 +2998,9 @@ GDALInConstructionAlgorithmArg &GDALAlgorithm::AddOutputDatasetArg(
     AddValidationAction(
         [this, &arg, pValue]()
         {
+            if (pValue->GetName() == "-")
+                pValue->Set("/vsistdout/");
+
             auto outputFormatArg = GetArg(GDAL_ARG_NAME_OUTPUT_FORMAT);
             if (outputFormatArg && outputFormatArg->GetType() == GAAT_STRING &&
                 (!outputFormatArg->IsExplicitlySet() ||
@@ -3338,10 +3355,25 @@ bool GDALAlgorithm::ValidateFormat(const GDALAlgorithmArg &arg,
             auto hDriver = GDALGetDriverByName(val.c_str());
             if (!hDriver)
             {
-                ReportError(CE_Failure, CPLE_AppDefined,
-                            "Invalid value for argument '%s'. Driver '%s' does "
-                            "not exist",
-                            arg.GetName().c_str(), val.c_str());
+                auto poMissingDriver =
+                    GetGDALDriverManager()->GetHiddenDriverByName(val.c_str());
+                if (poMissingDriver)
+                {
+                    const std::string msg =
+                        GDALGetMessageAboutMissingPluginDriver(poMissingDriver);
+                    ReportError(CE_Failure, CPLE_AppDefined,
+                                "Invalid value for argument '%s'. Driver '%s' "
+                                "not found but it known. However plugin %s",
+                                arg.GetName().c_str(), val.c_str(),
+                                msg.c_str());
+                }
+                else
+                {
+                    ReportError(CE_Failure, CPLE_AppDefined,
+                                "Invalid value for argument '%s'. Driver '%s' "
+                                "does not exist.",
+                                arg.GetName().c_str(), val.c_str());
+                }
                 return false;
             }
 
@@ -3350,7 +3382,9 @@ bool GDALAlgorithm::ValidateFormat(const GDALAlgorithmArg &arg,
             {
                 for (const std::string &cap : *caps)
                 {
-                    if (!GDALGetMetadataItem(hDriver, cap.c_str(), nullptr))
+                    const char *pszVal =
+                        GDALGetMetadataItem(hDriver, cap.c_str(), nullptr);
+                    if (!(pszVal && pszVal[0]))
                     {
                         if (cap == GDAL_DCAP_CREATECOPY &&
                             std::find(caps->begin(), caps->end(),
@@ -3361,6 +3395,16 @@ bool GDALAlgorithm::ValidateFormat(const GDALAlgorithmArg &arg,
                                                 nullptr))
                         {
                             // if it supports Create, it supports CreateCopy
+                        }
+                        else if (cap == GDAL_DMD_EXTENSIONS)
+                        {
+                            ReportError(
+                                CE_Failure, CPLE_AppDefined,
+                                "Invalid value for argument '%s'. Driver '%s' "
+                                "does "
+                                "not advertise any file format extension.",
+                                arg.GetName().c_str(), val.c_str());
+                            return false;
                         }
                         else
                         {
@@ -3432,7 +3476,9 @@ FormatAutoCompleteFunction(const GDALAlgorithmArg &arg,
                         break;
                     }
                 }
-                else if (poDriver->GetMetadataItem(cap.c_str()))
+                else if (const char *pszVal =
+                             poDriver->GetMetadataItem(cap.c_str());
+                         pszVal && pszVal[0])
                 {
                 }
                 else if (cap == GDAL_DCAP_CREATECOPY &&
@@ -4169,13 +4215,15 @@ bool GDALAlgorithm::Run(GDALProgressFunc pfnProgress, void *pProgressData)
 
     if (m_helpRequested || m_helpDocRequested)
     {
-        printf("%s", GetUsageForCLI(false).c_str()); /*ok*/
+        if (m_calledFromCommandLine)
+            printf("%s", GetUsageForCLI(false).c_str()); /*ok*/
         return true;
     }
 
     if (m_JSONUsageRequested)
     {
-        printf("%s", GetUsageAsJSON().c_str()); /*ok*/
+        if (m_calledFromCommandLine)
+            printf("%s", GetUsageAsJSON().c_str()); /*ok*/
         return true;
     }
 
