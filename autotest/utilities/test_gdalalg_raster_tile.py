@@ -795,6 +795,22 @@ def test_gdalalg_raster_tile_not_earth_crs(tmp_vsimem):
         alg.Run()
 
 
+def test_gdalalg_raster_tile_cannot_determine_target_extent(tmp_vsimem):
+
+    src_ds = gdal.Warp(
+        "", "../gdrivers/data/small_world.tif", options="-f MEM -t_srs +proj=ortho"
+    )
+    src_ds = gdal.Translate("", src_ds, options="-f MEM -srcwin 0 0 1 1")
+    alg = get_alg()
+    alg["input"] = src_ds
+    alg["output"] = tmp_vsimem
+    with pytest.raises(
+        Exception,
+        match="Cannot determine extent of raster in target CRS",
+    ):
+        alg.Run()
+
+
 def test_gdalalg_raster_tile_extent_not_compatible_tile_matrix(tmp_vsimem):
 
     src_ds = gdal.GetDriverByName("MEM").Create("", 1, 1)
@@ -1126,8 +1142,10 @@ def test_gdalalg_raster_tile_min_zoom_metadata_aux_xml(tmp_vsimem):
 
 @pytest.mark.require_driver("GTiff")
 @pytest.mark.require_driver("COG")
-@pytest.mark.parametrize("output_format", ["GTiff", "COG"])
-def test_gdalalg_raster_tile_output_format_gtiff(tmp_vsimem, output_format):
+@pytest.mark.parametrize(
+    "output_format,tile_size", [("GTiff", None), ("GTiff", 1024), ("COG", None)]
+)
+def test_gdalalg_raster_tile_output_format_gtiff(tmp_vsimem, output_format, tile_size):
 
     alg = get_alg()
     alg["input"] = gdal.Translate(
@@ -1140,7 +1158,12 @@ def test_gdalalg_raster_tile_output_format_gtiff(tmp_vsimem, output_format):
     alg["copy-src-metadata"] = True
     alg["metadata"] = {"FOO": "BAR"}
     alg["webviewer"] = "none"
+    if tile_size:
+        alg["tile-size"] = tile_size
     assert alg.Run()
+
+    if not tile_size:
+        tile_size = 256
 
     assert gdal.ReadDirRecursive(tmp_vsimem) == [
         "10/",
@@ -1152,32 +1175,42 @@ def test_gdalalg_raster_tile_output_format_gtiff(tmp_vsimem, output_format):
     ]
 
     with gdal.Open(tmp_vsimem / "10/177/409.tif") as ds:
+        assert ds.RasterXSize == tile_size
+        assert ds.RasterYSize == tile_size
         assert ds.GetSpatialRef().GetAuthorityCode(None) == "3857"
         assert list(ds.GetGeoTransform()) == pytest.approx(
             [
                 -13110479.09147343,
-                152.8740565703556,
+                152.8740565703556 / tile_size * 256,
                 0.0,
                 4030983.1236470547,
                 0.0,
-                -152.87405657035197,
+                -152.87405657035197 / tile_size * 256,
             ]
         )
         assert ds.GetMetadata_Dict() == {"AREA_OR_POINT": "Area", "FOO": "BAR"}
+        assert ds.GetMetadataItem("COMPRESSION", "IMAGE_STRUCTURE") == "LZW"
+        assert ds.GetRasterBand(1).GetBlockSize() == (
+            [tile_size, tile_size] if tile_size <= 512 else [256, 256]
+        )
 
     with gdal.Open(tmp_vsimem / "11/354/818.tif") as ds:
         assert ds.GetSpatialRef().GetAuthorityCode(None) == "3857"
         assert list(ds.GetGeoTransform()) == pytest.approx(
             [
                 -13110479.09147343,
-                76.43702828517625,
+                76.43702828517625 / tile_size * 256,
                 0.0,
                 4030983.1236470547,
                 0.0,
-                -76.43702828517625,
+                -76.43702828517625 / tile_size * 256,
             ]
         )
         assert ds.GetMetadata_Dict() == {"AREA_OR_POINT": "Area", "FOO": "BAR"}
+        assert ds.GetMetadataItem("COMPRESSION", "IMAGE_STRUCTURE") == "LZW"
+        assert ds.GetRasterBand(1).GetBlockSize() == (
+            [tile_size, tile_size] if tile_size <= 512 else [256, 256]
+        )
 
 
 def test_gdalalg_raster_tile_resume(tmp_vsimem):
@@ -1269,3 +1302,149 @@ def test_gdalalg_raster_tile_cannot_reopen_tile(tmp_vsimem):
     alg["resume"] = True
     with pytest.raises(Exception, match="exists but cannot be opened with PNG driver"):
         alg.Run()
+
+
+def test_gdalalg_raster_tile_raster(tmp_vsimem):
+
+    src_ds = gdal.Open("../gcore/data/byte.tif")
+    alg = get_alg()
+    alg["input"] = src_ds
+    alg["output"] = tmp_vsimem
+    alg["tiling-scheme"] = "raster"
+    alg["output-format"] = "GTiff"
+    with gdal.config_option("GDAL_RASTER_TILE_HTML_PREC", "10"):
+        assert alg.Run()
+
+    assert gdal.ReadDirRecursive(tmp_vsimem) == [
+        "0/",
+        "0/0/",
+        "0/0/0.tif",
+        "mapml.mapml",
+        "openlayers.html",
+    ]
+
+    with gdal.Open(tmp_vsimem / "0/0/0.tif") as ds:
+        assert ds.RasterCount == 2
+        assert ds.RasterXSize == 256
+        assert ds.RasterYSize == 256
+        assert [ds.GetRasterBand(i + 1).Checksum() for i in range(2)] == [4333, 4898]
+        assert (
+            ds.GetRasterBand(1).ReadRaster(0, 0, src_ds.RasterXSize, src_ds.RasterYSize)
+            == src_ds.ReadRaster()
+        )
+        assert [x for x in ds.GetGeoTransform()] == pytest.approx(
+            [x for x in src_ds.GetGeoTransform()]
+        )
+        assert ds.GetSpatialRef().IsSame(src_ds.GetSpatialRef())
+
+    with gdal.VSIFile(tmp_vsimem / "openlayers.html", "rb") as f:
+        got = f.read()
+        # Uncomment below line to regenerate expected file
+        # open("data/gdal_raster_tile_raster_expected_openlayers.html", "wb").write(got)
+        assert (
+            got
+            == open(
+                "data/gdal_raster_tile_raster_expected_openlayers.html", "rb"
+            ).read()
+        )
+
+
+def test_gdalalg_raster_tile_raster_ungeoreferenced(tmp_vsimem):
+
+    src_ds = gdal.Open("../gcore/data/byte.tif")
+    wrk_ds = gdal.GetDriverByName("MEM").Create(
+        "", src_ds.RasterXSize, src_ds.RasterYSize
+    )
+    wrk_ds.WriteRaster(
+        0, 0, src_ds.RasterXSize, src_ds.RasterYSize, src_ds.ReadRaster()
+    )
+
+    alg = get_alg()
+    alg["input"] = wrk_ds
+    alg["output"] = tmp_vsimem
+    alg["tiling-scheme"] = "raster"
+    alg["output-format"] = "GTiff"
+    assert alg.Run()
+
+    assert gdal.ReadDirRecursive(tmp_vsimem) == [
+        "0/",
+        "0/0/",
+        "0/0/0.tif",
+        "mapml.mapml",
+        "openlayers.html",
+    ]
+
+    with gdal.Open(tmp_vsimem / "0/0/0.tif") as ds:
+        assert ds.RasterCount == 2
+        assert ds.RasterXSize == 256
+        assert ds.RasterYSize == 256
+        assert [ds.GetRasterBand(i + 1).Checksum() for i in range(2)] == [4333, 4898]
+        assert (
+            ds.GetRasterBand(1).ReadRaster(0, 0, src_ds.RasterXSize, src_ds.RasterYSize)
+            == src_ds.ReadRaster()
+        )
+        assert [x for x in ds.GetGeoTransform()] == pytest.approx([0, 1, 0, 0, 0, -1])
+        assert ds.GetSpatialRef() is None
+
+
+def test_gdalalg_raster_tile_raster_min_max_zoom(tmp_vsimem):
+
+    src_ds = gdal.Open("../gdrivers/data/small_world.tif")
+
+    alg = get_alg()
+    alg["input"] = src_ds
+    alg["output"] = tmp_vsimem
+    alg["tiling-scheme"] = "raster"
+    alg["min-zoom"] = 0
+    alg["max-zoom"] = 2
+    alg["resampling"] = "nearest"
+    assert alg.Run()
+
+    assert gdal.ReadDirRecursive(tmp_vsimem) == [
+        "0/",
+        "0/0/",
+        "0/0/0.png",
+        "1/",
+        "1/0/",
+        "1/0/0.png",
+        "2/",
+        "2/0/",
+        "2/0/0.png",
+        "2/1/",
+        "2/1/0.png",
+        "mapml.mapml",
+        "openlayers.html",
+    ]
+
+    with gdal.Open(tmp_vsimem / "2/0/0.png") as ds:
+        assert ds.RasterCount == 4
+        assert ds.RasterXSize == 256
+        assert ds.RasterYSize == 256
+        assert [ds.GetRasterBand(i + 1).Checksum() for i in range(4)] == [
+            60550,
+            62572,
+            46338,
+            38489,
+        ]
+        assert ds.ReadRaster(0, 0, 256, 200, band_list=[1, 2, 3]) == src_ds.ReadRaster(
+            0, 0, 256, 200
+        )
+
+    with gdal.Open(tmp_vsimem / "2/1/0.png") as ds:
+        assert ds.RasterCount == 4
+        assert ds.RasterXSize == 256
+        assert ds.RasterYSize == 256
+        assert [ds.GetRasterBand(i + 1).Checksum() for i in range(4)] == [
+            54448,
+            61647,
+            44944,
+            38489,
+        ]
+        assert ds.ReadRaster(
+            0, 0, 400 - 256, 200, band_list=[1, 2, 3]
+        ) == src_ds.ReadRaster(256, 0, 400 - 256, 200)
+
+    with gdal.Open(tmp_vsimem / "1/0/0.png") as ds:
+        assert ds.ReadRaster(0, 0, 200, 100, band_list=[1, 2, 3]) == src_ds.ReadRaster(
+            buf_xsize=200, buf_ysize=100
+        )
