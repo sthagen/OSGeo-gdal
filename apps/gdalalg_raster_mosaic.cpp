@@ -112,13 +112,7 @@ GDALRasterMosaicAlgorithm::GDALRasterMosaicAlgorithm()
 bool GDALRasterMosaicAlgorithm::RunImpl(GDALProgressFunc pfnProgress,
                                         void *pProgressData)
 {
-    if (m_outputDataset.GetDatasetRef())
-    {
-        ReportError(CE_Failure, CPLE_NotSupported,
-                    "gdal raster mosaic does not support outputting to an "
-                    "already opened output dataset");
-        return false;
-    }
+    CPLAssert(!m_outputDataset.GetDatasetRef());
 
     std::vector<GDALDatasetH> ahInputDatasets;
     CPLStringList aosInputDatasetNames;
@@ -181,14 +175,21 @@ bool GDALRasterMosaicAlgorithm::RunImpl(GDALProgressFunc pfnProgress,
     }
 
     const char *pszType = "";
-    if (!m_overwrite && !m_outputDataset.GetName().empty() &&
+    if (!m_outputDataset.GetName().empty() &&
         GDALDoesFileOrDatasetExist(m_outputDataset.GetName().c_str(), &pszType))
     {
-        ReportError(CE_Failure, CPLE_AppDefined,
-                    "%s '%s' already exists. Specify the --overwrite "
-                    "option to overwrite it.",
-                    pszType, m_outputDataset.GetName().c_str());
-        return false;
+        if (!m_overwrite)
+        {
+            ReportError(CE_Failure, CPLE_AppDefined,
+                        "%s '%s' already exists. Specify the --overwrite "
+                        "option to overwrite it.",
+                        pszType, m_outputDataset.GetName().c_str());
+            return false;
+        }
+        else
+        {
+            VSIUnlink(m_outputDataset.GetName().c_str());
+        }
     }
 
     const bool bVRTOutput =
