@@ -25,6 +25,7 @@ def test_gdalg_raster_from_file():
     ds = gdal.Open("data/gdalg/read_byte.gdalg.json")
     assert ds.GetRasterBand(1).Checksum() == 4672
     assert ds.GetDriver().GetDescription() == "GDALG"
+    assert ds.GetFileList() == ["data/gdalg/read_byte.gdalg.json"]
 
 
 def test_gdalg_raster_opened_as_vector():
@@ -43,6 +44,7 @@ def test_gdalg_raster_pipeline_standard():
         )
     )
     assert ds.GetRasterBand(1).Checksum() == 4672
+    assert ds.GetFileList() is None
 
 
 def test_gdalg_raster_pipeline_explicit_write_step():
@@ -270,7 +272,10 @@ def test_gdalg_generate_from_raster_pipeline(tmp_vsimem):
             "--overwrite",
         ]
     )
-    assert json.loads(gdal.VSIFile(out_filename, "rb").read()) == {
+    j = json.loads(gdal.VSIFile(out_filename, "rb").read())
+    assert "gdal_version" in j
+    del j["gdal_version"]
+    assert j == {
         "command_line": "gdal raster pipeline read --input data/byte.tif ! reproject --dst-crs EPSG:4326",
         "type": "gdal_streamed_alg",
     }
@@ -320,7 +325,10 @@ def test_gdalg_generate_from_vector_pipeline(tmp_vsimem):
             out_filename,
         ]
     )
-    assert json.loads(gdal.VSIFile(out_filename, "rb").read()) == {
+    j = json.loads(gdal.VSIFile(out_filename, "rb").read())
+    assert "gdal_version" in j
+    del j["gdal_version"]
+    assert j == {
         "command_line": "gdal vector pipeline read --input ../ogr/data/poly.shp ! reproject --dst-crs EPSG:4326",
         "type": "gdal_streamed_alg",
     }
@@ -342,7 +350,10 @@ def test_gdalg_generate_from_vector_pipeline_geom(tmp_vsimem):
             out_filename,
         ]
     )
-    assert json.loads(gdal.VSIFile(out_filename, "rb").read()) == {
+    j = json.loads(gdal.VSIFile(out_filename, "rb").read())
+    assert "gdal_version" in j
+    del j["gdal_version"]
+    assert j == {
         "command_line": "gdal vector pipeline read --input ../ogr/data/poly.shp ! geom set-type --geometry-type MULTIPOLYGON",
         "type": "gdal_streamed_alg",
     }
