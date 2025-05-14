@@ -25,6 +25,8 @@ the center of each pixel to the center of the nearest pixel identified as a targ
 Target pixels are those in the source raster for which the raster pixel value is in the set of
 target pixel values.
 
+This subcommand is also available as a potential step of :ref:`gdal_raster_pipeline`
+
 Standard options
 ++++++++++++++++
 
@@ -74,6 +76,14 @@ Advanced options
 .. include:: gdal_options/oo.rst
 
 .. include:: gdal_options/if.rst
+
+
+.. GDALG output (on-the-fly / streamed dataset)
+.. --------------------------------------------
+
+.. versionadded:: 3.12
+
+.. include:: gdal_cli_include/gdalg_raster_compatible_non_natively_streamable.rst
 
 
 Examples

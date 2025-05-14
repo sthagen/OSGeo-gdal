@@ -2870,6 +2870,9 @@ class CPL_DLL GDALAlgorithmRegistry
     /** Validation function to use for key=value type of arguments. */
     bool ParseAndValidateKeyValue(GDALAlgorithmArg &arg);
 
+    /** Method used by GDALRaster|VectorPipelineAlgorithm */
+    bool RunPreStepPipelineValidations() const;
+
     /** Return whether output-format or output arguments express GDALG output */
     bool IsGDALGOutput() const;
 
@@ -2891,6 +2894,15 @@ class CPL_DLL GDALAlgorithmRegistry
      * ensure the command is safe to execute in a streamed dataset context.
      */
     virtual bool CheckSafeForStreamOutput();
+
+    /** Validate a format argument */
+    bool ValidateFormat(const GDALAlgorithmArg &arg, bool bStreamAllowed,
+                        bool bGDALGAllowed) const;
+
+    /** Completion function for a format argument */
+    static std::vector<std::string>
+    FormatAutoCompleteFunction(const GDALAlgorithmArg &arg, bool bStreamAllowed,
+                               bool bGDALGAllowed);
 
     //! @cond Doxygen_Suppress
     void AddAliasFor(GDALInConstructionAlgorithmArg *arg,
@@ -2965,8 +2977,7 @@ class CPL_DLL GDALAlgorithmRegistry
                          std::vector<double>, std::vector<GDALArgDatasetValue>>>
             &inConstructionValues);
 
-    bool ValidateFormat(const GDALAlgorithmArg &arg, bool bStreamAllowed,
-                        bool bGDALGAllowed) const;
+    bool ValidateBandArg() const;
 
     virtual bool RunImpl(GDALProgressFunc pfnProgress, void *pProgressData) = 0;
 

@@ -9,6 +9,11 @@ add_library(
   gdalalg_clip_common.cpp
   gdalalg_convert.cpp
   gdalalg_info.cpp
+  gdalalg_dataset.cpp
+  gdalalg_dataset_identify.cpp
+  gdalalg_dataset_copy.cpp
+  gdalalg_dataset_rename.cpp
+  gdalalg_dataset_delete.cpp
   gdalalg_main.cpp
   gdalalg_mdim.cpp
   gdalalg_mdim_info.cpp
@@ -37,6 +42,7 @@ add_library(
   gdalalg_raster_overview_add.cpp
   gdalalg_raster_overview_delete.cpp
   gdalalg_raster_overview_refresh.cpp
+  gdalalg_raster_rgb_to_palette.cpp
   gdalalg_raster_read.cpp
   gdalalg_raster_reclassify.cpp
   gdalalg_raster_reproject.cpp

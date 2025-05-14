@@ -94,6 +94,7 @@ Raster commands
    gdal_raster_reclassify
    gdal_raster_reproject
    gdal_raster_resize
+   gdal_raster_rgb_to_palette
    gdal_raster_roughness
    gdal_raster_scale
    gdal_raster_select
@@ -131,6 +132,7 @@ Raster commands
     - :ref:`gdal_raster_pipeline`: Process a raster dataset
     - :ref:`gdal_raster_polygonize`: Create a polygon feature dataset from a raster band
     - :ref:`gdal_raster_pixel_info`: Return information on a pixel of a raster dataset
+    - :ref:`gdal_raster_rgb_to_palette`: Convert a RGB image into a pseudo-color / paletted image
     - :ref:`gdal_raster_reclassify`: Reclassify a raster dataset
     - :ref:`gdal_raster_reproject`: Reproject a raster dataset
     - :ref:`gdal_raster_resize`: Resize a raster dataset without changing the georeferenced extents
@@ -217,6 +219,27 @@ Multidimensional raster commands
     - :ref:`gdal_mdim`: Entry point for multidimensional commands
     - :ref:`gdal_mdim_info`: Get information on a multidimensional dataset
     - :ref:`gdal_mdim_convert`: Convert a multidimensional dataset
+
+Dataset management commands
++++++++++++++++++++++++++++
+
+.. toctree::
+   :maxdepth: 1
+   :hidden:
+
+   gdal_dataset
+   gdal_dataset_identify
+   gdal_dataset_copy
+   gdal_dataset_rename
+   gdal_dataset_delete
+
+.. only:: html
+
+    - :ref:`gdal_dataset`: Entry point for dataset management commands
+    - :ref:`gdal_dataset_identify`: Identify driver opening dataset(s)
+    - :ref:`gdal_dataset_copy`: Copy files of a dataset.
+    - :ref:`gdal_dataset_rename`: Rename files of a dataset.
+    - :ref:`gdal_dataset_delete`: Delete dataset(s)
 
 Virtual System Interface (VSI) commands
 +++++++++++++++++++++++++++++++++++++++
