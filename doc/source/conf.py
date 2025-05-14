@@ -366,6 +366,13 @@ man_pages = [
         1,
     ),
     (
+        "programs/gdal_raster_overview_refresh",
+        "gdal-raster-overview-refresh",
+        "Refresh overviews",
+        [author_evenr],
+        1,
+    ),
+    (
         "programs/gdal_raster_pipeline",
         "gdal-raster-pipeline",
         "Process a raster dataset",
@@ -384,6 +391,13 @@ man_pages = [
         "gdal-raster-pixel-info",
         "Return information on a pixel of a raster dataset",
         [author_evenr],
+        1,
+    ),
+    (
+        "programs/gdal_raster_proximity",
+        "gdal-raster-proximity",
+        "Produces a raster proximity map",
+        [author_elpaso],
         1,
     ),
     (
