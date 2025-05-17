@@ -1171,6 +1171,7 @@ class CPL_DLL VRTDerivedRasterBand CPL_NON_FINAL : public VRTSourcedRasterBand
     bool InitializePython();
     CPLErr
     GetPixelFunctionArguments(const CPLString &,
+                              const std::vector<int> &anMapBufferIdxToSourceIdx,
                               std::vector<std::pair<CPLString, CPLString>> &);
 
     CPL_DISALLOW_COPY_ASSIGN(VRTDerivedRasterBand)
@@ -1290,6 +1291,7 @@ class VRTDriver final : public GDALDriver
 {
     CPL_DISALLOW_COPY_ASSIGN(VRTDriver)
 
+    std::mutex m_oMutex{};
     std::map<std::string, VRTSourceParser> m_oMapSourceParser{};
 
   public:

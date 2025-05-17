@@ -45,7 +45,7 @@ General
     - :ref:`gdal_cli_from_python`: How to use ``gdal`` CLI algorithms from Python
     - :ref:`gdal_cli_gdalg`: .gdalg files to replay serialized ``gdal`` commands
 
-Commands working with raster of vector inputs
+Commands working with raster or vector inputs
 +++++++++++++++++++++++++++++++++++++++++++++
 
 .. toctree::
@@ -106,6 +106,7 @@ Raster commands
    gdal_raster_tpi
    gdal_raster_tri
    gdal_raster_unscale
+   gdal_raster_update
    gdal_raster_viewshed
 
 .. only:: html
@@ -147,6 +148,7 @@ Raster commands
     - :ref:`gdal_raster_tpi`: Generate a Topographic Position Index (TPI) map.
     - :ref:`gdal_raster_tri`: Generate a Terrain Ruggedness Index (TRI) map.
     - :ref:`gdal_raster_unscale`: Convert scaled values of a raster dataset into unscaled values.
+    - :ref:`gdal_raster_update`: Update the destination raster with the content of the input one.
     - :ref:`gdal_raster_viewshed`: Compute the viewshed of a raster dataset.
 
 Vector commands
@@ -172,6 +174,7 @@ Vector commands
    gdal_vector_geom_buffer
    gdal_vector_geom_swap_xy
    gdal_vector_grid
+   gdal_vector_layer_algebra
    gdal_vector_pipeline
    gdal_vector_rasterize
    gdal_vector_reproject
@@ -196,6 +199,7 @@ Vector commands
     - :ref:`gdal_vector_geom_buffer`: Compute a buffer around geometries of a vector dataset
     - :ref:`gdal_vector_geom_swap_xy`: Swap X and Y coordinates of geometries of a vector dataset
     - :ref:`gdal_vector_grid`: Create a regular grid from scattered points
+    - :ref:`gdal_vector_layer_algebra`: Perform algebraic operation between 2 layers.
     - :ref:`gdal_vector_convert`: Convert a vector dataset
     - :ref:`gdal_vector_pipeline`: Process a vector dataset
     - :ref:`gdal_vector_reproject`: Reproject a vector dataset

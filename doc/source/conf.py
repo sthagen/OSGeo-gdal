@@ -534,6 +534,13 @@ man_pages = [
         1,
     ),
     (
+        "programs/gdal_raster_update",
+        "gdal-raster-update",
+        "Update the destination raster with the content of the input one.",
+        [author_evenr],
+        1,
+    ),
+    (
         "programs/gdal_raster_viewshed",
         "gdal-raster-viewshed",
         "Compute the viewshed of a raster dataset.",
@@ -649,6 +656,13 @@ man_pages = [
         "programs/gdal_vector_grid",
         "gdal-vector-grid",
         "Create a regular grid from scattered points",
+        [author_evenr],
+        1,
+    ),
+    (
+        "programs/gdal_vector_layer_algebra",
+        "gdal-vector-layer-algebra",
+        "Perform algebraic operation between 2 layers",
         [author_evenr],
         1,
     ),

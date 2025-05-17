@@ -2628,6 +2628,7 @@ class CPL_DLL GDALAlgorithmRegistry
 
   protected:
     friend class GDALInConstructionAlgorithmArg;
+    friend class GDALRasterReprojectUtils;
 
     /** Selected sub-algorithm. Set by ParseCommandLineArguments() when
      * handling over on a sub-algorithm. */
@@ -2823,6 +2824,10 @@ class CPL_DLL GDALAlgorithmRegistry
     GDALInConstructionAlgorithmArg &
     AddLayerNameArg(std::vector<std::string> *pValue,
                     const char *helpMessage = nullptr);
+
+    /** Add geometry type argument */
+    GDALInConstructionAlgorithmArg &
+    AddGeometryTypeArg(std::string *pValue, const char *helpMessage = nullptr);
 
     /** Add (single) band argument. */
     GDALInConstructionAlgorithmArg &

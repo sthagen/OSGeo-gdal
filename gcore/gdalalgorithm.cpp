@@ -1453,7 +1453,15 @@ GDALAlgorithm::GDALAlgorithm(const std::string &name,
     AddArg("config", 0, _("Configuration option"), &m_dummyConfigOptions)
         .SetMetaVar("<KEY>=<VALUE>")
         .SetOnlyForCLI()
-        .SetCategory(GAAC_COMMON);
+        .SetCategory(GAAC_COMMON)
+        .AddAction(
+            [this]()
+            {
+                ReportError(
+                    CE_Warning, CPLE_AppDefined,
+                    "Configuration options passed with the 'config' argument "
+                    "are ignored");
+            });
 }
 
 /************************************************************************/
@@ -3778,6 +3786,52 @@ GDALAlgorithm::AddLayerNameArg(std::vector<std::string> *pValue,
 }
 
 /************************************************************************/
+/*                 GDALAlgorithm::AddGeometryTypeArg()                  */
+/************************************************************************/
+
+GDALInConstructionAlgorithmArg &
+GDALAlgorithm::AddGeometryTypeArg(std::string *pValue, const char *helpMessage)
+{
+    return AddArg("geometry-type", 0,
+                  MsgOrDefault(helpMessage, _("Geometry type")), pValue)
+        .SetAutoCompleteFunction(
+            [](const std::string &currentValue)
+            {
+                std::vector<std::string> oRet;
+                for (const char *type :
+                     {"GEOMETRY", "POINT", "LINESTRING", "POLYGON",
+                      "MULTIPOINT", "MULTILINESTRING", "MULTIPOLYGON",
+                      "GEOMETRYCOLLECTION", "CURVE", "CIRCULARSTRING",
+                      "COMPOUNDCURVE", "SURFACE", "CURVEPOLYGON", "MULTICURVE",
+                      "MULTISURFACE", "POLYHEDRALSURFACE", "TIN"})
+                {
+                    if (currentValue.empty() ||
+                        STARTS_WITH(type, currentValue.c_str()))
+                    {
+                        oRet.push_back(type);
+                        oRet.push_back(std::string(type).append("Z"));
+                        oRet.push_back(std::string(type).append("M"));
+                        oRet.push_back(std::string(type).append("ZM"));
+                    }
+                }
+                return oRet;
+            })
+        .AddValidationAction(
+            [this, pValue]()
+            {
+                if (wkbFlatten(OGRFromOGCGeomType(pValue->c_str())) ==
+                        wkbUnknown &&
+                    !STARTS_WITH_CI(pValue->c_str(), "GEOMETRY"))
+                {
+                    ReportError(CE_Failure, CPLE_AppDefined,
+                                "Invalid geometry type '%s'", pValue->c_str());
+                    return false;
+                }
+                return true;
+            });
+}
+
+/************************************************************************/
 /*                  GDALAlgorithm::ValidateBandArg()                    */
 /************************************************************************/
 
@@ -4422,13 +4476,6 @@ bool GDALAlgorithm::Run(GDALProgressFunc pfnProgress, void *pProgressData)
 
     if (!ValidateArguments())
         return false;
-
-    if (!m_dummyConfigOptions.empty())
-    {
-        ReportError(CE_Warning, CPLE_AppDefined,
-                    "Configuration options passed with the 'config' argument "
-                    "are ignored");
-    }
 
     switch (ProcessGDALGOutput())
     {

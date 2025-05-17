@@ -58,6 +58,7 @@ add_library(
   gdalalg_raster_tpi.cpp
   gdalalg_raster_tri.cpp
   gdalalg_raster_unscale.cpp
+  gdalalg_raster_update.cpp
   gdalalg_raster_viewshed.cpp
   gdalalg_raster_write.cpp
   gdalalg_vector.cpp
@@ -85,6 +86,7 @@ add_library(
   gdalalg_vector_grid_invdistnn.cpp
   gdalalg_vector_grid_linear.cpp
   gdalalg_vector_grid_nearest.cpp
+  gdalalg_vector_layer_algebra.cpp
   gdalalg_vector_output_abstract.cpp
   gdalalg_vector_reproject.cpp
   gdalalg_vector_select.cpp
