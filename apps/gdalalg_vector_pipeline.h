@@ -171,6 +171,7 @@ class GDALVectorPipelineOutputLayer /* non final */
 {
   protected:
     explicit GDALVectorPipelineOutputLayer(OGRLayer &oSrcLayer);
+    ~GDALVectorPipelineOutputLayer();
 
     DEFINE_GET_NEXT_FEATURE_THROUGH_RAW(GDALVectorPipelineOutputLayer)
 
@@ -190,7 +191,7 @@ class GDALVectorPipelineOutputLayer /* non final */
 /************************************************************************/
 
 /** Class that forwards GetNextFeature() calls to the source layer and
- * can be aded to GDALVectorPipelineOutputDataset::AddLayer()
+ * can be added to GDALVectorPipelineOutputDataset::AddLayer()
  */
 class GDALVectorPipelinePassthroughLayer /* non final */
     : public GDALVectorPipelineOutputLayer
@@ -220,6 +221,37 @@ class GDALVectorPipelinePassthroughLayer /* non final */
 };
 
 /************************************************************************/
+/*                 GDALVectorNonStreamingAlgorithmDataset               */
+/************************************************************************/
+
+class MEMDataset;
+
+/**
+ * Dataset used to read all input features into memory and perform some
+ * processing.
+ */
+class GDALVectorNonStreamingAlgorithmDataset /* non final */
+    : public GDALDataset
+{
+  public:
+    GDALVectorNonStreamingAlgorithmDataset();
+    ~GDALVectorNonStreamingAlgorithmDataset();
+
+    virtual bool Process(OGRLayer &srcLayer, OGRLayer &dstLayer) = 0;
+
+    bool AddProcessedLayer(OGRLayer &srcLayer);
+    void AddPassThroughLayer(OGRLayer &oLayer);
+    int GetLayerCount() final override;
+    OGRLayer *GetLayer(int idx) final override;
+    int TestCapability(const char *pszCap) override;
+
+  private:
+    std::vector<std::unique_ptr<OGRLayer>> m_passthrough_layers{};
+    std::vector<OGRLayer *> m_layers{};
+    std::unique_ptr<MEMDataset> m_ds{};
+};
+
+/************************************************************************/
 /*                 GDALVectorPipelineOutputDataset                      */
 /************************************************************************/
 
@@ -243,6 +275,7 @@ class GDALVectorPipelineOutputDataset final : public GDALDataset
 
   public:
     explicit GDALVectorPipelineOutputDataset(GDALDataset &oSrcDS);
+    ~GDALVectorPipelineOutputDataset();
 
     void AddLayer(OGRLayer &oSrcLayer,
                   std::unique_ptr<OGRLayerWithTranslateFeature> poNewLayer);
