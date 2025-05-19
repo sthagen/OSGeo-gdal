@@ -201,6 +201,30 @@ def test_vrtderived_4(tmp_vsimem):
 
 
 ###############################################################################
+# Check handling of pixel function without correct subclass
+
+
+@gdaltest.enable_exceptions()
+def test_vrt_pixelfn_wrong_subclass():
+
+    xml = """
+    <VRTDataset rasterXSize="20" rasterYSize="20">
+      <VRTRasterBand dataType="Byte" band="1">
+        <PixelFunctionType>inv</PixelFunctionType>
+        <SimpleSource>
+           <SourceFilename>data/byte.tif</SourceFilename>
+           <SourceBand>1</SourceBand>
+        </SimpleSource>
+      </VRTRasterBand>
+    </VRTDataset>"""
+
+    with pytest.raises(
+        RuntimeError, match="may only be used with subClass=VRTDerivedRasterBand"
+    ):
+        gdal.Open(xml)
+
+
+###############################################################################
 # Check Python derived function with BufferRadius=1
 
 
@@ -1456,3 +1480,81 @@ def test_vrt_pixelfn_reclassify_nan(tmp_vsimem):
         dst,
         np.array([[1, 2]]),
     )
+
+
+@pytest.mark.parametrize(
+    "pixelfn,values,nodata_value,pixelfn_args,expected",
+    [
+        ("dB", [7], 7, {}, 7),
+        ("diff", [3, 7], 7, {}, 7),
+        ("diff", [7, 3], 7, {}, 7),
+        ("div", [3, 7], 7, {}, 7),
+        ("div", [7, 3], 7, {}, 7),
+        ("exp", [7], 7, {}, 7),
+        ("interpolate_linear", [7, 10, 20, 7], 7, {"t0": 0, "dt": 10, "t": 5}, 7),
+        ("interpolate_linear", [7, 10, 20, 7], 7, {"t0": 0, "dt": 10, "t": -1}, 7),
+        ("interpolate_linear", [7, 10, 20, 7], 7, {"t0": 0, "dt": 10, "t": 10}, 10),
+        ("interpolate_linear", [7, 10, 20, 7], 7, {"t0": 0, "dt": 10, "t": 11}, 11),
+        ("interpolate_linear", [7, 10, 20, 7], 7, {"t0": 0, "dt": 10, "t": 20}, 20),
+        ("interpolate_exp", [7, 10, 20, 7], 7, {"t0": 0, "dt": 10, "t": 5}, 7),
+        ("interpolate_exp", [7, 10, 20, 7], 7, {"t0": 0, "dt": 10, "t": -1}, 7),
+        ("interpolate_exp", [7, 10, 20, 7], 7, {"t0": 0, "dt": 10, "t": 10}, 10),
+        ("interpolate_exp", [7, 10, 20, 7], 7, {"t0": 0, "dt": 10, "t": 11}, 10.717734),
+        ("interpolate_exp", [7, 10, 20, 7], 7, {"t0": 0, "dt": 10, "t": 20}, 20),
+        ("inv", [7], 7, {}, 7),
+        ("inv", [float("nan")], 7, {}, float("nan")),
+        ("inv", [float("nan")], float("nan"), {}, float("nan")),
+        ("log10", [7], 7, {}, 7),
+        ("max", [3, 7, 9], 7, {}, 9),
+        ("max", [3, 7, 9], 7, {"propagateNoData": True}, 7),
+        ("min", [3, 7, 9], 7, {}, 3),
+        ("min", [3, float("nan"), 9], 7, {}, 3),
+        ("min", [3, float("nan"), 9], 7, {"propagateNoData": True}, 7),  # should be 3?
+        ("min", [3, 7, 9], 7, {"propagateNoData": True}, 7),
+        ("mul", [3, 7, 9], 7, {}, 27),
+        ("mul", [3, 7, 9], 7, {"propagateNoData": True}, 7),
+        ("mul", [3, 7, float("nan")], 7, {}, float("nan")),
+        ("mul", [3, 7, float("nan")], 7, {"propagateNoData": True}, 7),
+        ("mul", [3, float("nan"), 9], float("nan"), {}, 27),
+        (
+            "mul",
+            [3, float("nan"), 9],
+            float("nan"),
+            {"propagateNoData": True},
+            float("nan"),
+        ),
+        ("norm_diff", [3, 7], 7, {}, 7),
+        ("norm_diff", [7, 3], 7, {}, 7),
+        ("pow", [7], 7, {"power": 10}, 7),
+        ("scale", [7], 7, {"scale": 5, "offset": 10}, 7),
+        ("sqrt", [7], 7, {}, 7),
+        ("sum", [3, 7, 9], 7, {}, 12),
+        ("sum", [3, 7, 9], 7, {"propagateNoData": True}, 7),
+    ],
+)
+def test_vrt_pixelfn_nodata(
+    tmp_vsimem, pixelfn, values, nodata_value, pixelfn_args, expected
+):
+
+    pytest.importorskip("numpy")
+    gdaltest.importorskip_gdal_array()
+
+    with gdal.GetDriverByName("GTiff").Create(
+        tmp_vsimem / "src.tif", 1, 1, len(values), gdal.GDT_Float32
+    ) as src:
+        for i in range(len(values)):
+            src.GetRasterBand(i + 1).Fill(values[i])
+
+    xml = f"""
+    <VRTDataset rasterXSize="2" rasterYSize="1">
+      <VRTRasterBand dataType="Float32" band="1" subclass="VRTDerivedRasterBand">
+        <NoDataValue>{nodata_value}</NoDataValue>
+        <PixelFunctionType>{pixelfn}</PixelFunctionType>
+        <PixelFunctionArguments {" ".join(f'{k}="{v}"' for k, v in pixelfn_args.items())} />
+        {"".join(f'<SimpleSource><SourceFilename>{tmp_vsimem / "src.tif"}</SourceFilename><SourceBand>{i + 1}</SourceBand></SimpleSource>' for i in range(len(values)))}
+      </VRTRasterBand>
+    </VRTDataset>"""
+
+    result = gdal.Open(xml).ReadAsArray()[0, 0]
+
+    assert result == pytest.approx(expected, nan_ok=True)
