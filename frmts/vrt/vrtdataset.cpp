@@ -229,6 +229,8 @@ const char *VRTDataset::GetMetadataItem(const char *pszName,
     {
         if (EQUAL(pszName, "MULTI_THREADED_RASTERIO_LAST_USED"))
             return m_bMultiThreadedRasterIOLastUsed ? "1" : "0";
+        else if (EQUAL(pszName, "CheckCompatibleForDatasetIO()"))
+            return CheckCompatibleForDatasetIO() ? "1" : "0";
     }
     return GDALDataset::GetMetadataItem(pszName, pszDomain);
 }
@@ -1714,11 +1716,9 @@ CPLErr VRTDataset::AddBand(GDALDataType eType, char **papszOptions)
     {
         const int nWordDataSize = GDALGetDataTypeSizeBytes(eType);
 
-        /* --------------------------------------------------------------------
-     */
-        /*      Collect required information. */
-        /* --------------------------------------------------------------------
-     */
+        /* ---------------------------------------------------------------- */
+        /*      Collect required information.                               */
+        /* ---------------------------------------------------------------- */
         const char *pszImageOffset =
             CSLFetchNameValueDef(papszOptions, "ImageOffset", "0");
         vsi_l_offset nImageOffset = CPLScanUIntBig(
@@ -1761,11 +1761,9 @@ CPLErr VRTDataset::AddBand(GDALDataType eType, char **papszOptions)
         const bool bRelativeToVRT =
             CPLFetchBool(papszOptions, "relativeToVRT", false);
 
-        /* --------------------------------------------------------------------
-     */
-        /*      Create and initialize the band. */
-        /* --------------------------------------------------------------------
-     */
+        /* --------------------------------------------------------------- */
+        /*      Create and initialize the band.                            */
+        /* --------------------------------------------------------------- */
 
         VRTRawRasterBand *poBand =
             new VRTRawRasterBand(this, GetRasterCount() + 1, eType);
@@ -1822,6 +1820,23 @@ CPLErr VRTDataset::AddBand(GDALDataType eType, char **papszOptions)
             if (pszLanguage != nullptr)
                 poDerivedBand->SetPixelFunctionLanguage(pszLanguage);
 
+            const char *pszSkipNonContributingSources =
+                CSLFetchNameValue(papszOptions, "SkipNonContributingSources");
+            if (pszSkipNonContributingSources != nullptr)
+            {
+                poDerivedBand->SetSkipNonContributingSources(
+                    CPLTestBool(pszSkipNonContributingSources));
+            }
+            for (const auto &[pszKey, pszValue] :
+                 cpl::IterateNameValue(static_cast<CSLConstList>(papszOptions)))
+            {
+                if (STARTS_WITH(pszKey, "_PIXELFN_ARG_"))
+                {
+                    poDerivedBand->AddPixelFunctionArgument(pszKey + 13,
+                                                            pszValue);
+                }
+            }
+
             const char *pszTransferTypeName =
                 CSLFetchNameValue(papszOptions, "SourceTransferType");
             if (pszTransferTypeName != nullptr)
@@ -1840,7 +1855,7 @@ CPLErr VRTDataset::AddBand(GDALDataType eType, char **papszOptions)
             }
 
             /* We're done with the derived band specific stuff, so */
-            /* we can assigned the base class pointer now. */
+            /* we can assign the base class pointer now. */
             poBand = poDerivedBand;
         }
         else
@@ -2134,6 +2149,7 @@ bool VRTDataset::CheckCompatibleForDatasetIO() const
 
     m_nCompatibleForDatasetIO = false;
 
+    GDALDataset *poFirstBandSourceDS = nullptr;
     for (int iBand = 0; iBand < nBands; iBand++)
     {
         auto poVRTBand = static_cast<VRTRasterBand *>(papoBands[iBand]);
@@ -2163,8 +2179,12 @@ bool VRTDataset::CheckCompatibleForDatasetIO() const
                     return false;
 
                 if (poSource->m_nBand != iBand + 1 ||
-                    poSource->m_bGetMaskBand || poSource->m_osSrcDSName.empty())
+                    poSource->m_bGetMaskBand ||
+                    (nSources > 1 && poSource->m_osSrcDSName.empty()))
                     return false;
+                if (nSources == 1 && poSource->m_osSrcDSName.empty())
+                    poFirstBandSourceDS =
+                        poSource->GetRasterBand()->GetDataset();
                 osResampling = poSource->GetResampling();
             }
         }
@@ -2187,12 +2207,19 @@ bool VRTDataset::CheckCompatibleForDatasetIO() const
                 if (poSource->GetType() != VRTSimpleSource::GetTypeStatic())
                     return false;
                 if (poSource->m_nBand != iBand + 1 ||
-                    poSource->m_bGetMaskBand || poSource->m_osSrcDSName.empty())
+                    poSource->m_bGetMaskBand ||
+                    (nSources > 1 && poSource->m_osSrcDSName.empty()))
                     return false;
                 if (!poSource->IsSameExceptBandNumber(poRefSource))
                     return false;
                 if (osResampling.compare(poSource->GetResampling()) != 0)
                     return false;
+                if (nSources == 1 && poSource->m_osSrcDSName.empty() &&
+                    poFirstBandSourceDS !=
+                        poSource->GetRasterBand()->GetDataset())
+                {
+                    return false;
+                }
             }
         }
     }

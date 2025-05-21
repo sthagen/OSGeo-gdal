@@ -66,19 +66,22 @@ void GDALVectorPipelineStepAlgorithm::AddInputArgs(bool hiddenForCLI)
         .AddMetadataItem(GAAMDI_REQUIRED_CAPABILITIES, {GDAL_DCAP_VECTOR})
         .SetHiddenForCLI(hiddenForCLI);
     AddOpenOptionsArg(&m_openOptions).SetHiddenForCLI(hiddenForCLI);
-    AddInputDatasetArg(&m_inputDataset, GDAL_OF_VECTOR,
-                       /* positionalAndRequired = */ !hiddenForCLI)
-        .SetMinCount(1)
-        .SetMaxCount((GetName() == GDALVectorPipelineAlgorithm::NAME ||
-                      GetName() == GDALVectorConcatAlgorithm::NAME)
-                         ? INT_MAX
-                         : 1)
-        .SetHiddenForCLI(hiddenForCLI);
+    auto &datasetArg =
+        AddInputDatasetArg(&m_inputDataset, GDAL_OF_VECTOR,
+                           /* positionalAndRequired = */ !hiddenForCLI)
+            .SetMinCount(1)
+            .SetMaxCount((GetName() == GDALVectorPipelineAlgorithm::NAME ||
+                          GetName() == GDALVectorConcatAlgorithm::NAME)
+                             ? INT_MAX
+                             : 1)
+            .SetHiddenForCLI(hiddenForCLI);
     if (GetName() != GDALVectorSQLAlgorithm::NAME)
     {
-        AddArg("input-layer", 'l', _("Input layer name(s)"), &m_inputLayerNames)
-            .AddAlias("layer")
-            .SetHiddenForCLI(hiddenForCLI);
+        auto &layerArg = AddArg("input-layer", 'l', _("Input layer name(s)"),
+                                &m_inputLayerNames)
+                             .AddAlias("layer")
+                             .SetHiddenForCLI(hiddenForCLI);
+        SetAutoCompleteFunctionForLayerName(layerArg, datasetArg);
     }
 }
 
@@ -102,22 +105,9 @@ void GDALVectorPipelineStepAlgorithm::AddOutputArgs(
     AddLayerCreationOptionsArg(&m_layerCreationOptions)
         .SetHiddenForCLI(hiddenForCLI);
     AddOverwriteArg(&m_overwrite).SetHiddenForCLI(hiddenForCLI);
-    auto &updateArg = AddUpdateArg(&m_update).SetHiddenForCLI(hiddenForCLI);
-    AddArg("overwrite-layer", 0,
-           _("Whether overwriting existing layer is allowed"),
-           &m_overwriteLayer)
-        .SetDefault(false)
-        .SetHiddenForCLI(hiddenForCLI)
-        .AddValidationAction(
-            [&updateArg]()
-            {
-                updateArg.Set(true);
-                return true;
-            });
-    AddAppendUpdateArg(&m_appendLayer,
-                       _("Whether appending to existing layer is allowed"))
-        .SetDefault(false)
-        .SetHiddenForCLI(hiddenForCLI);
+    AddUpdateArg(&m_update).SetHiddenForCLI(hiddenForCLI);
+    AddOverwriteLayerArg(&m_overwriteLayer).SetHiddenForCLI(hiddenForCLI);
+    AddAppendLayerArg(&m_appendLayer).SetHiddenForCLI(hiddenForCLI);
     if (GetName() != GDALVectorSQLAlgorithm::NAME &&
         GetName() != GDALVectorConcatAlgorithm::NAME)
     {
@@ -496,8 +486,27 @@ bool GDALVectorPipelineAlgorithm::ParseCommandLineArguments(
         steps.back().args.push_back("streamed_dataset");
     }
 
+    bool helpRequested = false;
+    if (IsCalledFromCommandLine())
+    {
+        for (auto &step : steps)
+            step.alg->SetCalledFromCommandLine();
+
+        for (const std::string &v : args)
+        {
+            if (cpl::ends_with(v, "=?"))
+                helpRequested = true;
+        }
+    }
+
     if (steps.size() < 2)
     {
+        if (!steps.empty() && helpRequested)
+        {
+            steps.back().alg->ParseCommandLineArguments(steps.back().args);
+            return false;
+        }
+
         ReportError(CE_Failure, CPLE_AppDefined,
                     "At least 2 steps must be provided");
         return false;
@@ -525,6 +534,11 @@ bool GDALVectorPipelineAlgorithm::ParseCommandLineArguments(
     }
     if (steps.back().alg->GetName() != GDALVectorWriteAlgorithm::NAME)
     {
+        if (helpRequested)
+        {
+            steps.back().alg->ParseCommandLineArguments(steps.back().args);
+            return false;
+        }
         ReportError(CE_Failure, CPLE_AppDefined, "Last step should be '%s'",
                     GDALVectorWriteAlgorithm::NAME);
         return false;

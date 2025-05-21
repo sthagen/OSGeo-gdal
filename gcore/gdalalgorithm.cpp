@@ -20,6 +20,7 @@
 
 #include "gdalalgorithm.h"
 #include "gdal_priv.h"
+#include "ogrsf_frmts.h"
 #include "ogr_spatialref.h"
 
 #include <algorithm>
@@ -39,8 +40,6 @@ constexpr const char *GDAL_ARG_NAME_INPUT_FORMAT = "input-format";
 constexpr const char *GDAL_ARG_NAME_OUTPUT_DATA_TYPE = "output-data-type";
 
 constexpr const char *GDAL_ARG_NAME_OPEN_OPTION = "open-option";
-
-constexpr const char *GDAL_ARG_NAME_APPEND_UPDATE = "append-update";
 
 constexpr const char *GDAL_ARG_NAME_BAND = "band";
 
@@ -823,6 +822,10 @@ std::string GDALAlgorithmArg::ValidateChoice(const std::string &value) const
         expected += choice;
         expected += '\'';
     }
+    if (m_owner && m_owner->IsCalledFromCommandLine() && value == "?")
+    {
+        return "?";
+    }
     CPLError(CE_Failure, CPLE_IllegalArg,
              "Invalid value '%s' for string argument '%s'. Should be "
              "one among %s.",
@@ -1353,6 +1356,9 @@ GDALInConstructionAlgorithmArg &GDALInConstructionAlgorithmArg::SetIsCRSArg(
             const std::string &osVal =
                 static_cast<const GDALInConstructionAlgorithmArg *>(this)
                     ->Get<std::string>();
+            if (osVal == "?" && m_owner && m_owner->IsCalledFromCommandLine())
+                return true;
+
             if ((!noneAllowed || (osVal != "none" && osVal != "null")) &&
                 std::find(specialValues.begin(), specialValues.end(), osVal) ==
                     specialValues.end())
@@ -1594,7 +1600,10 @@ bool GDALAlgorithm::ParseArgument(
         {
             const CPLStringList aosTokens(
                 arg->GetPackedValuesAllowed()
-                    ? CSLTokenizeString2(value.c_str(), ",", CSLT_HONOURSTRINGS)
+                    ? CSLTokenizeString2(
+                          value.c_str(), ",",
+                          CSLT_HONOURSTRINGS | CSLT_STRIPLEADSPACES |
+                              CSLT_STRIPENDSPACES | CSLT_ALLOWEMPTYTOKENS)
                     : CSLAddString(nullptr, value.c_str()));
             if (!cpl::contains(inConstructionValues, arg))
             {
@@ -1608,7 +1617,7 @@ bool GDALAlgorithm::ParseArgument(
                 char *endptr = nullptr;
                 const auto val = std::strtol(v, &endptr, 10);
                 if (errno == 0 && endptr && endptr == v + strlen(v) &&
-                    val >= INT_MIN && val <= INT_MAX)
+                    val >= INT_MIN && val <= INT_MAX && strlen(v) > 0)
                 {
                     valueVector.push_back(static_cast<int>(val));
                 }
@@ -1629,7 +1638,10 @@ bool GDALAlgorithm::ParseArgument(
         {
             const CPLStringList aosTokens(
                 arg->GetPackedValuesAllowed()
-                    ? CSLTokenizeString2(value.c_str(), ",", CSLT_HONOURSTRINGS)
+                    ? CSLTokenizeString2(
+                          value.c_str(), ",",
+                          CSLT_HONOURSTRINGS | CSLT_STRIPLEADSPACES |
+                              CSLT_STRIPENDSPACES | CSLT_ALLOWEMPTYTOKENS)
                     : CSLAddString(nullptr, value.c_str()));
             if (!cpl::contains(inConstructionValues, arg))
             {
@@ -1641,7 +1653,7 @@ bool GDALAlgorithm::ParseArgument(
             {
                 char *endptr = nullptr;
                 double dfValue = CPLStrtod(v, &endptr);
-                if (endptr != v + strlen(v))
+                if (strlen(v) == 0 || endptr != v + strlen(v))
                 {
                     ReportError(
                         CE_Failure, CPLE_IllegalArg,
@@ -1725,6 +1737,8 @@ bool GDALAlgorithm::ParseCommandLineArguments(
                     m_referencePath);
                 m_selectedSubAlg->m_executionForStreamOutput =
                     m_executionForStreamOutput;
+                m_selectedSubAlg->m_calledFromCommandLine =
+                    m_calledFromCommandLine;
                 bool bRet = m_selectedSubAlg->ParseCommandLineArguments(
                     std::vector<std::string>(args.begin() + 1, args.end()));
                 m_selectedSubAlg->PropagateSpecialActionTo(this);
@@ -1750,6 +1764,7 @@ bool GDALAlgorithm::ParseCommandLineArguments(
         inConstructionValues;
 
     std::vector<std::string> lArgs(args);
+    bool helpValueRequested = false;
     for (size_t i = 0; i < lArgs.size(); /* incremented in loop */)
     {
         const auto &strArg = lArgs[i];
@@ -1757,6 +1772,8 @@ bool GDALAlgorithm::ParseCommandLineArguments(
         std::string name;
         std::string value;
         bool hasValue = false;
+        if (m_calledFromCommandLine && cpl::ends_with(strArg, "=?"))
+            helpValueRequested = true;
         if (strArg.size() >= 2 && strArg[0] == '-' && strArg[1] == '-')
         {
             const auto equalPos = strArg.find('=');
@@ -2081,7 +2098,7 @@ bool GDALAlgorithm::ParseCommandLineArguments(
         ++iCurPosArg;
     }
     // Check if this positional argument is required.
-    if (iCurPosArg < m_positionalArgs.size() &&
+    if (iCurPosArg < m_positionalArgs.size() && !helpValueRequested &&
         (GDALAlgorithmArgTypeIsList(m_positionalArgs[iCurPosArg]->GetType())
              ? m_positionalArgs[iCurPosArg]->GetMinCount() > 0
              : m_positionalArgs[iCurPosArg]->IsRequired()))
@@ -2091,6 +2108,53 @@ bool GDALAlgorithm::ParseCommandLineArguments(
                     "specified.",
                     m_positionalArgs[iCurPosArg]->GetMetaVar().c_str());
         return false;
+    }
+
+    if (m_calledFromCommandLine)
+    {
+        for (auto &arg : m_args)
+        {
+            if (arg->IsExplicitlySet() &&
+                ((arg->GetType() == GAAT_STRING &&
+                  arg->Get<std::string>() == "?") ||
+                 (arg->GetType() == GAAT_STRING_LIST &&
+                  arg->Get<std::vector<std::string>>().size() == 1 &&
+                  arg->Get<std::vector<std::string>>()[0] == "?")))
+            {
+                {
+                    CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+                    ValidateArguments();
+                }
+
+                auto choices = arg->GetChoices();
+                if (choices.empty())
+                    choices = arg->GetAutoCompleteChoices(std::string());
+                if (!choices.empty())
+                {
+                    if (choices.size() == 1)
+                    {
+                        ReportError(
+                            CE_Failure, CPLE_AppDefined,
+                            "Single potential value for argument '%s' is '%s'",
+                            arg->GetName().c_str(), choices.front().c_str());
+                    }
+                    else
+                    {
+                        std::string msg("Potential values for argument '");
+                        msg += arg->GetName();
+                        msg += "' are:";
+                        for (const auto &v : choices)
+                        {
+                            msg += "\n- ";
+                            msg += v;
+                        }
+                        ReportError(CE_Failure, CPLE_AppDefined, "%s",
+                                    msg.c_str());
+                    }
+                    return false;
+                }
+            }
+        }
     }
 
     return m_skipValidationInParseCommandLine || ValidateArguments();
@@ -2126,15 +2190,8 @@ bool GDALAlgorithm::ProcessDatasetArg(GDALAlgorithmArg *arg,
     bool ret = true;
 
     const auto updateArg = algForOutput->GetArg(GDAL_ARG_NAME_UPDATE);
-    const auto appendUpdateArg =
-        algForOutput->GetArg(GDAL_ARG_NAME_APPEND_UPDATE);
     const bool hasUpdateArg = updateArg && updateArg->GetType() == GAAT_BOOLEAN;
-    const bool hasAppendUpdateArg =
-        appendUpdateArg && appendUpdateArg->GetType() == GAAT_BOOLEAN;
-    const bool appendUpdate =
-        hasAppendUpdateArg && appendUpdateArg->Get<bool>();
-    const bool update =
-        (hasUpdateArg && updateArg->Get<bool>()) || appendUpdate;
+    const bool update = hasUpdateArg && updateArg->Get<bool>();
     const auto overwriteArg = algForOutput->GetArg(GDAL_ARG_NAME_OVERWRITE);
     const bool overwrite =
         (arg->IsOutput() && overwriteArg &&
@@ -2288,7 +2345,7 @@ bool GDALAlgorithm::ProcessDatasetArg(GDALAlgorithmArg *arg,
         const bool hasAppendArg =
             appendArg && appendArg->GetType() == GAAT_BOOLEAN;
         const bool append = (hasAppendArg && appendArg->Get<bool>());
-        if (!append && !appendUpdate)
+        if (!append)
         {
             // If outputting to MEM, do not try to erase a real file of the same name!
             const auto outputFormatArg =
@@ -2312,7 +2369,7 @@ bool GDALAlgorithm::ProcessDatasetArg(GDALAlgorithmArg *arg,
                             "%s '%s' already exists. Specify the --overwrite "
                             "option to overwrite it%s.",
                             pszType, val.GetName().c_str(),
-                            hasAppendArg || hasAppendUpdateArg
+                            hasAppendArg
                                 ? " or the --append option to append to it"
                             : hasUpdateArg
                                 ? " or the --update option to update it"
@@ -3198,6 +3255,43 @@ GDALAlgorithm::AddOverwriteArg(bool *pValue, const char *helpMessage)
 }
 
 /************************************************************************/
+/*                GDALAlgorithm::AddOverwriteLayerArg()                 */
+/************************************************************************/
+
+GDALInConstructionAlgorithmArg &
+GDALAlgorithm::AddOverwriteLayerArg(bool *pValue, const char *helpMessage)
+{
+    AddValidationAction(
+        [this]
+        {
+            auto updateArg = GetArg(GDAL_ARG_NAME_UPDATE);
+            if (!(updateArg && updateArg->GetType() == GAAT_BOOLEAN))
+            {
+                ReportError(CE_Failure, CPLE_AppDefined,
+                            "--update argument must exist for "
+                            "--overwrite-layer, even if hidden");
+                return false;
+            }
+            return true;
+        });
+    return AddArg(GDAL_ARG_NAME_OVERWRITE_LAYER, 0,
+                  MsgOrDefault(
+                      helpMessage,
+                      _("Whether overwriting existing output is allowed")),
+                  pValue)
+        .SetDefault(false)
+        .AddAction(
+            [this]
+            {
+                auto updateArg = GetArg(GDAL_ARG_NAME_UPDATE);
+                if (updateArg && updateArg->GetType() == GAAT_BOOLEAN)
+                {
+                    updateArg->Set(true);
+                }
+            });
+}
+
+/************************************************************************/
 /*                 GDALAlgorithm::AddUpdateArg()                        */
 /************************************************************************/
 
@@ -3213,18 +3307,40 @@ GDALAlgorithm::AddUpdateArg(bool *pValue, const char *helpMessage)
 }
 
 /************************************************************************/
-/*                GDALAlgorithm::AddAppendUpdateArg()                   */
+/*                GDALAlgorithm::AddAppendLayerArg()                    */
 /************************************************************************/
 
 GDALInConstructionAlgorithmArg &
-GDALAlgorithm::AddAppendUpdateArg(bool *pValue, const char *helpMessage)
+GDALAlgorithm::AddAppendLayerArg(bool *pValue, const char *helpMessage)
 {
-    return AddArg("append", 0,
-                  MsgOrDefault(helpMessage,
-                               _("Whether to append to an existing dataset")),
+    AddValidationAction(
+        [this]
+        {
+            auto updateArg = GetArg(GDAL_ARG_NAME_UPDATE);
+            if (!(updateArg && updateArg->GetType() == GAAT_BOOLEAN))
+            {
+                ReportError(CE_Failure, CPLE_AppDefined,
+                            "--update argument must exist for --append, even "
+                            "if hidden");
+                return false;
+            }
+            return true;
+        });
+    return AddArg(GDAL_ARG_NAME_APPEND, 0,
+                  MsgOrDefault(
+                      helpMessage,
+                      _("Whether appending to existing layer is allowed")),
                   pValue)
-        .AddHiddenAlias(GDAL_ARG_NAME_APPEND_UPDATE)
-        .SetDefault(false);
+        .SetDefault(false)
+        .AddAction(
+            [this]
+            {
+                auto updateArg = GetArg(GDAL_ARG_NAME_UPDATE);
+                if (updateArg && updateArg->GetType() == GAAT_BOOLEAN)
+                {
+                    updateArg->Set(true);
+                }
+            });
 }
 
 /************************************************************************/
@@ -3829,6 +3945,58 @@ GDALAlgorithm::AddGeometryTypeArg(std::string *pValue, const char *helpMessage)
                 }
                 return true;
             });
+}
+
+/************************************************************************/
+/*          GDALAlgorithm::SetAutoCompleteFunctionForLayerName()        */
+/************************************************************************/
+
+/* static */
+void GDALAlgorithm::SetAutoCompleteFunctionForLayerName(
+    GDALInConstructionAlgorithmArg &layerArg,
+    GDALInConstructionAlgorithmArg &datasetArg)
+{
+    CPLAssert(datasetArg.GetType() == GAAT_DATASET ||
+              datasetArg.GetType() == GAAT_DATASET_LIST);
+
+    layerArg.SetAutoCompleteFunction(
+        [&datasetArg](const std::string &currentValue)
+        {
+            std::vector<std::string> ret;
+            CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+            GDALArgDatasetValue *dsVal = nullptr;
+            if (datasetArg.GetType() == GAAT_DATASET)
+            {
+                dsVal = &(datasetArg.Get<GDALArgDatasetValue>());
+            }
+            else
+            {
+                auto &val = datasetArg.Get<std::vector<GDALArgDatasetValue>>();
+                if (val.size() == 1)
+                {
+                    dsVal = &val[0];
+                }
+            }
+            if (dsVal && !dsVal->GetName().empty())
+            {
+                auto poDS = std::unique_ptr<GDALDataset>(GDALDataset::Open(
+                    dsVal->GetName().c_str(), GDAL_OF_VECTOR));
+                if (poDS)
+                {
+                    for (auto &&poLayer : poDS->GetLayers())
+                    {
+                        if (currentValue == poLayer->GetDescription())
+                        {
+                            ret.clear();
+                            ret.push_back(poLayer->GetDescription());
+                            break;
+                        }
+                        ret.push_back(poLayer->GetDescription());
+                    }
+                }
+            }
+            return ret;
+        });
 }
 
 /************************************************************************/
@@ -5412,11 +5580,17 @@ GDALAlgorithm::GetAutoComplete(std::vector<std::string> &args,
                 }
                 ret = arg->GetAutoCompleteChoices(value);
             }
-            if (ret.empty())
+            if (!ret.empty() && ret.back() == value)
+            {
+                ret.clear();
+            }
+            else if (ret.empty())
             {
                 ret.push_back("**");
-                ret.push_back(
-                    std::string("description: ").append(arg->GetDescription()));
+                // Non printable UTF-8 space, to avoid autocompletion to pickup on 'd'
+                ret.push_back(std::string("\xC2\xA0"
+                                          "description: ")
+                                  .append(arg->GetDescription()));
             }
         }
     }
@@ -5428,18 +5602,44 @@ GDALAlgorithm::GetAutoComplete(std::vector<std::string> &args,
         // Try filenames
         if (ret.empty() && !args.empty())
         {
-            auto arg = GetArg(GDAL_ARG_NAME_INPUT);
-            for (const char *name :
-                 {"dataset", "filename", "like", "source", "destination"})
+            {
+                CPLErrorStateBackuper oErrorQuieter(CPLQuietErrorHandler);
+                SetParseForAutoCompletion();
+                CPL_IGNORE_RET_VAL(ParseCommandLineArguments(args));
+            }
+
+            const std::string &lastArg = args.back();
+            GDALAlgorithmArg *arg = nullptr;
+            for (const char *name : {GDAL_ARG_NAME_INPUT, "dataset", "filename",
+                                     "like", "source", "destination"})
             {
                 if (!arg)
                 {
-                    arg = GetArg(name);
+                    auto newArg = GetArg(name);
+                    if (newArg)
+                    {
+                        if (!newArg->IsExplicitlySet())
+                        {
+                            arg = newArg;
+                        }
+                        else if (newArg->GetType() == GAAT_STRING ||
+                                 newArg->GetType() == GAAT_STRING_LIST ||
+                                 newArg->GetType() == GAAT_DATASET ||
+                                 newArg->GetType() == GAAT_DATASET_LIST)
+                        {
+                            VSIStatBufL sStat;
+                            if ((!lastArg.empty() && lastArg.back() == '/') ||
+                                VSIStatL(lastArg.c_str(), &sStat) != 0)
+                            {
+                                arg = newArg;
+                            }
+                        }
+                    }
                 }
             }
             if (arg)
             {
-                ret = arg->GetAutoCompleteChoices(args.back());
+                ret = arg->GetAutoCompleteChoices(lastArg);
             }
         }
     }
