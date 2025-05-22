@@ -73,6 +73,57 @@ class GDALRasterPipelineStepAlgorithm /* non final */ : public GDALAlgorithm
                                     const std::string &helpURL,
                                     bool standaloneStep);
 
+    struct ConstructorOptions
+    {
+        bool standaloneStep = false;
+        bool addDefaultArguments = true;
+        std::string inputDatasetHelpMsg{};
+        std::string inputDatasetAlias{};
+        std::string inputDatasetMetaVar = "INPUT";
+        std::string outputDatasetHelpMsg{};
+
+        inline ConstructorOptions &SetStandaloneStep(bool b)
+        {
+            standaloneStep = b;
+            return *this;
+        }
+
+        inline ConstructorOptions &SetAddDefaultArguments(bool b)
+        {
+            addDefaultArguments = b;
+            return *this;
+        }
+
+        inline ConstructorOptions &SetInputDatasetHelpMsg(const std::string &s)
+        {
+            inputDatasetHelpMsg = s;
+            return *this;
+        }
+
+        inline ConstructorOptions &SetInputDatasetAlias(const std::string &s)
+        {
+            inputDatasetAlias = s;
+            return *this;
+        }
+
+        inline ConstructorOptions &SetInputDatasetMetaVar(const std::string &s)
+        {
+            inputDatasetMetaVar = s;
+            return *this;
+        }
+
+        inline ConstructorOptions &SetOutputDatasetHelpMsg(const std::string &s)
+        {
+            outputDatasetHelpMsg = s;
+            return *this;
+        }
+    };
+
+    GDALRasterPipelineStepAlgorithm(const std::string &name,
+                                    const std::string &description,
+                                    const std::string &helpURL,
+                                    const ConstructorOptions &options);
+
     friend class GDALRasterPipelineAlgorithm;
     friend class GDALAbstractPipelineAlgorithm<GDALRasterPipelineStepAlgorithm>;
 
@@ -90,11 +141,13 @@ class GDALRasterPipelineStepAlgorithm /* non final */ : public GDALAlgorithm
 
     void AddInputArgs(bool openForMixedRasterVector, bool hiddenForCLI);
     void AddOutputArgs(bool hiddenForCLI);
+    void AddHiddenInputDatasetArg();
 
     void SetOutputVRTCompatible(bool b);
 
     bool m_outputVRTCompatible = true;
     bool m_standaloneStep = false;
+    const ConstructorOptions m_constructorOptions;
 
     // Input arguments
     GDALArgDatasetValue m_inputDataset{};

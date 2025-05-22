@@ -15,6 +15,7 @@
 #include "gdalalg_raster_aspect.h"
 #include "gdalalg_raster_clip.h"
 #include "gdalalg_raster_color_map.h"
+#include "gdalalg_raster_color_merge.h"
 #include "gdalalg_raster_edit.h"
 #include "gdalalg_raster_fill_nodata.h"
 #include "gdalalg_raster_hillshade.h"
@@ -58,24 +59,50 @@
 GDALRasterPipelineStepAlgorithm::GDALRasterPipelineStepAlgorithm(
     const std::string &name, const std::string &description,
     const std::string &helpURL, bool standaloneStep)
+    : GDALRasterPipelineStepAlgorithm(
+          name, description, helpURL,
+          ConstructorOptions().SetStandaloneStep(standaloneStep))
+{
+}
+
+/************************************************************************/
+/*  GDALRasterPipelineStepAlgorithm::GDALRasterPipelineStepAlgorithm()  */
+/************************************************************************/
+
+GDALRasterPipelineStepAlgorithm::GDALRasterPipelineStepAlgorithm(
+    const std::string &name, const std::string &description,
+    const std::string &helpURL, const ConstructorOptions &options)
     : GDALAlgorithm(name, description, helpURL),
-      m_standaloneStep(standaloneStep)
+      m_standaloneStep(options.standaloneStep), m_constructorOptions(options)
 {
     if (m_standaloneStep)
     {
         m_supportsStreamedOutput = true;
 
-        AddInputArgs(false, false);
-        AddProgressArg();
-        AddOutputArgs(false);
+        if (m_constructorOptions.addDefaultArguments)
+        {
+            AddInputArgs(false, false);
+            AddProgressArg();
+            AddOutputArgs(false);
+        }
     }
-    else if (name != GDALRasterPipelineAlgorithm::NAME &&
-             name != GDALRasterReadAlgorithm::NAME)
+    else if (m_constructorOptions.addDefaultArguments)
     {
-        AddInputDatasetArg(&m_inputDataset, GDAL_OF_RASTER,
-                           /* positionalAndRequired = */ false)
-            .SetHidden();
+        AddHiddenInputDatasetArg();
     }
+}
+
+/************************************************************************/
+/*       GDALRasterPipelineStepAlgorithm::AddHiddenInputDatasetArg()    */
+/************************************************************************/
+
+void GDALRasterPipelineStepAlgorithm::AddHiddenInputDatasetArg()
+{
+    // Added so that "band" argument validation works, because
+    // GDALAlgorithm must be able to retrieve the input dataset
+    AddInputDatasetArg(&m_inputDataset, GDAL_OF_RASTER,
+                       /* positionalAndRequired = */ false)
+        .SetHidden();
 }
 
 /************************************************************************/
@@ -93,12 +120,16 @@ void GDALRasterPipelineStepAlgorithm::AddInputArgs(
                 : std::vector<std::string>{GDAL_DCAP_RASTER})
         .SetHiddenForCLI(hiddenForCLI);
     AddOpenOptionsArg(&m_openOptions).SetHiddenForCLI(hiddenForCLI);
-    AddInputDatasetArg(&m_inputDataset,
-                       openForMixedRasterVector
-                           ? (GDAL_OF_RASTER | GDAL_OF_VECTOR)
-                           : GDAL_OF_RASTER,
-                       /* positionalAndRequired = */ !hiddenForCLI)
-        .SetHiddenForCLI(hiddenForCLI);
+    auto &arg = AddInputDatasetArg(
+                    &m_inputDataset,
+                    openForMixedRasterVector ? (GDAL_OF_RASTER | GDAL_OF_VECTOR)
+                                             : GDAL_OF_RASTER,
+                    /* positionalAndRequired = */ !hiddenForCLI,
+                    m_constructorOptions.inputDatasetHelpMsg.c_str())
+                    .SetMetaVar(m_constructorOptions.inputDatasetMetaVar)
+                    .SetHiddenForCLI(hiddenForCLI);
+    if (!m_constructorOptions.inputDatasetAlias.empty())
+        arg.AddAlias(m_constructorOptions.inputDatasetAlias);
 }
 
 /************************************************************************/
@@ -114,7 +145,8 @@ void GDALRasterPipelineStepAlgorithm::AddOutputArgs(bool hiddenForCLI)
                                {GDAL_DCAP_RASTER, GDAL_DCAP_CREATECOPY})
               .SetHiddenForCLI(hiddenForCLI));
     AddOutputDatasetArg(&m_outputDataset, GDAL_OF_RASTER,
-                        /* positionalAndRequired = */ !hiddenForCLI)
+                        /* positionalAndRequired = */ !hiddenForCLI,
+                        m_constructorOptions.outputDatasetHelpMsg.c_str())
         .SetHiddenForCLI(hiddenForCLI)
         .SetDatasetInputFlags(GADV_NAME | GADV_OBJECT);
     AddCreationOptionsArg(&m_creationOptions).SetHiddenForCLI(hiddenForCLI);
@@ -299,7 +331,7 @@ GDALRasterPipelineAlgorithm::GDALRasterPipelineAlgorithm(
     bool openForMixedRasterVector)
     : GDALAbstractPipelineAlgorithm<GDALRasterPipelineStepAlgorithm>(
           NAME, DESCRIPTION, HELP_URL,
-          /*standaloneStep=*/false)
+          ConstructorOptions().SetAddDefaultArguments(false))
 {
     m_supportsStreamedOutput = true;
 
@@ -315,6 +347,7 @@ GDALRasterPipelineAlgorithm::GDALRasterPipelineAlgorithm(
     m_stepRegistry.Register<GDALRasterAspectAlgorithm>();
     m_stepRegistry.Register<GDALRasterClipAlgorithm>();
     m_stepRegistry.Register<GDALRasterColorMapAlgorithm>();
+    m_stepRegistry.Register<GDALRasterColorMergeAlgorithm>();
     m_stepRegistry.Register<GDALRasterEditAlgorithm>();
     m_stepRegistry.Register<GDALRasterFillNodataAlgorithm>();
     m_stepRegistry.Register<GDALRasterHillshadeAlgorithm>();
@@ -386,6 +419,21 @@ bool GDALRasterPipelineAlgorithm::ParseCommandLineArguments(
         {
             m_progressBarRequested = true;
             continue;
+        }
+
+        if (IsCalledFromCommandLine() && (arg == "-h" || arg == "--help"))
+        {
+            if (!steps.back().alg)
+                steps.pop_back();
+            if (steps.empty())
+            {
+                return GDALAlgorithm::ParseCommandLineArguments(args);
+            }
+            else
+            {
+                m_stepOnWhichHelpIsRequested = std::move(steps.back().alg);
+                return true;
+            }
         }
 
         auto &curStep = steps.back();
@@ -686,10 +734,13 @@ std::string GDALRasterPipelineAlgorithm::GetUsageForCLI(
         if (name != GDALRasterReadAlgorithm::NAME &&
             name != GDALRasterWriteAlgorithm::NAME)
         {
-            ret += '\n';
             auto alg = GetStepAlg(name);
-            alg->SetCallPath({name});
-            ret += alg->GetUsageForCLI(shortUsage, stepUsageOptions);
+            if (!alg->IsHidden())
+            {
+                ret += '\n';
+                alg->SetCallPath({name});
+                ret += alg->GetUsageForCLI(shortUsage, stepUsageOptions);
+            }
         }
     }
     {

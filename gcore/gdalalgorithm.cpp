@@ -2354,6 +2354,8 @@ bool GDALAlgorithm::ProcessDatasetArg(GDALAlgorithmArg *arg,
                   outputFormatArg->GetType() == GAAT_STRING &&
                   (EQUAL(outputFormatArg->Get<std::string>().c_str(), "MEM") ||
                    EQUAL(outputFormatArg->Get<std::string>().c_str(),
+                         "stream") ||
+                   EQUAL(outputFormatArg->Get<std::string>().c_str(),
                          "Memory"))))
             {
                 const char *pszType = "";
@@ -2418,14 +2420,15 @@ bool GDALAlgorithm::ValidateArguments()
     if (m_specialActionRequested)
         return true;
 
-    // If only --output=format=MEM is specified and not --output,
+    // If only --output=format=MEM/stream is specified and not --output,
     // then set empty name for --output.
     auto outputArg = GetArg(GDAL_ARG_NAME_OUTPUT);
     auto outputFormatArg = GetArg(GDAL_ARG_NAME_OUTPUT_FORMAT);
     if (outputArg && outputFormatArg && outputFormatArg->IsExplicitlySet() &&
         !outputArg->IsExplicitlySet() &&
         outputFormatArg->GetType() == GAAT_STRING &&
-        EQUAL(outputFormatArg->Get<std::string>().c_str(), "MEM") &&
+        (EQUAL(outputFormatArg->Get<std::string>().c_str(), "MEM") ||
+         EQUAL(outputFormatArg->Get<std::string>().c_str(), "stream")) &&
         outputArg->GetType() == GAAT_DATASET &&
         (outputArg->GetDatasetInputFlags() & GADV_NAME))
     {
@@ -2986,7 +2989,7 @@ GDALAlgorithm::AddArg(const std::string &longName, char chShortName,
 inline const char *MsgOrDefault(const char *helpMessage,
                                 const char *defaultMessage)
 {
-    return helpMessage ? helpMessage : defaultMessage;
+    return helpMessage && helpMessage[0] ? helpMessage : defaultMessage;
 }
 
 /************************************************************************/
@@ -4635,6 +4638,8 @@ GDALInConstructionAlgorithmArg &GDALAlgorithm::AddProgressArg()
 
 bool GDALAlgorithm::Run(GDALProgressFunc pfnProgress, void *pProgressData)
 {
+    WarnIfDeprecated();
+
     if (m_selectedSubAlg)
     {
         if (m_calledFromCommandLine)
@@ -4847,7 +4852,7 @@ GDALAlgorithm::GetUsageForCLI(bool shortUsage,
         for (const auto &subAlgName : GetSubAlgorithmNames())
         {
             auto subAlg = InstantiateSubAlgorithm(subAlgName);
-            if (subAlg)
+            if (subAlg && !subAlg->IsHidden())
             {
                 const std::string &name(subAlg->GetName());
                 osRet += "  - ";
@@ -4875,8 +4880,8 @@ GDALAlgorithm::GetUsageForCLI(bool shortUsage,
                         osRet += ')';
                     }
                 }
+                osRet += '\n';
             }
-            osRet += '\n';
         }
 
         if (shortUsage && hasNonPositionals)
@@ -5252,7 +5257,7 @@ std::string GDALAlgorithm::GetUsageAsJSON() const
     for (const auto &subAlgName : GetSubAlgorithmNames())
     {
         auto subAlg = InstantiateSubAlgorithm(subAlgName);
-        if (subAlg && subAlg->m_displayInJSONUsage)
+        if (subAlg && subAlg->m_displayInJSONUsage && !subAlg->IsHidden())
         {
             CPLJSONDocument oSubDoc;
             CPL_IGNORE_RET_VAL(oSubDoc.LoadMemory(subAlg->GetUsageAsJSON()));
@@ -5497,6 +5502,8 @@ std::vector<std::string>
 GDALAlgorithm::GetAutoComplete(std::vector<std::string> &args,
                                bool lastWordIsComplete, bool showAllOptions)
 {
+    std::vector<std::string> ret;
+
     // Get inner-most algorithm
     std::unique_ptr<GDALAlgorithm> curAlgHolder;
     GDALAlgorithm *curAlg = this;
@@ -5516,7 +5523,14 @@ GDALAlgorithm::GetAutoComplete(std::vector<std::string> &args,
             }
             if (nCount >= 2)
             {
-                return curAlg->GetSubAlgorithmNames();
+                for (const std::string &subAlgName :
+                     curAlg->GetSubAlgorithmNames())
+                {
+                    subAlg = curAlg->InstantiateSubAlgorithm(subAlgName);
+                    if (subAlg && !subAlg->IsHidden())
+                        ret.push_back(subAlg->GetName());
+                }
+                return ret;
             }
         }
         showAllOptions = false;
@@ -5529,8 +5543,6 @@ GDALAlgorithm::GetAutoComplete(std::vector<std::string> &args,
         return curAlg->GetAutoComplete(args, lastWordIsComplete,
                                        /* showAllOptions = */ false);
     }
-
-    std::vector<std::string> ret;
 
     std::string option;
     std::string value;
@@ -5597,7 +5609,12 @@ GDALAlgorithm::GetAutoComplete(std::vector<std::string> &args,
     else
     {
         // List possible sub-algorithms
-        ret = GetSubAlgorithmNames();
+        for (const std::string &subAlgName : GetSubAlgorithmNames())
+        {
+            auto subAlg = InstantiateSubAlgorithm(subAlgName);
+            if (subAlg && !subAlg->IsHidden())
+                ret.push_back(subAlg->GetName());
+        }
 
         // Try filenames
         if (ret.empty() && !args.empty())

@@ -48,6 +48,14 @@ class GDALAbstractPipelineAlgorithm CPL_NON_FINAL : public StepAlgorithm
     {
     }
 
+    GDALAbstractPipelineAlgorithm(
+        const std::string &name, const std::string &description,
+        const std::string &helpURL,
+        const typename StepAlgorithm::ConstructorOptions &options)
+        : StepAlgorithm(name, description, helpURL, options)
+    {
+    }
+
     ~GDALAbstractPipelineAlgorithm() override
     {
         // Destroy steps in the reverse order they have been constructed,
@@ -69,6 +77,7 @@ class GDALAbstractPipelineAlgorithm CPL_NON_FINAL : public StepAlgorithm
 
     GDALAlgorithmRegistry m_stepRegistry{};
     std::vector<std::unique_ptr<StepAlgorithm>> m_steps{};
+    std::unique_ptr<StepAlgorithm> m_stepOnWhichHelpIsRequested{};
 
   private:
     bool RunStep(typename StepAlgorithm::StepRunContext &ctxt) override;
@@ -148,6 +157,14 @@ template <class StepAlgorithm>
 bool GDALAbstractPipelineAlgorithm<StepAlgorithm>::RunStep(
     typename StepAlgorithm::StepRunContext &ctxt)
 {
+    if (m_stepOnWhichHelpIsRequested)
+    {
+        printf(
+            "%s",
+            m_stepOnWhichHelpIsRequested->GetUsageForCLI(false).c_str()); /*ok*/
+        return true;
+    }
+
     if (m_steps.empty())
     {
         // If invoked programmatically, not from the command line.
@@ -463,9 +480,12 @@ std::string GDALAbstractPipelineAlgorithm<StepAlgorithm>::GetUsageAsJSON() const
     for (const std::string &name : m_stepRegistry.GetNames())
     {
         auto alg = GetStepAlg(name);
-        CPLJSONDocument oStepDoc;
-        CPL_IGNORE_RET_VAL(oStepDoc.LoadMemory(alg->GetUsageAsJSON()));
-        jPipelineSteps.Add(oStepDoc.GetRoot());
+        if (!alg->IsHidden())
+        {
+            CPLJSONDocument oStepDoc;
+            CPL_IGNORE_RET_VAL(oStepDoc.LoadMemory(alg->GetUsageAsJSON()));
+            jPipelineSteps.Add(oStepDoc.GetRoot());
+        }
     }
     oDoc.GetRoot().Add("pipeline_algorithms", jPipelineSteps);
 

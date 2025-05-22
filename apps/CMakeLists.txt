@@ -26,6 +26,7 @@ add_library(
   gdalalg_raster_clean_collar.cpp
   gdalalg_raster_clip.cpp
   gdalalg_raster_color_map.cpp
+  gdalalg_raster_color_merge.cpp
   gdalalg_raster_convert.cpp
   gdalalg_raster_create.cpp
   gdalalg_raster_edit.cpp
@@ -72,14 +73,14 @@ add_library(
   gdalalg_vector_read.cpp
   gdalalg_vector_filter.cpp
   gdalalg_vector_geom.cpp
-  gdalalg_vector_geom_set_type.cpp
-  gdalalg_vector_geom_explode_collections.cpp
-  gdalalg_vector_geom_make_valid.cpp
-  gdalalg_vector_geom_segmentize.cpp
-  gdalalg_vector_geom_simplify.cpp
-  gdalalg_vector_geom_simplify_coverage.cpp
-  gdalalg_vector_geom_buffer.cpp
-  gdalalg_vector_geom_swap_xy.cpp
+  gdalalg_vector_set_geom_type.cpp
+  gdalalg_vector_explode_collections.cpp
+  gdalalg_vector_make_valid.cpp
+  gdalalg_vector_segmentize.cpp
+  gdalalg_vector_simplify.cpp
+  gdalalg_vector_simplify_coverage.cpp
+  gdalalg_vector_buffer.cpp
+  gdalalg_vector_swap_xy.cpp
   gdalalg_vector_grid.cpp
   gdalalg_vector_grid_average.cpp
   gdalalg_vector_grid_data_metrics.cpp
