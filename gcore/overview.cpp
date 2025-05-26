@@ -5248,23 +5248,15 @@ CPLErr GDALRegenerateOverviewsMultiBand(
         !STARTS_WITH_CI(pszResampling, "NEAR") &&
         (bIsMask || (papoSrcBands[0]->GetMaskFlags() & GMF_ALL_VALID) == 0);
 
-    bool *const pabHasNoData =
-        static_cast<bool *>(VSI_MALLOC_VERBOSE(nBands * sizeof(bool)));
-    double *const padfNoDataValue =
-        static_cast<double *>(VSI_MALLOC_VERBOSE(nBands * sizeof(double)));
-    if (pabHasNoData == nullptr || padfNoDataValue == nullptr)
-    {
-        CPLFree(pabHasNoData);
-        CPLFree(padfNoDataValue);
-        return CE_Failure;
-    }
+    std::vector<bool> abHasNoData(nBands);
+    std::vector<double> adfNoDataValue(nBands);
 
     for (int iBand = 0; iBand < nBands; ++iBand)
     {
         int nHasNoData = 0;
-        padfNoDataValue[iBand] =
+        adfNoDataValue[iBand] =
             papoSrcBands[iBand]->GetNoDataValue(&nHasNoData);
-        pabHasNoData[iBand] = CPL_TO_BOOL(nHasNoData);
+        abHasNoData[iBand] = CPL_TO_BOOL(nHasNoData);
     }
     const bool bPropagateNoData =
         CPLTestBool(CPLGetConfigOption("GDAL_OVR_PROPAGATE_NODATA", "NO"));
@@ -5460,9 +5452,9 @@ CPLErr GDALRegenerateOverviewsMultiBand(
         {
             const auto nDTSize = GDALGetDataTypeSizeBytes(eDataType);
             const bool bTmpDSMemRequirementOverflow =
-                nDstHeight > INT_MAX / (nBands * nDTSize) ||
-                nDstWidth > std::numeric_limits<int64_t>::max() /
-                                (nDstHeight * nBands * nDTSize);
+                nDTSize * nBands >
+                std::numeric_limits<int64_t>::max() /
+                    (static_cast<int64_t>(nDstWidth) * nDstHeight);
             const auto nTmpDSMemRequirement =
                 bTmpDSMemRequirementOverflow
                     ? 0
@@ -5471,9 +5463,9 @@ CPLErr GDALRegenerateOverviewsMultiBand(
 
             // make sure that one band buffer doesn't overflow size_t
             const bool bChunkSizeOverflow =
-                nDstHeight > INT_MAX / nDTSize ||
-                size_t(nDstWidth) >
-                    std::numeric_limits<size_t>::max() / (nDstHeight * nDTSize);
+                static_cast<size_t>(nDTSize) >
+                std::numeric_limits<size_t>::max() /
+                    (static_cast<uint64_t>(nDstWidth) * nDstHeight);
             const size_t nChunkSize =
                 bChunkSizeOverflow
                     ? 0
@@ -5482,8 +5474,8 @@ CPLErr GDALRegenerateOverviewsMultiBand(
             const auto CreateVRT =
                 [nBands, nSrcWidth, nSrcHeight, nDstTotalWidth, nDstTotalHeight,
                  pszResampling, eWrkDataType, papoSrcBands, papapoOverviewBands,
-                 iSrcOverview, pabHasNoData,
-                 padfNoDataValue](int nVRTBlockXSize, int nVRTBlockYSize)
+                 iSrcOverview, &abHasNoData,
+                 &adfNoDataValue](int nVRTBlockXSize, int nVRTBlockYSize)
             {
                 auto poVRTDS = std::make_unique<VRTDataset>(
                     nDstTotalWidth, nDstTotalHeight, nVRTBlockXSize,
@@ -5505,8 +5497,8 @@ CPLErr GDALRegenerateOverviewsMultiBand(
                         nSrcHeight, 0, 0, nDstTotalWidth, nDstTotalHeight);
                     // Add the source to the band
                     poVRTBand->AddSource(poVRTSrc.release());
-                    if (pabHasNoData[iBand])
-                        poVRTBand->SetNoDataValue(padfNoDataValue[iBand]);
+                    if (abHasNoData[iBand])
+                        poVRTBand->SetNoDataValue(adfNoDataValue[iBand]);
                 }
 
                 if (papoSrcBands[0]->GetMaskFlags() == GMF_PER_DATASET &&
@@ -6091,8 +6083,8 @@ CPLErr GDALRegenerateOverviewsMultiBand(
                     poJob->args.nDstYOff = nDstYOff;
                     poJob->args.nDstYOff2 = nDstYOff + nDstYCount;
                     poJob->args.pszResampling = pszResampling;
-                    poJob->args.bHasNoData = pabHasNoData[iBand];
-                    poJob->args.dfNoDataValue = padfNoDataValue[iBand];
+                    poJob->args.bHasNoData = abHasNoData[iBand];
+                    poJob->args.dfNoDataValue = adfNoDataValue[iBand];
                     poJob->args.eSrcDataType = eDataType;
                     poJob->args.bPropagateNoData = bPropagateNoData;
 
@@ -6136,9 +6128,6 @@ CPLErr GDALRegenerateOverviewsMultiBand(
                 eErr = CE_Failure;
         }
     }
-
-    CPLFree(pabHasNoData);
-    CPLFree(padfNoDataValue);
 
     if (eErr == CE_None)
         pfnProgress(1.0, nullptr, pProgressData);
