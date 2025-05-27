@@ -43,6 +43,7 @@ add_library(
   gdalalg_raster_overview_add.cpp
   gdalalg_raster_overview_delete.cpp
   gdalalg_raster_overview_refresh.cpp
+  gdalalg_raster_pansharpen.cpp
   gdalalg_raster_rgb_to_palette.cpp
   gdalalg_raster_read.cpp
   gdalalg_raster_reclassify.cpp
@@ -88,6 +89,7 @@ add_library(
   gdalalg_vector_grid_invdistnn.cpp
   gdalalg_vector_grid_linear.cpp
   gdalalg_vector_grid_nearest.cpp
+  gdalalg_vector_index.cpp
   gdalalg_vector_layer_algebra.cpp
   gdalalg_vector_output_abstract.cpp
   gdalalg_vector_reproject.cpp

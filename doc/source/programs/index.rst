@@ -88,6 +88,7 @@ Raster commands
    gdal_raster_overview_add
    gdal_raster_overview_delete
    gdal_raster_overview_refresh
+   gdal_raster_pansharpen
    gdal_raster_pipeline
    gdal_raster_pixel_info
    gdal_raster_polygonize
@@ -133,6 +134,7 @@ Raster commands
     - :ref:`gdal_raster_overview_add`: Add overviews to a raster dataset
     - :ref:`gdal_raster_overview_delete`: Remove overviews of a raster dataset
     - :ref:`gdal_raster_overview_refresh`: Refresh overviews
+    - :ref:`gdal_raster_pansharpen`: Perform a pansharpen operation
     - :ref:`gdal_raster_pipeline`: Process a raster dataset
     - :ref:`gdal_raster_polygonize`: Create a polygon feature dataset from a raster band
     - :ref:`gdal_raster_pixel_info`: Return information on a pixel of a raster dataset
@@ -171,6 +173,7 @@ Vector commands
    gdal_vector_info
    gdal_vector_explode_collections
    gdal_vector_grid
+   gdal_vector_index
    gdal_vector_layer_algebra
    gdal_vector_make_valid
    gdal_vector_pipeline
@@ -196,6 +199,7 @@ Vector commands
     - :ref:`gdal_vector_filter`: Filter a vector dataset
     - :ref:`gdal_vector_grid`: Create a regular grid from scattered points
     - :ref:`gdal_vector_info`: Get information on a vector dataset
+    - :ref:`gdal_vector_index`: Create a vector index of vector datasets
     - :ref:`gdal_vector_layer_algebra`: Perform algebraic operation between 2 layers.
     - :ref:`gdal_vector_make_valid`: Fix validity of geometries of a vector dataset
     - :ref:`gdal_vector_pipeline`: Process a vector dataset

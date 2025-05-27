@@ -182,6 +182,14 @@ def test_gdal_completion(gdal_path):
     if gdal.GetDriverByName("HFA"):
         assert "HFA" in out
 
+    # Test that config options are taken into account
+    out = gdaltest.runexternal(
+        f"{gdal_path} completion gdal raster convert --config GDAL_SKIP=GTiff --of"
+    ).split(" ")
+    assert "GTiff" not in out
+    if gdal.GetDriverByName("HFA"):
+        assert "HFA" in out
+
     out = gdaltest.runexternal(
         f"{gdal_path} completion gdal raster convert --input"
     ).split(" ")
@@ -372,15 +380,23 @@ def test_gdal_completion_dst_crs(gdal_path):
 
 def test_gdal_completion_config(gdal_path):
 
-    out = gdaltest.runexternal(
+    out, err = gdaltest.runexternal_out_and_err(
         f"{gdal_path} completion gdal raster convert --config"
-    ).split(" ")
+    )
     assert "CPL_DEBUG=" in out
+    assert err == ""
 
-    out = gdaltest.runexternal(
+    out, err = gdaltest.runexternal_out_and_err(
         f"{gdal_path} completion gdal raster convert --config="
-    ).split(" ")
+    )
     assert "CPL_DEBUG=" in out
+    assert err == ""
+
+    out, err = gdaltest.runexternal_out_and_err(
+        f"{gdal_path} completion gdal raster convert --config CPL_"
+    )
+    assert "CPL_DEBUG=" in out
+    assert err == ""
 
     out = gdaltest.runexternal(
         f"{gdal_path} completion gdal raster convert --config FOO="

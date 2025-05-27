@@ -415,6 +415,13 @@ man_pages = [
         1,
     ),
     (
+        "programs/gdal_raster_pansharpen",
+        "gdal-raster-pansharpen",
+        "Perform a pansharpen operation",
+        [author_evenr],
+        1,
+    ),
+    (
         "programs/gdal_raster_pipeline",
         "gdal-raster-pipeline",
         "Process a raster dataset",
@@ -656,6 +663,13 @@ man_pages = [
         "programs/gdal_vector_grid",
         "gdal-vector-grid",
         "Create a regular grid from scattered points",
+        [author_evenr],
+        1,
+    ),
+    (
+        "programs/gdal_index_index",
+        "gdal-index-index",
+        "Create a vector index of index datasets",
         [author_evenr],
         1,
     ),
