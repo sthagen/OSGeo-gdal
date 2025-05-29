@@ -4562,9 +4562,13 @@ int OGRSQLiteDataSource::FetchSRSId(const OGRSpatialReference *poSRS)
                 {
                     std::unique_ptr<OGRSpatialReference,
                                     OGRSpatialReferenceReleaser>
-                        poCachedSRS(new OGRSpatialReference(oSRS));
-                    poCachedSRS->SetAxisMappingStrategy(
-                        OAMS_TRADITIONAL_GIS_ORDER);
+                        poCachedSRS;
+                    poCachedSRS.reset(oSRS.Clone());
+                    if (poCachedSRS)
+                    {
+                        poCachedSRS->SetAxisMappingStrategy(
+                            OAMS_TRADITIONAL_GIS_ORDER);
+                    }
                     AddSRIDToCache(nSRSId, std::move(poCachedSRS));
                 }
 
@@ -4664,9 +4668,9 @@ int OGRSQLiteDataSource::FetchSRSId(const OGRSpatialReference *poSRS)
 
         if (nSRSId != m_nUndefinedSRID)
         {
-            auto poSRSClone = std::unique_ptr<OGRSpatialReference,
-                                              OGRSpatialReferenceReleaser>(
-                new OGRSpatialReference(oSRS));
+            std::unique_ptr<OGRSpatialReference, OGRSpatialReferenceReleaser>
+                poSRSClone;
+            poSRSClone.reset(oSRS.Clone());
             AddSRIDToCache(nSRSId, std::move(poSRSClone));
         }
 
