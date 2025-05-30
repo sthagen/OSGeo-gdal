@@ -493,6 +493,12 @@ bool BAGRasterBand::Initialize(hid_t hDatasetIDIn, const char *pszName)
 
         H5Sget_simple_extent_dims(m_hDataspace, dims, maxdims);
 
+        if (dims[0] > INT_MAX || dims[1] > INT_MAX)
+        {
+            CPLError(CE_Failure, CPLE_NotSupported,
+                     "At least one dimension size exceeds INT_MAX !");
+            return false;
+        }
         nRasterXSize = static_cast<int>(dims[1]);
         nRasterYSize = static_cast<int>(dims[0]);
     }
@@ -5739,8 +5745,8 @@ bool BAGCreator::CreateElevationOrUncertainty(
                     H5Sclose(hMemSpace);
 
                     if (!pfnProgress(
-                            static_cast<double>(iY * nXBlocks + iX + 1) /
-                                (nXBlocks * nYBlocks),
+                            (static_cast<double>(iY) * nXBlocks + iX + 1) /
+                                (static_cast<double>(nXBlocks) * nYBlocks),
                             "", pProgressData))
                     {
                         ret = false;
