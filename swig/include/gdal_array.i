@@ -64,6 +64,7 @@ typedef void GDALRasterBandShadow;
 typedef void GDALDatasetShadow;
 typedef void GDALRasterAttributeTableShadow;
 #endif
+typedef void GDALComputedRasterBandShadow;
 
 // Declaration from memmultidim.h
 std::shared_ptr<GDALMDArray> CPL_DLL MEMGroupCreateMDArray(GDALGroup* poGroup,
@@ -2040,7 +2041,7 @@ PyObject* _RecordBatchAsNumpy(VoidPtrAsLong recordBatchPtr,
     }
     PyArrayObject* ar;
     int flags = (readonly) ? 0x1 : 0x1 | 0x0400;
-    int nDataTypeSize = GDALGetDataTypeSize(datatype) / 8;
+    int nDataTypeSize = GDALGetDataTypeSizeBytes(datatype);
     if( bAuto )
     {
         if( nBandCount == 1 )

@@ -67,7 +67,12 @@ typedef enum
     GDT_TypeCount = 17 /* maximum type # + 1 */
 } GDALDataType;
 
-int CPL_DLL CPL_STDCALL GDALGetDataTypeSize(GDALDataType);  // Deprecated.
+int CPL_DLL CPL_STDCALL GDALGetDataTypeSize(GDALDataType)
+    /*! @cond Doxygen_Suppress */
+    CPL_WARN_DEPRECATED("Use GDALGetDataTypeSizeBits() or "
+                        "GDALGetDataTypeSizeBytes() * 8 instead")
+    /*! @endcond */
+    ;
 int CPL_DLL CPL_STDCALL GDALGetDataTypeSizeBits(GDALDataType eDataType);
 int CPL_DLL CPL_STDCALL GDALGetDataTypeSizeBytes(GDALDataType);
 int CPL_DLL CPL_STDCALL GDALDataTypeIsComplex(GDALDataType);
@@ -994,6 +999,18 @@ typedef enum
     "UpdateRelationship" /**< Dataset capability for supporting                \
                             UpdateRelationship()*/
 
+/** Dataset capability if GDALDataset::GetExtent() is fast.
+ *
+ * @since 3.12
+ */
+#define GDsCFastGetExtent "FastGetExtent"
+
+/** Dataset capability if GDALDataset::GetExtentWGS84LongLat() is fast.
+ *
+ * @since 3.12
+ */
+#define GDsCFastGetExtentWGS84LongLat "FastGetExtentWGS84LongLat"
+
 void CPL_DLL CPL_STDCALL GDALAllRegister(void);
 void CPL_DLL GDALRegisterPlugins(void);
 CPLErr CPL_DLL GDALRegisterPlugin(const char *name);
@@ -1314,6 +1331,10 @@ CPLErr CPL_DLL CPL_STDCALL GDALSetProjection(GDALDatasetH, const char *);
 CPLErr CPL_DLL GDALSetSpatialRef(GDALDatasetH, OGRSpatialReferenceH);
 CPLErr CPL_DLL CPL_STDCALL GDALGetGeoTransform(GDALDatasetH, double *);
 CPLErr CPL_DLL CPL_STDCALL GDALSetGeoTransform(GDALDatasetH, double *);
+
+CPLErr CPL_DLL GDALGetExtent(GDALDatasetH, OGREnvelope *,
+                             OGRSpatialReferenceH hCRS);
+CPLErr CPL_DLL GDALGetExtentWGS84LongLat(GDALDatasetH, OGREnvelope *);
 
 CPLErr CPL_DLL GDALDatasetGeolocationToPixelLine(
     GDALDatasetH, double dfGeolocX, double dfGeolocY, OGRSpatialReferenceH hSRS,
@@ -1931,6 +1952,80 @@ int CPL_DLL CPL_STDCALL GDALGetDataCoverageStatus(GDALRasterBandH hBand,
                                                   int nXSize, int nYSize,
                                                   int nMaskFlagStop,
                                                   double *pdfDataPct);
+
+void CPL_DLL GDALComputedRasterBandRelease(GDALComputedRasterBandH hBand);
+
+GDALComputedRasterBandH CPL_DLL GDALRasterBandAddBand(
+    GDALRasterBandH hBand, GDALRasterBandH hOtherBand) CPL_WARN_UNUSED_RESULT;
+GDALComputedRasterBandH CPL_DLL GDALRasterBandAddDouble(
+    GDALRasterBandH hBand, double constant) CPL_WARN_UNUSED_RESULT;
+
+GDALComputedRasterBandH CPL_DLL GDALRasterBandSubBand(
+    GDALRasterBandH hBand, GDALRasterBandH hOtherBand) CPL_WARN_UNUSED_RESULT;
+GDALComputedRasterBandH CPL_DLL GDALRasterBandSubDouble(
+    GDALRasterBandH hBand, double constant) CPL_WARN_UNUSED_RESULT;
+GDALComputedRasterBandH CPL_DLL GDALRasterBandSubDoubleToBand(
+    double constant, GDALRasterBandH hBand) CPL_WARN_UNUSED_RESULT;
+
+GDALComputedRasterBandH CPL_DLL GDALRasterBandMulBand(
+    GDALRasterBandH hBand, GDALRasterBandH hOtherBand) CPL_WARN_UNUSED_RESULT;
+GDALComputedRasterBandH CPL_DLL GDALRasterBandMulDouble(
+    GDALRasterBandH hBand, double constant) CPL_WARN_UNUSED_RESULT;
+
+GDALComputedRasterBandH CPL_DLL GDALRasterBandDivBand(
+    GDALRasterBandH hBand, GDALRasterBandH hOtherBand) CPL_WARN_UNUSED_RESULT;
+GDALComputedRasterBandH CPL_DLL GDALRasterBandDivDouble(
+    GDALRasterBandH hBand, double constant) CPL_WARN_UNUSED_RESULT;
+GDALComputedRasterBandH CPL_DLL GDALRasterBandDivDoubleByBand(
+    double constant, GDALRasterBandH hBand) CPL_WARN_UNUSED_RESULT;
+
+GDALComputedRasterBandH CPL_DLL GDALRasterBandGreaterThanBand(
+    GDALRasterBandH hBand, GDALRasterBandH hOtherBand) CPL_WARN_UNUSED_RESULT;
+GDALComputedRasterBandH CPL_DLL GDALRasterBandGreaterThanDouble(
+    GDALRasterBandH hBand, double constant) CPL_WARN_UNUSED_RESULT;
+
+GDALComputedRasterBandH CPL_DLL GDALRasterBandGreaterOrEqualToBand(
+    GDALRasterBandH hBand, GDALRasterBandH hOtherBand) CPL_WARN_UNUSED_RESULT;
+GDALComputedRasterBandH CPL_DLL GDALRasterBandGreaterOrEqualToDouble(
+    GDALRasterBandH hBand, double constant) CPL_WARN_UNUSED_RESULT;
+
+GDALComputedRasterBandH CPL_DLL GDALRasterBandLesserThanBand(
+    GDALRasterBandH hBand, GDALRasterBandH hOtherBand) CPL_WARN_UNUSED_RESULT;
+GDALComputedRasterBandH CPL_DLL GDALRasterBandLesserThanDouble(
+    GDALRasterBandH hBand, double constant) CPL_WARN_UNUSED_RESULT;
+
+GDALComputedRasterBandH CPL_DLL GDALRasterBandLesserOrEqualToBand(
+    GDALRasterBandH hBand, GDALRasterBandH hOtherBand) CPL_WARN_UNUSED_RESULT;
+GDALComputedRasterBandH CPL_DLL GDALRasterBandLesserOrEqualToDouble(
+    GDALRasterBandH hBand, double constant) CPL_WARN_UNUSED_RESULT;
+
+GDALComputedRasterBandH CPL_DLL GDALRasterBandEqualToBand(
+    GDALRasterBandH hBand, GDALRasterBandH hOtherBand) CPL_WARN_UNUSED_RESULT;
+GDALComputedRasterBandH CPL_DLL GDALRasterBandEqualToDouble(
+    GDALRasterBandH hBand, double constant) CPL_WARN_UNUSED_RESULT;
+
+GDALComputedRasterBandH CPL_DLL GDALRasterBandNotEqualToBand(
+    GDALRasterBandH hBand, GDALRasterBandH hOtherBand) CPL_WARN_UNUSED_RESULT;
+GDALComputedRasterBandH CPL_DLL GDALRasterBandNotEqualToDouble(
+    GDALRasterBandH hBand, double constant) CPL_WARN_UNUSED_RESULT;
+
+GDALComputedRasterBandH CPL_DLL
+GDALRasterBandIfThenElse(GDALRasterBandH hCondBand, GDALRasterBandH hThenBand,
+                         GDALRasterBandH hElseBand) CPL_WARN_UNUSED_RESULT;
+
+GDALComputedRasterBandH CPL_DLL GDALRasterBandAsDataType(
+    GDALRasterBandH hBand, GDALDataType eDT) CPL_WARN_UNUSED_RESULT;
+
+GDALComputedRasterBandH CPL_DLL GDALMaximumOfNBands(
+    size_t nBandCount, GDALRasterBandH *pahBands) CPL_WARN_UNUSED_RESULT;
+GDALComputedRasterBandH CPL_DLL GDALRasterBandMaxConstant(
+    GDALRasterBandH hBand, double dfConstant) CPL_WARN_UNUSED_RESULT;
+GDALComputedRasterBandH CPL_DLL GDALMinimumOfNBands(
+    size_t nBandCount, GDALRasterBandH *pahBands) CPL_WARN_UNUSED_RESULT;
+GDALComputedRasterBandH CPL_DLL GDALRasterBandMinConstant(
+    GDALRasterBandH hBand, double dfConstant) CPL_WARN_UNUSED_RESULT;
+GDALComputedRasterBandH CPL_DLL GDALMeanOfNBands(
+    size_t nBandCount, GDALRasterBandH *pahBands) CPL_WARN_UNUSED_RESULT;
 
 /* ==================================================================== */
 /*     GDALAsyncReader                                                  */
