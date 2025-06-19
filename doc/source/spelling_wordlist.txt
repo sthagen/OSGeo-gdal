@@ -169,6 +169,7 @@ backporting
 Backporting
 backports
 backslashed
+backtick
 bak
 bAllowPromotingToCurves
 bAllowResizeOutptr
@@ -1371,6 +1372,8 @@ Hydrologic
 Hydrological
 hypercubes
 hyperspectral
+hypsometric
+Hypsometric
 iAxis
 iBand
 iChild
