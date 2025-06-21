@@ -19,6 +19,10 @@
 #include "cpl_vsi.h"
 #include "cpl_error.h"
 
+#if defined(__cplusplus) && !defined(CPL_SUPRESS_CPLUSPLUS)
+#include <cstdint>
+#endif
+
 /**
  * \file cpl_conv.h
  *
