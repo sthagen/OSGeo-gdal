@@ -46,6 +46,17 @@
         "colorInterpretation": {
           "type": "string"
         },
+        "noDataValue": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string",
+              "const": "NaN"
+            }
+          ]
+        },
         "type": {
           "enum": [
             "Byte",
@@ -55,11 +66,13 @@
             "UInt32",
             "Int32",
             "UInt64",
-            "Int32",
+            "Int64",
+            "Float16",
             "Float32",
             "Float64",
             "CInt16",
             "CInt32",
+            "CFloat16",
             "CFloat32",
             "CFloat64"
           ]
@@ -220,6 +233,9 @@
         },
         "cornerCoordinates": {
           "$ref": "#/definitions/cornerCoordinates"
+        },
+        "extent": {
+          "type": "object"
         },
         "wgs84Extent": {
           "$ref": "https://geojson.org/schema/Geometry.json"
