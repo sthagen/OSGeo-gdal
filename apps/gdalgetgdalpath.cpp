@@ -15,6 +15,8 @@
 #include "gdal.h"
 #include "gdalgetgdalpath.h"
 
+#include <cassert>
+
 /************************************************************************/
 /*                         GDALGetGDALPath()                            */
 /************************************************************************/
@@ -38,7 +40,7 @@ std::string GDALGetGDALPath()
 #endif
              })
         {
-            const std::string osPath =
+            std::string osPath =
                 CPLFormFilenameSafe(pszGDAL_PATH, pszProgramName, nullptr);
             if (VSIStatL(osPath.c_str(), &sStat) == 0)
                 return osPath;
@@ -83,7 +85,7 @@ std::string GDALGetGDALPath()
                     if (VSIStatL(osBinFilename.c_str(), &sStat) == 0)
                     {
                         // Case if pszLibName=/usr/lib/libgdal.so.xxx
-                        osPath = osBinFilename;
+                        osPath = std::move(osBinFilename);
                     }
                     else
                     {
@@ -96,7 +98,7 @@ std::string GDALGetGDALPath()
                         if (VSIStatL(osBinFilename.c_str(), &sStat) == 0)
                         {
                             // Case if pszLibName=/usr/lib/yyyyy/libgdal.so.xxx
-                            osPath = osBinFilename;
+                            osPath = std::move(osBinFilename);
                         }
                         else
                         {
@@ -105,7 +107,7 @@ std::string GDALGetGDALPath()
                             if (VSIStatL(osBinFilename.c_str(), &sStat) == 0)
                             {
                                 // Case if pszLibName=/path/to/build_dir/libgdal.so.xxx
-                                osPath = osBinFilename;
+                                osPath = std::move(osBinFilename);
                             }
                         }
                     }
@@ -137,21 +139,21 @@ std::string GDALGetGDALPath()
     CPLAssert(fpOut);
     CPLSpawn(apszArgv, nullptr, fpOut.get(), /* bDisplayErr = */ false);
     const auto nPos = fpOut->Tell();
-    char szVersion[128] = {0};
-    if (nPos > 0 && nPos < sizeof(szVersion))
+    std::string osVersion;
+    osVersion.resize(128);
+    if (nPos > 0 && nPos < osVersion.size())
     {
-        size_t nVersionSize = static_cast<size_t>(nPos);
+        osVersion.resize(static_cast<size_t>(nPos));
         fpOut->Seek(0, SEEK_SET);
-        fpOut->Read(szVersion, 1, nVersionSize);
+        fpOut->Read(osVersion.data(), 1, osVersion.size());
         for (const char ch : {'\n', '\r'})
         {
-            if (szVersion[nVersionSize - 1] == ch)
+            if (!osVersion.empty() && osVersion.back() == ch)
             {
-                szVersion[nVersionSize - 1] = 0;
-                --nVersionSize;
+                osVersion.pop_back();
             }
         }
-        if (strcmp(szVersion, GDALVersionInfo("")) == 0)
+        if (osVersion == GDALVersionInfo(""))
         {
             return osPath;
         }
@@ -162,7 +164,7 @@ std::string GDALGetGDALPath()
                      "expected. Make sure the gdal binary corresponding "
                      "to the version of the libgdal of the current "
                      "process is in the PATH environment variable",
-                     osPath.c_str(), szVersion, GDALVersionInfo(""));
+                     osPath.c_str(), osVersion.c_str(), GDALVersionInfo(""));
         }
     }
     else
