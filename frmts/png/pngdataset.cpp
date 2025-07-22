@@ -226,7 +226,7 @@ CPLErr PNGRasterBand::IReadBlock(int nBlockXOff, int nBlockYOff, void *pImage)
 GDALColorInterp PNGRasterBand::GetColorInterpretation()
 
 {
-    PNGDataset *poGDS = reinterpret_cast<PNGDataset *>(poDS);
+    PNGDataset *poGDS = cpl::down_cast<PNGDataset *>(poDS);
 
     if (poGDS->nColorType == PNG_COLOR_TYPE_GRAY)
         return GCI_GrayIndex;
@@ -265,7 +265,7 @@ GDALColorInterp PNGRasterBand::GetColorInterpretation()
 GDALColorTable *PNGRasterBand::GetColorTable()
 
 {
-    PNGDataset *poGDS = reinterpret_cast<PNGDataset *>(poDS);
+    PNGDataset *poGDS = cpl::down_cast<PNGDataset *>(poDS);
 
     if (nBand == 1)
         return poGDS->poColorTable;
@@ -1386,7 +1386,7 @@ CPLErr PNGDataset::LoadInterlacedChunk(int iLine)
 
     if (pabyBuffer == nullptr)
     {
-        pabyBuffer = reinterpret_cast<GByte *>(VSI_MALLOC3_VERBOSE(
+        pabyBuffer = static_cast<GByte *>(VSI_MALLOC3_VERBOSE(
             nPixelOffset, GetRasterXSize(), nMaxChunkLines));
 
         if (pabyBuffer == nullptr)
@@ -1993,6 +1993,32 @@ GDALDataset *PNGDataset::OpenStage2(GDALOpenInfo *poOpenInfo, PNGDataset *&poDS)
         }
     }
 
+    png_color_16 *backgroundColor = nullptr;
+    if (png_get_bKGD(poDS->hPNG, poDS->psPNGInfo, &backgroundColor) ==
+            PNG_INFO_bKGD &&
+        backgroundColor)
+    {
+        if (poDS->nColorType == PNG_COLOR_TYPE_GRAY ||
+            poDS->nColorType == PNG_COLOR_TYPE_GRAY_ALPHA)
+        {
+            poDS->SetMetadataItem("BACKGROUND_COLOR",
+                                  CPLSPrintf("%d", backgroundColor->gray));
+        }
+        else if (poDS->nColorType == PNG_COLOR_TYPE_PALETTE)
+        {
+            poDS->SetMetadataItem("BACKGROUND_COLOR",
+                                  CPLSPrintf("%d", backgroundColor->index));
+        }
+        else if (poDS->nColorType == PNG_COLOR_TYPE_RGB ||
+                 poDS->nColorType == PNG_COLOR_TYPE_RGB_ALPHA)
+        {
+            poDS->SetMetadataItem("BACKGROUND_COLOR",
+                                  CPLSPrintf("%d,%d,%d", backgroundColor->red,
+                                             backgroundColor->green,
+                                             backgroundColor->blue));
+        }
+    }
+
     // Extract any text chunks as "metadata."
     poDS->CollectMetadata();
 
@@ -2141,6 +2167,18 @@ static bool safe_png_set_tRNS(jmp_buf sSetJmpContext, png_structp png_ptr,
         return false;
     }
     png_set_tRNS(png_ptr, info_ptr, trans, num_trans, trans_values);
+    return true;
+}
+
+static bool safe_png_set_bKGD(jmp_buf sSetJmpContext, png_structp png_ptr,
+                              png_infop info_ptr,
+                              png_const_color_16p background)
+{
+    if (setjmp(sSetJmpContext) != 0)
+    {
+        return false;
+    }
+    png_set_bKGD(png_ptr, info_ptr, background);
     return true;
 }
 
@@ -2434,6 +2472,51 @@ GDALDataset *PNGDataset::CreateCopy(const char *pszFilename,
         }
     }
 
+    if (const char *pszBackgroundColor =
+            poSrcDS->GetMetadataItem("BACKGROUND_COLOR"))
+    {
+        bool ret_set_bKGD = true;
+        png_color_16 backgroundColor = {0, 0, 0, 0, 0};
+        if (nColorType == PNG_COLOR_TYPE_GRAY ||
+            nColorType == PNG_COLOR_TYPE_GRAY_ALPHA)
+        {
+            backgroundColor.gray =
+                static_cast<png_uint_16>(atoi(pszBackgroundColor));
+            ret_set_bKGD = safe_png_set_bKGD(sSetJmpContext, hPNG, psPNGInfo,
+                                             &backgroundColor);
+        }
+        else if (nColorType == PNG_COLOR_TYPE_PALETTE)
+        {
+            backgroundColor.index =
+                static_cast<png_byte>(atoi(pszBackgroundColor));
+            ret_set_bKGD = safe_png_set_bKGD(sSetJmpContext, hPNG, psPNGInfo,
+                                             &backgroundColor);
+        }
+        else if (nColorType == PNG_COLOR_TYPE_RGB ||
+                 nColorType == PNG_COLOR_TYPE_RGB_ALPHA)
+        {
+            const CPLStringList aosTokens(
+                CSLTokenizeString2(pszBackgroundColor, " ,", 3));
+            if (aosTokens.size() == 3)
+            {
+                backgroundColor.red =
+                    static_cast<png_uint_16>(atoi(aosTokens[0]));
+                backgroundColor.green =
+                    static_cast<png_uint_16>(atoi(aosTokens[1]));
+                backgroundColor.blue =
+                    static_cast<png_uint_16>(atoi(aosTokens[2]));
+                ret_set_bKGD = safe_png_set_bKGD(sSetJmpContext, hPNG,
+                                                 psPNGInfo, &backgroundColor);
+            }
+        }
+        if (!ret_set_bKGD)
+        {
+            VSIFCloseL(fpImage);
+            png_destroy_write_struct(&hPNG, &psPNGInfo);
+            return nullptr;
+        }
+    }
+
     // Copy color profile data.
     const char *pszICCProfile =
         CSLFetchNameValue(papszOptions, "SOURCE_ICC_PROFILE");
@@ -2627,7 +2710,7 @@ GDALDataset *PNGDataset::CreateCopy(const char *pszFilename,
         if (bFoundTrans || bHaveNoData)
         {
             unsigned char *pabyAlpha =
-                reinterpret_cast<unsigned char *>(CPLMalloc(nEntryCount));
+                static_cast<unsigned char *>(CPLMalloc(nEntryCount));
 
             for (int iColor = 0; iColor < nEntryCount; iColor++)
             {
@@ -2777,7 +2860,7 @@ GDALDataset *PNGDataset::CreateCopy(const char *pszFilename,
         CPLPushErrorHandler(CPLQuietErrorHandler);
         GDALOpenInfo oOpenInfo(pszFilename, GA_ReadOnly);
         PNGDataset *poDS =
-            reinterpret_cast<PNGDataset *>(PNGDataset::Open(&oOpenInfo));
+            cpl::down_cast<PNGDataset *>(PNGDataset::Open(&oOpenInfo));
         CPLPopErrorHandler();
         if (poDS)
         {
@@ -2905,7 +2988,7 @@ void GDALRegister_PNG()
 
 CPLErr PNGRasterBand::IWriteBlock(int x, int y, void *pvData)
 {
-    PNGDataset &ds = *reinterpret_cast<PNGDataset *>(poDS);
+    PNGDataset &ds = *cpl::down_cast<PNGDataset *>(poDS);
 
     // Write the block (or consolidate into multichannel block) and then write.
 
@@ -2985,7 +3068,7 @@ CPLErr PNGRasterBand::SetColorTable(GDALColorTable *poCT)
             if (err != CE_None)
                 return err;
 
-            PNGDataset &ds = *reinterpret_cast<PNGDataset *>(poDS);
+            PNGDataset &ds = *cpl::down_cast<PNGDataset *>(poDS);
             ds.m_nColorType = PNG_COLOR_TYPE_PALETTE;
             break;
             // band::IWriteBlock will emit color table as part of the header
