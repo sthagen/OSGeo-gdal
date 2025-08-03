@@ -112,7 +112,7 @@ class GDALVectorSimplifyCoverageOutputDataset
             features.push_back(std::move(feature));
         }
 
-        // Perform coverage simplifciation
+        // Perform coverage simplification
         GEOSGeometry *coll = GEOSGeom_createCollection_r(
             m_poGeosContext, GEOS_GEOMETRYCOLLECTION, geoms.data(),
             static_cast<unsigned int>(geoms.size()));
