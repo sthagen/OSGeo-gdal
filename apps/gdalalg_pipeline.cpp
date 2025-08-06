@@ -136,6 +136,7 @@ void GDALPipelineStepAlgorithm::AddVectorInputArgs(bool hiddenForCLI)
                            /* positionalAndRequired = */ !hiddenForCLI)
             .SetMinCount(1)
             .SetMaxCount(m_constructorOptions.inputDatasetMaxCount)
+            .SetAutoOpenDataset(m_constructorOptions.autoOpenInputDatasets)
             .SetHiddenForCLI(hiddenForCLI);
     if (m_constructorOptions.addInputLayerNameArgument)
     {
@@ -388,7 +389,8 @@ class GDALPipelineAlgorithm final
 {
   public:
     static constexpr const char *NAME = "pipeline";
-    static constexpr const char *DESCRIPTION = "Execute a pipeline.";
+    static constexpr const char *DESCRIPTION =
+        "Process a dataset applying several steps.";
     static constexpr const char *HELP_URL = "/programs/gdal_pipeline.html";
 
     GDALPipelineAlgorithm()

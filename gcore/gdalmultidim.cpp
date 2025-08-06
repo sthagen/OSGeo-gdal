@@ -9276,8 +9276,8 @@ GDALDatasetFromArray *GDALDatasetFromArray::Create(
                  "can be exposed as classic GDALDataset");
         return nullptr;
     }
-    if (iXDim >= nDimCount ||
-        (nDimCount >= 2 && (iYDim >= nDimCount || iXDim == iYDim)))
+    if (iXDim >= nDimCount || iYDim >= nDimCount ||
+        (nDimCount >= 2 && iXDim == iYDim))
     {
         CPLError(CE_Failure, CPLE_NotSupported, "Invalid iXDim and/or iYDim");
         return nullptr;
@@ -10550,6 +10550,13 @@ GDALExtendedDataType::GDALExtendedDataType(
 /*                        GDALExtendedDataType()                        */
 /************************************************************************/
 
+/** Move constructor. */
+GDALExtendedDataType::GDALExtendedDataType(GDALExtendedDataType &&) = default;
+
+/************************************************************************/
+/*                        GDALExtendedDataType()                        */
+/************************************************************************/
+
 /** Copy constructor. */
 GDALExtendedDataType::GDALExtendedDataType(const GDALExtendedDataType &other)
     : m_osName(other.m_osName), m_eClass(other.m_eClass),
@@ -10601,22 +10608,7 @@ GDALExtendedDataType::operator=(const GDALExtendedDataType &other)
 
 /** Move assignment. */
 GDALExtendedDataType &
-GDALExtendedDataType::operator=(GDALExtendedDataType &&other)
-{
-    m_osName = std::move(other.m_osName);
-    m_eClass = other.m_eClass;
-    m_eSubType = other.m_eSubType;
-    m_eNumericDT = other.m_eNumericDT;
-    m_nSize = other.m_nSize;
-    m_nMaxStringLength = other.m_nMaxStringLength;
-    m_aoComponents = std::move(other.m_aoComponents);
-    m_poRAT = std::move(other.m_poRAT);
-    other.m_eClass = GEDTC_NUMERIC;
-    other.m_eNumericDT = GDT_Unknown;
-    other.m_nSize = 0;
-    other.m_nMaxStringLength = 0;
-    return *this;
-}
+GDALExtendedDataType::operator=(GDALExtendedDataType &&other) = default;
 
 /************************************************************************/
 /*                           Create()                                   */
