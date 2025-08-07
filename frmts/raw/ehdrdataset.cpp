@@ -1513,16 +1513,7 @@ GDALDataset *EHdrDataset::Open(GDALOpenInfo *poOpenInfo, bool bFileSizeCheck)
             if (utmZone >= 1 && utmZone <= 60 && bUTM && bWGS84 &&
                 (bNorth || bSouth))
             {
-                char projCSStr[64] = {'\0'};
-                snprintf(projCSStr, sizeof(projCSStr), "WGS 84 / UTM zone %d%c",
-                         utmZone, (bNorth) ? 'N' : 'S');
-
-                poDS->m_oSRS.SetProjCS(projCSStr);
-                poDS->m_oSRS.SetWellKnownGeogCS("WGS84");
-                poDS->m_oSRS.SetUTM(utmZone, bNorth);
-                poDS->m_oSRS.SetAuthority("PROJCS", "EPSG",
-                                          (bNorth ? 32600 : 32700) + utmZone);
-                poDS->m_oSRS.AutoIdentifyEPSG();
+                poDS->m_oSRS.importFromEPSG((bNorth ? 32600 : 32700) + utmZone);
             }
             else
             {
@@ -1580,9 +1571,12 @@ GDALDataset *EHdrDataset::Open(GDALOpenInfo *poOpenInfo, bool bFileSizeCheck)
                 if (nIndex >= 0 && nIndex < 65536)
                 {
                     const GDALColorEntry oEntry = {
-                        static_cast<short>(atoi(papszValues[1])),  // Red
-                        static_cast<short>(atoi(papszValues[2])),  // Green
-                        static_cast<short>(atoi(papszValues[3])),  // Blue
+                        static_cast<short>(
+                            std::clamp(atoi(papszValues[1]), 0, 255)),  // Red
+                        static_cast<short>(
+                            std::clamp(atoi(papszValues[2]), 0, 255)),  // Green
+                        static_cast<short>(
+                            std::clamp(atoi(papszValues[3]), 0, 255)),  // Blue
                         255};
 
                     poDS->m_poColorTable->SetColorEntry(nIndex, &oEntry);
