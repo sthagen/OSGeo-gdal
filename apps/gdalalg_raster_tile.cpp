@@ -693,22 +693,25 @@ static bool GenerateTile(
                                           ? osFilename
                                           : osFilename + ".tmp." + pszExtension;
 
+    const int W = tileMatrix.mTileWidth;
+    const int H = tileMatrix.mTileHeight;
+    constexpr int EXTRA_BYTE_PER_ROW = 1;  // for filter type
+    constexpr int EXTRA_ROWS = 2;          // for paethBuffer and paethBufferTmp
     if (!bAuxXML && EQUAL(pszExtension, "png") &&
-        eWorkingDataType == GDT_Byte &&
-        tileMatrix.mTileWidth <=
-            (INT_MAX - INT_MAX / 10) / nBands / tileMatrix.mTileHeight &&
-        poColorTable == nullptr && pdfDstNoData == nullptr &&
+        eWorkingDataType == GDT_Byte && poColorTable == nullptr &&
+        pdfDstNoData == nullptr && W <= INT_MAX / nBands &&
+        nBands * W <= INT_MAX - EXTRA_BYTE_PER_ROW &&
+        H <= INT_MAX - EXTRA_ROWS &&
+        EXTRA_BYTE_PER_ROW + nBands * W <= INT_MAX / (H + EXTRA_ROWS) &&
         CSLCount(creationOptions) == 0 &&
         CPLTestBool(
             CPLGetConfigOption("GDAL_RASTER_TILE_USE_PNG_OPTIM", "YES")))
     {
         // This is an optimized code path completely shortcircuiting libpng
-        // We manually generate the PNG file using the Average filter and
-        // ZLIB compressing the whole buffer, hopefully with libdeflate.
+        // We manually generate the PNG file using the Average or PAETH filter
+        // and ZLIB compressing the whole buffer, hopefully with libdeflate.
 
-        const int W = tileMatrix.mTileWidth;
-        const int H = tileMatrix.mTileHeight;
-        const int nDstBytesPerRow = 1 + nBands * W;
+        const int nDstBytesPerRow = EXTRA_BYTE_PER_ROW + nBands * W;
         const int nBPB = static_cast<int>(nBytesPerBand);
 
         bool bBlank = false;
@@ -728,7 +731,17 @@ static bool GenerateTile(
         if (bBlank)
             tmpBuffer.clear();
         const int tmpBufferSize = cpl::fits_on<int>(nDstBytesPerRow * H);
-        tmpBuffer.resize(tmpBufferSize + 2 * nDstBytesPerRow);
+        try
+        {
+            // cppcheck-suppress integerOverflowCond
+            tmpBuffer.resize(tmpBufferSize + EXTRA_ROWS * nDstBytesPerRow);
+        }
+        catch (const std::exception &)
+        {
+            CPLError(CE_Failure, CPLE_OutOfMemory,
+                     "Out of memory allocating temporary buffer");
+            return false;
+        }
         GByte *const paethBuffer = tmpBuffer.data() + tmpBufferSize;
 #ifdef USE_PAETH_SSE2
         GByte *const paethBufferTmp =
@@ -792,8 +805,17 @@ static bool GenerateTile(
 
                             costPaeth += (v < 128) ? v : 256 - v;
                         }
-                        for (int i = 1;
-                             i < W && (bForcePaeth || costPaeth < costAvg); ++i)
+
+#ifdef USE_PAETH_SSE2
+                        const int iLimitSSE2 =
+                            RunPaeth(dstBuffer.data() + j * W, nBands, nBPB,
+                                     paethBuffer, W, costPaeth);
+                        int i = iLimitSSE2;
+#else
+                        int i = 1;
+#endif
+                        for (; i < W && (costPaeth < costAvg || bForcePaeth);
+                             ++i)
                         {
                             const GByte v = PNG_PAETH(
                                 dstBuffer[0 * nBPB + j * W + i],
@@ -806,12 +828,11 @@ static bool GenerateTile(
                         }
                         if (costPaeth < costAvg || bForcePaeth)
                         {
-                            tmpBuffer[cpl::fits_on<int>(j * nDstBytesPerRow)] =
-                                PNG_FILTER_PAETH;
-                            memcpy(tmpBuffer.data() +
-                                       cpl::fits_on<int>(j * nDstBytesPerRow) +
-                                       1,
-                                   paethBuffer, nDstBytesPerRow - 1);
+                            GByte *out = tmpBuffer.data() +
+                                         cpl::fits_on<int>(j * nDstBytesPerRow);
+                            *out = PNG_FILTER_PAETH;
+                            ++out;
+                            memcpy(out, paethBuffer, nDstBytesPerRow - 1);
                         }
                     }
                 }
@@ -867,8 +888,17 @@ static bool GenerateTile(
 
                             costPaeth += (v < 128) ? v : 256 - v;
                         }
-                        for (int i = 1;
-                             i < W && (bForcePaeth || costPaeth < costAvg); ++i)
+
+#ifdef USE_PAETH_SSE2
+                        const int iLimitSSE2 =
+                            RunPaeth(dstBuffer.data() + j * W, nBands, nBPB,
+                                     paethBufferTmp, W, costPaeth);
+                        int i = iLimitSSE2;
+#else
+                        int i = 1;
+#endif
+                        for (; i < W && (costPaeth < costAvg || bForcePaeth);
+                             ++i)
                         {
                             {
                                 const GByte v = PNG_PAETH(
@@ -893,12 +923,26 @@ static bool GenerateTile(
                         }
                         if (costPaeth < costAvg || bForcePaeth)
                         {
-                            tmpBuffer[cpl::fits_on<int>(j * nDstBytesPerRow)] =
-                                PNG_FILTER_PAETH;
-                            memcpy(tmpBuffer.data() +
-                                       cpl::fits_on<int>(j * nDstBytesPerRow) +
-                                       1,
-                                   paethBuffer, nDstBytesPerRow - 1);
+                            GByte *out = tmpBuffer.data() +
+                                         cpl::fits_on<int>(j * nDstBytesPerRow);
+                            *out = PNG_FILTER_PAETH;
+                            ++out;
+#ifdef USE_PAETH_SSE2
+                            memcpy(out, paethBuffer, nBands);
+                            for (int iTmp = 1; iTmp < iLimitSSE2; ++iTmp)
+                            {
+                                out[nBands * iTmp + 0] =
+                                    paethBufferTmp[0 * W + iTmp];
+                                out[nBands * iTmp + 1] =
+                                    paethBufferTmp[1 * W + iTmp];
+                            }
+                            memcpy(
+                                out + iLimitSSE2 * nBands,
+                                paethBuffer + iLimitSSE2 * nBands,
+                                cpl::fits_on<int>((W - iLimitSSE2) * nBands));
+#else
+                            memcpy(out, paethBuffer, nDstBytesPerRow - 1);
+#endif
                         }
                     }
                 }
@@ -1013,12 +1057,11 @@ static bool GenerateTile(
 
                         if (costPaeth < costAvg || bForcePaeth)
                         {
-                            tmpBuffer[cpl::fits_on<int>(j * nDstBytesPerRow)] =
-                                PNG_FILTER_PAETH;
+                            GByte *out = tmpBuffer.data() +
+                                         cpl::fits_on<int>(j * nDstBytesPerRow);
+                            *out = PNG_FILTER_PAETH;
+                            ++out;
 #ifdef USE_PAETH_SSE2
-                            GByte *out =
-                                tmpBuffer.data() +
-                                cpl::fits_on<int>(j * nDstBytesPerRow) + 1;
                             memcpy(out, paethBuffer, nBands);
                             for (int iTmp = 1; iTmp < iLimitSSE2; ++iTmp)
                             {
@@ -1034,10 +1077,7 @@ static bool GenerateTile(
                                 paethBuffer + iLimitSSE2 * nBands,
                                 cpl::fits_on<int>((W - iLimitSSE2) * nBands));
 #else
-                            memcpy(tmpBuffer.data() +
-                                       cpl::fits_on<int>(j * nDstBytesPerRow) +
-                                       1,
-                                   paethBuffer, nDstBytesPerRow - 1);
+                            memcpy(out, paethBuffer, nDstBytesPerRow - 1);
 #endif
                         }
                     }
@@ -1175,12 +1215,11 @@ static bool GenerateTile(
                         }
                         if (costPaeth < costAvg || bForcePaeth)
                         {
-                            tmpBuffer[cpl::fits_on<int>(j * nDstBytesPerRow)] =
-                                PNG_FILTER_PAETH;
+                            GByte *out = tmpBuffer.data() +
+                                         cpl::fits_on<int>(j * nDstBytesPerRow);
+                            *out = PNG_FILTER_PAETH;
+                            ++out;
 #ifdef USE_PAETH_SSE2
-                            GByte *out =
-                                tmpBuffer.data() +
-                                cpl::fits_on<int>(j * nDstBytesPerRow) + 1;
                             memcpy(out, paethBuffer, nBands);
                             for (int iTmp = 1; iTmp < iLimitSSE2; ++iTmp)
                             {
@@ -1198,10 +1237,7 @@ static bool GenerateTile(
                                 paethBuffer + iLimitSSE2 * nBands,
                                 cpl::fits_on<int>((W - iLimitSSE2) * nBands));
 #else
-                            memcpy(tmpBuffer.data() +
-                                       cpl::fits_on<int>(j * nDstBytesPerRow) +
-                                       1,
-                                   paethBuffer, nDstBytesPerRow - 1);
+                            memcpy(out, paethBuffer, nDstBytesPerRow - 1);
 #endif
                         }
                     }
