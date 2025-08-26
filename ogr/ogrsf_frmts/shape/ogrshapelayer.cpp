@@ -862,8 +862,11 @@ OGRErr OGRShapeLayer::SetNextByIndex(GIntBig nIndex)
     if (!TouchLayer())
         return OGRERR_FAILURE;
 
-    if (nIndex < 0 || nIndex > INT_MAX)
-        return OGRERR_FAILURE;
+    if (nIndex < 0 || nIndex >= m_nTotalShapeCount)
+    {
+        m_iNextShapeId = m_nTotalShapeCount;
+        return OGRERR_NON_EXISTING_FEATURE;
+    }
 
     // Eventually we should try to use m_panMatchingFIDs list
     // if available and appropriate.
@@ -3769,6 +3772,14 @@ OGRErr OGRShapeLayer::Rename(const char *pszNewName)
 {
     if (!TestCapability(OLCRename))
         return OGRERR_FAILURE;
+
+    if (CPLLaunderForFilenameSafe(pszNewName, nullptr) != pszNewName)
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "Illegal characters in '%s' to form a valid filename",
+                 pszNewName);
+        return OGRERR_FAILURE;
+    }
 
     if (m_poDS->GetLayerByName(pszNewName) != nullptr)
     {
