@@ -23,6 +23,7 @@
 #include "cpl_string.h"
 #include "cpl_vsil_curl_priv.h"
 #include "cpl_mem_cache.h"
+#include "cpl_multiproc.h"
 
 #include "cpl_curl_priv.h"
 
@@ -241,9 +242,9 @@ class VSICurlFilesystemHandlerBase : public VSIFilesystemHandler
 
     static bool IsAllowedFilename(const char *pszFilename);
 
-    VSIVirtualHandle *Open(const char *pszFilename, const char *pszAccess,
-                           bool bSetError,
-                           CSLConstList /* papszOptions */) override;
+    VSIVirtualHandleUniquePtr Open(const char *pszFilename,
+                                   const char *pszAccess, bool bSetError,
+                                   CSLConstList /* papszOptions */) override;
 
     int Stat(const char *pszFilename, VSIStatBufL *pStatBuf,
              int nFlags) override;
@@ -271,7 +272,7 @@ class VSICurlFilesystemHandlerBase : public VSIFilesystemHandler
     virtual std::string GetFSPrefix() const = 0;
     virtual bool AllowCachedDataFor(const char *pszFilename);
 
-    virtual bool IsLocal(const char * /* pszPath */) override
+    virtual bool IsLocal(const char * /* pszPath */) const override
     {
         return false;
     }
@@ -574,8 +575,9 @@ class VSICurlFilesystemHandlerBaseWritable : public VSICurlFilesystemHandlerBase
     CreateWriteHandle(const char *pszFilename, CSLConstList papszOptions) = 0;
 
   public:
-    VSIVirtualHandle *Open(const char *pszFilename, const char *pszAccess,
-                           bool bSetError, CSLConstList papszOptions) override;
+    VSIVirtualHandleUniquePtr Open(const char *pszFilename,
+                                   const char *pszAccess, bool bSetError,
+                                   CSLConstList /* papszOptions */) override;
 
     bool SupportsSequentialWrite(const char * /* pszPath */,
                                  bool /* bAllowLocalTempFile */) override
