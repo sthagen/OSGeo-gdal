@@ -23,9 +23,12 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cerrno>
 #include <cinttypes>
+#include <climits>
 #include <cmath>
 #include <limits>
+#include <mutex>
 
 #undef SQLITE_STATIC
 #define SQLITE_STATIC static_cast<sqlite3_destructor_type>(nullptr)
@@ -8590,7 +8593,7 @@ void OGRGeoPackageTableLayer::GetNextArrowArrayAsynchronousWorker()
     std::lock_guard oLock(m_poFillArrowArray->oMutex);
     m_poFillArrowArray->bIsFinished = true;
     m_poFillArrowArray->bErrorOccurred = !osErrorMsg.empty();
-    m_poFillArrowArray->osErrorMsg = osErrorMsg;
+    m_poFillArrowArray->osErrorMsg = std::move(osErrorMsg);
 
     if (m_poFillArrowArray->nCountRows >= 0)
     {
