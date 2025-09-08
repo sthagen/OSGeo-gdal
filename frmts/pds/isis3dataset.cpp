@@ -187,22 +187,21 @@ class ISIS3Dataset final : public RawDataset
 
   public:
     ISIS3Dataset();
-    virtual ~ISIS3Dataset();
+    ~ISIS3Dataset() override;
 
-    virtual int CloseDependentDatasets() override;
+    int CloseDependentDatasets() override;
 
-    virtual CPLErr GetGeoTransform(GDALGeoTransform &gt) const override;
-    virtual CPLErr SetGeoTransform(const GDALGeoTransform &gt) override;
+    CPLErr GetGeoTransform(GDALGeoTransform &gt) const override;
+    CPLErr SetGeoTransform(const GDALGeoTransform &gt) override;
 
     const OGRSpatialReference *GetSpatialRef() const override;
     CPLErr SetSpatialRef(const OGRSpatialReference *poSRS) override;
 
-    virtual char **GetFileList() override;
+    char **GetFileList() override;
 
-    virtual char **GetMetadataDomainList() override;
-    virtual char **GetMetadata(const char *pszDomain = "") override;
-    virtual CPLErr SetMetadata(char **papszMD,
-                               const char *pszDomain = "") override;
+    char **GetMetadataDomainList() override;
+    char **GetMetadata(const char *pszDomain = "") override;
+    CPLErr SetMetadata(char **papszMD, const char *pszDomain = "") override;
 
     bool GetRawBinaryLayout(GDALDataset::RawBinaryLayout &) override;
 
@@ -247,24 +246,20 @@ class ISISTiledBand final : public GDALPamRasterBand
                   GIntBig nFirstTileOffset, GIntBig nXTileOffset,
                   GIntBig nYTileOffset, int bNativeOrder);
 
-    virtual ~ISISTiledBand()
-    {
-    }
-
     bool IsValid() const
     {
         return m_bValid;
     }
 
-    virtual CPLErr IReadBlock(int, int, void *) override;
-    virtual CPLErr IWriteBlock(int, int, void *) override;
+    CPLErr IReadBlock(int, int, void *) override;
+    CPLErr IWriteBlock(int, int, void *) override;
 
-    virtual double GetOffset(int *pbSuccess = nullptr) override;
-    virtual double GetScale(int *pbSuccess = nullptr) override;
-    virtual CPLErr SetOffset(double dfNewOffset) override;
-    virtual CPLErr SetScale(double dfNewScale) override;
-    virtual double GetNoDataValue(int *pbSuccess = nullptr) override;
-    virtual CPLErr SetNoDataValue(double dfNewNoData) override;
+    double GetOffset(int *pbSuccess = nullptr) override;
+    double GetScale(int *pbSuccess = nullptr) override;
+    CPLErr SetOffset(double dfNewOffset) override;
+    CPLErr SetScale(double dfNewScale) override;
+    double GetNoDataValue(int *pbSuccess = nullptr) override;
+    CPLErr SetNoDataValue(double dfNewNoData) override;
 
     void SetMaskBand(std::unique_ptr<GDALRasterBand> poMaskBand);
 };
@@ -291,24 +286,19 @@ class ISIS3RawRasterBand final : public RawRasterBand
                        int l_nLineOffset, GDALDataType l_eDataType,
                        int l_bNativeOrder);
 
-    virtual ~ISIS3RawRasterBand()
-    {
-    }
+    CPLErr IReadBlock(int, int, void *) override;
+    CPLErr IWriteBlock(int, int, void *) override;
 
-    virtual CPLErr IReadBlock(int, int, void *) override;
-    virtual CPLErr IWriteBlock(int, int, void *) override;
+    CPLErr IRasterIO(GDALRWFlag, int, int, int, int, void *, int, int,
+                     GDALDataType, GSpacing nPixelSpace, GSpacing nLineSpace,
+                     GDALRasterIOExtraArg *psExtraArg) override;
 
-    virtual CPLErr IRasterIO(GDALRWFlag, int, int, int, int, void *, int, int,
-                             GDALDataType, GSpacing nPixelSpace,
-                             GSpacing nLineSpace,
-                             GDALRasterIOExtraArg *psExtraArg) override;
-
-    virtual double GetOffset(int *pbSuccess = nullptr) override;
-    virtual double GetScale(int *pbSuccess = nullptr) override;
-    virtual CPLErr SetOffset(double dfNewOffset) override;
-    virtual CPLErr SetScale(double dfNewScale) override;
-    virtual double GetNoDataValue(int *pbSuccess = nullptr) override;
-    virtual CPLErr SetNoDataValue(double dfNewNoData) override;
+    double GetOffset(int *pbSuccess = nullptr) override;
+    double GetScale(int *pbSuccess = nullptr) override;
+    CPLErr SetOffset(double dfNewOffset) override;
+    CPLErr SetScale(double dfNewScale) override;
+    double GetNoDataValue(int *pbSuccess = nullptr) override;
+    CPLErr SetNoDataValue(double dfNewNoData) override;
 
     void SetMaskBand(std::unique_ptr<GDALRasterBand> poMaskBand);
 };
@@ -347,19 +337,18 @@ class ISIS3WrapperRasterBand final : public GDALProxyRasterBand
 
     virtual CPLErr Fill(double dfRealValue,
                         double dfImaginaryValue = 0) override;
-    virtual CPLErr IWriteBlock(int, int, void *) override;
+    CPLErr IWriteBlock(int, int, void *) override;
 
-    virtual CPLErr IRasterIO(GDALRWFlag, int, int, int, int, void *, int, int,
-                             GDALDataType, GSpacing nPixelSpace,
-                             GSpacing nLineSpace,
-                             GDALRasterIOExtraArg *psExtraArg) override;
+    CPLErr IRasterIO(GDALRWFlag, int, int, int, int, void *, int, int,
+                     GDALDataType, GSpacing nPixelSpace, GSpacing nLineSpace,
+                     GDALRasterIOExtraArg *psExtraArg) override;
 
-    virtual double GetOffset(int *pbSuccess = nullptr) override;
-    virtual double GetScale(int *pbSuccess = nullptr) override;
-    virtual CPLErr SetOffset(double dfNewOffset) override;
-    virtual CPLErr SetScale(double dfNewScale) override;
-    virtual double GetNoDataValue(int *pbSuccess = nullptr) override;
-    virtual CPLErr SetNoDataValue(double dfNewNoData) override;
+    double GetOffset(int *pbSuccess = nullptr) override;
+    double GetScale(int *pbSuccess = nullptr) override;
+    CPLErr SetOffset(double dfNewOffset) override;
+    CPLErr SetScale(double dfNewScale) override;
+    double GetNoDataValue(int *pbSuccess = nullptr) override;
+    CPLErr SetNoDataValue(double dfNewNoData) override;
 
     int GetMaskFlags() override
     {
@@ -388,9 +377,9 @@ class ISISMaskBand final : public GDALRasterBand
 
   public:
     explicit ISISMaskBand(GDALRasterBand *poBaseBand);
-    ~ISISMaskBand();
+    ~ISISMaskBand() override;
 
-    virtual CPLErr IReadBlock(int, int, void *) override;
+    CPLErr IReadBlock(int, int, void *) override;
 };
 
 /************************************************************************/
@@ -2404,103 +2393,119 @@ GDALDataset *ISIS3Dataset::Open(GDALOpenInfo *poOpenInfo)
     std::vector<std::string> aosWavelengthsUnit;
     std::vector<double> adfBandwidth;
     std::vector<std::string> aosBandwidthUnit;
-    const auto oBandBin = poDS->m_oJSonLabel.GetObj("IsisCube/BandBin");
-    if (oBandBin.IsValid() && oBandBin.GetType() == CPLJSONObject::Type::Object)
+    const auto oIsisCube = poDS->m_oJSonLabel.GetObj("IsisCube");
+    if (oIsisCube.GetType() == CPLJSONObject::Type::Object)
     {
-        for (const auto &child : oBandBin.GetChildren())
+        for (const auto &oChildIsisCube : oIsisCube.GetChildren())
         {
-            if (CPLString(child.GetName()).ifind("name") != std::string::npos)
+            if (oChildIsisCube.GetType() == CPLJSONObject::Type::Object &&
+                oChildIsisCube.GetString("_type") == "group" &&
+                (oChildIsisCube.GetName() == "BandBin" ||
+                 oChildIsisCube.GetString("_container_name") == "BandBin"))
             {
-                // Use "name" in priority
-                if (EQUAL(child.GetName().c_str(), "name"))
+                for (const auto &child : oChildIsisCube.GetChildren())
                 {
-                    aosBandNames.clear();
-                }
-                else if (!aosBandNames.empty())
-                {
-                    continue;
-                }
-
-                if (child.GetType() == CPLJSONObject::Type::String &&
-                    nBands == 1)
-                {
-                    aosBandNames.push_back(child.ToString());
-                }
-                else if (child.GetType() == CPLJSONObject::Type::Array)
-                {
-                    auto oArray = child.ToArray();
-                    if (oArray.Size() == nBands)
+                    if (CPLString(child.GetName()).ifind("name") !=
+                        std::string::npos)
                     {
-                        for (int i = 0; i < nBands; i++)
+                        // Use "name" in priority
+                        if (EQUAL(child.GetName().c_str(), "name"))
                         {
-                            if (oArray[i].GetType() ==
-                                CPLJSONObject::Type::String)
+                            aosBandNames.clear();
+                        }
+                        else if (!aosBandNames.empty())
+                        {
+                            continue;
+                        }
+
+                        if (child.GetType() == CPLJSONObject::Type::String &&
+                            nBands == 1)
+                        {
+                            aosBandNames.push_back(child.ToString());
+                        }
+                        else if (child.GetType() == CPLJSONObject::Type::Array)
+                        {
+                            auto oArray = child.ToArray();
+                            if (oArray.Size() == nBands)
                             {
-                                aosBandNames.push_back(oArray[i].ToString());
-                            }
-                            else
-                            {
-                                aosBandNames.clear();
-                                break;
+                                for (int i = 0; i < nBands; i++)
+                                {
+                                    if (oArray[i].GetType() ==
+                                        CPLJSONObject::Type::String)
+                                    {
+                                        aosBandNames.push_back(
+                                            oArray[i].ToString());
+                                    }
+                                    else
+                                    {
+                                        aosBandNames.clear();
+                                        break;
+                                    }
+                                }
                             }
                         }
                     }
-                }
-            }
-            else if (EQUAL(child.GetName().c_str(), "BandSuffixUnit") &&
-                     child.GetType() == CPLJSONObject::Type::Array)
-            {
-                auto oArray = child.ToArray();
-                if (oArray.Size() == nBands)
-                {
-                    for (int i = 0; i < nBands; i++)
+                    else if (EQUAL(child.GetName().c_str(), "BandSuffixUnit") &&
+                             child.GetType() == CPLJSONObject::Type::Array)
                     {
-                        if (oArray[i].GetType() == CPLJSONObject::Type::String)
+                        auto oArray = child.ToArray();
+                        if (oArray.Size() == nBands)
                         {
-                            aosBandUnits.push_back(oArray[i].ToString());
-                        }
-                        else
-                        {
-                            aosBandUnits.clear();
-                            break;
+                            for (int i = 0; i < nBands; i++)
+                            {
+                                if (oArray[i].GetType() ==
+                                    CPLJSONObject::Type::String)
+                                {
+                                    aosBandUnits.push_back(
+                                        oArray[i].ToString());
+                                }
+                                else
+                                {
+                                    aosBandUnits.clear();
+                                    break;
+                                }
+                            }
                         }
                     }
+                    else if (EQUAL(child.GetName().c_str(), "BandBinCenter") ||
+                             EQUAL(child.GetName().c_str(), "Center"))
+                    {
+                        GetValueAndUnits(child, adfWavelengths,
+                                         aosWavelengthsUnit, nBands);
+                    }
+                    else if (EQUAL(child.GetName().c_str(), "BandBinUnit") &&
+                             child.GetType() == CPLJSONObject::Type::String)
+                    {
+                        CPLString unit(child.ToString());
+                        if (STARTS_WITH_CI(unit, "micromet") ||
+                            EQUAL(unit, "um") ||
+                            STARTS_WITH_CI(unit, "nanomet") ||
+                            EQUAL(unit, "nm"))
+                        {
+                            aosWavelengthsUnit.push_back(child.ToString());
+                        }
+                    }
+                    else if (EQUAL(child.GetName().c_str(), "Width"))
+                    {
+                        GetValueAndUnits(child, adfBandwidth, aosBandwidthUnit,
+                                         nBands);
+                    }
                 }
-            }
-            else if (EQUAL(child.GetName().c_str(), "BandBinCenter") ||
-                     EQUAL(child.GetName().c_str(), "Center"))
-            {
-                GetValueAndUnits(child, adfWavelengths, aosWavelengthsUnit,
-                                 nBands);
-            }
-            else if (EQUAL(child.GetName().c_str(), "BandBinUnit") &&
-                     child.GetType() == CPLJSONObject::Type::String)
-            {
-                CPLString unit(child.ToString());
-                if (STARTS_WITH_CI(unit, "micromet") || EQUAL(unit, "um") ||
-                    STARTS_WITH_CI(unit, "nanomet") || EQUAL(unit, "nm"))
-                {
-                    aosWavelengthsUnit.push_back(child.ToString());
-                }
-            }
-            else if (EQUAL(child.GetName().c_str(), "Width"))
-            {
-                GetValueAndUnits(child, adfBandwidth, aosBandwidthUnit, nBands);
-            }
-        }
 
-        if (!adfWavelengths.empty() && aosWavelengthsUnit.size() == 1)
-        {
-            for (int i = 1; i < nBands; i++)
-            {
-                aosWavelengthsUnit.push_back(aosWavelengthsUnit[0]);
-            }
-        }
-        if (!adfBandwidth.empty() && aosBandwidthUnit.size() == 1)
-        {
-            for (int i = 1; i < nBands; i++)
-            {
-                aosBandwidthUnit.push_back(aosBandwidthUnit[0]);
+                if (!adfWavelengths.empty() && aosWavelengthsUnit.size() == 1)
+                {
+                    for (int i = 1; i < nBands; i++)
+                    {
+                        aosWavelengthsUnit.push_back(aosWavelengthsUnit[0]);
+                    }
+                }
+                if (!adfBandwidth.empty() && aosBandwidthUnit.size() == 1)
+                {
+                    for (int i = 1; i < nBands; i++)
+                    {
+                        aosBandwidthUnit.push_back(aosBandwidthUnit[0]);
+                    }
+                }
             }
         }
     }
@@ -3175,11 +3180,12 @@ void ISIS3Dataset::BuildLabel()
     // Deal with History object
     BuildHistory();
 
-    oLabel.Delete("History");
+    oLabel.Delete("History_IsisCube");
     if (!m_osHistory.empty())
     {
         CPLJSONObject oHistory;
         oHistory.Add("_type", "object");
+        oHistory.Add("_container_name", "History");
         oHistory.Add("Name", "IsisCube");
         if (m_osExternalFilename.empty())
             oHistory.Add("StartByte", pszHISTORY_STARTBYTE_PLACEHOLDER);
@@ -3192,7 +3198,7 @@ void ISIS3Dataset::BuildLabel()
             osFilename += ".History.IsisCube";
             oHistory.Add("^History", osFilename);
         }
-        oLabel.Add("History", oHistory);
+        oLabel.Add("History_IsisCube", oHistory);
     }
 
     // Deal with other objects that have StartByte & Bytes
@@ -3209,7 +3215,7 @@ void ISIS3Dataset::BuildLabel()
         for (CPLJSONObject &oObj : oLabel.GetChildren())
         {
             CPLString osKey = oObj.GetName();
-            if (osKey == "History")
+            if (osKey == "History_IsisCube")
             {
                 continue;
             }
@@ -3356,7 +3362,7 @@ void ISIS3Dataset::BuildHistory()
             osSrcFilename = oFilename.ToString();
         }
         CPLString osHistoryFilename(osSrcFilename);
-        CPLJSONObject oHistory = m_oSrcJSonLabel["History"];
+        CPLJSONObject oHistory = m_oSrcJSonLabel["History_IsisCube"];
         if (oHistory.GetType() == CPLJSONObject::Type::Object)
         {
             CPLJSONObject oHistoryFilename = oHistory["^History"];

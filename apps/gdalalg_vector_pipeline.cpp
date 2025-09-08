@@ -24,6 +24,7 @@
 #include "gdalalg_vector_geom.h"
 #include "gdalalg_vector_info.h"
 #include "gdalalg_vector_make_valid.h"
+#include "gdalalg_vector_partition.h"
 #include "gdalalg_vector_reproject.h"
 #include "gdalalg_vector_segmentize.h"
 #include "gdalalg_vector_select.h"
@@ -47,6 +48,8 @@
 #ifndef _
 #define _(x) (x)
 #endif
+
+GDALVectorAlgorithmStepRegistry::~GDALVectorAlgorithmStepRegistry() = default;
 
 /************************************************************************/
 /*  GDALVectorPipelineStepAlgorithm::GDALVectorPipelineStepAlgorithm()  */
@@ -90,7 +93,8 @@ GDALVectorPipelineStepAlgorithm::~GDALVectorPipelineStepAlgorithm() = default;
 /************************************************************************/
 
 GDALVectorPipelineAlgorithm::GDALVectorPipelineAlgorithm()
-    : GDALAbstractPipelineAlgorithm<GDALVectorPipelineStepAlgorithm>(
+    : GDALAbstractPipelineAlgorithm<GDALVectorPipelineStepAlgorithm,
+                                    GDALVectorAlgorithmStepRegistry>(
           NAME, DESCRIPTION, HELP_URL,
           ConstructorOptions().SetInputDatasetMaxCount(INT_MAX))
 {
@@ -116,7 +120,7 @@ GDALVectorPipelineAlgorithm::GDALVectorPipelineAlgorithm()
 
 /* static */
 void GDALVectorPipelineAlgorithm::RegisterAlgorithms(
-    GDALAlgorithmRegistry &registry, bool forMixedPipeline)
+    GDALVectorAlgorithmStepRegistry &registry, bool forMixedPipeline)
 {
     GDALAlgorithmRegistry::AlgInfo algInfo;
 
@@ -127,20 +131,14 @@ void GDALVectorPipelineAlgorithm::RegisterAlgorithms(
                                 : std::string(name);
     };
 
-    algInfo.m_name = addSuffixIfNeeded(GDALVectorReadAlgorithm::NAME);
-    algInfo.m_creationFunc = []() -> std::unique_ptr<GDALAlgorithm>
-    { return std::make_unique<GDALVectorReadAlgorithm>(); };
-    registry.Register(algInfo);
+    registry.Register<GDALVectorReadAlgorithm>(
+        addSuffixIfNeeded(GDALVectorReadAlgorithm::NAME));
 
-    algInfo.m_name = addSuffixIfNeeded(GDALVectorWriteAlgorithm::NAME);
-    algInfo.m_creationFunc = []() -> std::unique_ptr<GDALAlgorithm>
-    { return std::make_unique<GDALVectorWriteAlgorithm>(); };
-    registry.Register(algInfo);
+    registry.Register<GDALVectorWriteAlgorithm>(
+        addSuffixIfNeeded(GDALVectorWriteAlgorithm::NAME));
 
-    algInfo.m_name = addSuffixIfNeeded(GDALVectorInfoAlgorithm::NAME);
-    algInfo.m_creationFunc = []() -> std::unique_ptr<GDALAlgorithm>
-    { return std::make_unique<GDALVectorInfoAlgorithm>(); };
-    registry.Register(algInfo);
+    registry.Register<GDALVectorInfoAlgorithm>(
+        addSuffixIfNeeded(GDALVectorInfoAlgorithm::NAME));
 
     registry.Register<GDALVectorBufferAlgorithm>();
     registry.Register<GDALVectorCheckCoverageAlgorithm>();
@@ -148,32 +146,25 @@ void GDALVectorPipelineAlgorithm::RegisterAlgorithms(
     registry.Register<GDALVectorConcatAlgorithm>();
     registry.Register<GDALVectorCleanCoverageAlgorithm>();
 
-    algInfo.m_name = addSuffixIfNeeded(GDALVectorClipAlgorithm::NAME);
-    algInfo.m_creationFunc = []() -> std::unique_ptr<GDALAlgorithm>
-    { return std::make_unique<GDALVectorClipAlgorithm>(); };
-    registry.Register(algInfo);
+    registry.Register<GDALVectorClipAlgorithm>(
+        addSuffixIfNeeded(GDALVectorClipAlgorithm::NAME));
 
-    algInfo.m_name = addSuffixIfNeeded(GDALVectorEditAlgorithm::NAME);
-    algInfo.m_creationFunc = []() -> std::unique_ptr<GDALAlgorithm>
-    { return std::make_unique<GDALVectorEditAlgorithm>(); };
-    registry.Register(algInfo);
+    registry.Register<GDALVectorEditAlgorithm>(
+        addSuffixIfNeeded(GDALVectorEditAlgorithm::NAME));
 
     registry.Register<GDALVectorExplodeCollectionsAlgorithm>();
 
-    algInfo.m_name = addSuffixIfNeeded(GDALVectorReprojectAlgorithm::NAME);
-    algInfo.m_creationFunc = []() -> std::unique_ptr<GDALAlgorithm>
-    { return std::make_unique<GDALVectorReprojectAlgorithm>(); };
-    registry.Register(algInfo);
+    registry.Register<GDALVectorReprojectAlgorithm>(
+        addSuffixIfNeeded(GDALVectorReprojectAlgorithm::NAME));
 
     registry.Register<GDALVectorFilterAlgorithm>();
     registry.Register<GDALVectorGeomAlgorithm>();
     registry.Register<GDALVectorMakeValidAlgorithm>();
+    registry.Register<GDALVectorPartitionAlgorithm>();
     registry.Register<GDALVectorSegmentizeAlgorithm>();
 
-    algInfo.m_name = addSuffixIfNeeded(GDALVectorSelectAlgorithm::NAME);
-    algInfo.m_creationFunc = []() -> std::unique_ptr<GDALAlgorithm>
-    { return std::make_unique<GDALVectorSelectAlgorithm>(); };
-    registry.Register(algInfo);
+    registry.Register<GDALVectorSelectAlgorithm>(
+        addSuffixIfNeeded(GDALVectorSelectAlgorithm::NAME));
 
     registry.Register<GDALVectorSetGeomTypeAlgorithm>();
     registry.Register<GDALVectorSimplifyAlgorithm>();

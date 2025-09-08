@@ -67,7 +67,7 @@ namespace cpl
 /*                             VSIDIRS3                                 */
 /************************************************************************/
 
-struct VSIDIRS3 : public VSIDIRS3Like
+struct VSIDIRS3 final : public VSIDIRS3Like
 {
     bool m_bRegularListingDone = false;
     bool m_bDirectoryBucketListingDone = false;
@@ -255,6 +255,14 @@ bool VSIDIRS3::AnalyseS3FileList(
             if (strcmp(psIter->pszValue, "Contents") == 0)
             {
                 const char *pszKey = CPLGetXMLValue(psIter, "Key", nullptr);
+                if (pszKey && CPLHasUnbalancedPathTraversal(pszKey))
+                {
+                    CPLError(
+                        CE_Warning, CPLE_AppDefined,
+                        "Ignoring key '%s' that has a path traversal pattern",
+                        pszKey);
+                    continue;
+                }
                 if (bIsTruncated && nRecurseDepth < 0 && pszKey)
                 {
                     osNextMarker = pszKey;
@@ -368,6 +376,14 @@ bool VSIDIRS3::AnalyseS3FileList(
                 if (pszKey &&
                     strncmp(pszKey, osPrefix.c_str(), osPrefix.size()) == 0)
                 {
+                    if (CPLHasUnbalancedPathTraversal(pszKey))
+                    {
+                        CPLError(CE_Warning, CPLE_AppDefined,
+                                 "Ignoring prefix '%s' that has a path "
+                                 "traversal pattern",
+                                 pszKey);
+                        continue;
+                    }
                     std::string osKey = pszKey;
                     if (!osKey.empty() && osKey.back() == '/')
                         osKey.pop_back();
@@ -445,6 +461,14 @@ bool VSIDIRS3::AnalyseS3FileList(
                 const char *pszName = CPLGetXMLValue(psIter, "Name", nullptr);
                 if (pszName)
                 {
+                    if (CPLHasUnbalancedPathTraversal(pszName))
+                    {
+                        CPLError(CE_Warning, CPLE_AppDefined,
+                                 "Ignoring bucket name '%s' that has a path "
+                                 "traversal pattern",
+                                 pszName);
+                        continue;
+                    }
                     aoEntries.push_back(std::make_unique<VSIDIREntry>());
                     // cppcheck-suppress constVariableReference
                     auto &entry = aoEntries.back();
@@ -1863,6 +1887,45 @@ VSIS3FSHandler::CreateWriteHandle(const char *pszFilename,
 }
 
 /************************************************************************/
+/*                        NormalizeFilenameIfNeeded()                   */
+/************************************************************************/
+
+static void NormalizeFilenameIfNeeded(CPLString &osFilename,
+                                      const char *&pszFilename)
+{
+    // Transform '/vsis3/./foo' to '/vsis3/foo' by default
+    //
+    // Cf https://curl.se/libcurl/c/CURLOPT_PATH_AS_IS.html
+    if (!CPLTestBool(VSIGetPathSpecificOption(pszFilename,
+                                              "GDAL_HTTP_PATH_VERBATIM", "NO")))
+    {
+        osFilename.replaceAll("/./", '/');
+
+        // Remove "/.." or /../" sequences..
+        while (true)
+        {
+            const auto nSlashDotDotSlashPos = osFilename.find("/../");
+            if (nSlashDotDotSlashPos != std::string::npos &&
+                nSlashDotDotSlashPos > 0)
+            {
+                const auto nLastSlashPos =
+                    osFilename.rfind('/', nSlashDotDotSlashPos - 1);
+                if (nLastSlashPos != std::string::npos)
+                {
+                    osFilename = osFilename.substr(0, nLastSlashPos + 1) +
+                                 osFilename.substr(nSlashDotDotSlashPos +
+                                                   strlen("/../"));
+                    continue;
+                }
+            }
+            break;
+        }
+
+        pszFilename = osFilename.c_str();
+    }
+}
+
+/************************************************************************/
 /*                                Open()                                */
 /************************************************************************/
 
@@ -1872,6 +1935,9 @@ VSIVirtualHandleUniquePtr VSICurlFilesystemHandlerBaseWritable::Open(
 {
     if (!STARTS_WITH_CI(pszFilename, GetFSPrefix().c_str()))
         return nullptr;
+
+    CPLString osFilename(pszFilename);
+    NormalizeFilenameIfNeeded(osFilename, pszFilename);
 
     if (strchr(pszAccess, '+'))
     {
@@ -2400,6 +2466,9 @@ char **VSIS3FSHandler::GetFileMetadata(const char *pszFilename,
     if (!STARTS_WITH_CI(pszFilename, GetFSPrefix().c_str()))
         return nullptr;
 
+    CPLString osFilename(pszFilename);
+    NormalizeFilenameIfNeeded(osFilename, pszFilename);
+
     if (pszDomain == nullptr || !EQUAL(pszDomain, "TAGS"))
     {
         return VSICurlFilesystemHandlerBase::GetFileMetadata(
@@ -2517,6 +2586,9 @@ bool VSIS3FSHandler::SetFileMetadata(const char *pszFilename,
 {
     if (!STARTS_WITH_CI(pszFilename, GetFSPrefix().c_str()))
         return false;
+
+    CPLString osFilename(pszFilename);
+    NormalizeFilenameIfNeeded(osFilename, pszFilename);
 
     if (pszDomain == nullptr ||
         !(EQUAL(pszDomain, "HEADERS") || EQUAL(pszDomain, "TAGS")))
@@ -2701,7 +2773,8 @@ int IVSIS3LikeFSHandler::MkdirInternal(const char *pszDirname, long /*nMode*/,
     NetworkStatisticsFileSystem oContextFS(GetFSPrefix().c_str());
     NetworkStatisticsAction oContextAction("Mkdir");
 
-    std::string osDirname(pszDirname);
+    CPLString osDirname(pszDirname);
+    NormalizeFilenameIfNeeded(osDirname, pszDirname);
     if (!osDirname.empty() && osDirname.back() != '/')
         osDirname += "/";
 
@@ -2774,7 +2847,8 @@ int IVSIS3LikeFSHandler::Rmdir(const char *pszDirname)
     NetworkStatisticsFileSystem oContextFS(GetFSPrefix().c_str());
     NetworkStatisticsAction oContextAction("Rmdir");
 
-    std::string osDirname(pszDirname);
+    CPLString osDirname(pszDirname);
+    NormalizeFilenameIfNeeded(osDirname, pszDirname);
     if (!osDirname.empty() && osDirname.back() != '/')
         osDirname += "/";
 
@@ -2832,6 +2906,9 @@ int IVSIS3LikeFSHandler::Stat(const char *pszFilename, VSIStatBufL *pStatBuf,
     if (!STARTS_WITH_CI(pszFilename, GetFSPrefix().c_str()))
         return -1;
 
+    CPLString osFilename(pszFilename);
+    NormalizeFilenameIfNeeded(osFilename, pszFilename);
+
     if ((nFlags & VSI_STAT_CACHE_ONLY) != 0)
         return VSICurlFilesystemHandlerBase::Stat(pszFilename, pStatBuf,
                                                   nFlags);
@@ -2843,7 +2920,6 @@ int IVSIS3LikeFSHandler::Stat(const char *pszFilename, VSIStatBufL *pStatBuf,
     NetworkStatisticsFileSystem oContextFS(GetFSPrefix().c_str());
     NetworkStatisticsAction oContextAction("Stat");
 
-    std::string osFilename(pszFilename);
     if (osFilename.find('/', GetFSPrefix().size()) == std::string::npos)
         osFilename += "/";
 
@@ -2882,9 +2958,10 @@ int IVSIS3LikeFSHandler::Stat(const char *pszFilename, VSIStatBufL *pStatBuf,
     bool bStatBaseObject = true;
     if (GetFSPrefix() == "/vsis3/")
     {
-        auto poS3HandleHelper = std::unique_ptr<VSIS3HandleHelper>(
-            VSIS3HandleHelper::BuildFromURI(pszFilename + GetFSPrefix().size(),
-                                            GetFSPrefix().c_str(), true));
+        auto poS3HandleHelper =
+            std::unique_ptr<VSIS3HandleHelper>(VSIS3HandleHelper::BuildFromURI(
+                osFilename.c_str() + GetFSPrefix().size(),
+                GetFSPrefix().c_str(), true));
         if (poS3HandleHelper)
         {
             const bool bIsDirectoryBucket =
@@ -2979,6 +3056,9 @@ int IVSIS3LikeFSHandler::Unlink(const char *pszFilename)
     if (!STARTS_WITH_CI(pszFilename, GetFSPrefix().c_str()))
         return -1;
 
+    CPLString osFilename(pszFilename);
+    NormalizeFilenameIfNeeded(osFilename, pszFilename);
+
     std::string osNameWithoutPrefix = pszFilename + GetFSPrefix().size();
     if (osNameWithoutPrefix.find('/') == std::string::npos)
     {
@@ -3019,6 +3099,12 @@ int IVSIS3LikeFSHandler::Rename(const char *oldpath, const char *newpath,
         return -1;
     if (!STARTS_WITH_CI(newpath, GetFSPrefix().c_str()))
         return -1;
+
+    CPLString osOldPath(oldpath);
+    NormalizeFilenameIfNeeded(osOldPath, oldpath);
+
+    CPLString osNewPath(newpath);
+    NormalizeFilenameIfNeeded(osNewPath, newpath);
 
     NetworkStatisticsFileSystem oContextFS(GetFSPrefix().c_str());
     NetworkStatisticsAction oContextAction("Rename");
@@ -3383,6 +3469,9 @@ VSIDIR *IVSIS3LikeFSHandler::OpenDir(const char *pszPath, int nRecurseDepth,
 
     if (!STARTS_WITH_CI(pszPath, GetFSPrefix().c_str()))
         return nullptr;
+
+    CPLString osPath(pszPath);
+    NormalizeFilenameIfNeeded(osPath, pszPath);
 
     NetworkStatisticsFileSystem oContextFS(GetFSPrefix().c_str());
     NetworkStatisticsAction oContextAction("OpenDir");

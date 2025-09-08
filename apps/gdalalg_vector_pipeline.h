@@ -28,6 +28,8 @@
 /*                GDALVectorPipelineStepAlgorithm                       */
 /************************************************************************/
 
+class GDALVectorAlgorithmStepRegistry;
+
 class GDALVectorPipelineStepAlgorithm /* non final */
     : public GDALPipelineStepAlgorithm
 {
@@ -46,7 +48,8 @@ class GDALVectorPipelineStepAlgorithm /* non final */
                                     const ConstructorOptions &options);
 
     friend class GDALVectorPipelineAlgorithm;
-    friend class GDALAbstractPipelineAlgorithm<GDALVectorPipelineStepAlgorithm>;
+    friend class GDALAbstractPipelineAlgorithm<GDALVectorPipelineStepAlgorithm,
+                                               GDALVectorAlgorithmStepRegistry>;
     friend class GDALVectorConcatAlgorithm;
 
     int GetInputType() const override
@@ -61,6 +64,34 @@ class GDALVectorPipelineStepAlgorithm /* non final */
 };
 
 /************************************************************************/
+/*                      GDALVectorAlgorithmStepRegistry                 */
+/************************************************************************/
+
+class GDALVectorAlgorithmStepRegistry : public virtual GDALAlgorithmRegistry
+{
+  public:
+    GDALVectorAlgorithmStepRegistry() = default;
+    ~GDALVectorAlgorithmStepRegistry() override;
+
+    /** Register the algorithm of type MyAlgorithm.
+     */
+    template <class MyAlgorithm>
+    bool Register(const std::string &name = std::string())
+    {
+        static_assert(
+            std::is_base_of_v<GDALVectorPipelineStepAlgorithm, MyAlgorithm>,
+            "Algorithm is not a GDALVectorPipelineStepAlgorithm");
+
+        AlgInfo info;
+        info.m_name = name.empty() ? MyAlgorithm::NAME : name;
+        info.m_aliases = MyAlgorithm::GetAliasesStatic();
+        info.m_creationFunc = []() -> std::unique_ptr<GDALAlgorithm>
+        { return std::make_unique<MyAlgorithm>(); };
+        return GDALAlgorithmRegistry::Register(info);
+    }
+};
+
+/************************************************************************/
 /*                     GDALVectorPipelineAlgorithm                      */
 /************************************************************************/
 
@@ -71,7 +102,8 @@ class GDALVectorPipelineStepAlgorithm /* non final */
 #define GDAL_PIPELINE_PROJ_NOSTALGIA
 
 class GDALVectorPipelineAlgorithm final
-    : public GDALAbstractPipelineAlgorithm<GDALVectorPipelineStepAlgorithm>
+    : public GDALAbstractPipelineAlgorithm<GDALVectorPipelineStepAlgorithm,
+                                           GDALVectorAlgorithmStepRegistry>
 {
   public:
     static constexpr const char *NAME = "pipeline";
@@ -99,7 +131,7 @@ class GDALVectorPipelineAlgorithm final
     std::string GetUsageForCLI(bool shortUsage,
                                const UsageOptions &usageOptions) const override;
 
-    static void RegisterAlgorithms(GDALAlgorithmRegistry &registry,
+    static void RegisterAlgorithms(GDALVectorAlgorithmStepRegistry &registry,
                                    bool forMixedPipeline);
 };
 
@@ -117,7 +149,7 @@ class GDALVectorPipelineOutputLayer /* non final */
 {
   protected:
     explicit GDALVectorPipelineOutputLayer(OGRLayer &oSrcLayer);
-    ~GDALVectorPipelineOutputLayer();
+    ~GDALVectorPipelineOutputLayer() override;
 
     DEFINE_GET_NEXT_FEATURE_THROUGH_RAW(GDALVectorPipelineOutputLayer)
 
@@ -139,7 +171,7 @@ class GDALVectorPipelineOutputLayer /* non final */
 /** Class that forwards GetNextFeature() calls to the source layer and
  * can be added to GDALVectorPipelineOutputDataset::AddLayer()
  */
-class GDALVectorPipelinePassthroughLayer /* non final */
+class GDALVectorPipelinePassthroughLayer final
     : public GDALVectorPipelineOutputLayer
 {
   public:
@@ -178,7 +210,7 @@ class GDALVectorNonStreamingAlgorithmDataset /* non final */
 {
   public:
     GDALVectorNonStreamingAlgorithmDataset();
-    ~GDALVectorNonStreamingAlgorithmDataset();
+    ~GDALVectorNonStreamingAlgorithmDataset() override;
 
     virtual bool Process(OGRLayer &srcLayer, OGRLayer &dstLayer) = 0;
 
@@ -219,7 +251,7 @@ class GDALVectorPipelineOutputDataset final : public GDALDataset
 
   public:
     explicit GDALVectorPipelineOutputDataset(GDALDataset &oSrcDS);
-    ~GDALVectorPipelineOutputDataset();
+    ~GDALVectorPipelineOutputDataset() override;
 
     void AddLayer(OGRLayer &oSrcLayer,
                   std::unique_ptr<OGRLayerWithTranslateFeature> poNewLayer);

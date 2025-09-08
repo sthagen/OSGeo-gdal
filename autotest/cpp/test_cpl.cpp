@@ -832,6 +832,21 @@ TEST_F(test_cpl, CPLStringList_Sort)
     EXPECT_STREQ(oNVL.FetchNameValue("D"), "DD");
 }
 
+TEST_F(test_cpl, URLEncode)
+{
+    EXPECT_STREQ(CPLString("AB").URLEncode(), "AB");
+    EXPECT_STREQ(CPLString("A/B").URLEncode(), "A/B");
+    EXPECT_STREQ(CPLString("A B").URLEncode(), "A%20B");
+
+    const char *uriA =
+        "http://example.com/path with space%20/pipe|/query?param=1&val=A B";
+    const char *uriB = "http://example.com/path%20with%20space%20/pipe%7C/"
+                       "query?param=1&val=A%20B";
+    EXPECT_STREQ(CPLString(uriA).URLEncode(), uriB);
+    EXPECT_STREQ(CPLString(uriA).URLEncode(), CPLString(uriB).URLEncode());
+    EXPECT_STREQ(CPLString(uriA).URLEncode().URLEncode(), uriB);
+}
+
 TEST_F(test_cpl, CPL_HMAC_SHA256)
 {
     GByte abyDigest[CPL_SHA256_HASH_SIZE];
@@ -5007,37 +5022,38 @@ TEST_F(test_cpl, CPLGetExecPath)
     if (!CPLGetExecPath(achBuffer.data(), static_cast<int>(achBuffer.size())))
     {
         GTEST_SKIP() << "CPLGetExecPath() not implemented for this platform";
-        return;
     }
-
-    bool bFoundNulTerminatedChar = false;
-    for (char ch : achBuffer)
+    else
     {
-        if (ch == '\0')
+        bool bFoundNulTerminatedChar = false;
+        for (char ch : achBuffer)
         {
-            bFoundNulTerminatedChar = true;
-            break;
+            if (ch == '\0')
+            {
+                bFoundNulTerminatedChar = true;
+                break;
+            }
         }
+        ASSERT_TRUE(bFoundNulTerminatedChar);
+
+        // Check that the file exists
+        VSIStatBufL sStat;
+        EXPECT_EQ(VSIStatL(achBuffer.data(), &sStat), 0);
+
+        const std::string osStrBefore(achBuffer.data());
+
+        // Resize the buffer to just the minimum size
+        achBuffer.resize(strlen(achBuffer.data()) + 1);
+        EXPECT_TRUE(CPLGetExecPath(achBuffer.data(),
+                                   static_cast<int>(achBuffer.size())));
+
+        EXPECT_STREQ(osStrBefore.c_str(), achBuffer.data());
+
+        // Too small buffer
+        achBuffer.resize(achBuffer.size() - 1);
+        EXPECT_FALSE(CPLGetExecPath(achBuffer.data(),
+                                    static_cast<int>(achBuffer.size())));
     }
-    ASSERT_TRUE(bFoundNulTerminatedChar);
-
-    // Check that the file exists
-    VSIStatBufL sStat;
-    EXPECT_EQ(VSIStatL(achBuffer.data(), &sStat), 0);
-
-    const std::string osStrBefore(achBuffer.data());
-
-    // Resize the buffer to just the minimum size
-    achBuffer.resize(strlen(achBuffer.data()) + 1);
-    EXPECT_TRUE(
-        CPLGetExecPath(achBuffer.data(), static_cast<int>(achBuffer.size())));
-
-    EXPECT_STREQ(osStrBefore.c_str(), achBuffer.data());
-
-    // Too small buffer
-    achBuffer.resize(achBuffer.size() - 1);
-    EXPECT_FALSE(
-        CPLGetExecPath(achBuffer.data(), static_cast<int>(achBuffer.size())));
 }
 
 TEST_F(test_cpl, VSIDuplicateFileSystemHandler)
@@ -5991,6 +6007,8 @@ TEST_F(test_cpl, CPLGetCurrentThreadCount)
 TEST_F(test_cpl, CPLHasPathTraversal)
 {
     EXPECT_TRUE(CPLHasPathTraversal("a/../b"));
+    EXPECT_TRUE(CPLHasPathTraversal("a/../"));
+    EXPECT_TRUE(CPLHasPathTraversal("a/.."));
     EXPECT_TRUE(CPLHasPathTraversal("a\\..\\b"));
     EXPECT_FALSE(CPLHasPathTraversal("a/b"));
     {
@@ -5999,6 +6017,28 @@ TEST_F(test_cpl, CPLHasPathTraversal)
         EXPECT_FALSE(CPLHasPathTraversal("a/../b"));
         EXPECT_FALSE(CPLHasPathTraversal("a\\..\\b"));
     }
+}
+
+TEST_F(test_cpl, CPLHasUnbalancedPathTraversal)
+{
+    EXPECT_FALSE(CPLHasUnbalancedPathTraversal("a"));
+    EXPECT_FALSE(CPLHasUnbalancedPathTraversal("."));
+    EXPECT_FALSE(CPLHasUnbalancedPathTraversal("./"));
+    EXPECT_FALSE(CPLHasUnbalancedPathTraversal("a/.."));
+    EXPECT_FALSE(CPLHasUnbalancedPathTraversal("a/../b"));
+    EXPECT_FALSE(CPLHasUnbalancedPathTraversal("./a/../b"));
+    EXPECT_FALSE(CPLHasUnbalancedPathTraversal("a\\..\\b"));
+    EXPECT_FALSE(CPLHasUnbalancedPathTraversal("a/../b/../"));
+    EXPECT_FALSE(CPLHasUnbalancedPathTraversal("a/../b/.."));
+    EXPECT_FALSE(CPLHasUnbalancedPathTraversal("a/b"));
+
+    EXPECT_TRUE(CPLHasUnbalancedPathTraversal(".."));
+    EXPECT_TRUE(CPLHasUnbalancedPathTraversal("../"));
+    EXPECT_TRUE(CPLHasUnbalancedPathTraversal("../b"));
+    EXPECT_TRUE(CPLHasUnbalancedPathTraversal("a/../../"));
+    EXPECT_TRUE(CPLHasUnbalancedPathTraversal("a/../b/../.."));
+    EXPECT_TRUE(CPLHasUnbalancedPathTraversal("a/../b/../../"));
+    EXPECT_TRUE(CPLHasUnbalancedPathTraversal("a\\..\\..\\"));
 }
 
 }  // namespace
