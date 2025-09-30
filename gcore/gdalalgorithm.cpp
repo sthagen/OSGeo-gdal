@@ -44,8 +44,6 @@ constexpr const char *GDAL_ARG_NAME_OUTPUT_OPEN_OPTION = "output-open-option";
 
 constexpr const char *GDAL_ARG_NAME_BAND = "band";
 
-constexpr const char *GDAL_ARG_NAME_QUIET = "quiet";
-
 //! @cond Doxygen_Suppress
 struct GDALAlgorithmArgHS
 {
@@ -6514,6 +6512,7 @@ GDALAlgorithm::GetAutoComplete(std::vector<std::string> &args,
     }
     if (curAlg != this)
     {
+        curAlg->m_calledFromCommandLine = m_calledFromCommandLine;
         return curAlg->GetAutoComplete(args, lastWordIsComplete,
                                        /* showAllOptions = */ false);
     }
