@@ -479,6 +479,13 @@ man_pages = [
         1,
     ),
     (
+        "programs/gdal_mdim_mosaic",
+        "gdal-mdim-mosaic",
+        "Build a mosaic, either virtual (VRT) or materialized, from multidimensional datasets",
+        [author_evenr],
+        1,
+    ),
+    (
         "programs/gdal_pipeline",
         "gdal-pipeline",
         "Process a dataset applying several steps",
@@ -889,6 +896,13 @@ man_pages = [
         "gdal-vector-explode-collections",
         "Explode geometries of type collection of a vector dataset",
         [author_evenr],
+        1,
+    ),
+    (
+        "programs/gdal_vector_make_point",
+        "gdal-vector-make-point",
+        "Create point features from attribute fields",
+        [author_dbaston],
         1,
     ),
     (
