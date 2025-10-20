@@ -11,6 +11,7 @@
 # SPDX-License-Identifier: MIT
 ###############################################################################
 
+import array
 import math
 import struct
 
@@ -209,13 +210,13 @@ def test_vrtmultidim_subgroup_and_cross_references():
     <Group name="/">
         <Dimension name="X" size="20" indexingVariable="X"/>
         <Dimension name="Y" size="30" indexingVariable="/Y"/>
-        <Array name="X">
-            <DataType>Float32</DataType>
-            <DimensionRef ref="/X"/>
-        </Array>
         <Array name="Y">
             <DataType>Float32</DataType>
             <DimensionRef ref="Y"/>
+        </Array>
+        <Array name="X">
+            <DataType>Float32</DataType>
+            <DimensionRef ref="/X"/>
         </Array>
         <Group name="subgroup">
             <Dimension name="X" size="2" indexingVariable="X"/>
@@ -261,7 +262,7 @@ def test_vrtmultidim_subgroup_and_cross_references():
     assert indexing_var.GetDimensionCount() == 1
     assert indexing_var.GetDimensions()[0].GetSize() == 3
 
-    assert rg.GetMDArrayNames() == ["X", "Y"]
+    assert rg.GetMDArrayNames() == ["Y", "X"]
     X = rg.OpenMDArray("X")
     assert X
     assert X.GetDataType().GetNumericDataType() == gdal.GDT_Float32
@@ -1315,7 +1316,9 @@ def test_vrtmultidim_createmultidimensional():
             "attr_too_big", [4000 * 1000 * 1000], gdal.ExtendedDataType.CreateString()
         )
 
-    ar = rg.CreateMDArray("ar", [dim], gdal.ExtendedDataType.Create(gdal.GDT_Float32))
+    ar = rg.CreateMDArray(
+        "ar", [dim], gdal.ExtendedDataType.Create(gdal.GDT_Float32), ["BLOCKSIZE=2"]
+    )
     assert ar[0]
     with gdal.quiet_errors():
         assert not rg.CreateMDArray(
@@ -1357,6 +1360,7 @@ def test_vrtmultidim_createmultidimensional():
     <Array name="ar">
       <DataType>Float32</DataType>
       <DimensionRef ref="dim" />
+      <BlockSize>2</BlockSize>
       <Attribute name="attr">
         <DataType>String</DataType>
       </Attribute>
@@ -1367,6 +1371,11 @@ def test_vrtmultidim_createmultidimensional():
 """
     )
     _validate(got_data)
+
+    with gdal.OpenEx(tmpfile, gdal.OF_MULTIDIM_RASTER) as ds:
+        rg = ds.GetRootGroup()
+        ar = rg.OpenMDArray("ar")
+        assert ar.GetBlockSize() == [2]
 
     gdal.Unlink(tmpfile)
 
@@ -1929,3 +1938,66 @@ def test_vrtmultidim_arraysource_getmask_error_wrong_option():
       </VRTRasterBand>
     </VRTDataset>"""
         )
+
+
+@gdaltest.enable_exceptions()
+@pytest.mark.parametrize(
+    "source_slab,dest_slab,view_expr,expected",
+    [
+        ("", "", "[::1,:]", [0, 1, 2, 3, 4, 5]),
+        ("", "", "[::-1,:]", [4, 5, 2, 3, 0, 1]),
+        ('<SourceSlab offset="1,0" />', "", "[:,:]", [2, 3, 4, 5, 0, 0]),
+        ('<SourceSlab offset="1,0" />', "", "[::-1,:]", [4, 5, 2, 3, 0, 0]),
+        ("", '<DestSlab offset="1,0" />', "[:,:]", [0, 0, 0, 1, 2, 3]),
+        ("", '<DestSlab offset="1,0" />', "[::-1,:]", [2, 3, 0, 1, 0, 0]),
+        (
+            '<SourceSlab offset="1,0" />',
+            '<DestSlab offset="1,0" />',
+            "[:,:]",
+            [0, 0, 2, 3, 4, 5],
+        ),
+        (
+            '<SourceSlab offset="1,0" />',
+            '<DestSlab offset="1,0" />',
+            "[::-1,:]",
+            [4, 5, 2, 3, 0, 0],
+        ),
+    ],
+)
+def test_vrtmultidim_arraysource_view(
+    tmp_vsimem, source_slab, dest_slab, view_expr, expected
+):
+
+    with gdal.GetDriverByName("GTiff").Create(tmp_vsimem / "src.tif", 2, 3) as ds:
+        ds.GetRasterBand(1).WriteRaster(
+            0, 0, 2, 3, array.array("B", [0, 1, 2, 3, 4, 5])
+        )
+
+    ds = gdal.Open(
+        f"""<VRTDataset rasterXSize="2" rasterYSize="3">
+  <VRTRasterBand dataType="Byte" band="1">
+    <ArraySource>
+      <DerivedArray>
+        <Array name="data">
+          <DataType>Byte</DataType>
+          <Dimension name="y" size="3"/>
+          <Dimension name="x" size="2"/>
+          <Source>
+            <SourceFilename relativeToVRT="0">{tmp_vsimem}/src.tif</SourceFilename>
+            <SourceBand>1</SourceBand>
+            {source_slab}
+            {dest_slab}
+          </Source>
+        </Array>
+        <Step>
+          <View expr="{view_expr}"/>
+        </Step>
+      </DerivedArray>
+    </ArraySource>
+  </VRTRasterBand>
+</VRTDataset>"""
+    )
+
+    assert array.array("B", ds.GetRasterBand(1).ReadRaster()) == array.array(
+        "B", expected
+    )

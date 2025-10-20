@@ -5975,12 +5975,10 @@ def test_ogr_geojson_invalid_number(tmp_vsimem):
         ]
     }""",
     )
-    with ogr.Open(tmp_vsimem / "out.json") as ds:
-        lyr = ds.GetLayer(0)
-        with pytest.raises(
-            Exception, match="Unrecognized number: 123456781234567-81234567812345678"
-        ):
-            lyr.GetNextFeature()
+    with pytest.raises(
+        Exception, match="Unrecognized number: 123456781234567-81234567812345678"
+    ):
+        ogr.Open(tmp_vsimem / "out.json")
 
     gdal.FileFromMemBuffer(
         tmp_vsimem / "out.json",
@@ -5991,9 +5989,31 @@ def test_ogr_geojson_invalid_number(tmp_vsimem):
         ]
     }""",
     )
-    with ogr.Open(tmp_vsimem / "out.json") as ds:
-        lyr = ds.GetLayer(0)
-        with pytest.raises(
-            Exception, match="Unrecognized number: 12345678.1234567-81234567812345678"
-        ):
-            lyr.GetNextFeature()
+    with pytest.raises(
+        Exception, match="Unrecognized number: 12345678.1234567-81234567812345678"
+    ):
+        ogr.Open(tmp_vsimem / "out.json")
+
+    gdal.FileFromMemBuffer(
+        tmp_vsimem / "out.json", '{"":{"":"","features":[{"":4a},0]}}'
+    )
+
+    with pytest.raises(Exception, match="Unrecognized number: 4a"):
+        ogr.Open(tmp_vsimem / "out.json")
+
+
+def test_ogr_geojson_export_to_json_geom_collection_with_curve():
+
+    g = ogr.CreateGeometryFromWkt(
+        "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(CIRCULARSTRING EMPTY),POINT (0 0))"
+    )
+    assert json.loads(g.ExportToJson()) == {
+        "type": "GeometryCollection",
+        "geometries": [
+            {
+                "type": "GeometryCollection",
+                "geometries": [{"type": "LineString", "coordinates": []}],
+            },
+            {"type": "Point", "coordinates": [0.0, 0.0]},
+        ],
+    }
