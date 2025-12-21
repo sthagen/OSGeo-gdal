@@ -2787,12 +2787,11 @@ GDALDataset *OGRMVTDataset::OpenDirectory(GDALOpenInfo *poOpenInfo)
                             CPLJSONObject oFields;
                             oFields.Deinit();
                             poDS->m_apoLayers.push_back(
-                                std::unique_ptr<OGRLayer>(
-                                    new OGRMVTDirectoryLayer(
-                                        poDS, poTileLayer->GetName(),
-                                        poOpenInfo->pszFilename, oFields,
-                                        CPLJSONArray(), bJsonField, wkbUnknown,
-                                        nullptr)));
+                                std::make_unique<OGRMVTDirectoryLayer>(
+                                    poDS, poTileLayer->GetName(),
+                                    poOpenInfo->pszFilename, oFields,
+                                    CPLJSONArray(), bJsonField, wkbUnknown,
+                                    nullptr));
                             poLayer = poDS->m_apoLayers.back().get();
                             poLDefn = poLayer->GetLayerDefn();
                             poLDefn->SetGeomType(eTileGeomType);
@@ -2929,11 +2928,10 @@ GDALDataset *OGRMVTDataset::OpenDirectory(GDALOpenInfo *poOpenInfo)
                 OGRMVTFindAttributesFromTileStat(oTileStatLayers,
                                                  oId.ToString().c_str());
 
-            poDS->m_apoLayers.push_back(
-                std::unique_ptr<OGRLayer>(new OGRMVTDirectoryLayer(
-                    poDS, oId.ToString().c_str(), poOpenInfo->pszFilename,
-                    oFields, oAttributesFromTileStats, bJsonField, eGeomType,
-                    (bExtentValid) ? &sExtent : nullptr)));
+            poDS->m_apoLayers.push_back(std::make_unique<OGRMVTDirectoryLayer>(
+                poDS, oId.ToString().c_str(), poOpenInfo->pszFilename, oFields,
+                oAttributesFromTileStats, bJsonField, eGeomType,
+                (bExtentValid) ? &sExtent : nullptr));
         }
     }
 
@@ -3484,7 +3482,12 @@ class OGRMVTWriterDataset final : public GDALDataset
     OGRMVTWriterDataset();
     ~OGRMVTWriterDataset() override;
 
-    CPLErr Close() override;
+    CPLErr Close(GDALProgressFunc = nullptr, void * = nullptr) override;
+
+    bool CanReopenWithCurrentDescription() const override
+    {
+        return false;
+    }
 
     OGRLayer *ICreateLayer(const char *pszName,
                            const OGRGeomFieldDefn *poGeomFieldDefn,
@@ -3663,7 +3666,7 @@ OGRMVTWriterDataset::~OGRMVTWriterDataset()
 /*                              Close()                                 */
 /************************************************************************/
 
-CPLErr OGRMVTWriterDataset::Close()
+CPLErr OGRMVTWriterDataset::Close(GDALProgressFunc, void *)
 {
     CPLErr eErr = CE_None;
     if (nOpenFlags != OPEN_FLAGS_CLOSED)
@@ -4100,10 +4103,8 @@ OGRErr OGRMVTWriterDataset::PreGenerateForTileReal(
     }
 
     // Create a layer with a single feature in it
-    std::shared_ptr<MVTTileLayer> poLayer =
-        std::shared_ptr<MVTTileLayer>(new MVTTileLayer());
-    std::shared_ptr<MVTTileLayerFeature> poGPBFeature =
-        std::shared_ptr<MVTTileLayerFeature>(new MVTTileLayerFeature());
+    auto poLayer = std::make_shared<MVTTileLayer>();
+    auto poGPBFeature = std::make_shared<MVTTileLayerFeature>();
     poLayer->addFeature(poGPBFeature);
 
     OGRwkbGeometryType eGeomType = wkbFlatten(poGeom->getGeometryType());
@@ -5080,7 +5081,7 @@ std::string OGRMVTWriterDataset::EncodeTile(
                 std::max(nZ, poLayerProperties->m_nMaxZoom);
         }
 
-        std::shared_ptr<MVTTileLayer> poTargetLayer(new MVTTileLayer());
+        auto poTargetLayer = std::make_shared<MVTTileLayer>();
         oTargetTile.addLayer(poTargetLayer);
         poTargetLayer->setName(pszLayerName);
         poTargetLayer->setVersion(m_nMVTVersion);
@@ -5215,8 +5216,7 @@ std::string OGRMVTWriterDataset::EncodeTile(
             auto oIter = oMapLayerNameToTargetLayer.find(pszLayerName);
             if (oIter == oMapLayerNameToTargetLayer.end())
             {
-                poTargetLayer =
-                    std::shared_ptr<MVTTileLayer>(new MVTTileLayer());
+                poTargetLayer = std::make_shared<MVTTileLayer>();
                 TargetTileLayerProps props;
                 props.m_poLayer = poTargetLayer;
                 oTargetTile.addLayer(poTargetLayer);
@@ -5290,7 +5290,7 @@ std::string OGRMVTWriterDataset::RecodeTileLowerResolution(
         sqlite3_bind_int(hStmtRows, 3, nY);
         sqlite3_bind_text(hStmtRows, 4, pszLayerName, -1, SQLITE_STATIC);
 
-        std::shared_ptr<MVTTileLayer> poTargetLayer(new MVTTileLayer());
+        auto poTargetLayer = std::make_shared<MVTTileLayer>();
         oTargetTile.addLayer(poTargetLayer);
         poTargetLayer->setName(pszLayerName);
         poTargetLayer->setVersion(m_nMVTVersion);
@@ -5883,8 +5883,7 @@ OGRErr OGRMVTWriterDataset::WriteFeature(OGRMVTWriterLayer *poLayer,
 
     if (!m_bReuseTempFile)
     {
-        auto poFeatureContent =
-            std::shared_ptr<OGRMVTFeatureContent>(new OGRMVTFeatureContent());
+        auto poFeatureContent = std::make_shared<OGRMVTFeatureContent>();
         auto poSharedGeom = std::shared_ptr<OGRGeometry>(poGeom->clone());
 
         poFeatureContent->nFID = poFeature->GetFID();
@@ -5995,7 +5994,7 @@ OGRErr OGRMVTWriterDataset::WriteFeature(OGRMVTWriterLayer *poLayer,
 
 int OGRMVTWriterDataset::TestCapability(const char *pszCap) const
 {
-    if (EQUAL(pszCap, ODsCCreateLayer))
+    if (EQUAL(pszCap, ODsCCreateLayer) || EQUAL(pszCap, ODsCRandomLayerWrite))
         return true;
     return false;
 }

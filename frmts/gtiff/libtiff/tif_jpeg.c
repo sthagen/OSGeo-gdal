@@ -1016,7 +1016,7 @@ JPEGFixupTagsSubsamplingReadByte(struct JPEGFixupTagsSubsamplingData *data,
         assert(m < 0x80000000UL);
         if (TIFFReadFile(data->tif, data->buffer, (tmsize_t)m) != (tmsize_t)m)
             return (0);
-        data->buffercurrentbyte = data->buffer;
+        data->buffercurrentbyte = (uint8_t *)data->buffer;
         data->bufferbytesleft = m;
         data->fileoffset += m;
         data->filebytesleft -= m;
@@ -1282,7 +1282,8 @@ int TIFFJPEGIsFullStripRequired(TIFF *tif)
     sp->cinfo.d.data_precision = td->td_bitspersample;
     sp->cinfo.d.bits_in_jsample = td->td_bitspersample;
 #else
-    if (sp->cinfo.d.data_precision != td->td_bitspersample)
+    if (td->td_bitspersample != BITS_IN_JSAMPLE ||
+        sp->cinfo.d.data_precision != td->td_bitspersample)
     {
         TIFFErrorExtR(tif, module, "Improper JPEG data precision");
         return (0);

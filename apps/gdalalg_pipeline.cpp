@@ -88,12 +88,12 @@ void GDALPipelineStepAlgorithm::AddRasterInputArgs(
         .SetHiddenForCLI(hiddenForCLI);
     AddOpenOptionsArg(&m_openOptions).SetHiddenForCLI(hiddenForCLI);
     auto &arg =
-        AddInputDatasetArg(&m_inputDataset,
-                           openForMixedRasterVector
-                               ? (GDAL_OF_RASTER | GDAL_OF_VECTOR)
-                               : GDAL_OF_RASTER,
-                           /* positionalAndRequired = */ !hiddenForCLI,
-                           m_constructorOptions.inputDatasetHelpMsg.c_str())
+        AddInputDatasetArg(
+            &m_inputDataset,
+            openForMixedRasterVector ? (GDAL_OF_RASTER | GDAL_OF_VECTOR)
+                                     : GDAL_OF_RASTER,
+            m_constructorOptions.inputDatasetRequired && !hiddenForCLI,
+            m_constructorOptions.inputDatasetHelpMsg.c_str())
             .SetMinCount(1)
             .SetMaxCount(m_constructorOptions.inputDatasetMaxCount)
             .SetAutoOpenDataset(m_constructorOptions.autoOpenInputDatasets)
@@ -184,11 +184,7 @@ void GDALPipelineStepAlgorithm::AddVectorOutputArgs(
         outputDatasetArg.SetPositional();
     if (!hiddenForCLI && m_constructorOptions.outputDatasetRequired)
         outputDatasetArg.SetRequired();
-    if (!m_constructorOptions.outputDatasetMutualExclusionGroup.empty())
-    {
-        outputDatasetArg.SetMutualExclusionGroup(
-            m_constructorOptions.outputDatasetMutualExclusionGroup);
-    }
+
     AddCreationOptionsArg(&m_creationOptions).SetHiddenForCLI(hiddenForCLI);
     AddLayerCreationOptionsArg(&m_layerCreationOptions)
         .SetHiddenForCLI(hiddenForCLI);
@@ -197,11 +193,6 @@ void GDALPipelineStepAlgorithm::AddVectorOutputArgs(
     if (m_constructorOptions.addUpdateArgument)
     {
         updateArg = &AddUpdateArg(&m_update).SetHiddenForCLI(hiddenForCLI);
-    }
-    if (updateArg && !m_constructorOptions.updateMutualExclusionGroup.empty())
-    {
-        updateArg->SetMutualExclusionGroup(
-            m_constructorOptions.updateMutualExclusionGroup);
     }
     if (m_constructorOptions.addOverwriteLayerArgument)
     {
@@ -594,6 +585,7 @@ GDALPipelineAlgorithm::GDALPipelineAlgorithm()
 
     GDALRasterPipelineAlgorithm::RegisterAlgorithms(m_stepRegistry, true);
     GDALVectorPipelineAlgorithm::RegisterAlgorithms(m_stepRegistry, true);
+    m_stepRegistry.Register<GDALRasterAsFeaturesAlgorithm>();
     m_stepRegistry.Register<GDALRasterContourAlgorithm>();
     m_stepRegistry.Register<GDALRasterFootprintAlgorithm>();
     m_stepRegistry.Register<GDALRasterPolygonizeAlgorithm>();
@@ -616,7 +608,6 @@ GDALPipelineAlgorithm::GetUsageForCLI(bool shortUsage,
     if (!m_helpDocCategory.empty() && m_helpDocCategory != "main")
     {
         auto alg = GetStepAlg(m_helpDocCategory);
-        std::string ret;
         if (alg)
         {
             alg->SetCallPath({CPLString(m_helpDocCategory)
@@ -642,7 +633,7 @@ GDALPipelineAlgorithm::GetUsageForCLI(bool shortUsage,
         return ret;
 
     ret +=
-        "\n<PIPELINE> is of the form: read|calc|concat|mosaic|stack "
+        "\n<PIPELINE> is of the form: read|calc|concat|create|mosaic|stack "
         "[READ-OPTIONS] "
         "( ! <STEP-NAME> [STEP-OPTIONS] )* ! write!info!tile [WRITE-OPTIONS]\n";
 

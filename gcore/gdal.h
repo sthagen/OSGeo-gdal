@@ -1294,7 +1294,12 @@ GDALDriverH CPL_DLL CPL_STDCALL GDALGetDatasetDriver(GDALDatasetH);
 char CPL_DLL **CPL_STDCALL GDALGetFileList(GDALDatasetH);
 void CPL_DLL GDALDatasetMarkSuppressOnClose(GDALDatasetH);
 CPLErr CPL_DLL CPL_STDCALL GDALClose(GDALDatasetH);
+CPLErr CPL_DLL GDALCloseEx(GDALDatasetH hDS, GDALProgressFunc pfnProgress,
+                           void *pProgressData);
+bool CPL_DLL GDALDatasetGetCloseReportsProgress(GDALDatasetH hDS);
 CPLErr CPL_DLL GDALDatasetRunCloseWithoutDestroying(GDALDatasetH hDS);
+CPLErr CPL_DLL GDALDatasetRunCloseWithoutDestroyingEx(
+    GDALDatasetH hDS, GDALProgressFunc pfnProgress, void *pProgressData);
 int CPL_DLL CPL_STDCALL GDALGetRasterXSize(GDALDatasetH);
 int CPL_DLL CPL_STDCALL GDALGetRasterYSize(GDALDatasetH);
 int CPL_DLL CPL_STDCALL GDALGetRasterCount(GDALDatasetH);
@@ -1358,6 +1363,18 @@ CPLErr CPL_DLL GDALGetExtentWGS84LongLat(GDALDatasetH, OGREnvelope *);
 CPLErr CPL_DLL GDALDatasetGeolocationToPixelLine(
     GDALDatasetH, double dfGeolocX, double dfGeolocY, OGRSpatialReferenceH hSRS,
     double *pdfPixel, double *pdfLine, CSLConstList papszTransformerOptions);
+
+CPLErr CPL_DLL GDALDatasetGetInterBandCovarianceMatrix(
+    GDALDatasetH hDS, double *padfCovMatrix, size_t nSize, int nBandCount,
+    const int *panBandList, bool bApproxOK, bool bForce,
+    bool bWriteIntoMetadata, int nDeltaDegreeOfFreedom,
+    GDALProgressFunc pfnProgress, void *pProgressData);
+
+CPLErr CPL_DLL GDALDatasetComputeInterBandCovarianceMatrix(
+    GDALDatasetH hDS, double *padfCovMatrix, size_t nSize, int nBandCount,
+    const int *panBandList, bool bApproxOK, bool bWriteIntoMetadata,
+    int nDeltaDegreeOfFreedom, GDALProgressFunc pfnProgress,
+    void *pProgressData);
 
 int CPL_DLL CPL_STDCALL GDALGetGCPCount(GDALDatasetH);
 const char CPL_DLL *CPL_STDCALL GDALGetGCPProjection(GDALDatasetH);

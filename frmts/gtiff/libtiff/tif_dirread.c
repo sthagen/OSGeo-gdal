@@ -3283,13 +3283,42 @@ TIFFReadDirEntryPersampleShort(TIFF *tif, TIFFDirEntry *direntry,
     uint16_t *m;
     uint16_t *na;
     uint16_t nb;
-    if (direntry->tdir_count < (uint64_t)tif->tif_dir.td_samplesperpixel)
-        return (TIFFReadDirEntryErrCount);
+    if (direntry->tdir_count != (uint64_t)tif->tif_dir.td_samplesperpixel)
+    {
+        const TIFFField *fip = TIFFFieldWithTag(tif, direntry->tdir_tag);
+        if (direntry->tdir_count == 0)
+        {
+            return TIFFReadDirEntryErrCount;
+        }
+        else if (direntry->tdir_count <
+                 (uint64_t)tif->tif_dir.td_samplesperpixel)
+        {
+            TIFFWarningExtR(
+                tif, "TIFFReadDirEntryPersampleShort",
+                "Tag %s entry count is %" PRIu64
+                " , whereas it should be SamplesPerPixel=%d. Assuming that "
+                "missing entries are all at the value of the first one",
+                fip ? fip->field_name : "unknown tagname", direntry->tdir_count,
+                tif->tif_dir.td_samplesperpixel);
+        }
+        else
+        {
+            TIFFWarningExtR(tif, "TIFFReadDirEntryPersampleShort",
+                            "Tag %s entry count is %" PRIu64
+                            " , whereas it should be SamplesPerPixel=%d. "
+                            "Ignoring extra entries",
+                            fip ? fip->field_name : "unknown tagname",
+                            direntry->tdir_count,
+                            tif->tif_dir.td_samplesperpixel);
+        }
+    }
     err = TIFFReadDirEntryShortArray(tif, direntry, &m);
     if (err != TIFFReadDirEntryErrOk || m == NULL)
         return (err);
     na = m;
     nb = tif->tif_dir.td_samplesperpixel;
+    if (direntry->tdir_count < nb)
+        nb = (uint16_t)direntry->tdir_count;
     *value = *na++;
     nb--;
     while (nb > 0)
@@ -6355,8 +6384,8 @@ static int TIFFFetchNormalTag(TIFF *tif, TIFFDirEntry *dp, int recover)
                     /* TIFFReadDirEntryArrayWithLimit() ensures this can't be
                      * larger than MAX_SIZE_TAG_DATA */
                     assert((uint32_t)dp->tdir_count + 1 == dp->tdir_count + 1);
-                    uint8_t *o =
-                        _TIFFmallocExt(tif, (uint32_t)dp->tdir_count + 1);
+                    uint8_t *o = (uint8_t *)_TIFFmallocExt(
+                        tif, (uint32_t)dp->tdir_count + 1);
                     if (o == NULL)
                     {
                         if (data != NULL)
@@ -6938,8 +6967,8 @@ static int TIFFFetchNormalTag(TIFF *tif, TIFFDirEntry *dp, int recover)
                                         "byte. Forcing it to be null",
                                         fip->field_name);
                         /* Enlarge buffer and add terminating null. */
-                        uint8_t *o =
-                            _TIFFmallocExt(tif, (uint32_t)dp->tdir_count + 1);
+                        uint8_t *o = (uint8_t *)_TIFFmallocExt(
+                            tif, (uint32_t)dp->tdir_count + 1);
                         if (o == NULL)
                         {
                             if (data != NULL)
@@ -7309,8 +7338,8 @@ static int TIFFFetchNormalTag(TIFF *tif, TIFFDirEntry *dp, int recover)
                         "in null byte. Forcing it to be null",
                         fip->field_name);
                     /* Enlarge buffer and add terminating null. */
-                    uint8_t *o =
-                        _TIFFmallocExt(tif, (uint32_t)dp->tdir_count + 1);
+                    uint8_t *o = (uint8_t *)_TIFFmallocExt(
+                        tif, (uint32_t)dp->tdir_count + 1);
                     if (o == NULL)
                     {
                         if (data != NULL)
@@ -7866,7 +7895,7 @@ static void allocChoppedUpStripArrays(TIFF *tif, uint32_t nstrips,
  */
 static void ChopUpSingleUncompressedStrip(TIFF *tif)
 {
-    register TIFFDirectory *td = &tif->tif_dir;
+    TIFFDirectory *td = &tif->tif_dir;
     uint64_t bytecount;
     uint64_t offset;
     uint32_t rowblock;
@@ -8382,7 +8411,7 @@ int _TIFFFillStriles(TIFF *tif) { return _TIFFFillStrilesInternal(tif, 1); }
 
 static int _TIFFFillStrilesInternal(TIFF *tif, int loadStripByteCount)
 {
-    register TIFFDirectory *td = &tif->tif_dir;
+    TIFFDirectory *td = &tif->tif_dir;
     int return_value = 1;
 
     /* Do not do anything if TIFF_DEFERSTRILELOAD is not set */
