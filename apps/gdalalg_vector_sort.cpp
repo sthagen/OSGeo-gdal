@@ -45,26 +45,26 @@ GDALVectorSortAlgorithm::GDALVectorSortAlgorithm(bool standaloneStep)
 namespace
 {
 
-bool CreateDstFeatures(
-    const std::vector<std::unique_ptr<OGRFeature>> &srcFeatures,
-    const std::vector<size_t> &sortedIndices, OGRLayer &dstLayer,
-    GDALProgressFunc pfnProgress, void *pProgressData, double dfProgressStart,
-    double dfProgressRatio)
+bool CreateDstFeatures(std::vector<std::unique_ptr<OGRFeature>> &srcFeatures,
+                       const std::vector<size_t> &sortedIndices,
+                       OGRLayer &dstLayer, GDALProgressFunc pfnProgress,
+                       void *pProgressData, double dfProgressStart,
+                       double dfProgressRatio)
 {
+    uint64_t nCounter = 0;
     for (size_t iSrcFeature : sortedIndices)
     {
-        OGRFeature *poSrcFeature = srcFeatures[iSrcFeature].get();
+        auto &poSrcFeature = srcFeatures[iSrcFeature];
         poSrcFeature->SetFDefnUnsafe(dstLayer.GetLayerDefn());
         poSrcFeature->SetFID(OGRNullFID);
 
-        if (dstLayer.CreateFeature(poSrcFeature) != OGRERR_NONE)
+        if (dstLayer.CreateFeature(std::move(poSrcFeature)) != OGRERR_NONE)
         {
             return false;
         }
         if (pfnProgress &&
             !pfnProgress(dfProgressStart +
-                             static_cast<double>(dstLayer.GetFeatureCount()) *
-                                 dfProgressRatio,
+                             static_cast<double>(++nCounter) * dfProgressRatio,
                          "", pProgressData))
         {
             CPLError(CE_Failure, CPLE_UserInterrupt, "Interrupted by user");
@@ -267,10 +267,9 @@ class GDALVectorSTRTreeSortDataset
             },
             &sortedIndices);
 
-        for (size_t nullInd : nullIndices)
-        {
-            sortedIndices.push_back(nullInd);
-        }
+        sortedIndices.insert(sortedIndices.end(), nullIndices.begin(),
+                             nullIndices.end());
+        nullIndices.clear();
 
         const double dfProgressStart = nLayerFeatures > 0 ? 2.0 / 3.0 : 0.0;
         const double dfProgressRatio =

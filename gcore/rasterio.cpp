@@ -2990,6 +2990,8 @@ CPL_NOINLINE void GDALCopyWordsT(const int16_t *const CPL_RESTRICT pSrcData,
     }
 }
 
+#endif  // HAVE_SSE2
+
 template <>
 CPL_NOINLINE void GDALCopyWordsT(const double *const CPL_RESTRICT pSrcData,
                                  int nSrcPixelStride,
@@ -3050,36 +3052,20 @@ CPL_NOINLINE void GDALCopyWordsT(const GFloat16 *const CPL_RESTRICT pSrcData,
                             nDstPixelStride, nWordCount);
 }
 
-#ifdef __F16C__
-
-template <>
-CPL_NOINLINE void GDALCopyWordsT(const float *const CPL_RESTRICT pSrcData,
-                                 int nSrcPixelStride,
-                                 GFloat16 *const CPL_RESTRICT pDstData,
-                                 int nDstPixelStride, GPtrDiff_t nWordCount)
-{
-    GDALCopyWordsT_8atatime(pSrcData, nSrcPixelStride, pDstData,
-                            nDstPixelStride, nWordCount);
-}
-
-template <>
-CPL_NOINLINE void GDALCopyWordsT(const double *const CPL_RESTRICT pSrcData,
-                                 int nSrcPixelStride,
-                                 GFloat16 *const CPL_RESTRICT pDstData,
-                                 int nDstPixelStride, GPtrDiff_t nWordCount)
-{
-    GDALCopyWordsT_8atatime(pSrcData, nSrcPixelStride, pDstData,
-                            nDstPixelStride, nWordCount);
-}
-
-#endif  // __F16C__
-
-#endif  // HAVE_SSE2
-
 template <>
 CPL_NOINLINE void GDALCopyWordsT(const float *const CPL_RESTRICT pSrcData,
                                  int nSrcPixelStride,
                                  GByte *const CPL_RESTRICT pDstData,
+                                 int nDstPixelStride, GPtrDiff_t nWordCount)
+{
+    GDALCopyWordsT_8atatime(pSrcData, nSrcPixelStride, pDstData,
+                            nDstPixelStride, nWordCount);
+}
+
+template <>
+CPL_NOINLINE void GDALCopyWordsT(const float *const CPL_RESTRICT pSrcData,
+                                 int nSrcPixelStride,
+                                 GInt8 *const CPL_RESTRICT pDstData,
                                  int nDstPixelStride, GPtrDiff_t nWordCount)
 {
     GDALCopyWordsT_8atatime(pSrcData, nSrcPixelStride, pDstData,
@@ -3100,6 +3086,36 @@ template <>
 CPL_NOINLINE void GDALCopyWordsT(const float *const CPL_RESTRICT pSrcData,
                                  int nSrcPixelStride,
                                  GUInt16 *const CPL_RESTRICT pDstData,
+                                 int nDstPixelStride, GPtrDiff_t nWordCount)
+{
+    GDALCopyWordsT_8atatime(pSrcData, nSrcPixelStride, pDstData,
+                            nDstPixelStride, nWordCount);
+}
+
+template <>
+CPL_NOINLINE void GDALCopyWordsT(const float *const CPL_RESTRICT pSrcData,
+                                 int nSrcPixelStride,
+                                 GInt32 *const CPL_RESTRICT pDstData,
+                                 int nDstPixelStride, GPtrDiff_t nWordCount)
+{
+    GDALCopyWordsT_8atatime(pSrcData, nSrcPixelStride, pDstData,
+                            nDstPixelStride, nWordCount);
+}
+
+template <>
+CPL_NOINLINE void GDALCopyWordsT(const float *const CPL_RESTRICT pSrcData,
+                                 int nSrcPixelStride,
+                                 GFloat16 *const CPL_RESTRICT pDstData,
+                                 int nDstPixelStride, GPtrDiff_t nWordCount)
+{
+    GDALCopyWordsT_8atatime(pSrcData, nSrcPixelStride, pDstData,
+                            nDstPixelStride, nWordCount);
+}
+
+template <>
+CPL_NOINLINE void GDALCopyWordsT(const double *const CPL_RESTRICT pSrcData,
+                                 int nSrcPixelStride,
+                                 GFloat16 *const CPL_RESTRICT pDstData,
                                  int nDstPixelStride, GPtrDiff_t nWordCount)
 {
     GDALCopyWordsT_8atatime(pSrcData, nSrcPixelStride, pDstData,
@@ -3493,10 +3509,14 @@ static void GDALReplicateWord(const void *CPL_RESTRICT pSrcData,
 /************************************************************************/
 
 template <class T, int srcStride, int dstStride>
-static inline void GDALUnrolledCopyGeneric(T *CPL_RESTRICT pDest,
-                                           const T *CPL_RESTRICT pSrc,
-                                           GPtrDiff_t nIters)
+#if defined(__GNUC__) && defined(__AVX2__)
+__attribute__((optimize("tree-vectorize")))
+#endif
+static inline void
+GDALUnrolledCopyGeneric(T *CPL_RESTRICT pDest, const T *CPL_RESTRICT pSrc,
+                        GPtrDiff_t nIters)
 {
+#if !(defined(__GNUC__) && defined(__AVX2__))
     if (nIters >= 16)
     {
         for (GPtrDiff_t i = nIters / 16; i != 0; i--)
@@ -3522,6 +3542,9 @@ static inline void GDALUnrolledCopyGeneric(T *CPL_RESTRICT pDest,
         }
         nIters = nIters % 16;
     }
+#else
+#pragma GCC unroll 4
+#endif
     for (GPtrDiff_t i = 0; i < nIters; i++)
     {
         pDest[i * dstStride] = *pSrc;
@@ -3537,7 +3560,31 @@ static inline void GDALUnrolledCopy(T *CPL_RESTRICT pDest,
     GDALUnrolledCopyGeneric<T, srcStride, dstStride>(pDest, pSrc, nIters);
 }
 
-#ifdef HAVE_SSE2
+#if defined(__AVX2__) && defined(HAVE_SSSE3_AT_COMPILE_TIME) &&                \
+    (defined(__x86_64) || defined(_M_X64) || defined(USE_NEON_OPTIMIZATIONS))
+
+template <>
+void GDALUnrolledCopy<GByte, 3, 1>(GByte *CPL_RESTRICT pDest,
+                                   const GByte *CPL_RESTRICT pSrc,
+                                   GPtrDiff_t nIters)
+{
+    if (nIters > 16)
+    {
+        // The SSSE3 variant is slightly faster than what the gcc autovectorizer
+        // generates
+        GDALUnrolledCopy_GByte_3_1_SSSE3(pDest, pSrc, nIters);
+    }
+    else
+    {
+        for (GPtrDiff_t i = 0; i < nIters; i++)
+        {
+            pDest[i] = *pSrc;
+            pSrc += 3;
+        }
+    }
+}
+
+#elif defined(HAVE_SSE2) && !(defined(__GNUC__) && defined(__AVX2__))
 
 template <>
 void GDALUnrolledCopy<GByte, 2, 1>(GByte *CPL_RESTRICT pDest,
@@ -3575,6 +3622,92 @@ void GDALUnrolledCopy<GByte, 2, 1>(GByte *CPL_RESTRICT pDest,
     }
 }
 
+static void GDALUnrolledCopy_GByte_3_1_SSE2(GByte *CPL_RESTRICT pDest,
+                                            const GByte *CPL_RESTRICT pSrc,
+                                            GPtrDiff_t nIters)
+{
+    decltype(nIters) i = 0;
+    const __m128i xmm_mask_ori = _mm_set_epi32(0, 0, 0, 255);
+    // If we were sure that there would always be 2 trailing bytes, we could
+    // check against nIters - 15
+    for (; i < nIters - 16; i += 16)
+    {
+        __m128i xmm0 =
+            _mm_loadu_si128(reinterpret_cast<__m128i const *>(pSrc + 0));
+        __m128i xmm1 =
+            _mm_loadu_si128(reinterpret_cast<__m128i const *>(pSrc + 16));
+        __m128i xmm2 =
+            _mm_loadu_si128(reinterpret_cast<__m128i const *>(pSrc + 32));
+
+        auto xmm_mask0 = xmm_mask_ori;
+        auto xmm_mask1 = _mm_slli_si128(xmm_mask_ori, 6);
+        auto xmm_mask2 = _mm_slli_si128(xmm_mask_ori, 11);
+
+        auto xmm = _mm_and_si128(xmm0, xmm_mask0);
+        auto xmm_res1 = _mm_and_si128(_mm_slli_si128(xmm1, 4), xmm_mask1);
+
+        xmm_mask0 = _mm_slli_si128(xmm_mask0, 1);
+        xmm_mask1 = _mm_slli_si128(xmm_mask1, 1);
+        xmm0 = _mm_srli_si128(xmm0, 2);
+        xmm = _mm_or_si128(xmm, _mm_and_si128(xmm0, xmm_mask0));
+        xmm_res1 = _mm_or_si128(
+            xmm_res1, _mm_and_si128(_mm_slli_si128(xmm1, 2), xmm_mask1));
+
+        xmm_mask0 = _mm_slli_si128(xmm_mask0, 1);
+        xmm_mask1 = _mm_slli_si128(xmm_mask1, 1);
+        xmm0 = _mm_srli_si128(xmm0, 2);
+        xmm = _mm_or_si128(xmm, _mm_and_si128(xmm0, xmm_mask0));
+        xmm_res1 = _mm_or_si128(xmm_res1, _mm_and_si128(xmm1, xmm_mask1));
+
+        xmm_mask0 = _mm_slli_si128(xmm_mask0, 1);
+        xmm_mask1 = _mm_slli_si128(xmm_mask1, 1);
+        xmm0 = _mm_srli_si128(xmm0, 2);
+        xmm = _mm_or_si128(xmm, _mm_and_si128(xmm0, xmm_mask0));
+        xmm_res1 = _mm_or_si128(
+            xmm_res1, _mm_and_si128(_mm_srli_si128(xmm1, 2), xmm_mask1));
+
+        xmm_mask0 = _mm_slli_si128(xmm_mask0, 1);
+        xmm_mask1 = _mm_slli_si128(xmm_mask1, 1);
+        xmm0 = _mm_srli_si128(xmm0, 2);
+        xmm = _mm_or_si128(xmm, _mm_and_si128(xmm0, xmm_mask0));
+        xmm_res1 = _mm_or_si128(
+            xmm_res1, _mm_and_si128(_mm_srli_si128(xmm1, 4), xmm_mask1));
+        xmm = _mm_or_si128(xmm, xmm_res1);
+
+        xmm_mask0 = _mm_slli_si128(xmm_mask0, 1);
+        xmm0 = _mm_srli_si128(xmm0, 2);
+        xmm = _mm_or_si128(xmm, _mm_and_si128(xmm0, xmm_mask0));
+
+        xmm = _mm_or_si128(xmm,
+                           _mm_and_si128(_mm_slli_si128(xmm2, 10), xmm_mask2));
+
+        xmm_mask2 = _mm_slli_si128(xmm_mask2, 1);
+        xmm = _mm_or_si128(xmm,
+                           _mm_and_si128(_mm_slli_si128(xmm2, 8), xmm_mask2));
+
+        xmm_mask2 = _mm_slli_si128(xmm_mask2, 1);
+        xmm = _mm_or_si128(xmm,
+                           _mm_and_si128(_mm_slli_si128(xmm2, 6), xmm_mask2));
+
+        xmm_mask2 = _mm_slli_si128(xmm_mask2, 1);
+        xmm = _mm_or_si128(xmm,
+                           _mm_and_si128(_mm_slli_si128(xmm2, 4), xmm_mask2));
+
+        xmm_mask2 = _mm_slli_si128(xmm_mask2, 1);
+        xmm = _mm_or_si128(xmm,
+                           _mm_and_si128(_mm_slli_si128(xmm2, 2), xmm_mask2));
+
+        _mm_storeu_si128(reinterpret_cast<__m128i *>(pDest + i), xmm);
+
+        pSrc += 3 * 16;
+    }
+    for (; i < nIters; i++)
+    {
+        pDest[i] = *pSrc;
+        pSrc += 3;
+    }
+}
+
 #ifdef HAVE_SSSE3_AT_COMPILE_TIME
 
 template <>
@@ -3582,16 +3715,36 @@ void GDALUnrolledCopy<GByte, 3, 1>(GByte *CPL_RESTRICT pDest,
                                    const GByte *CPL_RESTRICT pSrc,
                                    GPtrDiff_t nIters)
 {
-    if (nIters > 16 && CPLHaveRuntimeSSSE3())
+    if (nIters > 16)
     {
-        GDALUnrolledCopy_GByte_3_1_SSSE3(pDest, pSrc, nIters);
+        if (CPLHaveRuntimeSSSE3())
+        {
+            GDALUnrolledCopy_GByte_3_1_SSSE3(pDest, pSrc, nIters);
+        }
+        else
+        {
+            GDALUnrolledCopy_GByte_3_1_SSE2(pDest, pSrc, nIters);
+        }
     }
     else
     {
-        GDALUnrolledCopyGeneric<GByte, 3, 1>(pDest, pSrc, nIters);
+        for (GPtrDiff_t i = 0; i < nIters; i++)
+        {
+            pDest[i] = *pSrc;
+            pSrc += 3;
+        }
     }
 }
 
+#else
+
+template <>
+void GDALUnrolledCopy<GByte, 3, 1>(GByte *CPL_RESTRICT pDest,
+                                   const GByte *CPL_RESTRICT pSrc,
+                                   GPtrDiff_t nIters)
+{
+    GDALUnrolledCopy_GByte_3_1_SSE2(pDest, pSrc, nIters);
+}
 #endif
 
 template <>
@@ -5674,12 +5827,6 @@ bool GDALBufferHasOnlyNoData(const void *pBuffer, double dfNoDataValue,
 {
     // In the case where the nodata is 0, we can compare several bytes at
     // once. Select the largest natural integer type for the architecture.
-#if SIZEOF_VOIDP >= 8 || defined(__x86_64__)
-    // We test __x86_64__ for x32 arch where SIZEOF_VOIDP == 4
-    typedef std::uint64_t WordType;
-#else
-    typedef std::uint32_t WordType;
-#endif
     if (dfNoDataValue == 0.0 && nWidth == nLineStride &&
         // Do not use this optimized code path for floating point numbers,
         // as it can't detect negative zero.
@@ -5687,14 +5834,69 @@ bool GDALBufferHasOnlyNoData(const void *pBuffer, double dfNoDataValue,
     {
         const GByte *pabyBuffer = static_cast<const GByte *>(pBuffer);
         const size_t nSize =
-            (nWidth * nHeight * nComponents * nBitsPerSample + 7) / 8;
-        size_t i = 0;
+            static_cast<size_t>((static_cast<uint64_t>(nWidth) * nHeight *
+                                     nComponents * nBitsPerSample +
+                                 7) /
+                                8);
+#ifdef HAVE_SSE2
+        size_t n = nSize;
+        // Align to 16 bytes
+        while ((reinterpret_cast<uintptr_t>(pabyBuffer) & 15) != 0 && n > 0)
+        {
+            --n;
+            if (*pabyBuffer)
+                return false;
+            pabyBuffer++;
+        }
+
+        const auto zero = _mm_setzero_si128();
+        constexpr int UNROLLING = 4;
+        while (n >= UNROLLING * sizeof(zero))
+        {
+            const auto v0 = _mm_load_si128(reinterpret_cast<const __m128i *>(
+                pabyBuffer + 0 * sizeof(zero)));
+            const auto v1 = _mm_load_si128(reinterpret_cast<const __m128i *>(
+                pabyBuffer + 1 * sizeof(zero)));
+            const auto v2 = _mm_load_si128(reinterpret_cast<const __m128i *>(
+                pabyBuffer + 2 * sizeof(zero)));
+            const auto v3 = _mm_load_si128(reinterpret_cast<const __m128i *>(
+                pabyBuffer + 3 * sizeof(zero)));
+            const auto v =
+                _mm_or_si128(_mm_or_si128(v0, v1), _mm_or_si128(v2, v3));
+#if defined(__SSE4_1__) || defined(USE_NEON_OPTIMIZATIONS)
+            if (!_mm_test_all_zeros(v, v))
+#else
+            if (_mm_movemask_epi8(_mm_cmpeq_epi8(v, zero)) != 0xFFFF)
+#endif
+            {
+                return false;
+            }
+            pabyBuffer += UNROLLING * sizeof(zero);
+            n -= UNROLLING * sizeof(zero);
+        }
+
+        while (n > 0)
+        {
+            --n;
+            if (*pabyBuffer)
+                return false;
+            pabyBuffer++;
+        }
+#else
+#if SIZEOF_VOIDP >= 8 || defined(__x86_64__)
+        // We test __x86_64__ for x32 arch where SIZEOF_VOIDP == 4
+        typedef std::uint64_t WordType;
+#else
+        typedef std::uint32_t WordType;
+#endif
+
         const size_t nInitialIters =
             std::min(sizeof(WordType) -
                          static_cast<size_t>(
                              reinterpret_cast<std::uintptr_t>(pabyBuffer) %
                              sizeof(WordType)),
                      nSize);
+        size_t i = 0;
         for (; i < nInitialIters; i++)
         {
             if (pabyBuffer[i])
@@ -5710,8 +5912,107 @@ bool GDALBufferHasOnlyNoData(const void *pBuffer, double dfNoDataValue,
             if (pabyBuffer[i])
                 return false;
         }
+#endif
         return true;
     }
+
+#ifdef HAVE_SSE2
+    else if (dfNoDataValue == 0.0 && nWidth == nLineStride &&
+             nBitsPerSample == 32 && nSampleFormat == GSF_FLOATING_POINT)
+    {
+        const auto signMask = _mm_set1_epi32(0x7FFFFFFF);
+        const auto zero = _mm_setzero_si128();
+        const GByte *pabyBuffer = static_cast<const GByte *>(pBuffer);
+        const size_t n = nWidth * nHeight * nComponents;
+
+        size_t i = 0;
+        constexpr int UNROLLING = 4;
+        constexpr size_t VALUES_PER_ITER =
+            UNROLLING * sizeof(zero) / sizeof(float);
+        for (; i + VALUES_PER_ITER <= n; i += VALUES_PER_ITER)
+        {
+            const auto v0 = _mm_loadu_si128(reinterpret_cast<const __m128i *>(
+                pabyBuffer + 0 * sizeof(zero)));
+            const auto v1 = _mm_loadu_si128(reinterpret_cast<const __m128i *>(
+                pabyBuffer + 1 * sizeof(zero)));
+            const auto v2 = _mm_loadu_si128(reinterpret_cast<const __m128i *>(
+                pabyBuffer + 2 * sizeof(zero)));
+            const auto v3 = _mm_loadu_si128(reinterpret_cast<const __m128i *>(
+                pabyBuffer + 3 * sizeof(zero)));
+            auto v = _mm_or_si128(_mm_or_si128(v0, v1), _mm_or_si128(v2, v3));
+            // Clear the sign bit (makes -0.0 become +0.0)
+            v = _mm_and_si128(v, signMask);
+#if defined(__SSE4_1__) || defined(USE_NEON_OPTIMIZATIONS)
+            if (!_mm_test_all_zeros(v, v))
+#else
+            if (_mm_movemask_epi8(_mm_cmpeq_epi8(v, zero)) != 0xFFFF)
+#endif
+            {
+                return false;
+            }
+            pabyBuffer += UNROLLING * sizeof(zero);
+        }
+
+        for (; i < n; i++)
+        {
+            uint32_t bits;
+            memcpy(&bits, pabyBuffer, sizeof(bits));
+            pabyBuffer += sizeof(bits);
+            if ((bits & 0x7FFFFFFF) != 0)
+                return false;
+        }
+
+        return true;
+    }
+
+    else if (dfNoDataValue == 0.0 && nWidth == nLineStride &&
+             nBitsPerSample == 64 && nSampleFormat == GSF_FLOATING_POINT)
+    {
+        const auto signMask = _mm_set1_epi64x(0x7FFFFFFFFFFFFFFFLL);
+        const auto zero = _mm_setzero_si128();
+        const GByte *pabyBuffer = static_cast<const GByte *>(pBuffer);
+        const size_t n = nWidth * nHeight * nComponents;
+
+        size_t i = 0;
+        constexpr int UNROLLING = 4;
+        constexpr size_t VALUES_PER_ITER =
+            UNROLLING * sizeof(zero) / sizeof(double);
+        for (; i + VALUES_PER_ITER <= n; i += VALUES_PER_ITER)
+        {
+            const auto v0 = _mm_loadu_si128(reinterpret_cast<const __m128i *>(
+                pabyBuffer + 0 * sizeof(zero)));
+            const auto v1 = _mm_loadu_si128(reinterpret_cast<const __m128i *>(
+                pabyBuffer + 1 * sizeof(zero)));
+            const auto v2 = _mm_loadu_si128(reinterpret_cast<const __m128i *>(
+                pabyBuffer + 2 * sizeof(zero)));
+            const auto v3 = _mm_loadu_si128(reinterpret_cast<const __m128i *>(
+                pabyBuffer + 3 * sizeof(zero)));
+            auto v = _mm_or_si128(_mm_or_si128(v0, v1), _mm_or_si128(v2, v3));
+            // Clear the sign bit (makes -0.0 become +0.0)
+            v = _mm_and_si128(v, signMask);
+#if defined(__SSE4_1__) || defined(USE_NEON_OPTIMIZATIONS)
+            if (!_mm_test_all_zeros(v, v))
+#else
+            if (_mm_movemask_epi8(_mm_cmpeq_epi8(v, zero)) != 0xFFFF)
+#endif
+            {
+                return false;
+            }
+            pabyBuffer += UNROLLING * sizeof(zero);
+        }
+
+        for (; i < n; i++)
+        {
+            uint64_t bits;
+            memcpy(&bits, pabyBuffer, sizeof(bits));
+            pabyBuffer += sizeof(bits);
+            if ((bits & 0x7FFFFFFFFFFFFFFFULL) != 0)
+                return false;
+        }
+
+        return true;
+    }
+#endif
 
     if (nBitsPerSample == 8 && nSampleFormat == GSF_UNSIGNED_INT)
     {
