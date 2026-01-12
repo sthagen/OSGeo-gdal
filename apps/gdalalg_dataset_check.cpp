@@ -40,6 +40,8 @@ GDALDatasetCheckAlgorithm::GDALDatasetCheckAlgorithm()
 
     AddInputDatasetArg(&m_input, GDAL_OF_RASTER | GDAL_OF_VECTOR |
                                      GDAL_OF_MULTIDIM_RASTER);
+    AddOpenOptionsArg(&m_openOptions);
+    AddInputFormatsArg(&m_inputFormats);
 
     AddArg("return-code", 0, _("Return code"), &m_retCode)
         .SetHiddenForCLI()
@@ -57,6 +59,9 @@ bool GDALDatasetCheckAlgorithm::RunImpl(GDALProgressFunc pfnProgress,
     auto poDS = m_input.GetDatasetRef();
     CPLAssert(poDS);
 
+    const CPLStringList aosOpenOptions(m_openOptions);
+    const CPLStringList aosAllowedDrivers(m_inputFormats);
+
     const CPLStringList aosSubdatasets(
         CSLDuplicate(poDS->GetMetadata("SUBDATASETS")));
     const int nSubdatasets = aosSubdatasets.size() / 2;
@@ -69,8 +74,9 @@ bool GDALDatasetCheckAlgorithm::RunImpl(GDALProgressFunc pfnProgress,
         {
             if (cpl::ends_with(std::string_view(pszKey), "_NAME"))
             {
-                auto poSubDS =
-                    std::unique_ptr<GDALDataset>(GDALDataset::Open(pszValue));
+                auto poSubDS = std::unique_ptr<GDALDataset>(
+                    GDALDataset::Open(pszValue, 0, aosAllowedDrivers.List(),
+                                      aosOpenOptions.List()));
                 if (poSubDS)
                 {
                     std::unique_ptr<void, decltype(&GDALDestroyScaledProgress)>
@@ -456,7 +462,8 @@ bool GDALDatasetCheckAlgorithm::CheckDataset(GDALDataset *poDS,
                 nProgress += nPixels;
                 if (pfnProgress &&
                     !pfnProgress(static_cast<double>(nProgress) /
-                                     static_cast<double>(nTotalContent),
+                                     static_cast<double>(
+                                         std::max<GIntBig>(1, nTotalContent)),
                                  "", pProgressData))
                 {
                     ReportError(CE_Failure, CPLE_UserInterrupt,
@@ -505,7 +512,8 @@ bool GDALDatasetCheckAlgorithm::CheckDataset(GDALDataset *poDS,
                         static_cast<GIntBig>(oWindow.nXSize) * oWindow.nYSize;
                     if (pfnProgress &&
                         !pfnProgress(static_cast<double>(nProgress) /
-                                         static_cast<double>(nTotalContent),
+                                         static_cast<double>(std::max<GIntBig>(
+                                             1, nTotalContent)),
                                      "", pProgressData))
                     {
                         ReportError(CE_Failure, CPLE_UserInterrupt,
