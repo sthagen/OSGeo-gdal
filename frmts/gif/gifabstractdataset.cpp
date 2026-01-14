@@ -192,7 +192,7 @@ char **GIFAbstractDataset::GetMetadataDomainList()
 /*                           GetMetadata()                              */
 /************************************************************************/
 
-char **GIFAbstractDataset::GetMetadata(const char *pszDomain)
+CSLConstList GIFAbstractDataset::GetMetadata(const char *pszDomain)
 {
     if (fp == nullptr)
         return nullptr;
