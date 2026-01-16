@@ -16,6 +16,10 @@ DATA_DIR = pathlib.Path(os.path.join(os.path.dirname(__file__), "data"))
 GDAL_GREEN_BLUE = matplotlib.colors.ListedColormap(["#71c9f1", "#359946"])
 
 
+gdal.UseExceptions()
+matplotlib.use("Agg")  # use a non-GUI backend
+
+
 def print_cell_values(ax, data):
     for y in range(data.shape[0]):
         for x in range(data.shape[1]):
@@ -212,9 +216,9 @@ def test_gdal_raster_reclassify():
         output_format="MEM",
         mapping="[1,3]= 101; [4, 5)= 102; 7=102; NO_DATA=103; DEFAULT=NO_DATA",
     )
-    alg.Finalize()
 
     data_out = alg["output"].GetDataset().ReadAsMaskedArray()
+    alg.Finalize()
 
     ax.pcolor(data, cmap=pyplot.get_cmap("Purples"))
     print_cell_values(ax, data)
@@ -264,7 +268,7 @@ def test_gdal_raster_zonal_stats(tmp_path):
     vector_gdf.boundary.plot(ax=ax, edgecolor="black", linewidth=1, aspect="equal")
 
     stats_df = gpd.read_file(output_fname)
-    stats_df.drop("geometry", axis=1, inplace=True)
+    stats_df.drop("geometry", axis=1, inplace=True, errors="ignore")
 
     vector_gdf.merge(stats_df, on="csduid").plot(
         ax=ax2, aspect="equal", column="mean", vmin=vmin, vmax=vmax
@@ -273,6 +277,117 @@ def test_gdal_raster_zonal_stats(tmp_path):
 
     plt.savefig(
         f"{IMAGE_ROOT}/programs/gdal_raster_zonal_stats.jpg",
+        bbox_inches="tight",
+        transparent=True,
+    )
+
+
+def test_gdal_vector_buffer_points(tmp_path):
+
+    opts = [
+        {"quadrant-segments": 4, "distance": 5},
+        {"quadrant-segments": 20, "distance": 5},
+    ]
+    src_fname = tmp_path / "points.geojson"
+
+    wkt_ds(
+        src_fname,
+        [
+            "POINT (0 0)",
+            "POINT (5 5)",
+        ],
+    )
+
+    for i, opt in enumerate(opts):
+        opt["input"] = src_fname
+        opt["output"] = tmp_path / f"{i}_buffers.geojson"
+        alg = gdal.Run("vector buffer", opt)
+        alg.Finalize()
+
+    plt, ax = pyplot.subplots(1, len(opts), figsize=(10, 4))
+
+    src_gdf = gpd.read_file(src_fname)
+
+    for i in range(len(opts)):
+
+        src_gdf.plot(ax=ax[i], alpha=0.5, color="black")
+
+        dst_gdf = gpd.read_file(tmp_path / f"{i}_buffers.geojson")
+        dst_gdf.plot(ax=ax[i], alpha=0.5, edgecolor="black", cmap=GDAL_GREEN_BLUE)
+
+    plt.savefig(
+        f"{IMAGE_ROOT}/programs/gdal_vector_buffer_points.svg",
+        bbox_inches="tight",
+        transparent=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "parameter,opts",
+    [
+        (
+            "endcap",
+            [
+                {"endcap-style": "round", "distance": 2},
+                {"endcap-style": "flat", "distance": 2},
+                {"endcap-style": "square", "distance": 2},
+            ],
+        ),
+        (
+            "side",
+            [
+                {"side": "both", "distance": 2},
+                {"side": "left", "distance": 2},
+                {"side": "right", "distance": 2},
+            ],
+        ),
+        (
+            "join",
+            [
+                {"join-style": "round", "distance": 2},
+                {"join-style": "mitre", "distance": 2},
+                {"join-style": "bevel", "distance": 2},
+            ],
+        ),
+        (
+            "mitre",
+            [
+                {"join-style": "round", "distance": 2, "mitre-limit": 5},
+                {"join-style": "round", "distance": 2, "mitre-limit": 1},
+            ],
+        ),
+    ],
+)
+def test_gdal_vector_buffer_lines(tmp_path, parameter, opts):
+    src_fname = tmp_path / "lines.geojson"
+
+    wkt_ds(
+        src_fname,
+        ["LINESTRING (30 10, 40 20, 30 30, 40 40)"],
+    )
+
+    for i, opt in enumerate(opts):
+        opt["input"] = src_fname
+        opt["output"] = tmp_path / f"{i}_{parameter}.geojson"
+        alg = gdal.Run("vector buffer", opt)
+        alg.Finalize()
+
+    plt, ax = pyplot.subplots(1, len(opts), figsize=(10, 4))
+
+    src_gdf = gpd.read_file(src_fname)
+
+    for i in range(len(opts)):
+        ax[i].set_axis_off()
+
+        src_gdf.plot(ax=ax[i], alpha=0.5, color="black", linewidth=2)
+
+        dst_gdf = gpd.read_file(tmp_path / f"{i}_{parameter}.geojson")
+        dst_gdf.plot(
+            ax=ax[i], alpha=0.5, linewidth=0.5, edgecolor="gray", cmap=GDAL_GREEN_BLUE
+        )
+
+    plt.savefig(
+        f"{IMAGE_ROOT}/programs/gdal_vector_buffer_lines_{parameter}.svg",
         bbox_inches="tight",
         transparent=True,
     )
@@ -323,8 +438,8 @@ def test_gdal_vector_check_geometry(tmp_path):
     }
 
     for k, v in cases.items():
-        src_fname = tmp_path / f"{k}.shp"
-        dst_fname = tmp_path / f"{k}_out.shp"
+        src_fname = tmp_path / f"{k}.gpkg"
+        dst_fname = tmp_path / f"{k}_out.gpkg"
 
         wkt_ds(src_fname, [v])
 
@@ -336,10 +451,10 @@ def test_gdal_vector_check_geometry(tmp_path):
     for i, (k, v) in enumerate(cases.items()):
         ax[i].set_axis_off()
 
-        src_gdf = gpd.read_file(tmp_path / f"{k}.shp")
+        src_gdf = gpd.read_file(tmp_path / f"{k}.gpkg")
         src_gdf.plot(ax=ax[i], alpha=0.5, cmap=GDAL_GREEN_BLUE)
 
-        dst_gdf = gpd.read_file(tmp_path / f"{k}_out.shp")
+        dst_gdf = gpd.read_file(tmp_path / f"{k}_out.gpkg")
         dst_gdf.plot(ax=ax[i], alpha=1.0, color="black")
 
     plt.savefig(
@@ -355,9 +470,9 @@ def test_gdal_vector_check_geometry(tmp_path):
 )
 def test_gdal_vector_layer_algebra(tmp_path, operation):
 
-    squares_fname = DATA_DIR / "squares.shp"
-    circle_fname = DATA_DIR / "circle.shp"
-    result_fname = tmp_path / "out.shp"
+    squares_fname = DATA_DIR / "squares.geojson"
+    circle_fname = DATA_DIR / "circle.geojson"
+    result_fname = tmp_path / "out.geojson"
 
     alg = gdal.Run(
         "vector layer-algebra",
@@ -466,6 +581,7 @@ def test_gdal_vector_clean_coverage(tmp_path, case, opts):
         bbox_inches="tight",
         transparent=True,
     )
+    pyplot.close()
 
 
 def test_gdal_vector_simplify_coverage(tmp_path):
