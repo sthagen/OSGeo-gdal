@@ -122,6 +122,8 @@ class CPL_DLL GDALRasterBand : public GDALMajorObject
         GSpacing nPixelSpace, GSpacing nLineSpace,
         GDALRasterIOExtraArg *psExtraArg) CPL_WARN_UNUSED_RESULT;
 
+    CPL_INTERNAL bool HasNoData() const;
+
   protected:
     GDALRasterBand();
     explicit GDALRasterBand(int bForceCachedIO);
@@ -552,6 +554,8 @@ class CPL_DLL GDALRasterBand : public GDALMajorObject
     virtual CPLErr CreateMaskBand(int nFlagsIn);
     virtual bool IsMaskBand() const;
     virtual GDALMaskValueRange GetMaskValueRange() const;
+    bool HasConflictingMaskSources(std::string *posDetailMessage = nullptr,
+                                   bool bMentionPrioritarySource = true) const;
 
     virtual CPLVirtualMem *
     GetVirtualMemAuto(GDALRWFlag eRWFlag, int *pnPixelSpace,
@@ -610,7 +614,11 @@ class CPL_DLL GDALRasterBand : public GDALMajorObject
     {
       public:
         explicit WindowIteratorWrapper(const GDALRasterBand &band,
-                                       size_t maxSize);
+                                       size_t maxSize = 0);
+
+        explicit WindowIteratorWrapper(const GDALRasterBand &band1,
+                                       const GDALRasterBand &band2,
+                                       size_t maxSize = 0);
 
         uint64_t count() const;
 
@@ -623,11 +631,16 @@ class CPL_DLL GDALRasterBand : public GDALMajorObject
         const int m_nRasterYSize;
         int m_nBlockXSize;
         int m_nBlockYSize;
+
+        WindowIteratorWrapper(int nRasterXSize, int nRasterYSize,
+                              int nBlockXSize, int nBlockYSize, size_t maxSize);
     };
 
     //! @endcond
 
     WindowIteratorWrapper IterateWindows(size_t maxSize = 0) const;
+
+    virtual bool MayMultiBlockReadingBeMultiThreaded() const;
 
 #ifndef DOXYGEN_XML
     void ReportError(CPLErr eErrClass, CPLErrorNum err_no, const char *fmt,

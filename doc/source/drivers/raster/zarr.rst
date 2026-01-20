@@ -87,6 +87,14 @@ the correct driver to open the Zarr store:
 - :file:`.zgroup`
 - :file:`.zarray`
 
+Sharding support
+----------------
+
+.. versionadded:: 3.13
+
+`Zarr v3 sharding <https://zarr-specs.readthedocs.io/en/latest/v3/codecs/sharding-indexed/index.html>`__
+is supported in read-only since GDAL 3.13.
+
 Kerchunk reference stores
 -------------------------
 
@@ -347,11 +355,12 @@ The following dataset open options are available:
       In classic 2D mode, whereas the subdataset list should include all arrays,
       including those with 0 or 1 dimension.
 
--  .. oo:: USE_ZMETADATA
+-  .. oo:: USE_CONSOLIDATED_METADATA
       :choices: YES, NO
       :default: YES
 
-      Whether to use consolidated metadata from .zmetadata (Zarr V2 only).
+      Whether to use consolidated metadata (from :file:`.zmetadata` for Zarr V2,
+      or root :file:`zarr.json` for Zarr V3)
 
 -  .. oo:: CACHE_TILE_PRESENCE
       :choices: YES, NO
@@ -570,12 +579,12 @@ dataset-level creation options for the multidimensional API :
       :choices: ZARR_V2, ZARR_V3
       :default: ZARR_V2
 
--  .. co:: CREATE_ZMETADATA
+-  .. co:: CREATE_CONSOLIDATED_METADATA
       :choices: YES, NO
       :default: YES
 
-      Whether to create consolidated metadata into
-      .zmetadata (Zarr V2 only).
+      Whether to create consolidated metadata (into :file:`.zmetadata` for Zarr V2,
+      or root :file:`zarr.json` for Zarr V3)
 
 -  .. co:: CONVERT_TO_KERCHUNK_PARQUET_REFERENCE
       :choices: YES, NO
@@ -669,3 +678,4 @@ See Also:
 
 .. spelling:word-list::
     Kerchunk
+    Sharding
