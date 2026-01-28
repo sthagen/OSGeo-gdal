@@ -2577,6 +2577,7 @@ predelete
 preinstalled
 preload
 premultiplication
+premultiplied
 Prepar
 preparse
 prepended
@@ -2721,6 +2722,7 @@ qtcreator
 quadkey
 Quadrilateralized
 quadtree
+quantile
 Quantile
 quantizeCoordinates
 quantized
