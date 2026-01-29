@@ -1213,6 +1213,10 @@ GDAL provides a set of default pixel functions that can be used without writing 
      - Number of input sources
      - PixelFunctionArguments
      - Description
+   * - **area**
+     - 0
+     - 
+     - (GDAL >= 3.13) Returns the area of each pixel in square meters.
    * - **argmax**
      - >= 1
      - ``propagateNoData`` (optional, default=false)
@@ -1580,6 +1584,10 @@ GDAL provides a set of default pixel functions that can be used without writing 
      - = 1
      - ``to`` (optional)
      - Convert incoming ``NoData`` values to a new value, IEEE 754 `nan` by default
+   * - **round**
+     - = 1
+     - - ``digits`` (optional)
+     - (GDAL >= 3.13) Round the input to the specified number of digits to the right of the decimal point.
    * - **scale**
      - = 1
      - -

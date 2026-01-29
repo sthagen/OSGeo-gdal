@@ -20,7 +20,7 @@ import threading
 import gdaltest
 import pytest
 
-from osgeo import gdal
+from osgeo import gdal, ogr
 
 pytestmark = pytest.mark.skipif(
     not gdaltest.vrt_has_open_support(),
@@ -1440,6 +1440,134 @@ def test_vrt_pixelfn_constant_factor(tmp_vsimem, fn):
 
 
 ###############################################################################
+# Test "area" pixel function
+
+
+def test_vrt_pixelfn_area_geographic(tmp_vsimem):
+
+    pytest.importorskip("numpy")
+    gdaltest.importorskip_gdal_array()
+
+    xml = """
+    <VRTDataset rasterXSize="20" rasterYSize="10">
+      <GeoTransform>-72, 0.1, 0, 44, 0, -0.1</GeoTransform>
+      <SRS>EPSG:4326</SRS>
+      <VRTRasterBand dataType="Float64" band="1" subClass="VRTDerivedRasterBand">
+        <PixelFunctionType>area</PixelFunctionType>
+        <PixelFunctionArguments />
+      </VRTRasterBand>
+    </VRTDataset>"""
+
+    ds = gdal.Open(xml)
+    result = ds.ReadAsArray()
+
+    poly_ul = ogr.CreateGeometryFromWkt(
+        "POLYGON ((-72 43.9, -71.9 43.9, -71.9 44, -72 44, -72 43.9))",
+        reference=ds.GetSpatialRef(),
+    )
+    assert result[0, 0] == poly_ul.GeodesicArea()
+
+    poly_lr = ogr.CreateGeometryFromWkt(
+        "POLYGON ((-70.1 43, -70 43, -70 43.1, -70.1 43.1, -70.1 43))",
+        reference=ds.GetSpatialRef(),
+    )
+    assert result[-1, -1] == poly_lr.GeodesicArea()
+
+
+def test_vrt_pixelfn_area_projected(tmp_vsimem):
+
+    pytest.importorskip("numpy")
+    gdaltest.importorskip_gdal_array()
+
+    # the <PixelFunctionArguments crs="3" /> tag is just to test that a user
+    # cannot override a built-in argument. Since "crs" is a pointer, allowing
+    # a user to override it would permit abitrary memory access.
+    xml = """
+    <VRTDataset rasterXSize="20" rasterYSize="10">
+      <GeoTransform>441500, 10, 0, 216600, 0, -10</GeoTransform>
+      <SRS>EPSG:32145</SRS>
+      <VRTRasterBand dataType="Float64" band="1" subClass="VRTDerivedRasterBand">
+        <PixelFunctionType>area</PixelFunctionType>
+        <PixelFunctionArguments crs="3" />
+      </VRTRasterBand>
+    </VRTDataset>"""
+
+    ds = gdal.Open(xml)
+    result = ds.ReadAsArray()
+
+    poly_ul = ogr.CreateGeometryFromWkt(
+        "POLYGON ((441500 216590, 441510 216590, 441510 216600, 441500 216600, 441500 216590))",
+        reference=ds.GetSpatialRef(),
+    )
+    assert result[0, 0] == poly_ul.GeodesicArea()
+
+    poly_lr = ogr.CreateGeometryFromWkt(
+        "POLYGON ((441690 216500, 441700 216500, 441700 216510, 441690 216510, 441690 216500))",
+        reference=ds.GetSpatialRef(),
+    )
+    assert result[-1, -1] == poly_lr.GeodesicArea()
+
+
+@gdaltest.enable_exceptions()
+def test_vrt_pixelfn_area_missing_crs():
+
+    xml = """
+    <VRTDataset rasterXSize="20" rasterYSize="20">
+      <GeoTransform>-72, 0.1, 0, 44, 0, -0.1</GeoTransform>
+      <VRTRasterBand dataType="Float64" band="1" subClass="VRTDerivedRasterBand">
+        <PixelFunctionType>area</PixelFunctionType>
+        <PixelFunctionArguments />
+      </VRTRasterBand>
+    </VRTDataset>"""
+
+    ds = gdal.Open(xml)
+
+    with pytest.raises(Exception, match="has no .SRS"):
+        ds.ReadRaster()
+
+
+@gdaltest.enable_exceptions()
+def test_vrt_pixelfn_area_missing_geotransform():
+
+    xml = """
+    <VRTDataset rasterXSize="20" rasterYSize="20">
+      <SRS>EPSG:4326</SRS>
+      <VRTRasterBand dataType="Float64" band="1" subClass="VRTDerivedRasterBand">
+        <PixelFunctionType>area</PixelFunctionType>
+        <PixelFunctionArguments />
+      </VRTRasterBand>
+    </VRTDataset>"""
+
+    ds = gdal.Open(xml)
+
+    with pytest.raises(Exception, match="has no .GeoTransform"):
+        ds.ReadRaster()
+
+
+@gdaltest.enable_exceptions()
+def test_vrt_pixelfn_area_unexpected_source():
+
+    xml = """
+    <VRTDataset rasterXSize="20" rasterYSize="20">
+      <GeoTransform>-72, 0.1, 0, 44, 0, -0.1</GeoTransform>
+      <SRS>EPSG:4326</SRS>
+      <VRTRasterBand dataType="Float64" band="1" subClass="VRTDerivedRasterBand">
+        <PixelFunctionType>area</PixelFunctionType>
+        <PixelFunctionArguments />
+        <SimpleSource>
+           <SourceFilename>data/byte.tif</SourceFilename>
+           <SourceBand>1</SourceBand>
+        </SimpleSource>
+      </VRTRasterBand>
+    </VRTDataset>"""
+
+    ds = gdal.Open(xml)
+
+    with pytest.raises(Exception, match="unexpected source band"):
+        ds.ReadRaster()
+
+
+###############################################################################
 # Test "quantile" pixel function
 
 
@@ -1701,6 +1829,7 @@ def test_vrt_pixelfn_reclassify_nan(tmp_vsimem):
     )
 
 
+@gdaltest.enable_exceptions()
 @pytest.mark.parametrize(
     "pixelfn,values,nodata_value,pixelfn_args,expected",
     [
@@ -1780,6 +1909,12 @@ def test_vrt_pixelfn_reclassify_nan(tmp_vsimem):
         ("quantile", [7], 7, {"q": 1}, 7),
         ("quantile", [7, 6, 1, 2], 7, {"q": 0.5}, 2),
         ("quantile", [7, 6, 1, 2], 7, {"q": 0.5, "propagateNoData": True}, 7),
+        ("round", [7.1], 7.1, {}, 7.1),
+        ("round", [7.1], 7.2, {}, 7),
+        ("round", [3.14159], 7, {"digits": 3}, 3.142),
+        ("round", [6253], 7, {"digits": -2}, 6300),
+        ("round", [6253], 7, {"digits": "invalid"}, "Failed to parse .* digits"),
+        ("round", [3, 4], 7, {}, "input must be a single band"),
         ("scale", [7], 7, {"scale": 5, "offset": 10}, 7),
         ("sqrt", [7], 7, {}, 7),
         ("sum", [3, 7, 9], 7, {}, 12),
@@ -1794,7 +1929,7 @@ def test_vrt_pixelfn_nodata(
     gdaltest.importorskip_gdal_array()
 
     with gdal.GetDriverByName("GTiff").Create(
-        tmp_vsimem / "src.tif", 1, 1, len(values), gdal.GDT_Float32
+        tmp_vsimem / "src.tif", 1, 1, len(values), gdal.GDT_Float64
     ) as src:
         for i in range(len(values)):
             src.GetRasterBand(i + 1).Fill(values[i])
@@ -1809,9 +1944,15 @@ def test_vrt_pixelfn_nodata(
       </VRTRasterBand>
     </VRTDataset>"""
 
-    result = gdal.Open(xml).ReadAsArray()[0, 0]
+    ds = gdal.Open(xml)
 
-    assert result == pytest.approx(expected, nan_ok=True)
+    if type(expected) is str:
+        with pytest.raises(Exception, match=expected):
+            ds.ReadAsArray()
+    else:
+        result = ds.ReadAsArray()[0, 0]
+
+        assert result == pytest.approx(expected, nan_ok=True)
 
 
 @pytest.mark.parametrize("propagate", (True, False))
