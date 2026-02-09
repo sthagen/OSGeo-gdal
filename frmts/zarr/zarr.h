@@ -1114,6 +1114,8 @@ class ZarrArray CPL_NON_FINAL : public GDALPamMDArray
     std::vector<std::shared_ptr<GDALMDArray>>
     GetCoordinateVariables() const override;
 
+    bool IsRegularlySpaced(double &dfStart, double &dfIncrement) const override;
+
     bool Resize(const std::vector<GUInt64> &anNewDimSizes,
                 CSLConstList) override;
 
@@ -1366,6 +1368,14 @@ class ZarrV3Array final : public ZarrArray
                        ZarrByteVectorQuickResize &abyDecodedBlockData,
                        bool &bMissingBlockOut) const;
 
+    bool IRead(const GUInt64 *arrayStartIdx, const size_t *count,
+               const GInt64 *arrayStep, const GPtrDiff_t *bufferStride,
+               const GDALExtendedDataType &bufferDataType,
+               void *pDstBuffer) const override;
+
+    void PreloadShardedBlocks(const GUInt64 *arrayStartIdx,
+                              const size_t *count) const;
+
     bool IWrite(const GUInt64 *arrayStartIdx, const size_t *count,
                 const GInt64 *arrayStep, const GPtrDiff_t *bufferStride,
                 const GDALExtendedDataType &bufferDataType,
@@ -1425,5 +1435,7 @@ class ZarrV3Array final : public ZarrArray
 
     CPLStringList GetRawBlockInfoInfo() const override;
 };
+
+void ZarrClearCoordinateCache();
 
 #endif  // ZARR_H

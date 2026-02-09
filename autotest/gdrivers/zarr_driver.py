@@ -6185,94 +6185,137 @@ def test_zarr_read_simple_sharding_network():
     if webserver_port == 0:
         pytest.skip()
 
-    try:
+    zarr_json = json.dumps(
+        {
+            "shape": [2, 2],
+            "data_type": "uint8",
+            "chunk_grid": {
+                "name": "regular",
+                "configuration": {"chunk_shape": [2, 2]},
+            },
+            "chunk_key_encoding": {
+                "name": "default",
+                "configuration": {"separator": "/"},
+            },
+            "fill_value": 0,
+            "codecs": [
+                {
+                    "name": "sharding_indexed",
+                    "configuration": {
+                        "chunk_shape": [2, 2],
+                        "codecs": [
+                            {"name": "bytes", "configuration": {"endian": "little"}}
+                        ],
+                        "index_codecs": [
+                            {"name": "bytes", "configuration": {"endian": "little"}}
+                        ],
+                    },
+                }
+            ],
+            "attributes": {},
+            "zarr_format": 3,
+            "node_type": "array",
+            "storage_transformers": [],
+        }
+    )
+    shard_index = struct.pack("<Q", 0) + struct.pack("<Q", 4)
+    shard_tail = b"\x00" * (16384 - len(shard_index)) + shard_index
+    chunk_block = b"\x01\x02\x03\x04" + (16384 - 4) * b"\x00"
 
-        handler = webserver.SequentialHandler()
-        handler.add("GET", "/test.zarr/", 404)
-        handler.add("HEAD", "/test.zarr/.zmetadata", 404)
-        handler.add("HEAD", "/test.zarr/.zarray", 404)
-        handler.add("HEAD", "/test.zarr/.zgroup", 404)
-        zarr_json = json.dumps(
-            {
-                "shape": [2, 2],
-                "data_type": "uint8",
-                "chunk_grid": {
-                    "name": "regular",
-                    "configuration": {"chunk_shape": [2, 2]},
-                },
-                "chunk_key_encoding": {
-                    "name": "default",
-                    "configuration": {"separator": "/"},
-                },
-                "fill_value": 0,
-                "codecs": [
-                    {
-                        "name": "sharding_indexed",
-                        "configuration": {
-                            "chunk_shape": [2, 2],
-                            "codecs": [
-                                {"name": "bytes", "configuration": {"endian": "little"}}
-                            ],
-                            "index_codecs": [
-                                {"name": "bytes", "configuration": {"endian": "little"}}
-                            ],
-                        },
-                    }
-                ],
-                "attributes": {},
-                "zarr_format": 3,
-                "node_type": "array",
-                "storage_transformers": [],
-            }
-        )
-        handler.add(
-            "HEAD",
-            "/test.zarr/zarr.json",
-            200,
-            {"Content-Length": "%d" % len(zarr_json)},
-        )
-        handler.add(
-            "GET",
-            "/test.zarr/zarr.json",
-            200,
-            {"Content-Length": "%d" % len(zarr_json)},
-            zarr_json,
-        )
-        handler.add("HEAD", "/test.zarr/zarr.json.aux.xml", 404)
-        handler.add("HEAD", "/test.zarr/zarr.aux", 404)
-        handler.add("HEAD", "/test.zarr/zarr.AUX", 404)
-        handler.add("HEAD", "/test.zarr/zarr.json.aux", 404)
-        handler.add("HEAD", "/test.zarr/zarr.json.AUX", 404)
-        handler.add("HEAD", "/test.zarr/zarr.json.gmac", 404)
-        handler.add("HEAD", "/test.zarr/c/0/0", 200, {"Content-Length": "65536"})
-        data = struct.pack("<Q", 0) + struct.pack("<Q", 4)
-        data = b"\x00" * (16384 - len(data)) + data
-        handler.add(
-            "GET",
-            "/test.zarr/c/0/0",
-            206,
-            {"Content-Length": "16384", "Content-Range": "bytes 49152-65535/65536"},
-            data,
-            expected_headers={"Range": "bytes=49152-65535"},
-        )
-        handler.add(
-            "GET",
-            "/test.zarr/c/0/0",
-            206,
-            {"Content-Length": "16384", "Content-Range": "bytes 0-16383/65536"},
-            b"\x01\x02\x03\x04" + (16384 - 4) * b"\x00",
-            expected_headers={"Range": "bytes=0-16383"},
-        )
-        with webserver.install_http_handler(handler):
-            ds = gdal.Open(
-                'ZARR:"/vsicurl/http://localhost:%d/test.zarr"' % webserver_port
+    try:
+        # Loop twice: second iteration proves ClearMemoryCaches() lets the
+        # driver re-fetch everything cleanly.
+        for _ in range(2):
+            handler = webserver.SequentialHandler()
+            handler.add("GET", "/test.zarr/", 404)
+            handler.add("HEAD", "/test.zarr/.zmetadata", 404)
+            handler.add("HEAD", "/test.zarr/.zarray", 404)
+            handler.add("HEAD", "/test.zarr/.zgroup", 404)
+            handler.add(
+                "HEAD",
+                "/test.zarr/zarr.json",
+                200,
+                {"Content-Length": "%d" % len(zarr_json)},
             )
-            assert ds.GetRasterBand(1).ReadBlock(0, 0) == b"\x01\x02\x03\x04"
+            handler.add(
+                "GET",
+                "/test.zarr/zarr.json",
+                200,
+                {"Content-Length": "%d" % len(zarr_json)},
+                zarr_json,
+            )
+            handler.add("HEAD", "/test.zarr/zarr.json.aux.xml", 404)
+            handler.add("HEAD", "/test.zarr/zarr.aux", 404)
+            handler.add("HEAD", "/test.zarr/zarr.AUX", 404)
+            handler.add("HEAD", "/test.zarr/zarr.json.aux", 404)
+            handler.add("HEAD", "/test.zarr/zarr.json.AUX", 404)
+            handler.add("HEAD", "/test.zarr/zarr.json.gmac", 404)
+            handler.add("HEAD", "/test.zarr/c/0/0", 200, {"Content-Length": "65536"})
+            handler.add(
+                "GET",
+                "/test.zarr/c/0/0",
+                206,
+                {
+                    "Content-Length": "16384",
+                    "Content-Range": "bytes 49152-65535/65536",
+                },
+                shard_tail,
+                expected_headers={"Range": "bytes=49152-65535"},
+            )
+            handler.add(
+                "GET",
+                "/test.zarr/c/0/0",
+                206,
+                {
+                    "Content-Length": "16384",
+                    "Content-Range": "bytes 0-16383/65536",
+                },
+                chunk_block,
+                expected_headers={"Range": "bytes=0-16383"},
+            )
+            with webserver.install_http_handler(handler):
+                ds = gdal.Open(
+                    'ZARR:"/vsicurl/http://localhost:%d/test.zarr"' % webserver_port
+                )
+                assert ds.GetRasterBand(1).ReadBlock(0, 0) == b"\x01\x02\x03\x04"
+            ds = None
+            gdal.ClearMemoryCaches()
 
     finally:
         webserver.server_stop(webserver_process, webserver_port)
 
-        gdal.VSICurlClearCache()
+
+###############################################################################
+# Test batch reads: full-array read via multidim API on a sharded dataset
+# uses BatchDecodePartial (ReadMultiRange) and produces correct data.
+
+
+@gdaltest.enable_exceptions()
+def test_zarr_batch_reads_sharding():
+
+    compressors = gdal.GetDriverByName("Zarr").GetMetadataItem("COMPRESSORS")
+    if "zstd" not in compressors:
+        pytest.skip("compressor zstd not available")
+
+    ds = gdal.OpenEx(
+        "data/zarr/v3/simple_sharding.zarr",
+        gdal.OF_MULTIDIM_RASTER,
+    )
+    ar = ds.GetRootGroup().OpenMDArray("simple_sharding")
+    assert ar.GetBlockSize() == [5, 6]
+
+    expected = [i for i in range(24 * 26)]
+
+    # Full-extent read triggers PreloadShardedBlocks → BatchDecodePartial.
+    # Verify data matches single-block reads.
+    data = list(struct.unpack("f" * (24 * 26), ar.Read()))
+    assert data == expected
+
+    # Partial read spanning multiple inner chunks within a shard
+    partial = list(struct.unpack("f" * (10 * 12), ar.Read([0, 0], [10, 12])))
+    for row in range(10):
+        for col in range(12):
+            assert partial[row * 12 + col] == expected[row * 26 + col]
 
 
 ###############################################################################

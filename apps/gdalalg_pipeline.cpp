@@ -31,6 +31,7 @@
 #include "gdalalg_raster_footprint.h"
 #include "gdalalg_raster_polygonize.h"
 #include "gdalalg_raster_info.h"
+#include "gdalalg_raster_pixel_info.h"
 #include "gdalalg_raster_tile.h"
 #include "gdalalg_vector_grid.h"
 #include "gdalalg_vector_info.h"
@@ -221,11 +222,7 @@ void GDALPipelineStepAlgorithm::AddVectorOutputArgs(
     }
     if (m_constructorOptions.addOutputLayerNameArgument)
     {
-        AddArg(GDAL_ARG_NAME_OUTPUT_LAYER,
-               shortNameOutputLayerAllowed ? 'l' : 0, _("Output layer name"),
-               &m_outputLayerName)
-            .AddHiddenAlias("nln")  // For ogr2ogr nostalgic people
-            .SetHiddenForCLI(hiddenForCLI);
+        AddOutputLayerNameArg(hiddenForCLI, shortNameOutputLayerAllowed);
     }
     if (m_constructorOptions.addSkipErrorsArgument)
     {
@@ -233,6 +230,20 @@ void GDALPipelineStepAlgorithm::AddVectorOutputArgs(
                &m_skipErrors)
             .AddHiddenAlias("skip-failures");  // For ogr2ogr nostalgic people
     }
+}
+
+/************************************************************************/
+/*          GDALPipelineStepAlgorithm::AddOutputLayerNameArg()          */
+/************************************************************************/
+
+void GDALPipelineStepAlgorithm::AddOutputLayerNameArg(
+    bool hiddenForCLI, bool shortNameOutputLayerAllowed)
+{
+    AddArg(GDAL_ARG_NAME_OUTPUT_LAYER, shortNameOutputLayerAllowed ? 'l' : 0,
+           _("Output layer name"),
+           &m_outputLayerName)
+        .AddHiddenAlias("nln")  // For ogr2ogr nostalgic people
+        .SetHiddenForCLI(hiddenForCLI);
 }
 
 /************************************************************************/
@@ -498,6 +509,7 @@ GDALPipelineAlgorithm::GDALPipelineAlgorithm()
     m_stepRegistry.Register<GDALRasterAsFeaturesAlgorithm>();
     m_stepRegistry.Register<GDALRasterContourAlgorithm>();
     m_stepRegistry.Register<GDALRasterFootprintAlgorithm>();
+    m_stepRegistry.Register<GDALRasterPixelInfoAlgorithm>();
     m_stepRegistry.Register<GDALRasterPolygonizeAlgorithm>();
     m_stepRegistry.Register<GDALRasterZonalStatsAlgorithm>();
     m_stepRegistry.Register<GDALVectorGridAlgorithm>();
