@@ -27,6 +27,7 @@ pytestmark = pytest.mark.skipif(
     reason="VRT driver open missing",
 )
 
+
 ###############################################################################
 @pytest.fixture(autouse=True, scope="module")
 def module_disable_exceptions():
@@ -383,33 +384,28 @@ def test_vrtderived_9():
 
     # Missing PixelFunctionType
     with gdal.quiet_errors():
-        ds = gdal.Open(
-            """<VRTDataset rasterXSize="10" rasterYSize="10">
+        ds = gdal.Open("""<VRTDataset rasterXSize="10" rasterYSize="10">
   <VRTRasterBand dataType="Byte" band="1" subClass="VRTDerivedRasterBand">
     <PixelFunctionLanguage>Python</PixelFunctionLanguage>
   </VRTRasterBand>
 </VRTDataset>
-"""
-        )
+""")
     assert ds is None
 
     # Unsupported PixelFunctionLanguage
     with gdal.quiet_errors():
-        ds = gdal.Open(
-            """<VRTDataset rasterXSize="10" rasterYSize="10">
+        ds = gdal.Open("""<VRTDataset rasterXSize="10" rasterYSize="10">
   <VRTRasterBand dataType="Byte" band="1" subClass="VRTDerivedRasterBand">
     <PixelFunctionType>identity</PixelFunctionType>
     <PixelFunctionLanguage>foo</PixelFunctionLanguage>
   </VRTRasterBand>
 </VRTDataset>
-"""
-        )
+""")
     assert ds is None
 
     # PixelFunctionCode can only be used with Python
     with gdal.quiet_errors():
-        ds = gdal.Open(
-            """<VRTDataset rasterXSize="10" rasterYSize="10">
+        ds = gdal.Open("""<VRTDataset rasterXSize="10" rasterYSize="10">
   <VRTRasterBand dataType="Byte" band="1" subClass="VRTDerivedRasterBand">
     <PixelFunctionType>identity</PixelFunctionType>
     <PixelFunctionCode><![CDATA[
@@ -419,40 +415,34 @@ def identity(in_ar, out_ar, xoff, yoff, xsize, ysize, raster_xsize, raster_ysize
      </PixelFunctionCode>
   </VRTRasterBand>
 </VRTDataset>
-"""
-        )
+""")
     assert ds is None
 
     # BufferRadius can only be used with Python
     with gdal.quiet_errors():
-        ds = gdal.Open(
-            """<VRTDataset rasterXSize="10" rasterYSize="10">
+        ds = gdal.Open("""<VRTDataset rasterXSize="10" rasterYSize="10">
   <VRTRasterBand dataType="Byte" band="1" subClass="VRTDerivedRasterBand">
     <PixelFunctionType>identity</PixelFunctionType>
     <BufferRadius>1</BufferRadius>
   </VRTRasterBand>
 </VRTDataset>
-"""
-        )
+""")
     assert ds is None
 
     # Invalid BufferRadius
     with gdal.quiet_errors():
-        ds = gdal.Open(
-            """<VRTDataset rasterXSize="10" rasterYSize="10">
+        ds = gdal.Open("""<VRTDataset rasterXSize="10" rasterYSize="10">
   <VRTRasterBand dataType="Byte" band="1" subClass="VRTDerivedRasterBand">
     <PixelFunctionType>identity</PixelFunctionType>
     <PixelFunctionLanguage>Python</PixelFunctionLanguage>
     <BufferRadius>-1</BufferRadius>
   </VRTRasterBand>
 </VRTDataset>
-"""
-        )
+""")
     assert ds is None
 
     # Error at Python code compilation (indentation error)
-    ds = gdal.Open(
-        """<VRTDataset rasterXSize="10" rasterYSize="10">
+    ds = gdal.Open("""<VRTDataset rasterXSize="10" rasterYSize="10">
   <VRTRasterBand dataType="Byte" band="1" subClass="VRTDerivedRasterBand">
     <PixelFunctionType>identity</PixelFunctionType>
     <PixelFunctionLanguage>Python</PixelFunctionLanguage>
@@ -463,8 +453,7 @@ syntax_error
     </PixelFunctionCode>
   </VRTRasterBand>
 </VRTDataset>
-"""
-    )
+""")
     with gdal.config_option("GDAL_VRT_ENABLE_PYTHON", "YES"), gdaltest.error_handler():
         cs = ds.GetRasterBand(1).Checksum()
     if cs != -1:
@@ -472,8 +461,7 @@ syntax_error
         pytest.fail("invalid checksum")
 
     # Error at run time (in global code)
-    ds = gdal.Open(
-        """<VRTDataset rasterXSize="10" rasterYSize="10">
+    ds = gdal.Open("""<VRTDataset rasterXSize="10" rasterYSize="10">
   <VRTRasterBand dataType="Byte" band="1" subClass="VRTDerivedRasterBand">
     <PixelFunctionType>identity</PixelFunctionType>
     <PixelFunctionLanguage>Python</PixelFunctionLanguage>
@@ -485,8 +473,7 @@ def identity(in_ar, out_ar, xoff, yoff, xsize, ysize, raster_xsize, raster_ysize
     </PixelFunctionCode>
   </VRTRasterBand>
 </VRTDataset>
-"""
-    )
+""")
     with gdal.config_option("GDAL_VRT_ENABLE_PYTHON", "YES"), gdaltest.error_handler():
         cs = ds.GetRasterBand(1).Checksum()
     if cs != -1:
@@ -494,8 +481,7 @@ def identity(in_ar, out_ar, xoff, yoff, xsize, ysize, raster_xsize, raster_ysize
         pytest.fail("invalid checksum")
 
     # Error at run time (in pixel function)
-    ds = gdal.Open(
-        """<VRTDataset rasterXSize="10" rasterYSize="10">
+    ds = gdal.Open("""<VRTDataset rasterXSize="10" rasterYSize="10">
   <VRTRasterBand dataType="Byte" band="1" subClass="VRTDerivedRasterBand">
     <PixelFunctionType>identity</PixelFunctionType>
     <PixelFunctionLanguage>Python</PixelFunctionLanguage>
@@ -506,8 +492,7 @@ def identity(in_ar, out_ar, xoff, yoff, xsize, ysize, raster_xsize, raster_ysize
     </PixelFunctionCode>
   </VRTRasterBand>
 </VRTDataset>
-"""
-    )
+""")
     with gdal.config_option("GDAL_VRT_ENABLE_PYTHON", "YES"), gdaltest.error_handler():
         cs = ds.GetRasterBand(1).Checksum()
     if cs != -1:
@@ -515,8 +500,7 @@ def identity(in_ar, out_ar, xoff, yoff, xsize, ysize, raster_xsize, raster_ysize
         pytest.fail("invalid checksum")
 
     # User exception
-    ds = gdal.Open(
-        """<VRTDataset rasterXSize="10" rasterYSize="10">
+    ds = gdal.Open("""<VRTDataset rasterXSize="10" rasterYSize="10">
   <VRTRasterBand dataType="Byte" band="1" subClass="VRTDerivedRasterBand">
     <PixelFunctionType>identity</PixelFunctionType>
     <PixelFunctionLanguage>Python</PixelFunctionLanguage>
@@ -527,8 +511,7 @@ def identity(in_ar, out_ar, xoff, yoff, xsize, ysize, raster_xsize, raster_ysize
     </PixelFunctionCode>
   </VRTRasterBand>
 </VRTDataset>
-"""
-    )
+""")
     with gdal.config_option("GDAL_VRT_ENABLE_PYTHON", "YES"), gdaltest.error_handler():
         cs = ds.GetRasterBand(1).Checksum()
     if cs != -1:
@@ -536,8 +519,7 @@ def identity(in_ar, out_ar, xoff, yoff, xsize, ysize, raster_xsize, raster_ysize
         pytest.fail("invalid checksum")
 
     # unknown_function
-    ds = gdal.Open(
-        """<VRTDataset rasterXSize="10" rasterYSize="10">
+    ds = gdal.Open("""<VRTDataset rasterXSize="10" rasterYSize="10">
   <VRTRasterBand dataType="Byte" band="1" subClass="VRTDerivedRasterBand">
     <PixelFunctionType>unknown_function</PixelFunctionType>
     <PixelFunctionLanguage>Python</PixelFunctionLanguage>
@@ -548,8 +530,7 @@ def identity(in_ar, out_ar, xoff, yoff, xsize, ysize, raster_xsize, raster_ysize
     </PixelFunctionCode>
   </VRTRasterBand>
 </VRTDataset>
-"""
-    )
+""")
     with gdal.config_option("GDAL_VRT_ENABLE_PYTHON", "YES"), gdaltest.error_handler():
         cs = ds.GetRasterBand(1).Checksum()
     if cs != -1:
@@ -557,8 +538,7 @@ def identity(in_ar, out_ar, xoff, yoff, xsize, ysize, raster_xsize, raster_ysize
         pytest.fail("invalid checksum")
 
     # uncallable object
-    ds = gdal.Open(
-        """<VRTDataset rasterXSize="10" rasterYSize="10">
+    ds = gdal.Open("""<VRTDataset rasterXSize="10" rasterYSize="10">
   <VRTRasterBand dataType="Byte" band="1" subClass="VRTDerivedRasterBand">
     <PixelFunctionType>uncallable_object</PixelFunctionType>
     <PixelFunctionLanguage>Python</PixelFunctionLanguage>
@@ -568,8 +548,7 @@ uncallable_object = True
     </PixelFunctionCode>
   </VRTRasterBand>
 </VRTDataset>
-"""
-    )
+""")
     with gdal.config_option("GDAL_VRT_ENABLE_PYTHON", "YES"), gdaltest.error_handler():
         cs = ds.GetRasterBand(1).Checksum()
     if cs != -1:
@@ -577,15 +556,13 @@ uncallable_object = True
         pytest.fail("invalid checksum")
 
     # unknown_module
-    ds = gdal.Open(
-        """<VRTDataset rasterXSize="10" rasterYSize="10">
+    ds = gdal.Open("""<VRTDataset rasterXSize="10" rasterYSize="10">
   <VRTRasterBand dataType="Byte" band="1" subClass="VRTDerivedRasterBand">
     <PixelFunctionType>unknown_module.unknown_function</PixelFunctionType>
     <PixelFunctionLanguage>Python</PixelFunctionLanguage>
   </VRTRasterBand>
 </VRTDataset>
-"""
-    )
+""")
     with gdal.config_option("GDAL_VRT_ENABLE_PYTHON", "YES"), gdaltest.error_handler():
         cs = ds.GetRasterBand(1).Checksum()
     if cs != -1:
@@ -596,8 +573,7 @@ uncallable_object = True
 def vrtderived_code_that_only_makes_sense_with_GDAL_VRT_ENABLE_PYTHON_equal_IF_SAFE_but_that_is_now_disabled():
 
     # untrusted import
-    ds = gdal.Open(
-        """<VRTDataset rasterXSize="10" rasterYSize="10">
+    ds = gdal.Open("""<VRTDataset rasterXSize="10" rasterYSize="10">
   <VRTRasterBand dataType="Byte" band="1" subClass="VRTDerivedRasterBand">
     <PixelFunctionType>my_func</PixelFunctionType>
     <PixelFunctionLanguage>Python</PixelFunctionLanguage>
@@ -608,8 +584,7 @@ def my_func(in_ar, out_ar, xoff, yoff, xsize, ysize, raster_xsize, raster_ysize,
     </PixelFunctionCode>
   </VRTRasterBand>
 </VRTDataset>
-"""
-    )
+""")
     with gdal.quiet_errors():
         cs = ds.GetRasterBand(1).Checksum()
     if cs != -1:
@@ -617,8 +592,7 @@ def my_func(in_ar, out_ar, xoff, yoff, xsize, ysize, raster_xsize, raster_ysize,
         pytest.fail("invalid checksum")
 
     # untrusted function
-    ds = gdal.Open(
-        """<VRTDataset rasterXSize="10" rasterYSize="10">
+    ds = gdal.Open("""<VRTDataset rasterXSize="10" rasterYSize="10">
   <VRTRasterBand dataType="Byte" band="1" subClass="VRTDerivedRasterBand">
     <PixelFunctionType>my_func</PixelFunctionType>
     <PixelFunctionLanguage>Python</PixelFunctionLanguage>
@@ -629,8 +603,7 @@ def my_func(in_ar, out_ar, xoff, yoff, xsize, ysize, raster_xsize, raster_ysize,
     </PixelFunctionCode>
   </VRTRasterBand>
 </VRTDataset>
-"""
-    )
+""")
     with gdal.quiet_errors():
         cs = ds.GetRasterBand(1).Checksum()
     if cs != -1:
@@ -638,15 +611,13 @@ def my_func(in_ar, out_ar, xoff, yoff, xsize, ysize, raster_xsize, raster_ysize,
         pytest.fail("invalid checksum")
 
     # GDAL_VRT_ENABLE_PYTHON not set to YES
-    ds = gdal.Open(
-        """<VRTDataset rasterXSize="10" rasterYSize="10">
+    ds = gdal.Open("""<VRTDataset rasterXSize="10" rasterYSize="10">
   <VRTRasterBand dataType="Byte" band="1" subClass="VRTDerivedRasterBand">
     <PixelFunctionType>vrtderived.one_pix_func</PixelFunctionType>
     <PixelFunctionLanguage>Python</PixelFunctionLanguage>
   </VRTRasterBand>
 </VRTDataset>
-"""
-    )
+""")
     with gdal.quiet_errors():
         cs = ds.GetRasterBand(1).Checksum()
     if cs != -1:
@@ -782,16 +753,13 @@ def test_vrtderived_12():
         "CFloat32",
         "CFloat64",
     ]:
-        ds = gdal.Open(
-            """<VRTDataset rasterXSize="10" rasterYSize="10">
+        ds = gdal.Open("""<VRTDataset rasterXSize="10" rasterYSize="10">
 <VRTRasterBand dataType="%s" band="1" subClass="VRTDerivedRasterBand">
     <ColorInterp>Gray</ColorInterp>
     <PixelFunctionType>vrtderived.one_pix_func</PixelFunctionType>
     <PixelFunctionLanguage>Python</PixelFunctionLanguage>
 </VRTRasterBand>
-</VRTDataset>"""
-            % dt
-        )
+</VRTDataset>""" % dt)
 
         with gdal.config_option(
             "GDAL_VRT_ENABLE_PYTHON", "YES"
@@ -821,17 +789,14 @@ def test_vrtderived_12():
 
     # Same for SourceTransferType
     for dt in ["CInt16", "CInt32", "CFloat16"]:
-        ds = gdal.Open(
-            """<VRTDataset rasterXSize="10" rasterYSize="10">
+        ds = gdal.Open("""<VRTDataset rasterXSize="10" rasterYSize="10">
 <VRTRasterBand dataType="%s" band="1" subClass="VRTDerivedRasterBand">
     <SourceTransferType>Byte</SourceTransferType>
     <ColorInterp>Gray</ColorInterp>
     <PixelFunctionType>vrtderived.one_pix_func</PixelFunctionType>
     <PixelFunctionLanguage>Python</PixelFunctionLanguage>
 </VRTRasterBand>
-</VRTDataset>"""
-            % dt
-        )
+</VRTDataset>""" % dt)
 
         with gdal.config_option(
             "GDAL_VRT_ENABLE_PYTHON", "YES"
@@ -875,8 +840,8 @@ def test_vrtderived_14():
         ds = gdal.GetDriverByName("VRT").CreateCopy(
             "/vsimem/vrtderived_14.vrt", gdal.Open("data/vrt/python_ones.vrt")
         )
-        (my_min, my_max) = ds.GetRasterBand(1).ComputeRasterMinMax()
-        (my_min2, my_max2, mean, stddev) = ds.GetRasterBand(1).ComputeStatistics(False)
+        my_min, my_max = ds.GetRasterBand(1).ComputeRasterMinMax()
+        my_min2, my_max2, mean, stddev = ds.GetRasterBand(1).ComputeStatistics(False)
         hist = ds.GetRasterBand(1).GetHistogram()
 
     assert (my_min, my_max) == (1.0, 1.0), "invalid ComputeRasterMinMax"
@@ -1081,8 +1046,7 @@ def identity(in_ar, out_ar, *args, **kwargs):
 @gdaltest.enable_exceptions()
 def test_vrt_expression_missing_expression_arg():
 
-    ds = gdal.Open(
-        """<VRTDataset rasterXSize="20" rasterYSize="20">
+    ds = gdal.Open("""<VRTDataset rasterXSize="20" rasterYSize="20">
   <VRTRasterBand dataType="Float64" band="1" subClass="VRTDerivedRasterBand">
     <SimpleSource>
       <SourceFilename relativeToVRT="0">data/byte.tif</SourceFilename>
@@ -1090,8 +1054,7 @@ def test_vrt_expression_missing_expression_arg():
     </SimpleSource>
     <PixelFunctionType>expression</PixelFunctionType>
   </VRTRasterBand>
-</VRTDataset>"""
-    )
+</VRTDataset>""")
     with pytest.raises(Exception, match="Missing 'expression' pixel function argument"):
         ds.GetRasterBand(1).Checksum()
 
@@ -2541,3 +2504,39 @@ def test_vrt_derived_virtual_overviews(tmp_vsimem):
     with gdaltest.error_raised(gdal.CE_None):
         got = mask_band.ReadRaster(0, 0, width, height, 1, 1)
     assert got == b"\x02"
+
+
+def test_vrt_derived_zero_initialization(tmp_vsimem):
+
+    vrt_w = 20
+    vrt_h = 10
+    tile_w = vrt_w // 2
+    tile_h = vrt_h
+    tile_offset = vrt_w - tile_w
+    with gdal.GetDriverByName("GTiff").Create(
+        tmp_vsimem / "src1.tif", tile_w, tile_h, 1, gdal.GDT_UInt8
+    ) as src:
+        src.WriteRaster(0, 0, tile_w, tile_h, b"\x01" * (tile_w * tile_h))
+
+    xml = f"""
+    <VRTDataset rasterXSize="{vrt_w}" rasterYSize="{vrt_h}">
+      <VRTRasterBand dataType="Byte" band="1" subclass="VRTDerivedRasterBand">
+        <PixelFunctionType>sum</PixelFunctionType>
+        <SimpleSource>
+          <SourceFilename>{tmp_vsimem / "src1.tif"}</SourceFilename>
+          <SourceBand>1</SourceBand>
+          <SrcRect xOff="0" yOff="0" xSize="{tile_w}" ySize="{tile_h}" />
+          <DstRect xOff="{tile_offset}" yOff="0" xSize="{tile_w}" ySize="{tile_h}" />
+        </SimpleSource>
+      </VRTRasterBand>
+    </VRTDataset>"""
+
+    buf_obj = bytearray(b"\xff" * ((vrt_h - 1) * vrt_w + tile_offset))
+    got = gdal.Open(xml).ReadRaster(
+        0, 0, tile_offset, vrt_h, buf_obj=buf_obj, buf_line_space=vrt_w
+    )
+    assert (
+        got
+        == (b"\x00" * tile_offset + b"\xff" * tile_w) * (vrt_h - 1)
+        + b"\x00" * tile_offset
+    )

@@ -2019,6 +2019,8 @@ bool GDALAlgorithm::ParseCommandLineArguments(
                     m_executionForStreamOutput;
                 m_selectedSubAlg->m_calledFromCommandLine =
                     m_calledFromCommandLine;
+                m_selectedSubAlg->m_skipValidationInParseCommandLine =
+                    m_skipValidationInParseCommandLine;
                 bool bRet = m_selectedSubAlg->ParseCommandLineArguments(
                     std::vector<std::string>(args.begin() + 1, args.end()));
                 m_selectedSubAlg->PropagateSpecialActionTo(this);
@@ -2294,6 +2296,15 @@ bool GDALAlgorithm::ParseCommandLineArguments(
         }
     }
 
+    if (m_inputDatasetCanBeOmitted && m_positionalArgs.size() >= 1 &&
+        !m_positionalArgs[0]->IsExplicitlySet() &&
+        m_positionalArgs[0]->GetName() == GDAL_ARG_NAME_INPUT &&
+        (m_positionalArgs[0]->GetType() == GAAT_DATASET ||
+         m_positionalArgs[0]->GetType() == GAAT_DATASET_LIST))
+    {
+        ++iCurPosArg;
+    }
+
     while (i < lArgs.size() && iCurPosArg < m_positionalArgs.size())
     {
         GDALAlgorithmArg *arg = m_positionalArgs[iCurPosArg];
@@ -2555,6 +2566,12 @@ bool GDALAlgorithm::ProcessDatasetArg(GDALAlgorithmArg *arg,
     {
         return false;
     }
+    else if (m_inputDatasetCanBeOmitted &&
+             val.GetName() == GDAL_DATASET_PIPELINE_PLACEHOLDER_VALUE &&
+             !arg->IsOutput())
+    {
+        return true;
+    }
     else if (!val.GetDatasetRef() && arg->AutoOpenDataset() &&
              (!arg->IsOutput() || (arg == outputArg && update && !overwrite) ||
               onlyInputSpecifiedInUpdateAndOutputNotRequired))
@@ -2647,11 +2664,37 @@ bool GDALAlgorithm::ProcessDatasetArg(GDALAlgorithmArg *arg,
         }
 
         auto oIter = m_oMapDatasetNameToDataset.find(osDatasetName.c_str());
-        auto poDS = oIter != m_oMapDatasetNameToDataset.end()
-                        ? oIter->second
-                        : GDALDataset::Open(osDatasetName.c_str(), flags,
-                                            aosAllowedDrivers.List(),
-                                            aosOpenOptions.List());
+        GDALDataset *poDS;
+        {
+            // The PostGISRaster may emit an error message, that is not
+            // relevant, if it is the vector driver that was intended
+            std::unique_ptr<CPLErrorStateBackuper> poBackuper;
+            if (cpl::starts_with(osDatasetName, "PG:") &&
+                (flags & (GDAL_OF_RASTER | GDAL_OF_VECTOR)) != 0)
+            {
+                poBackuper = std::make_unique<CPLErrorStateBackuper>(
+                    CPLQuietErrorHandler);
+            }
+
+            CPL_IGNORE_RET_VAL(poBackuper);
+            poDS = oIter != m_oMapDatasetNameToDataset.end()
+                       ? oIter->second
+                       : GDALDataset::Open(osDatasetName.c_str(), flags,
+                                           aosAllowedDrivers.List(),
+                                           aosOpenOptions.List());
+
+            // Retry with PostGIS vector driver
+            if (!poDS && poBackuper &&
+                GetGDALDriverManager()->GetDriverByName("PostGISRaster") &&
+                aosAllowedDrivers.empty() && aosOpenOptions.empty())
+            {
+                poBackuper.reset();
+                poDS = GDALDataset::Open(
+                    osDatasetName.c_str(), flags & ~GDAL_OF_RASTER,
+                    aosAllowedDrivers.List(), aosOpenOptions.List());
+            }
+        }
+
         if (poDS)
         {
             if (oIter != m_oMapDatasetNameToDataset.end())
@@ -2915,7 +2958,10 @@ bool GDALAlgorithm::ValidateArguments()
                     }
                 }
             }
-            if (emitError)
+            if (emitError && !(m_inputDatasetCanBeOmitted &&
+                               arg->GetName() == GDAL_ARG_NAME_INPUT &&
+                               (arg->GetType() == GAAT_DATASET ||
+                                arg->GetType() == GAAT_DATASET_LIST)))
             {
                 ReportError(CE_Failure, CPLE_AppDefined,
                             "Required argument '%s' has not been specified.",
@@ -3459,9 +3505,13 @@ void GDALAlgorithm::SetAutoCompleteFunctionForFilename(
     GDALInConstructionAlgorithmArg &arg, GDALArgDatasetType type)
 {
     arg.SetAutoCompleteFunction(
-        [type](const std::string &currentValue) -> std::vector<std::string>
+        [&arg,
+         type](const std::string &currentValue) -> std::vector<std::string>
         {
             std::vector<std::string> oRet;
+
+            if (arg.IsHidden())
+                return oRet;
 
             {
                 CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
@@ -4396,7 +4446,8 @@ GDALAlgorithm::AddOutputFormatArg(std::string *pValue, bool bStreamAllowed,
         [this, &arg, bStreamAllowed, bGDALGAllowed]()
         { return ValidateFormat(arg, bStreamAllowed, bGDALGAllowed); });
     arg.SetAutoCompleteFunction(
-        [&arg, bStreamAllowed, bGDALGAllowed](const std::string &) {
+        [&arg, bStreamAllowed, bGDALGAllowed](const std::string &)
+        {
             return FormatAutoCompleteFunction(arg, bStreamAllowed,
                                               bGDALGAllowed);
         });
@@ -5988,30 +6039,34 @@ GDALAlgorithm::GetUsageForCLI(bool shortUsage,
                 osRet += " [OPTIONS]";
             for (const auto *arg : m_positionalArgs)
             {
-                const bool optional =
-                    (!arg->IsRequired() && !(GetName() == "pipeline" &&
-                                             arg->GetName() == "pipeline"));
-                osRet += ' ';
-                if (optional)
-                    osRet += '[';
-                const std::string &metavar = arg->GetMetaVar();
-                if (!metavar.empty() && metavar[0] == '<')
+                if ((!arg->IsHidden() && !arg->IsHiddenForCLI()) ||
+                    (GetName() == "pipeline" && arg->GetName() == "pipeline"))
                 {
-                    osRet += metavar;
+                    const bool optional =
+                        (!arg->IsRequired() && !(GetName() == "pipeline" &&
+                                                 arg->GetName() == "pipeline"));
+                    osRet += ' ';
+                    if (optional)
+                        osRet += '[';
+                    const std::string &metavar = arg->GetMetaVar();
+                    if (!metavar.empty() && metavar[0] == '<')
+                    {
+                        osRet += metavar;
+                    }
+                    else
+                    {
+                        osRet += '<';
+                        osRet += metavar;
+                        osRet += '>';
+                    }
+                    if (arg->GetType() == GAAT_DATASET_LIST &&
+                        arg->GetMaxCount() > 1)
+                    {
+                        osRet += "...";
+                    }
+                    if (optional)
+                        osRet += ']';
                 }
-                else
-                {
-                    osRet += '<';
-                    osRet += metavar;
-                    osRet += '>';
-                }
-                if (arg->GetType() == GAAT_DATASET_LIST &&
-                    arg->GetMaxCount() > 1)
-                {
-                    osRet += "...";
-                }
-                if (optional)
-                    osRet += ']';
             }
         }
 
@@ -6796,6 +6851,52 @@ GDALAlgorithm::GetAutoComplete(std::vector<std::string> &args,
     }
 
     return ret;
+}
+
+/************************************************************************/
+/*                   GDALAlgorithm::GetFieldIndices()                   */
+/************************************************************************/
+
+bool GDALAlgorithm::GetFieldIndices(const std::vector<std::string> &names,
+                                    OGRLayerH hLayer, std::vector<int> &indices)
+{
+    VALIDATE_POINTER1(hLayer, __func__, false);
+
+    const OGRLayer &layer = *OGRLayer::FromHandle(hLayer);
+
+    if (names.size() == 1 && names[0] == "ALL")
+    {
+        const int nSrcFieldCount = layer.GetLayerDefn()->GetFieldCount();
+        for (int i = 0; i < nSrcFieldCount; ++i)
+        {
+            indices.push_back(i);
+        }
+    }
+    else if (!names.empty() && !(names.size() == 1 && names[0] == "NONE"))
+    {
+        std::set<int> fieldsAdded;
+        for (const std::string &osFieldName : names)
+        {
+
+            const int nIdx =
+                layer.GetLayerDefn()->GetFieldIndex(osFieldName.c_str());
+
+            if (nIdx < 0)
+            {
+                CPLError(CE_Failure, CPLE_AppDefined,
+                         "Field '%s' does not exist in layer '%s'",
+                         osFieldName.c_str(), layer.GetName());
+                return false;
+            }
+
+            if (fieldsAdded.insert(nIdx).second)
+            {
+                indices.push_back(nIdx);
+            }
+        }
+    }
+
+    return true;
 }
 
 /************************************************************************/

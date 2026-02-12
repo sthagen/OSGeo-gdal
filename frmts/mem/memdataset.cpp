@@ -559,7 +559,7 @@ bool MEMRasterBand::IsMaskBand() const
 MEMDataset::MEMDataset()
     : GDALDataset(FALSE), bGeoTransformSet(FALSE), m_poPrivate(new Private())
 {
-    m_gt[5] = -1;
+    m_gt.yscale = -1;
     DisableReadWriteMutex();
 }
 
@@ -2133,7 +2133,7 @@ inline static void FastCopy(size_t nIters, GByte *dstPtr, const GByte *srcPtr,
     if (nIters >= 8)
     {
 #define COPY_ELT(i)                                                            \
-    memcpy(dstPtr + (i)*dst_inc_offset, srcPtr + (i)*src_inc_offset, N)
+    memcpy(dstPtr + (i) * dst_inc_offset, srcPtr + (i) * src_inc_offset, N)
         while (true)
         {
             COPY_ELT(0);

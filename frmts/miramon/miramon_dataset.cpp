@@ -11,6 +11,8 @@
  * SPDX-License-Identifier: MIT
  ****************************************************************************/
 
+#include <algorithm>
+
 #include "miramon_dataset.h"
 #include "miramon_rasterband.h"
 #include "miramon_band.h"  // Per a MMRBand
@@ -39,6 +41,20 @@ void GDALRegister_MiraMon()
 
     poDriver->SetMetadataItem(GDAL_DCAP_VIRTUALIO, "YES");
     poDriver->SetMetadataItem(GDAL_DMD_SUBDATASETS, "YES");
+
+    poDriver->SetMetadataItem(GDAL_DCAP_OPEN, "YES");
+
+    poDriver->SetMetadataItem(
+        GDAL_DMD_OPENOPTIONLIST,
+        "<OpenOptionList>\n"
+        "   <Option name='RAT_OR_CT' type='string-select' "
+        "description='Controls whether the Raster Attribute Table (RAT) "
+        "and/or the Color Table (CT) are exposed.' default='ALL'>\n"
+        "       <Value>ALL</Value>\n"
+        "       <Value>RAT</Value>\n"
+        "       <Value>CT</Value>\n"
+        "   </Option>\n"
+        "</OpenOptionList>\n");
 
     poDriver->pfnOpen = MMRDataset::Open;
     poDriver->pfnIdentify = MMRDataset::Identify;
@@ -86,10 +102,20 @@ MMRDataset::MMRDataset(GDALOpenInfo *poOpenInfo)
     ReadProjection();
     nBands = 0;
 
-    // Assign every band to a subdataset (if any)
-    // If all bands should go to a one single Subdataset, then,
-    // no subdataset will be created and all bands will go to this
-    // dataset.
+    // Getting the open option that determines how to expose subdatasets.
+    // To avoid recusivity subdatasets are exposed as they are.
+    const char *pszDataType =
+        CSLFetchNameValue(poOpenInfo->papszOpenOptions, "RAT_OR_CT");
+    if (pszDataType != nullptr)
+    {
+        if (EQUAL(pszDataType, "RAT"))
+            nRatOrCT = RAT_OR_CT::RAT;
+        else if (EQUAL(pszDataType, "ALL"))
+            nRatOrCT = RAT_OR_CT::ALL;
+        else if (EQUAL(pszDataType, "CT"))
+            nRatOrCT = RAT_OR_CT::CT;
+    }
+
     AssignBandsToSubdataSets();
 
     // Create subdatasets or add bands, as needed
@@ -397,6 +423,50 @@ bool MMRDataset::BandInTheSameDataset(int nIBand1, int nIBand2) const
     if (pThisBand->GetBoundingBoxMaxY() != pOtherBand->GetBoundingBoxMaxY())
         return false;
 
+    // Two images with different simbolization are assigned to different subdatasets
+    if (!EQUAL(pThisBand->GetColor_Const(), pOtherBand->GetColor_Const()))
+        return false;
+    if (pThisBand->GetConstantColorRGB().c1 !=
+        pOtherBand->GetConstantColorRGB().c1)
+        return false;
+    if (pThisBand->GetConstantColorRGB().c2 !=
+        pOtherBand->GetConstantColorRGB().c2)
+        return false;
+    if (pThisBand->GetConstantColorRGB().c3 !=
+        pOtherBand->GetConstantColorRGB().c3)
+        return false;
+    if (!EQUAL(pThisBand->GetColor_Paleta(), pOtherBand->GetColor_Paleta()))
+        return false;
+    if (!EQUAL(pThisBand->GetColor_TractamentVariable(),
+               pOtherBand->GetColor_TractamentVariable()))
+        return false;
+    if (!EQUAL(pThisBand->GetTractamentVariable(),
+               pOtherBand->GetTractamentVariable()))
+        return false;
+    if (!EQUAL(pThisBand->GetColor_EscalatColor(),
+               pOtherBand->GetColor_EscalatColor()))
+        return false;
+    if (!EQUAL(pThisBand->GetColor_N_SimbolsALaTaula(),
+               pOtherBand->GetColor_N_SimbolsALaTaula()))
+        return false;
+    if (pThisBand->IsCategorical() != pOtherBand->IsCategorical())
+        return false;
+    if (pThisBand->IsCategorical())
+    {
+        if (pThisBand->GetMaxSet() != pOtherBand->GetMaxSet())
+            return false;
+        if (pThisBand->GetMaxSet())
+        {
+            if (pThisBand->GetMax() != pOtherBand->GetMax())
+                return false;
+        }
+    }
+
+    // Two images with different RATs are assigned to different subdatasets
+    if (!EQUAL(pThisBand->GetShortRATName(), pOtherBand->GetShortRATName()) ||
+        !EQUAL(pThisBand->GetAssociateREL(), pOtherBand->GetAssociateREL()))
+        return false;
+
     // One image has NoData values and the other does not;
     // they are assigned to different subdatasets
     if (pThisBand->BandHasNoData() != pOtherBand->BandHasNoData())
@@ -425,8 +495,8 @@ int MMRDataset::UpdateGeoTransform()
         osMinX.empty())
         return 1;
 
-    if (1 != CPLsscanf(osMinX, "%lf", &(m_gt[0])))
-        m_gt[0] = 0.0;
+    if (1 != CPLsscanf(osMinX, "%lf", &(m_gt.xorig)))
+        m_gt.xorig = 0.0;
 
     int nNCols = m_pMMRRel->GetColumnsNumberFromREL();
     if (nNCols <= 0)
@@ -441,8 +511,8 @@ int MMRDataset::UpdateGeoTransform()
     if (1 != CPLsscanf(osMaxX, "%lf", &dfMaxX))
         dfMaxX = 1.0;
 
-    m_gt[1] = (dfMaxX - m_gt[0]) / nNCols;
-    m_gt[2] = 0.0;  // No rotation in MiraMon rasters
+    m_gt.xscale = (dfMaxX - m_gt.xorig) / nNCols;
+    m_gt.xrot = 0.0;  // No rotation in MiraMon rasters
 
     CPLString osMinY;
     if (!m_pMMRRel->GetMetadataValue(SECTION_EXTENT, "MinY", osMinY) ||
@@ -462,13 +532,13 @@ int MMRDataset::UpdateGeoTransform()
     if (1 != CPLsscanf(osMaxY, "%lf", &dfMaxY))
         dfMaxY = 1.0;
 
-    m_gt[3] = dfMaxY;
-    m_gt[4] = 0.0;
+    m_gt.yorig = dfMaxY;
+    m_gt.yrot = 0.0;
 
     double dfMinY;
     if (1 != CPLsscanf(osMinY, "%lf", &dfMinY))
         dfMinY = 0.0;
-    m_gt[5] = (dfMinY - m_gt[3]) / nNRows;
+    m_gt.yscale = (dfMinY - m_gt.yorig) / nNRows;
 
     return 0;
 }
@@ -480,8 +550,8 @@ const OGRSpatialReference *MMRDataset::GetSpatialRef() const
 
 CPLErr MMRDataset::GetGeoTransform(GDALGeoTransform &gt) const
 {
-    if (m_gt[0] != 0.0 || m_gt[1] != 1.0 || m_gt[2] != 0.0 || m_gt[3] != 0.0 ||
-        m_gt[4] != 0.0 || m_gt[5] != 1.0)
+    if (m_gt.xorig != 0.0 || m_gt.xscale != 1.0 || m_gt.xrot != 0.0 ||
+        m_gt.yorig != 0.0 || m_gt.yrot != 0.0 || m_gt.yscale != 1.0)
     {
         gt = m_gt;
         return CE_None;

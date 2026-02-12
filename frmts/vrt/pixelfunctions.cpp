@@ -964,9 +964,9 @@ struct TintermediateS<
     Tsrc, Tdest,
     std::enable_if_t<
         (std::is_same_v<Tsrc, uint8_t> || std::is_same_v<Tsrc, int16_t> ||
-         std::is_same_v<Tsrc, uint16_t>)&&(std::is_same_v<Tdest, uint8_t> ||
-                                           std::is_same_v<Tdest, int16_t> ||
-                                           std::is_same_v<Tdest, uint16_t>),
+         std::is_same_v<Tsrc, uint16_t>) &&
+            (std::is_same_v<Tdest, uint8_t> || std::is_same_v<Tdest, int16_t> ||
+             std::is_same_v<Tdest, uint16_t>),
         bool>>
 {
     using type = int32_t;
@@ -3009,17 +3009,11 @@ static CPLErr ExprPixelFunc(void **papoSources, int nSources, void *pData,
             return CE_Failure;
         }
 
-        CPLStringList aosGeoTransform(
-            CSLTokenizeString2(pszGT, ",", CSLT_HONOURSTRINGS));
-        if (aosGeoTransform.size() != 6)
+        if (!gt.Init(pszGT))
         {
             CPLError(CE_Failure, CPLE_AppDefined,
                      "Invalid GeoTransform argument");
             return CE_Failure;
-        }
-        for (int i = 0; i < 6; i++)
-        {
-            gt[i] = CPLAtof(aosGeoTransform[i]);
         }
     }
 
@@ -3137,19 +3131,11 @@ static CPLErr AreaPixelFunc(void ** /*papoSources*/, int nSources, void *pData,
     }
 
     GDALGeoTransform gt;
+    if (!gt.Init(pszGT))
     {
-        CPLStringList aosGeoTransform(
-            CSLTokenizeString2(pszGT, ",", CSLT_HONOURSTRINGS));
-        if (aosGeoTransform.size() != 6)
-        {
-            CPLError(CE_Failure, CPLE_AppDefined,
-                     "area: invalid GeoTransform argument");
-            return CE_Failure;
-        }
-        for (int i = 0; i < 6; i++)
-        {
-            gt[i] = CPLAtof(aosGeoTransform[i]);
-        }
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "area: Invalid GeoTransform argument");
+        return CE_Failure;
     }
 
     const char *pszXOff = CSLFetchNameValue(papszArgs, "xoff");

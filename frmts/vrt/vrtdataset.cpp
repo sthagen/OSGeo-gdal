@@ -314,7 +314,8 @@ CPLXMLNode *VRTDataset::SerializeToXML(const char *pszVRTPathIn)
         CPLSetXMLValue(
             psDSTree, "GeoTransform",
             CPLSPrintf("%24.16e,%24.16e,%24.16e,%24.16e,%24.16e,%24.16e",
-                       m_gt[0], m_gt[1], m_gt[2], m_gt[3], m_gt[4], m_gt[5]));
+                       m_gt.xorig, m_gt.xscale, m_gt.xrot, m_gt.yorig,
+                       m_gt.yrot, m_gt.yscale));
     }
 
     /* -------------------------------------------------------------------- */
@@ -550,18 +551,13 @@ CPLErr VRTDataset::XMLInit(const CPLXMLNode *psTree, const char *pszVRTPathIn)
     const char *pszGT = CPLGetXMLValue(psTree, "GeoTransform", "");
     if (strlen(pszGT) > 0)
     {
-        const CPLStringList aosTokens(
-            CSLTokenizeStringComplex(pszGT, ",", FALSE, FALSE));
-        if (aosTokens.size() != 6)
+        if (m_gt.Init(pszGT, ","))
         {
-            CPLError(CE_Warning, CPLE_AppDefined,
-                     "GeoTransform node does not have expected six values.");
+            m_bGeoTransformSet = true;
         }
         else
         {
-            for (int iTA = 0; iTA < 6; iTA++)
-                m_gt[iTA] = CPLAtof(aosTokens[iTA]);
-            m_bGeoTransformSet = TRUE;
+            CPLError(CE_Warning, CPLE_AppDefined, "Invalid GeoTransform");
         }
     }
 

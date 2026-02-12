@@ -647,8 +647,17 @@ int VSIMkdirRecursive(const char *pszPathname, long mode)
     if (!pszPathname)
         return -1;
 
-    const std::string osPathnameOri(pszPathname);
-    if (osPathnameOri.empty() || osPathnameOri == "/")
+    std::string osPathnameOri(pszPathname);
+    if (cpl::starts_with(osPathnameOri, "/vsimem/"))
+    {
+        osPathnameOri = VSIFileManager::GetHandler(pszPathname)
+                            ->GetCanonicalFilename(osPathnameOri);
+    }
+    // Limit to avoid performance issues such as in
+    // https://issues.oss-fuzz.com/issues/471096341
+    constexpr size_t CPL_MAX_PATH = 4096;
+    if (osPathnameOri.empty() || osPathnameOri == "/" ||
+        osPathnameOri.size() > CPL_MAX_PATH)
         return -1;
 
     VSIStatBufL sStat;

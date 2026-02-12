@@ -28,6 +28,7 @@ from osgeo import gdal, osr
 
 pytestmark = pytest.mark.require_driver("ZARR")
 
+
 ###############################################################################
 @pytest.fixture(autouse=True, scope="module")
 def module_disable_exceptions():
@@ -3241,9 +3242,11 @@ def test_zarr_write_interleave(tmp_vsimem, dt, array_type):
     ar = rg.OpenMDArray(rg.GetMDArrayNames()[0])
     assert ar.Read() == array.array(
         array_type,
-        [0, 1, 2, 3, 4, 5]
-        if dt != gdal.GDT_CFloat64
-        else [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5],
+        (
+            [0, 1, 2, 3, 4, 5]
+            if dt != gdal.GDT_CFloat64
+            else [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5]
+        ),
     )
     if dt != gdal.GDT_CFloat64:
         assert ar.Read(
@@ -3255,7 +3258,7 @@ def test_zarr_write_interleave(tmp_vsimem, dt, array_type):
     "string_format,input_str,output_str",
     [
         ("ASCII", "0123456789truncated", "0123456789"),
-        ("UNICODE", "\u00E9" + "123456789truncated", "\u00E9" + "123456789"),
+        ("UNICODE", "\u00e9" + "123456789truncated", "\u00e9" + "123456789"),
     ],
     ids=("ASCII", "UNICODE"),
 )
@@ -3301,13 +3304,13 @@ def test_zarr_update_array_string(tmp_vsimem, srcfilename):
     )
     gdal.FileFromMemBuffer(filename + "/0", open(srcfilename + "/0", "rb").read())
 
-    eta = "\u03B7"
+    eta = "\u03b7"
 
     def update():
         ds = gdal.OpenEx(filename, gdal.OF_MULTIDIM_RASTER | gdal.OF_UPDATE)
         rg = ds.GetRootGroup()
         ar = rg.OpenMDArray(rg.GetMDArrayNames()[0])
-        assert ar.Read() == ["\u00E9"]
+        assert ar.Read() == ["\u00e9"]
         assert ar.Write([eta]) == gdal.CE_None
         assert gdal.GetLastErrorMsg() == ""
 
@@ -6179,7 +6182,7 @@ def test_zarr_read_simple_sharding_network():
     webserver_process = None
     webserver_port = 0
 
-    (webserver_process, webserver_port) = webserver.launch(
+    webserver_process, webserver_port = webserver.launch(
         handler=webserver.DispatcherHttpHandler
     )
     if webserver_port == 0:
@@ -6223,63 +6226,59 @@ def test_zarr_read_simple_sharding_network():
     chunk_block = b"\x01\x02\x03\x04" + (16384 - 4) * b"\x00"
 
     try:
-        # Loop twice: second iteration proves ClearMemoryCaches() lets the
-        # driver re-fetch everything cleanly.
-        for _ in range(2):
-            handler = webserver.SequentialHandler()
-            handler.add("GET", "/test.zarr/", 404)
-            handler.add("HEAD", "/test.zarr/.zmetadata", 404)
-            handler.add("HEAD", "/test.zarr/.zarray", 404)
-            handler.add("HEAD", "/test.zarr/.zgroup", 404)
-            handler.add(
-                "HEAD",
-                "/test.zarr/zarr.json",
-                200,
-                {"Content-Length": "%d" % len(zarr_json)},
-            )
-            handler.add(
-                "GET",
-                "/test.zarr/zarr.json",
-                200,
-                {"Content-Length": "%d" % len(zarr_json)},
-                zarr_json,
-            )
-            handler.add("HEAD", "/test.zarr/zarr.json.aux.xml", 404)
-            handler.add("HEAD", "/test.zarr/zarr.aux", 404)
-            handler.add("HEAD", "/test.zarr/zarr.AUX", 404)
-            handler.add("HEAD", "/test.zarr/zarr.json.aux", 404)
-            handler.add("HEAD", "/test.zarr/zarr.json.AUX", 404)
-            handler.add("HEAD", "/test.zarr/zarr.json.gmac", 404)
-            handler.add("HEAD", "/test.zarr/c/0/0", 200, {"Content-Length": "65536"})
-            handler.add(
-                "GET",
-                "/test.zarr/c/0/0",
-                206,
-                {
-                    "Content-Length": "16384",
-                    "Content-Range": "bytes 49152-65535/65536",
-                },
-                shard_tail,
-                expected_headers={"Range": "bytes=49152-65535"},
-            )
-            handler.add(
-                "GET",
-                "/test.zarr/c/0/0",
-                206,
-                {
-                    "Content-Length": "16384",
-                    "Content-Range": "bytes 0-16383/65536",
-                },
-                chunk_block,
-                expected_headers={"Range": "bytes=0-16383"},
-            )
-            with webserver.install_http_handler(handler):
-                ds = gdal.Open(
-                    'ZARR:"/vsicurl/http://localhost:%d/test.zarr"' % webserver_port
+        with gdaltest.config_options({"GDAL_PAM_ENABLED": "NO"}):
+            # Loop twice: second iteration proves ClearMemoryCaches() lets the
+            # driver re-fetch everything cleanly.
+            for _ in range(2):
+                handler = webserver.SequentialHandler()
+                handler.add("GET", "/test.zarr/", 404)
+                handler.add("HEAD", "/test.zarr/.zmetadata", 404)
+                # Probe zarr.json first; v2 probes (.zarray, .zgroup) skipped.
+                handler.add(
+                    "HEAD",
+                    "/test.zarr/zarr.json",
+                    200,
+                    {"Content-Length": "%d" % len(zarr_json)},
                 )
-                assert ds.GetRasterBand(1).ReadBlock(0, 0) == b"\x01\x02\x03\x04"
-            ds = None
-            gdal.ClearMemoryCaches()
+                handler.add(
+                    "GET",
+                    "/test.zarr/zarr.json",
+                    200,
+                    {"Content-Length": "%d" % len(zarr_json)},
+                    zarr_json,
+                )
+                handler.add(
+                    "HEAD", "/test.zarr/c/0/0", 200, {"Content-Length": "65536"}
+                )
+                handler.add(
+                    "GET",
+                    "/test.zarr/c/0/0",
+                    206,
+                    {
+                        "Content-Length": "16384",
+                        "Content-Range": "bytes 49152-65535/65536",
+                    },
+                    shard_tail,
+                    expected_headers={"Range": "bytes=49152-65535"},
+                )
+                handler.add(
+                    "GET",
+                    "/test.zarr/c/0/0",
+                    206,
+                    {
+                        "Content-Length": "16384",
+                        "Content-Range": "bytes 0-16383/65536",
+                    },
+                    chunk_block,
+                    expected_headers={"Range": "bytes=0-16383"},
+                )
+                with webserver.install_http_handler(handler):
+                    ds = gdal.Open(
+                        'ZARR:"/vsicurl/http://localhost:%d/test.zarr"' % webserver_port
+                    )
+                    assert ds.GetRasterBand(1).ReadBlock(0, 0) == b"\x01\x02\x03\x04"
+                ds = None
+                gdal.ClearMemoryCaches()
 
     finally:
         webserver.server_stop(webserver_process, webserver_port)

@@ -3214,7 +3214,7 @@ void netCDFDataset::SetProjectionFromVar(
     // Look for grid_mapping metadata.
     const char *pszValue = pszGivenGM;
     CPLString osTmpGridMapping;  // let is in this outer scope as pszValue may
-        // point to it
+    // point to it
     if (pszValue == nullptr)
     {
         pszValue = FetchAttr(nGroupId, nVarId, CF_GRD_MAPPING);
@@ -3973,8 +3973,6 @@ void netCDFDataset::SetProjectionFromVar(
             if (!bSwitchedXY)
             {
                 poDS->bBottomUp = (yMinMax[0] <= yMinMax[1]);
-                CPLDebug("GDAL_netCDF", "set bBottomUp = %d from Y axis",
-                         static_cast<int>(poDS->bBottomUp));
                 if (!poDS->bBottomUp)
                 {
                     std::swap(yMinMax[0], yMinMax[1]);
@@ -4165,6 +4163,27 @@ void netCDFDataset::SetProjectionFromVar(
                     gtFromAttribute[i] = CPLAtof(aosGeoTransform[i]);
                 }
 
+                // When GDAL writes a raster that is north-up oriented, it
+                // writes the "GeoTransform" attribute unmodified, that is with
+                // gt.yscale < 0, but the first line is actually the southern-most
+                // one, consistently with the values of the "y" coordinate
+                // variable. This is wrong... but we have always done that, so
+                // this is hard to fix now.
+                // However there are datasets like
+                // https://public.hub.geosphere.at/datahub/resources/spartacus-v2-1d-1km/filelisting/TN/SPARTACUS2-DAILY_TN_2026.nc
+                // that correctly use a positive gt.yscale value. So make sure to not emit
+                // a warning when comparing against the geotransform derived from
+                // the x/y coordinates.
+                GDALGeoTransform gtFromAttributeNorthUp = gtFromAttribute;
+                if (gtFromAttributeNorthUp.yscale > 0 &&
+                    gtFromAttributeNorthUp.IsAxisAligned())
+                {
+                    gtFromAttributeNorthUp.yorig +=
+                        poDS->nRasterYSize * gtFromAttributeNorthUp.yscale;
+                    gtFromAttributeNorthUp.yscale =
+                        -gtFromAttributeNorthUp.yscale;
+                }
+
                 if (bGotCfGT)
                 {
                     constexpr double GT_RELERROR_WARN_THRESHOLD = 1e-6;
@@ -4172,9 +4191,9 @@ void netCDFDataset::SetProjectionFromVar(
                     for (int i = 0; i < 6; i++)
                     {
                         double dfAbsoluteError =
-                            std::abs(tmpGT[i] - gtFromAttribute[i]);
+                            std::abs(tmpGT[i] - gtFromAttributeNorthUp[i]);
                         if (dfAbsoluteError >
-                            std::abs(gtFromAttribute[i] *
+                            std::abs(gtFromAttributeNorthUp[i] *
                                      GT_RELERROR_WARN_THRESHOLD))
                         {
                             dfMaxAbsoluteError =
@@ -4196,7 +4215,18 @@ void netCDFDataset::SetProjectionFromVar(
 
                 if (bUseGeoTransformFromAttribute)
                 {
-                    tmpGT = gtFromAttribute;
+                    if (bGotCfGT)
+                    {
+                        tmpGT = gtFromAttributeNorthUp;
+                        if (gtFromAttributeNorthUp.IsAxisAligned())
+                        {
+                            poDS->bBottomUp = true;
+                        }
+                    }
+                    else
+                    {
+                        tmpGT = gtFromAttribute;
+                    }
                     bGotGdalGT = true;
                 }
             }
@@ -4241,6 +4271,12 @@ void netCDFDataset::SetProjectionFromVar(
 
         if (bGotGdalSRS && !bGotGdalGT)
             CPLDebug("GDAL_netCDF", "Got SRS but no geotransform from GDAL!");
+    }
+
+    if (bGotCfGT || bGotGdalGT)
+    {
+        CPLDebug("GDAL_netCDF", "set bBottomUp = %d from Y axis",
+                 static_cast<int>(poDS->bBottomUp));
     }
 
     if (!pszWKT && !bGotCfSRS)
@@ -5069,8 +5105,8 @@ CPLErr netCDFDataset::SetGeoTransform(const GDALGeoTransform &gt)
         return CE_Failure;
     }
 
-    CPLDebug("GDAL_netCDF", "SetGeoTransform(%f,%f,%f,%f,%f,%f)", gt[0], gt[1],
-             gt[2], gt[3], gt[4], gt[5]);
+    CPLDebug("GDAL_netCDF", "SetGeoTransform(%f,%f,%f,%f,%f,%f)", gt.xorig,
+             gt.xscale, gt.xrot, gt.yorig, gt.yrot, gt.yscale);
 
     SetGeoTransformNoUpdate(gt);
 
@@ -5586,11 +5622,7 @@ CPLErr netCDFDataset::AddProjectionVars(bool bDefsOnly,
             // Optional GDAL custom projection tags.
             if (bWriteGDALTags)
             {
-                CPLString osGeoTransform;
-                for (int i = 0; i < 6; i++)
-                {
-                    osGeoTransform += CPLSPrintf("%.17g ", m_gt[i]);
-                }
+                std::string osGeoTransform = m_gt.ToString(" ");
                 CPLDebug("GDAL_netCDF", "szGeoTransform = %s",
                          osGeoTransform.c_str());
 
@@ -5842,10 +5874,10 @@ CPLErr netCDFDataset::AddProjectionVars(bool bDefsOnly,
             }
 
             // Get Y values.
-            const double dfY0 = (!bBottomUp) ? m_gt[3] :
+            const double dfY0 = (!bBottomUp) ? m_gt.yorig :
                                              // Invert latitude values.
-                                    m_gt[3] + (m_gt[5] * nRasterYSize);
-            const double dfDY = m_gt[5];
+                                    m_gt.yorig + (m_gt.yscale * nRasterYSize);
+            const double dfDY = m_gt.yscale;
 
             for (int j = 0; j < nRasterYSize; j++)
             {
@@ -5859,8 +5891,8 @@ CPLErr netCDFDataset::AddProjectionVars(bool bDefsOnly,
             countX[0] = nRasterXSize;
 
             // Get X values.
-            const double dfX0 = m_gt[0];
-            const double dfDX = m_gt[1];
+            const double dfX0 = m_gt.xorig;
+            const double dfDX = m_gt.xscale;
 
             for (int i = 0; i < nRasterXSize; i++)
             {
@@ -6130,10 +6162,10 @@ CPLErr netCDFDataset::AddProjectionVars(bool bDefsOnly,
         else if (bWriteLonLat)
         {
             // Get latitude values.
-            const double dfY0 = (!bBottomUp) ? m_gt[3] :
+            const double dfY0 = (!bBottomUp) ? m_gt.yorig :
                                              // Invert latitude values.
-                                    m_gt[3] + (m_gt[5] * nRasterYSize);
-            const double dfDY = m_gt[5];
+                                    m_gt.yorig + (m_gt.yscale * nRasterYSize);
+            const double dfDY = m_gt.yscale;
 
             std::unique_ptr<double, decltype(&VSIFree)> adLatValKeeper(nullptr,
                                                                        VSIFree);
@@ -6186,8 +6218,8 @@ CPLErr netCDFDataset::AddProjectionVars(bool bDefsOnly,
             size_t countLat[1] = {static_cast<size_t>(nRasterYSize)};
 
             // Get longitude values.
-            const double dfX0 = m_gt[0];
-            const double dfDX = m_gt[1];
+            const double dfX0 = m_gt.xorig;
+            const double dfDX = m_gt.xscale;
 
             std::unique_ptr<double, decltype(&VSIFree)> adLonValKeeper(
                 static_cast<double *>(
@@ -8071,7 +8103,7 @@ GDALDataset *netCDFDataset::Open(GDALOpenInfo *poOpenInfo)
     CPLMutexHolderD(&hNCMutex);
 
     CPLReleaseMutex(hNCMutex);  // Release mutex otherwise we'll deadlock with
-        // GDALDataset own mutex.
+    // GDALDataset own mutex.
     netCDFDataset *poDS = new netCDFDataset();
     poDS->papszOpenOptions = CSLDuplicate(poOpenInfo->papszOpenOptions);
     CPLAcquireMutex(hNCMutex, 1000.0);
@@ -8101,7 +8133,7 @@ GDALDataset *netCDFDataset::Open(GDALOpenInfo *poOpenInfo)
                                          poOpenInfo->fpL))
         {
             CPLReleaseMutex(hNCMutex);  // Release mutex otherwise we'll
-                // deadlock with GDALDataset own mutex.
+            // deadlock with GDALDataset own mutex.
             delete poDS;
             CPLAcquireMutex(hNCMutex, 1000.0);
             return nullptr;
@@ -8151,7 +8183,7 @@ GDALDataset *netCDFDataset::Open(GDALOpenInfo *poOpenInfo)
                 NCDF_FORMAT_UNKNOWN == poDS->eFormat)
             {
                 CPLReleaseMutex(hNCMutex);  // Release mutex otherwise we'll
-                    // deadlock with GDALDataset own mutex.
+                // deadlock with GDALDataset own mutex.
                 delete poDS;
                 CPLAcquireMutex(hNCMutex, 1000.0);
                 return nullptr;
@@ -8290,7 +8322,7 @@ GDALDataset *netCDFDataset::Open(GDALOpenInfo *poOpenInfo)
         CPLDebug("GDAL_netCDF", "error opening");
 #endif
         CPLReleaseMutex(hNCMutex);  // Release mutex otherwise we'll deadlock
-            // with GDALDataset own mutex.
+        // with GDALDataset own mutex.
         delete poDS;
         CPLAcquireMutex(hNCMutex, 1000.0);
         return nullptr;
@@ -8319,7 +8351,7 @@ GDALDataset *netCDFDataset::Open(GDALOpenInfo *poOpenInfo)
     if (status != NC_NOERR)
     {
         CPLReleaseMutex(hNCMutex);  // Release mutex otherwise we'll deadlock
-            // with GDALDataset own mutex.
+        // with GDALDataset own mutex.
         delete poDS;
         CPLAcquireMutex(hNCMutex, 1000.0);
         return nullptr;
@@ -8372,7 +8404,7 @@ GDALDataset *netCDFDataset::Open(GDALOpenInfo *poOpenInfo)
             NETCDF_UFFD_UNMAP(pCtx);
 #endif
             CPLReleaseMutex(hNCMutex);  // Release mutex otherwise we'll
-                // deadlock with GDALDataset own mutex.
+            // deadlock with GDALDataset own mutex.
             delete poDS;
             CPLAcquireMutex(hNCMutex, 1000.0);
             return nullptr;
@@ -8450,7 +8482,7 @@ GDALDataset *netCDFDataset::Open(GDALOpenInfo *poOpenInfo)
         if (poDS->eAccess == GA_Update)
         {
             CPLReleaseMutex(hNCMutex);  // Release mutex otherwise we'll
-                // deadlock with GDALDataset own mutex.
+            // deadlock with GDALDataset own mutex.
             delete poDS;
             return nullptr;
         }
@@ -8474,7 +8506,7 @@ GDALDataset *netCDFDataset::Open(GDALOpenInfo *poOpenInfo)
     {
         poDS->GDALPamDataset::SetMetadata(poDS->papszMetadata);
         CPLReleaseMutex(hNCMutex);  // Release mutex otherwise we'll deadlock
-            // with GDALDataset own mutex.
+        // with GDALDataset own mutex.
         poDS->TryLoadXML();
         // If the dataset has been opened in raster mode only, exit
         if ((poOpenInfo->nOpenFlags & GDAL_OF_RASTER) != 0 &&
@@ -8514,7 +8546,7 @@ GDALDataset *netCDFDataset::Open(GDALOpenInfo *poOpenInfo)
             poDS->CreateSubDatasetList(cdfid);
             poDS->GDALPamDataset::SetMetadata(poDS->papszMetadata);
             CPLReleaseMutex(hNCMutex);  // Release mutex otherwise we'll
-                // deadlock with GDALDataset own mutex.
+            // deadlock with GDALDataset own mutex.
             poDS->TryLoadXML();
             CPLAcquireMutex(hNCMutex, 1000.0);
             return poDS;
@@ -8563,7 +8595,7 @@ GDALDataset *netCDFDataset::Open(GDALOpenInfo *poOpenInfo)
         CPLError(CE_Warning, CPLE_AppDefined,
                  "Variable has %d dimension(s) - not supported.", nd);
         CPLReleaseMutex(hNCMutex);  // Release mutex otherwise we'll deadlock
-            // with GDALDataset own mutex.
+        // with GDALDataset own mutex.
         delete poDS;
         CPLAcquireMutex(hNCMutex, 1000.0);
         return nullptr;
@@ -8754,7 +8786,7 @@ GDALDataset *netCDFDataset::Open(GDALOpenInfo *poOpenInfo)
                  "Invalid raster dimensions: " CPL_FRMT_GUIB "x" CPL_FRMT_GUIB,
                  static_cast<GUIntBig>(xdim), static_cast<GUIntBig>(ydim));
         CPLReleaseMutex(hNCMutex);  // Release mutex otherwise we'll deadlock
-            // with GDALDataset own mutex.
+        // with GDALDataset own mutex.
         delete poDS;
         CPLAcquireMutex(hNCMutex, 1000.0);
         return nullptr;
@@ -8781,7 +8813,7 @@ GDALDataset *netCDFDataset::Open(GDALOpenInfo *poOpenInfo)
     if ((nd >= 2 && k != 2) || (nd == 1 && k != 1))
     {
         CPLReleaseMutex(hNCMutex);  // Release mutex otherwise we'll deadlock
-            // with GDALDataset own mutex.
+        // with GDALDataset own mutex.
         delete poDS;
         CPLAcquireMutex(hNCMutex, 1000.0);
         return nullptr;
@@ -8826,8 +8858,8 @@ GDALDataset *netCDFDataset::Open(GDALOpenInfo *poOpenInfo)
                 if (status != NC_NOERR)
                 {
                     CPLReleaseMutex(hNCMutex);  // Release mutex otherwise we'll
-                        // deadlock with GDALDataset own
-                        // mutex.
+                    // deadlock with GDALDataset own
+                    // mutex.
                     delete poDS;
                     CPLAcquireMutex(hNCMutex, 1000.0);
                     return nullptr;
@@ -9024,7 +9056,7 @@ GDALDataset *netCDFDataset::Open(GDALOpenInfo *poOpenInfo)
         {
             CPLFree(panBandZLev);
             CPLReleaseMutex(hNCMutex);  // Release mutex otherwise we'll
-                // deadlock with GDALDataset own mutex.
+            // deadlock with GDALDataset own mutex.
             delete poDS;
             CPLAcquireMutex(hNCMutex, 1000.0);
             return nullptr;
@@ -9067,7 +9099,7 @@ GDALDataset *netCDFDataset::Open(GDALOpenInfo *poOpenInfo)
     }
 
     CPLReleaseMutex(hNCMutex);  // Release mutex otherwise we'll deadlock with
-        // GDALDataset own mutex.
+    // GDALDataset own mutex.
     poDS->TryLoadXML();
 
     if (bTreatAsSubdataset)
@@ -9229,7 +9261,7 @@ netCDFDataset *netCDFDataset::CreateLL(const char *pszFilename, int nXSize,
     }
 
     CPLReleaseMutex(hNCMutex);  // Release mutex otherwise we'll deadlock with
-        // GDALDataset own mutex.
+    // GDALDataset own mutex.
     netCDFDataset *poDS = new netCDFDataset();
     CPLAcquireMutex(hNCMutex, 1000.0);
 
@@ -9262,8 +9294,8 @@ netCDFDataset *netCDFDataset::CreateLL(const char *pszFilename, int nXSize,
                          "%s is an existing file, but not a directory",
                          pszFilename);
                 CPLReleaseMutex(hNCMutex);  // Release mutex otherwise we'll
-                    // deadlock with GDALDataset own
-                    // mutex.
+                // deadlock with GDALDataset own
+                // mutex.
                 delete poDS;
                 CPLAcquireMutex(hNCMutex, 1000.0);
                 return nullptr;
@@ -9274,7 +9306,7 @@ netCDFDataset *netCDFDataset::CreateLL(const char *pszFilename, int nXSize,
             CPLError(CE_Failure, CPLE_FileIO, "Cannot create %s directory",
                      pszFilename);
             CPLReleaseMutex(hNCMutex);  // Release mutex otherwise we'll
-                // deadlock with GDALDataset own mutex.
+            // deadlock with GDALDataset own mutex.
             delete poDS;
             CPLAcquireMutex(hNCMutex, 1000.0);
             return nullptr;
@@ -9308,7 +9340,7 @@ netCDFDataset *netCDFDataset::CreateLL(const char *pszFilename, int nXSize,
                      "directory",
                      pszFilename);
             CPLReleaseMutex(hNCMutex);  // Release mutex otherwise we'll
-                // deadlock with GDALDataset own mutex.
+            // deadlock with GDALDataset own mutex.
             delete poDS;
             CPLAcquireMutex(hNCMutex, 1000.0);
             return nullptr;
@@ -9328,7 +9360,7 @@ netCDFDataset *netCDFDataset::CreateLL(const char *pszFilename, int nXSize,
                  "Unable to create netCDF file %s (Error code %d): %s .",
                  pszFilename, status, nc_strerror(status));
         CPLReleaseMutex(hNCMutex);  // Release mutex otherwise we'll deadlock
-            // with GDALDataset own mutex.
+        // with GDALDataset own mutex.
         delete poDS;
         CPLAcquireMutex(hNCMutex, 1000.0);
         return nullptr;
