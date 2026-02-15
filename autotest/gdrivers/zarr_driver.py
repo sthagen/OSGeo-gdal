@@ -2732,6 +2732,89 @@ def test_zarr_read_data_type_fallback_zarr_v3(tmp_vsimem):
 
 
 @pytest.mark.parametrize(
+    "extension_name",
+    ["numpy.datetime64", "numpy.timedelta64"],
+)
+def test_zarr_read_numpy_datetime64_extension_zarr_v3(tmp_vsimem, extension_name):
+    """Test that numpy.datetime64 and numpy.timedelta64 extension types
+    written by zarr-python 3.x (without a fallback key) are mapped to Int64,
+    that configuration attributes are exposed, and that actual values
+    (including endianness) are correctly read."""
+
+    NAT = -(1 << 63)  # INT64_MIN
+
+    j = {
+        "zarr_format": 3,
+        "node_type": "array",
+        "shape": [3],
+        "data_type": {
+            "name": extension_name,
+            "configuration": {"unit": "ns", "scale_factor": 1},
+        },
+        "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [3]}},
+        "chunk_key_encoding": {"name": "default"},
+        "fill_value": "NaT",
+        "codecs": [{"name": "bytes", "configuration": {"endian": "little"}}],
+    }
+
+    dirname = tmp_vsimem / "test_np_datetime.zarr"
+    gdal.Mkdir(dirname, 0)
+    gdal.FileFromMemBuffer(dirname / "zarr.json", json.dumps(j))
+
+    # Write chunk with known values: two timestamps and NaT
+    chunk_data = struct.pack("<qqq", 1000000000, 2000000000, NAT)
+    gdal.Mkdir(dirname / "c", 0)
+    gdal.FileFromMemBuffer(dirname / "c/0", chunk_data)
+
+    # Check via classic raster API
+    ds = gdal.Open(dirname)
+    assert ds.GetRasterBand(1).DataType == gdal.GDT_Int64
+
+    # Check via multidim API for structural info and values
+    ds = gdal.OpenEx(dirname, gdal.OF_MULTIDIM_RASTER)
+    rg = ds.GetRootGroup()
+    ar = rg.OpenMDArray(rg.GetMDArrayNames()[0])
+    assert ar.GetDataType().GetNumericDataType() == gdal.GDT_Int64
+
+    # Check configuration is exposed as structural info
+    si = ar.GetStructuralInfo()
+    assert si["data_type.name"] == extension_name
+    assert si["data_type.unit"] == "ns"
+    assert si["data_type.scale_factor"] == "1"
+
+    # Check actual values read back correctly (endianness test)
+    data = struct.unpack("qqq", ar.Read())
+    assert data == (1000000000, 2000000000, NAT)
+
+    # Check NaT is registered as nodata
+    assert ar.GetNoDataValueAsInt64() == NAT
+
+
+@gdaltest.enable_exceptions()
+def test_zarr_read_numpy_datetime64_unsupported_extension_zarr_v3(tmp_vsimem):
+    """Test that an unrecognized extension type (without fallback) raises an error."""
+
+    j = {
+        "zarr_format": 3,
+        "node_type": "array",
+        "shape": [1],
+        "data_type": {
+            "name": "some.unknown.extension",
+            "configuration": {},
+        },
+        "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [1]}},
+        "chunk_key_encoding": {"name": "default"},
+        "fill_value": 0,
+    }
+
+    dirname = tmp_vsimem / "test_unknown_ext.zarr"
+    gdal.Mkdir(dirname, 0)
+    gdal.FileFromMemBuffer(dirname / "zarr.json", json.dumps(j))
+    with pytest.raises(Exception, match="Invalid or unsupported format"):
+        gdal.Open(dirname)
+
+
+@pytest.mark.parametrize(
     "data_type,fill_value,nodata",
     [
         # JSON NoDataValues cannot be Float16
@@ -6116,6 +6199,34 @@ def test_zarr_read_simple_sharding(tmp_path):
 
 
 ###############################################################################
+# Test parallel decode of sharded inner chunks with GDAL_NUM_THREADS
+
+
+@gdaltest.enable_exceptions()
+def test_zarr_read_simple_sharding_parallel():
+
+    compressors = gdal.GetDriverByName("Zarr").GetMetadataItem("COMPRESSORS")
+    if "zstd" not in compressors:
+        pytest.skip("compressor zstd not available")
+
+    ds = gdal.OpenEx("data/zarr/v3/simple_sharding.zarr", gdal.OF_MULTIDIM_RASTER)
+    ar = ds.GetRootGroup().OpenMDArray("simple_sharding")
+
+    # Read sequentially first
+    expected = list(struct.unpack("f" * (24 * 26), ar.Read()))
+    ds = None
+
+    # Read with parallel decode
+    with gdal.config_option("GDAL_NUM_THREADS", "ALL_CPUS"):
+        ds = gdal.OpenEx("data/zarr/v3/simple_sharding.zarr", gdal.OF_MULTIDIM_RASTER)
+        ar = ds.GetRootGroup().OpenMDArray("simple_sharding")
+        result = list(struct.unpack("f" * (24 * 26), ar.Read()))
+        ds = None
+
+    assert result == expected
+
+
+###############################################################################
 # Test various errors in the shard data file
 
 
@@ -6315,6 +6426,50 @@ def test_zarr_batch_reads_sharding():
     for row in range(10):
         for col in range(12):
             assert partial[row * 12 + col] == expected[row * 26 + col]
+
+
+###############################################################################
+# Test reading a 3D sharded dataset with asymmetric inner chunk counts.
+# Regression test for inner chunk index linearization in DecodePartial and
+# BatchDecodePartial. The existing simple_sharding.zarr fixture has symmetric
+# inner chunk counts [2,2] which masks this bug.
+
+
+@gdaltest.enable_exceptions()
+def test_zarr_read_sharded_3d():
+
+    compressors = gdal.GetDriverByName("Zarr").GetMetadataItem("COMPRESSORS")
+    if "zstd" not in compressors:
+        pytest.skip("compressor zstd not available")
+
+    # Fixture: 3D float32 (3,12,14), shard (3,6,8), inner chunk (1,6,4)
+    # Inner chunk counts per shard: [3,1,2] (asymmetric - triggers bug)
+    ds = gdal.OpenEx(
+        "data/zarr/v3/sharded_3d.zarr",
+        gdal.OF_MULTIDIM_RASTER,
+    )
+    ar = ds.GetRootGroup().OpenMDArray("sharded_3d")
+    assert ar is not None
+    assert ar.GetBlockSize() == [1, 6, 4]
+
+    nbands, nrows, ncols = 3, 12, 14
+    expected = list(range(nbands * nrows * ncols))
+
+    # Full-extent read exercises BatchDecodePartial (via PreloadShardedBlocks).
+    data = list(struct.unpack("f" * len(expected), ar.Read()))
+    assert data == expected
+
+    # Per-band reads exercise DecodePartial. Band indices 1 and 2 produce
+    # out-of-bounds shard index without the fix.
+    for b in range(nbands):
+        band_data = list(
+            struct.unpack(
+                "f" * (nrows * ncols),
+                ar.Read(array_start_idx=[b, 0, 0], count=[1, nrows, ncols]),
+            )
+        )
+        band_expected = expected[b * nrows * ncols : (b + 1) * nrows * ncols]
+        assert band_data == band_expected
 
 
 ###############################################################################
@@ -7615,3 +7770,65 @@ def test_zarr_read_srs_eopf_sample_service(tmp_vsimem, filename, j):
 
     ds = gdal.Open(tmp_vsimem / filename)
     assert ds.GetSpatialRef().GetAuthorityCode(None) == "32632"
+
+
+###############################################################################
+# Test Zarr v3 fixed-length string data types
+
+
+@pytest.mark.parametrize(
+    "dirname,expected_class,expected_max_len,expected_values",
+    [
+        ("null_terminated_bytes.zarr", 1, 5, ["hi", "bye"]),  # GEDTC_STRING=1
+        ("fixed_length_utf32.zarr", 1, 0, ["AB", "CD"]),  # variable-length GDAL string
+    ],
+)
+def test_zarr_v3_read_fixed_length_string_dtypes(
+    dirname, expected_class, expected_max_len, expected_values
+):
+
+    filename = "data/zarr/v3/" + dirname
+    ds = gdal.OpenEx(filename, gdal.OF_MULTIDIM_RASTER)
+    assert ds is not None
+    rg = ds.GetRootGroup()
+    assert rg is not None
+    ar = rg.OpenMDArray("ar")
+    assert ar is not None
+    assert ar.GetDataType().GetClass() == expected_class
+    assert ar.GetDataType().GetMaxStringLength() == expected_max_len
+    assert ar.GetDimensionCount() == 1
+    assert ar.GetDimensions()[0].GetSize() == 2
+    assert ar.Read() == expected_values
+
+
+###############################################################################
+# Test Zarr v3 sharded fixed-length string array
+
+
+def test_zarr_v3_read_sharded_null_terminated_bytes():
+
+    filename = "data/zarr/v3/sharded_null_terminated_bytes.zarr"
+    ds = gdal.OpenEx(filename, gdal.OF_MULTIDIM_RASTER)
+    assert ds is not None
+    rg = ds.GetRootGroup()
+    assert rg is not None
+    ar = rg.OpenMDArray("ar")
+    assert ar is not None
+    assert ar.GetDataType().GetClass() == 1  # GEDTC_STRING
+    assert ar.GetDimensionCount() == 1
+    assert ar.GetDimensions()[0].GetSize() == 4
+    assert ar.Read() == ["hi", "bye", "foo", "bar"]
+
+
+###############################################################################
+# Test that writing Zarr v3 string data types is rejected
+
+
+def test_zarr_v3_write_string_dtype_not_supported():
+
+    filename = "data/zarr/v3/null_terminated_bytes.zarr"
+    ds = gdal.OpenEx(filename, gdal.OF_MULTIDIM_RASTER)
+    rg = ds.GetRootGroup()
+    ar = rg.OpenMDArray("ar")
+    with gdal.quiet_errors():
+        assert ar.Write(["x", "y"]) == gdal.CE_Failure

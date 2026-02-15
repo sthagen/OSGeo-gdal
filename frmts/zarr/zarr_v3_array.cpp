@@ -260,7 +260,7 @@ bool ZarrV3Array::NeedDecodedBuffer() const
 {
     for (const auto &elt : m_aoDtypeElts)
     {
-        if (elt.needByteSwapping || elt.gdalTypeIsApproxOfNative)
+        if (elt.needByteSwapping)
         {
             return true;
         }
@@ -693,70 +693,124 @@ lbl_next:
     if (dimIdx > 0)
         goto lbl_return;
 
-    // For each shard with >1 uncached block, batch-read
-    const char *const apszOpenOptions[] = {"IGNORE_FILENAME_RESTRICTIONS=YES",
-                                           nullptr};
+    // Collect shards that qualify for batching (>1 block)
+    struct ShardWork
+    {
+        const std::string *posFilename;
+        std::vector<BlockInfo> *paBlocks;
+    };
 
+    std::vector<ShardWork> aShardWork;
     for (auto &[osFilename, aBlocks] : oShardToBlocks)
     {
-        if (aBlocks.size() <= 1)
-            continue;
+        if (aBlocks.size() > 1)
+            aShardWork.push_back({&osFilename, &aBlocks});
+    }
 
+    if (aShardWork.empty())
+        return;
+
+    const char *const apszOpenOptions[] = {"IGNORE_FILENAME_RESTRICTIONS=YES",
+                                           nullptr};
+    const bool bNeedDecode = NeedDecodedBuffer();
+
+    // Process one shard: open file, batch-decode, type-convert, cache.
+    // poCodecs: per-thread clone (parallel) or m_poCodecs (sequential).
+    // oMutex: guards cache writes (uncontended in sequential path).
+    const auto ProcessOneShard =
+        [this, &apszOpenOptions, bNeedDecode](const ShardWork &work,
+                                              ZarrV3CodecSequence *poCodecs,
+                                              std::mutex &oMutex)
+    {
         VSIVirtualHandleUniquePtr fp(
-            VSIFOpenEx2L(osFilename.c_str(), "rb", 0, apszOpenOptions));
+            VSIFOpenEx2L(work.posFilename->c_str(), "rb", 0, apszOpenOptions));
         if (!fp)
-            continue;
+            return;
 
-        // Build request list
+        const auto &aBlocks = *work.paBlocks;
         std::vector<std::pair<std::vector<size_t>, std::vector<size_t>>>
             anRequests;
         anRequests.reserve(aBlocks.size());
         for (const auto &info : aBlocks)
-        {
             anRequests.push_back({info.anStartIdx, info.anCount});
-        }
 
         std::vector<ZarrByteVectorQuickResize> aResults;
-        if (!m_poCodecs->BatchDecodePartial(fp.get(), anRequests, aResults))
-            continue;
+        if (!poCodecs->BatchDecodePartial(fp.get(), anRequests, aResults))
+            return;
 
-        // Store results in block cache
-        const bool bNeedDecode = NeedDecodedBuffer();
-        for (size_t i = 0; i < aBlocks.size(); ++i)
+        // Type-convert outside mutex (CPU-bound, thread-local data)
+        std::vector<ZarrByteVectorQuickResize> aDecoded;
+        if (bNeedDecode)
         {
-            if (aResults[i].empty())
+            const size_t nSourceSize = m_aoDtypeElts.back().nativeOffset +
+                                       m_aoDtypeElts.back().nativeSize;
+            const auto nGDALDTSize = m_oType.GetSize();
+            aDecoded.resize(aBlocks.size());
+            for (size_t i = 0; i < aBlocks.size(); ++i)
             {
-                CachedBlock cachedBlock;
-                m_oChunkCache[aBlocks[i].anBlockIndices] =
-                    std::move(cachedBlock);
-                continue;
-            }
-
-            CachedBlock cachedBlock;
-            if (bNeedDecode)
-            {
-                const size_t nSourceSize = m_aoDtypeElts.back().nativeOffset +
-                                           m_aoDtypeElts.back().nativeSize;
-                const auto nGDALDTSize = m_oType.GetSize();
+                if (aResults[i].empty())
+                    continue;
                 const size_t nValues = aResults[i].size() / nSourceSize;
-                ZarrByteVectorQuickResize abyDecoded;
-                abyDecoded.resize(nValues * nGDALDTSize);
+                aDecoded[i].resize(nValues * nGDALDTSize);
                 const GByte *pSrc = aResults[i].data();
-                GByte *pDst = abyDecoded.data();
+                GByte *pDst = aDecoded[i].data();
                 for (size_t v = 0; v < nValues;
                      v++, pSrc += nSourceSize, pDst += nGDALDTSize)
                 {
                     DecodeSourceElt(m_aoDtypeElts, pSrc, pDst);
                 }
-                std::swap(cachedBlock.abyDecoded, abyDecoded);
             }
-            else
+        }
+
+        // Store in cache under mutex
+        std::lock_guard<std::mutex> oLock(oMutex);
+        for (size_t i = 0; i < aBlocks.size(); ++i)
+        {
+            CachedBlock cachedBlock;
+            if (!aResults[i].empty())
             {
-                std::swap(cachedBlock.abyDecoded, aResults[i]);
+                if (bNeedDecode)
+                    std::swap(cachedBlock.abyDecoded, aDecoded[i]);
+                else
+                    std::swap(cachedBlock.abyDecoded, aResults[i]);
             }
             m_oChunkCache[aBlocks[i].anBlockIndices] = std::move(cachedBlock);
         }
+    };
+
+    const int nMaxThreads = GDALGetNumThreads();
+
+    const int nShards = static_cast<int>(aShardWork.size());
+    std::mutex oMutex;
+
+    // Sequential: single thread, single shard, or no thread pool
+    CPLWorkerThreadPool *wtp = (nMaxThreads > 1 && nShards > 1)
+                                   ? GDALGetGlobalThreadPool(nMaxThreads)
+                                   : nullptr;
+    if (!wtp)
+    {
+        for (const auto &work : aShardWork)
+            ProcessOneShard(work, m_poCodecs.get(), oMutex);
+        return;
     }
+
+    CPLDebugOnly("ZARR",
+                 "PreloadShardedBlocks: parallel across %d shards (%d threads)",
+                 nShards, std::min(nMaxThreads, nShards));
+
+    // Clone codecs upfront on main thread (Clone is not thread-safe)
+    std::vector<std::unique_ptr<ZarrV3CodecSequence>> apoCodecs(nShards);
+    for (int i = 0; i < nShards; ++i)
+        apoCodecs[i] = m_poCodecs->Clone();
+
+    auto poQueue = wtp->CreateJobQueue();
+    for (int i = 0; i < nShards; ++i)
+    {
+        poQueue->SubmitJob([&work = aShardWork[i], pCodecs = apoCodecs[i].get(),
+                            &oMutex, &ProcessOneShard]()
+                           { ProcessOneShard(work, pCodecs, oMutex); });
+    }
+    poQueue->WaitCompletion();
 }
 
 /************************************************************************/
@@ -1033,6 +1087,12 @@ bool ZarrV3Array::IWrite(const GUInt64 *arrayStartIdx, const size_t *count,
                  "Writing to sharded dataset is not supported");
         return false;
     }
+    if (m_oType.GetClass() == GEDTC_STRING)
+    {
+        CPLError(CE_Failure, CPLE_NotSupported,
+                 "Writing Zarr V3 string data types is not yet supported");
+        return false;
+    }
     return ZarrArray::IWrite(arrayStartIdx, count, arrayStep, bufferStride,
                              bufferDataType, pSrcBuffer);
 }
@@ -1194,14 +1254,57 @@ static GDALExtendedDataType ParseDtypeV3(const CPLJSONObject &obj,
             elt.gdalSize = elt.gdalType.GetSize();
             if (!elt.gdalTypeIsApproxOfNative)
                 elt.nativeSize = elt.gdalSize;
-
             if (elt.nativeSize > 1)
             {
                 elt.needByteSwapping = (CPL_IS_LSB == 0);
             }
-
             elts.emplace_back(elt);
             return GDALExtendedDataType::Create(eDT);
+        }
+        else if (obj.GetType() == CPLJSONObject::Type::Object)
+        {
+            const auto osName = obj["name"].ToString();
+            const auto oConfig = obj["configuration"];
+            DtypeElt elt;
+
+            if (osName == "null_terminated_bytes" && oConfig.IsValid())
+            {
+                const int nBytes = oConfig["length_bytes"].ToInteger();
+                if (nBytes <= 0 || nBytes > 10 * 1024 * 1024)
+                    break;
+                elt.nativeType = DtypeElt::NativeType::STRING_ASCII;
+                elt.nativeSize = static_cast<size_t>(nBytes);
+                elt.gdalType = GDALExtendedDataType::CreateString(
+                    static_cast<size_t>(nBytes));
+                elt.gdalSize = elt.gdalType.GetSize();
+                elts.emplace_back(elt);
+                return GDALExtendedDataType::CreateString(
+                    static_cast<size_t>(nBytes));
+            }
+            else if (osName == "fixed_length_utf32" && oConfig.IsValid())
+            {
+                const int nBytes = oConfig["length_bytes"].ToInteger();
+                if (nBytes <= 0 || nBytes % 4 != 0 || nBytes > 10 * 1024 * 1024)
+                    break;
+                elt.nativeType = DtypeElt::NativeType::STRING_UNICODE;
+                elt.nativeSize = static_cast<size_t>(nBytes);
+                // Endianness handled by the bytes codec in v3
+                elt.gdalType = GDALExtendedDataType::CreateString();
+                elt.gdalSize = elt.gdalType.GetSize();
+                elts.emplace_back(elt);
+                return GDALExtendedDataType::CreateString();
+            }
+            else if (osName == "numpy.datetime64" ||
+                     osName == "numpy.timedelta64")
+            {
+                elt.nativeType = DtypeElt::NativeType::SIGNED_INT;
+                elt.gdalType = GDALExtendedDataType::Create(GDT_Int64);
+                elt.gdalSize = elt.gdalType.GetSize();
+                elt.nativeSize = elt.gdalSize;
+                elt.needByteSwapping = (CPL_IS_LSB == 0);
+                elts.emplace_back(elt);
+                return GDALExtendedDataType::Create(GDT_Int64);
+            }
         }
     } while (false);
     CPLError(CE_Failure, CPLE_AppDefined,
@@ -1561,6 +1664,7 @@ ZarrV3Group::LoadArray(const std::string &osArrayName,
         CPLError(CE_Failure, CPLE_NotSupported, "data_type missing");
         return nullptr;
     }
+    const auto oOrigDtype = oDtype;
     if (oDtype["fallback"].IsValid())
         oDtype = oDtype["fallback"];
     std::vector<DtypeElt> aoDtypeElts;
@@ -1574,6 +1678,26 @@ ZarrV3Group::LoadArray(const std::string &osArrayName,
         return nullptr;
 
     std::vector<GByte> abyNoData;
+
+    struct NoDataFreer
+    {
+        std::vector<GByte> &m_abyNodata;
+        const GDALExtendedDataType &m_oType;
+
+        NoDataFreer(std::vector<GByte> &abyNoDataIn,
+                    const GDALExtendedDataType &oTypeIn)
+            : m_abyNodata(abyNoDataIn), m_oType(oTypeIn)
+        {
+        }
+
+        ~NoDataFreer()
+        {
+            if (!m_abyNodata.empty())
+                m_oType.FreeDynamicMemory(&m_abyNodata[0]);
+        }
+    };
+
+    NoDataFreer noDataFreer(abyNoData, oType);
 
     auto oFillValue = oRoot["fill_value"];
     auto eFillValueType = oFillValue.GetType();
@@ -1595,7 +1719,14 @@ ZarrV3Group::LoadArray(const std::string &osArrayName,
     else if (eFillValueType == CPLJSONObject::Type::String)
     {
         const auto osFillValue = oFillValue.ToString();
-        if (STARTS_WITH(osFillValue.c_str(), "0x"))
+        if (oType.GetClass() == GEDTC_STRING)
+        {
+            abyNoData.resize(oType.GetSize());
+            char *pDstStr = CPLStrdup(osFillValue.c_str());
+            char **pDstPtr = reinterpret_cast<char **>(&abyNoData[0]);
+            memcpy(pDstPtr, &pDstStr, sizeof(pDstStr));
+        }
+        else if (STARTS_WITH(osFillValue.c_str(), "0x"))
         {
             if (osFillValue.size() > 2 + 2 * oType.GetSize())
             {
@@ -1653,36 +1784,51 @@ ZarrV3Group::LoadArray(const std::string &osArrayName,
         }
         else
         {
-            bool bOK = true;
-            double dfNoDataValue = ParseNoDataStringAsDouble(osFillValue, bOK);
-            if (!bOK)
+            // Handle "NaT" fill_value for numpy.datetime64/timedelta64
+            // NaT is equivalent to INT64_MIN per the zarr extension spec
+            if (osFillValue == "NaT" && oType.GetNumericDataType() == GDT_Int64)
             {
-                CPLError(CE_Failure, CPLE_AppDefined, "Invalid fill_value");
-                return nullptr;
-            }
-            else if (oType.GetNumericDataType() == GDT_Float16)
-            {
-                const GFloat16 hfNoDataValue =
-                    static_cast<GFloat16>(dfNoDataValue);
-                abyNoData.resize(sizeof(hfNoDataValue));
-                memcpy(&abyNoData[0], &hfNoDataValue, sizeof(hfNoDataValue));
-            }
-            else if (oType.GetNumericDataType() == GDT_Float32)
-            {
-                const float fNoDataValue = static_cast<float>(dfNoDataValue);
-                abyNoData.resize(sizeof(fNoDataValue));
-                memcpy(&abyNoData[0], &fNoDataValue, sizeof(fNoDataValue));
-            }
-            else if (oType.GetNumericDataType() == GDT_Float64)
-            {
-                abyNoData.resize(sizeof(dfNoDataValue));
-                memcpy(&abyNoData[0], &dfNoDataValue, sizeof(dfNoDataValue));
+                const int64_t nNaT = std::numeric_limits<int64_t>::min();
+                abyNoData.resize(oType.GetSize());
+                memcpy(&abyNoData[0], &nNaT, sizeof(nNaT));
             }
             else
             {
-                CPLError(CE_Failure, CPLE_AppDefined,
-                         "Invalid fill_value for this data type");
-                return nullptr;
+                bool bOK = true;
+                double dfNoDataValue =
+                    ParseNoDataStringAsDouble(osFillValue, bOK);
+                if (!bOK)
+                {
+                    CPLError(CE_Failure, CPLE_AppDefined, "Invalid fill_value");
+                    return nullptr;
+                }
+                else if (oType.GetNumericDataType() == GDT_Float16)
+                {
+                    const GFloat16 hfNoDataValue =
+                        static_cast<GFloat16>(dfNoDataValue);
+                    abyNoData.resize(sizeof(hfNoDataValue));
+                    memcpy(&abyNoData[0], &hfNoDataValue,
+                           sizeof(hfNoDataValue));
+                }
+                else if (oType.GetNumericDataType() == GDT_Float32)
+                {
+                    const float fNoDataValue =
+                        static_cast<float>(dfNoDataValue);
+                    abyNoData.resize(sizeof(fNoDataValue));
+                    memcpy(&abyNoData[0], &fNoDataValue, sizeof(fNoDataValue));
+                }
+                else if (oType.GetNumericDataType() == GDT_Float64)
+                {
+                    abyNoData.resize(sizeof(dfNoDataValue));
+                    memcpy(&abyNoData[0], &dfNoDataValue,
+                           sizeof(dfNoDataValue));
+                }
+                else
+                {
+                    CPLError(CE_Failure, CPLE_AppDefined,
+                             "Invalid fill_value for this data type");
+                    return nullptr;
+                }
             }
         }
     }
@@ -1804,6 +1950,31 @@ ZarrV3Group::LoadArray(const std::string &osArrayName,
     }
     poArray->SetAttributes(Self(), oAttributes);
     poArray->SetDtype(oDtype);
+    // Expose extension data type configuration as structural info
+    if (oOrigDtype.GetType() == CPLJSONObject::Type::Object)
+    {
+        const auto osName = oOrigDtype.GetString("name");
+        if (!osName.empty())
+        {
+            poArray->SetStructuralInfo("data_type.name", osName.c_str());
+        }
+        const auto oConfig = oOrigDtype["configuration"];
+        if (oConfig.IsValid() &&
+            oConfig.GetType() == CPLJSONObject::Type::Object)
+        {
+            const auto osUnit = oConfig.GetString("unit");
+            if (!osUnit.empty())
+            {
+                poArray->SetStructuralInfo("data_type.unit", osUnit.c_str());
+            }
+            const auto nScaleFactor = oConfig.GetInteger("scale_factor", -1);
+            if (nScaleFactor > 0)
+            {
+                poArray->SetStructuralInfo("data_type.scale_factor",
+                                           CPLSPrintf("%d", nScaleFactor));
+            }
+        }
+    }
     if (oCodecs.Size() > 0 &&
         oCodecs[oCodecs.Size() - 1].GetString("name") != "bytes")
     {
@@ -1934,6 +2105,27 @@ CPLStringList ZarrV3Array::GetRawBlockInfoInfo() const
                  "Zarr driver issue: gdalTypeIsApproxOfNative is not taken "
                  "into account by codecs. Nodata will be assumed to be zero by "
                  "sharding codec");
+    }
+    else if (!abyNoData.empty() &&
+             (zarrDataType.nativeType == DtypeElt::NativeType::STRING_ASCII ||
+              zarrDataType.nativeType == DtypeElt::NativeType::STRING_UNICODE))
+    {
+        // Convert from GDAL representation (char* pointer) to native
+        // format (fixed-size null-padded buffer) for FillWithNoData()
+        char *pStr = nullptr;
+        memcpy(&pStr, abyNoData.data(), sizeof(pStr));
+        oInputArrayMetadata.abyNoData.resize(zarrDataType.nativeSize, 0);
+        if (pStr &&
+            zarrDataType.nativeType == DtypeElt::NativeType::STRING_ASCII)
+        {
+            const size_t nCopy =
+                std::min(strlen(pStr), zarrDataType.nativeSize > 0
+                                           ? zarrDataType.nativeSize - 1
+                                           : static_cast<size_t>(0));
+            memcpy(oInputArrayMetadata.abyNoData.data(), pStr, nCopy);
+        }
+        // STRING_UNICODE non-empty fill would need UTF-8 to UCS4
+        // conversion; zero-fill is correct for the common "" case
     }
     else
     {
