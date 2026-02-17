@@ -31,6 +31,11 @@
 
 #define CRS_ATTRIBUTE_NAME "_CRS"
 
+// UUID identifying the multiscales zarr convention
+// (https://github.com/zarr-conventions/multiscales)
+constexpr const char *ZARR_MULTISCALES_UUID =
+    "d35379db-88df-4056-af3a-620245f8e347";
+
 const CPLCompressor *ZarrGetShuffleCompressor();
 const CPLCompressor *ZarrGetShuffleDecompressor();
 const CPLCompressor *ZarrGetQuantizeDecompressor();
@@ -1345,6 +1350,22 @@ class ZarrV3Array final : public ZarrArray
     mutable bool m_bOverviewsLoaded = false;
     mutable std::vector<std::shared_ptr<GDALMDArray>> m_apoOverviews{};
 
+    /** Shard write cache: accumulates dirty inner chunks per shard, encodes
+     * each shard exactly once on FlushShardCache() (called from Flush()).
+     * Without this cache, FlushDirtyBlockSharded() would re-read, decode,
+     * overlay, re-encode, and write the entire shard for every inner chunk,
+     * resulting in O(N) encode cycles per shard where N = inner chunks/shard.
+     */
+    struct ShardWriteEntry
+    {
+        ZarrByteVectorQuickResize abyShardBuffer{};
+        std::vector<bool> abDirtyInnerChunks{};
+    };
+
+    // Note: cache is unbounded - one entry per shard written. For very large
+    // rasters, consider adding LRU eviction in a follow-up.
+    mutable std::map<std::string, ShardWriteEntry> m_oShardWriteCache{};
+
     ZarrV3Array(const std::shared_ptr<ZarrSharedResource> &poSharedResource,
                 const std::shared_ptr<ZarrGroupBase> &poParent,
                 const std::string &osName,
@@ -1424,6 +1445,10 @@ class ZarrV3Array final : public ZarrArray
     bool AllocateWorkingBuffers() const override;
 
     bool FlushDirtyBlock() const override;
+    bool FlushDirtyBlockSharded() const;
+    bool FlushSingleShard(const std::string &osFilename,
+                          ShardWriteEntry &entry) const;
+    bool FlushShardCache() const;
 
     std::string BuildChunkFilename(const uint64_t *blockIndices) const override;
 

@@ -911,6 +911,68 @@ std::shared_ptr<GDALMDArray> ZarrV3Group::CreateMDArray(
         return nullptr;
     }
 
+    // Sharding: wrap inner codecs into a sharding_indexed codec
+    const char *pszShardChunkShape =
+        CSLFetchNameValue(papszOptions, "SHARD_CHUNK_SHAPE");
+    if (pszShardChunkShape != nullptr)
+    {
+
+        const CPLStringList aosChunkShape(
+            CSLTokenizeString2(pszShardChunkShape, ",", 0));
+        if (static_cast<size_t>(aosChunkShape.size()) != aoDimensions.size())
+        {
+            CPLError(CE_Failure, CPLE_AppDefined,
+                     "SHARD_CHUNK_SHAPE has %d values, expected %d",
+                     aosChunkShape.size(),
+                     static_cast<int>(aoDimensions.size()));
+            return nullptr;
+        }
+
+        CPLJSONArray oChunkShapeArray;
+        for (int i = 0; i < aosChunkShape.size(); ++i)
+        {
+            const auto nInner = static_cast<GUInt64>(atoll(aosChunkShape[i]));
+            if (nInner == 0 || anOuterBlockSize[i] % nInner != 0)
+            {
+                CPLError(CE_Failure, CPLE_AppDefined,
+                         "SHARD_CHUNK_SHAPE[%d]=%s must divide "
+                         "BLOCKSIZE[%d]=" CPL_FRMT_GUIB " evenly",
+                         i, aosChunkShape[i], i, anOuterBlockSize[i]);
+                return nullptr;
+            }
+            oChunkShapeArray.Add(static_cast<uint64_t>(nInner));
+        }
+
+        // Index codecs: always bytes(little) + crc32c
+        CPLJSONArray oIndexCodecs;
+        {
+            CPLJSONObject oBytesCodec;
+            oBytesCodec.Add("name", "bytes");
+            oBytesCodec.Add("configuration",
+                            ZarrV3CodecBytes::GetConfiguration(true));
+            oIndexCodecs.Add(oBytesCodec);
+        }
+        {
+            CPLJSONObject oCRC32CCodec;
+            oCRC32CCodec.Add("name", "crc32c");
+            oIndexCodecs.Add(oCRC32CCodec);
+        }
+
+        CPLJSONObject oShardingConfig;
+        oShardingConfig.Add("chunk_shape", oChunkShapeArray);
+        oShardingConfig.Add("codecs", oCodecs);
+        oShardingConfig.Add("index_codecs", oIndexCodecs);
+        oShardingConfig.Add("index_location", "end");
+
+        CPLJSONObject oShardingCodec;
+        oShardingCodec.Add("name", "sharding_indexed");
+        oShardingCodec.Add("configuration", oShardingConfig);
+
+        // Replace top-level codecs with just the sharding codec
+        oCodecs = CPLJSONArray();
+        oCodecs.Add(oShardingCodec);
+    }
+
     std::vector<GUInt64> anInnerBlockSize = anOuterBlockSize;
     if (oCodecs.Size() > 0)
     {

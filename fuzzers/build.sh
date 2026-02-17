@@ -176,7 +176,7 @@ curl -L http://download.osgeo.org/libtiff/tiff-4.7.1.tar.gz > tiff-4.7.1.tar.gz 
   rm tiff-4.7.1.tar.gz
 
 rm -rf libaec
-git clone --depth 1 --branch fix_ossfuzz_478301093 https://github.com/rouault/libaec
+git clone --depth 1 https://github.com/Deutsches-Klimarechenzentrum/libaec
 
 # libxerces-c-dev${ARCH_SUFFIX}
 # libsqlite3-dev${ARCH_SUFFIX}

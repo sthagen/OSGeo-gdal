@@ -84,7 +84,12 @@ bool ZarrV3Array::Flush()
     if (!m_bValid)
         return true;
 
+    // Flush last dirty block (may add to shard write cache)
     bool ret = ZarrV3Array::FlushDirtyBlock();
+
+    // Encode and write all cached shards
+    if (!ZarrV3Array::FlushShardCache())
+        ret = false;
 
     if (!m_aoDims.empty())
     {
@@ -984,6 +989,13 @@ bool ZarrV3Array::FlushDirtyBlock() const
         return true;
     m_bDirtyBlock = false;
 
+    // Sharded arrays need special handling: the block cache operates at
+    // inner chunk granularity but we must write complete shards.
+    if (m_poCodecs && m_poCodecs->SupportsPartialDecoding())
+    {
+        return FlushDirtyBlockSharded();
+    }
+
     std::string osFilename = BuildChunkFilename(m_anCachedBlockIndices.data());
 
     const size_t nSourceSize =
@@ -1072,6 +1084,333 @@ bool ZarrV3Array::FlushDirtyBlock() const
 }
 
 /************************************************************************/
+/*                ZarrV3Array::FlushDirtyBlockSharded()                 */
+/************************************************************************/
+
+// Accumulates dirty inner chunks into a per-shard write cache.
+// Actual encoding and writing happens in FlushShardCache().
+// This avoids the O(N) decode-encode cost of re-encoding the full shard
+// for every inner chunk write (N = inner chunks per shard).
+// Single-writer only: concurrent writes to the same shard are not supported.
+
+bool ZarrV3Array::FlushDirtyBlockSharded() const
+{
+    const size_t nDims = GetDimensionCount();
+    const size_t nSourceSize =
+        m_aoDtypeElts.back().nativeOffset + m_aoDtypeElts.back().nativeSize;
+
+    // 1. Convert dirty inner block from GDAL format to native format
+    if (!m_abyDecodedBlockData.empty())
+    {
+        const size_t nDTSize = m_oType.GetSize();
+        const size_t nValues = m_abyDecodedBlockData.size() / nDTSize;
+        GByte *pDst = &m_abyRawBlockData[0];
+        const GByte *pSrc = m_abyDecodedBlockData.data();
+        for (size_t i = 0; i < nValues;
+             i++, pDst += nSourceSize, pSrc += nDTSize)
+        {
+            EncodeElt(m_aoDtypeElts, pSrc, pDst);
+        }
+    }
+
+    // 2. Compute shard indices and inner block position within shard
+    std::vector<uint64_t> anShardIndices(nDims);
+    std::vector<size_t> anPosInShard(nDims);
+    for (size_t i = 0; i < nDims; ++i)
+    {
+        anShardIndices[i] = m_anCachedBlockIndices[i] * m_anInnerBlockSize[i] /
+                            m_anOuterBlockSize[i];
+        anPosInShard[i] = static_cast<size_t>(m_anCachedBlockIndices[i] %
+                                              m_anCountInnerBlockInOuter[i]);
+    }
+
+    std::string osFilename = BuildChunkFilename(anShardIndices.data());
+
+    // 3. Get or create shard cache entry
+    size_t nShardElements = 1;
+    for (size_t i = 0; i < nDims; ++i)
+        nShardElements *= static_cast<size_t>(m_anOuterBlockSize[i]);
+
+    size_t nTotalInnerChunks = 1;
+    for (size_t i = 0; i < nDims; ++i)
+        nTotalInnerChunks *= static_cast<size_t>(m_anCountInnerBlockInOuter[i]);
+
+    auto oIt = m_oShardWriteCache.find(osFilename);
+    if (oIt == m_oShardWriteCache.end())
+    {
+        ShardWriteEntry entry;
+        try
+        {
+            entry.abyShardBuffer.resize(nShardElements * nSourceSize);
+        }
+        catch (const std::exception &)
+        {
+            CPLError(CE_Failure, CPLE_OutOfMemory,
+                     "Cannot allocate memory for shard buffer");
+            return false;
+        }
+        try
+        {
+            entry.abDirtyInnerChunks.resize(nTotalInnerChunks, false);
+        }
+        catch (const std::exception &)
+        {
+            CPLError(CE_Failure, CPLE_OutOfMemory,
+                     "Cannot allocate memory for dirty chunk tracking");
+            return false;
+        }
+
+        // Read existing shard or fill with nodata
+        VSIStatBufL sStat;
+        if (VSIStatL(osFilename.c_str(), &sStat) == 0)
+        {
+            VSILFILE *fpRead = VSIFOpenL(osFilename.c_str(), "rb");
+            if (fpRead == nullptr)
+            {
+                CPLError(CE_Failure, CPLE_AppDefined,
+                         "Cannot open shard file %s for reading",
+                         osFilename.c_str());
+                return false;
+            }
+
+            ZarrByteVectorQuickResize abyFileData;
+            try
+            {
+                abyFileData.resize(static_cast<size_t>(sStat.st_size));
+            }
+            catch (const std::exception &)
+            {
+                CPLError(
+                    CE_Failure, CPLE_OutOfMemory,
+                    "Cannot allocate " CPL_FRMT_GUIB " bytes for shard file %s",
+                    static_cast<GUIntBig>(sStat.st_size), osFilename.c_str());
+                VSIFCloseL(fpRead);
+                return false;
+            }
+            if (VSIFReadL(abyFileData.data(), 1, abyFileData.size(), fpRead) !=
+                abyFileData.size())
+            {
+                CPLError(CE_Failure, CPLE_AppDefined,
+                         "Cannot read shard file %s", osFilename.c_str());
+                VSIFCloseL(fpRead);
+                return false;
+            }
+            VSIFCloseL(fpRead);
+
+            entry.abyShardBuffer = std::move(abyFileData);
+            if (!m_poCodecs->Decode(entry.abyShardBuffer))
+            {
+                CPLError(CE_Failure, CPLE_AppDefined,
+                         "Cannot decode existing shard %s", osFilename.c_str());
+                return false;
+            }
+
+            if (entry.abyShardBuffer.size() != nShardElements * nSourceSize)
+            {
+                CPLError(CE_Failure, CPLE_AppDefined,
+                         "Decoded shard %s has unexpected size",
+                         osFilename.c_str());
+                return false;
+            }
+        }
+        else
+        {
+            if (m_pabyNoData == nullptr ||
+                (m_oType.GetClass() == GEDTC_NUMERIC &&
+                 GetNoDataValueAsDouble() == 0.0))
+            {
+                memset(entry.abyShardBuffer.data(), 0,
+                       entry.abyShardBuffer.size());
+            }
+            else
+            {
+                for (size_t i = 0; i < nShardElements; ++i)
+                {
+                    memcpy(entry.abyShardBuffer.data() + i * nSourceSize,
+                           m_pabyNoData, nSourceSize);
+                }
+            }
+        }
+
+        oIt = m_oShardWriteCache.emplace(osFilename, std::move(entry)).first;
+    }
+
+    // cppcheck-suppress derefInvalidIteratorRedundantCheck
+    auto &entry = oIt->second;
+
+    // 4. Compute inner chunk linear index and mark dirty
+    size_t nInnerChunkIdx = 0;
+    for (size_t i = 0; i < nDims; ++i)
+    {
+        nInnerChunkIdx = nInnerChunkIdx * static_cast<size_t>(
+                                              m_anCountInnerBlockInOuter[i]) +
+                         anPosInShard[i];
+    }
+    entry.abDirtyInnerChunks[nInnerChunkIdx] = true;
+    const bool bAllDirty =
+        std::all_of(entry.abDirtyInnerChunks.begin(),
+                    entry.abDirtyInnerChunks.end(), [](bool b) { return b; });
+
+    // 5. Copy dirty inner block into shard buffer at correct position.
+    // Same strided N-D copy pattern as CopySubArrayIntoLargerOne() in
+    // zarr_v3_codec_sharding.cpp (operates on GUInt64 block sizes here).
+    {
+        std::vector<size_t> anShardStride(nDims);
+        size_t nStride = nSourceSize;
+        for (size_t iDim = nDims; iDim > 0;)
+        {
+            --iDim;
+            anShardStride[iDim] = nStride;
+            nStride *= static_cast<size_t>(m_anOuterBlockSize[iDim]);
+        }
+
+        GByte *pShardDst = entry.abyShardBuffer.data();
+        for (size_t iDim = 0; iDim < nDims; ++iDim)
+        {
+            pShardDst += anPosInShard[iDim] *
+                         static_cast<size_t>(m_anInnerBlockSize[iDim]) *
+                         anShardStride[iDim];
+        }
+
+        const GByte *pInnerSrc = m_abyRawBlockData.data();
+        const size_t nLastDimBytes =
+            static_cast<size_t>(m_anInnerBlockSize.back()) * nSourceSize;
+
+        if (nDims == 1)
+        {
+            memcpy(pShardDst, pInnerSrc, nLastDimBytes);
+        }
+        else
+        {
+            std::vector<GByte *> dstPtrStack(nDims + 1);
+            std::vector<size_t> count(nDims + 1);
+            dstPtrStack[0] = pShardDst;
+            size_t dimIdx = 0;
+        lbl_next_depth:
+            if (dimIdx + 1 == nDims)
+            {
+                memcpy(dstPtrStack[dimIdx], pInnerSrc, nLastDimBytes);
+                pInnerSrc += nLastDimBytes;
+            }
+            else
+            {
+                count[dimIdx] = static_cast<size_t>(m_anInnerBlockSize[dimIdx]);
+                while (true)
+                {
+                    dimIdx++;
+                    dstPtrStack[dimIdx] = dstPtrStack[dimIdx - 1];
+                    goto lbl_next_depth;
+                lbl_return_to_caller:
+                    dimIdx--;
+                    if (--count[dimIdx] == 0)
+                        break;
+                    dstPtrStack[dimIdx] += anShardStride[dimIdx];
+                }
+            }
+            if (dimIdx > 0)
+                goto lbl_return_to_caller;
+        }
+    }
+
+    // 6. Flush shard immediately if all inner chunks have been written,
+    // to bound memory usage during sequential writes.
+    if (bAllDirty)
+    {
+        const bool bOK = FlushSingleShard(osFilename, entry);
+        m_oShardWriteCache.erase(osFilename);
+        return bOK;
+    }
+
+    return true;
+}
+
+/************************************************************************/
+/*                   ZarrV3Array::FlushSingleShard()                    */
+/************************************************************************/
+
+bool ZarrV3Array::FlushSingleShard(const std::string &osFilename,
+                                   ShardWriteEntry &entry) const
+{
+    // Encode mutates abyShardBuffer in-place. On failure the buffer
+    // is left in an undefined state, but the shard is not written.
+    if (!m_poCodecs->Encode(entry.abyShardBuffer))
+    {
+        CPLError(CE_Failure, CPLE_AppDefined, "Cannot encode shard for %s",
+                 osFilename.c_str());
+        return false;
+    }
+
+    // All-nodata shard: skip writing (or delete stale file from prior write)
+    if (entry.abyShardBuffer.empty())
+    {
+        VSIStatBufL sStat;
+        if (VSIStatL(osFilename.c_str(), &sStat) == 0)
+            VSIUnlink(osFilename.c_str());
+        return true;
+    }
+
+    // Create directory if needed
+    if (m_osDimSeparator == "/")
+    {
+        std::string osDir = CPLGetDirnameSafe(osFilename.c_str());
+        VSIStatBufL sStatDir;
+        if (VSIStatL(osDir.c_str(), &sStatDir) != 0)
+        {
+            if (VSIMkdirRecursive(osDir.c_str(), 0755) != 0)
+            {
+                CPLError(CE_Failure, CPLE_AppDefined,
+                         "Cannot create directory %s", osDir.c_str());
+                return false;
+            }
+        }
+    }
+
+    VSILFILE *fp = VSIFOpenL(osFilename.c_str(), "wb");
+    if (fp == nullptr)
+    {
+        CPLError(CE_Failure, CPLE_AppDefined, "Cannot create shard file %s",
+                 osFilename.c_str());
+        return false;
+    }
+
+    const size_t nEncodedSize = entry.abyShardBuffer.size();
+    bool bRet = true;
+    if (VSIFWriteL(entry.abyShardBuffer.data(), 1, nEncodedSize, fp) !=
+        nEncodedSize)
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "Could not write shard file %s correctly", osFilename.c_str());
+        bRet = false;
+    }
+    VSIFCloseL(fp);
+    return bRet;
+}
+
+/************************************************************************/
+/*                    ZarrV3Array::FlushShardCache()                    */
+/************************************************************************/
+
+// Encodes and writes all cached shards. Called from Flush().
+// Each shard is encoded exactly once regardless of how many inner chunks
+// were written.
+
+bool ZarrV3Array::FlushShardCache() const
+{
+    if (m_oShardWriteCache.empty())
+        return true;
+
+    bool bRet = true;
+    for (auto &[osFilename, entry] : m_oShardWriteCache)
+    {
+        if (!FlushSingleShard(osFilename, entry))
+            bRet = false;
+    }
+
+    m_oShardWriteCache.clear();
+    return bRet;
+}
+
+/************************************************************************/
 /*                        ZarrV3Array::IWrite()                         */
 /************************************************************************/
 
@@ -1081,12 +1420,6 @@ bool ZarrV3Array::IWrite(const GUInt64 *arrayStartIdx, const size_t *count,
                          const GDALExtendedDataType &bufferDataType,
                          const void *pSrcBuffer)
 {
-    if (m_poCodecs && m_poCodecs->SupportsPartialDecoding())
-    {
-        CPLError(CE_Failure, CPLE_NotSupported,
-                 "Writing to sharded dataset is not supported");
-        return false;
-    }
     if (m_oType.GetClass() == GEDTC_STRING)
     {
         CPLError(CE_Failure, CPLE_NotSupported,
@@ -2237,11 +2570,7 @@ void ZarrV3Array::LoadOverviews() const
 
     const auto oZarrConventionsArray = oZarrConventions.ToArray();
     const auto hasMultiscalesUUIDLambda = [](const CPLJSONObject &obj)
-    {
-        constexpr const char *MULTISCALES_UUID =
-            "d35379db-88df-4056-af3a-620245f8e347";
-        return obj.GetString("uuid") == MULTISCALES_UUID;
-    };
+    { return obj.GetString("uuid") == ZARR_MULTISCALES_UUID; };
     const bool bFoundMultiScalesUUID =
         std::find_if(oZarrConventionsArray.begin(), oZarrConventionsArray.end(),
                      hasMultiscalesUUIDLambda) != oZarrConventionsArray.end();

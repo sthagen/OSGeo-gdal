@@ -2980,6 +2980,7 @@ shapefiles
 Shapefiles
 shapelib
 Shapelib
+sharded
 shortname
 shortnames
 shp

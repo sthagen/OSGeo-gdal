@@ -727,7 +727,13 @@ CPLErr MMRRasterBand::FromPaletteToColorTableCategoricalMode()
         {
             // In that case (byte, uint) we can limit the number
             // of colours at the maximum value that the band has.
+            if (static_cast<int>(poBand->GetMax()) == INT_MAX)
+                return CE_Failure;
             nNPossibleValues = static_cast<int>(poBand->GetMax()) + 1;
+
+            // Oss-fuzz issue: 484932882
+            if (nNPossibleValues <= 0 || nNPossibleValues >= 65536)
+                return CE_Failure;
         }
         else
         {

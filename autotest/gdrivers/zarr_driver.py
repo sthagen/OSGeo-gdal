@@ -7832,3 +7832,291 @@ def test_zarr_v3_write_string_dtype_not_supported():
     ar = rg.OpenMDArray("ar")
     with gdal.quiet_errors():
         assert ar.Write(["x", "y"]) == gdal.CE_Failure
+
+
+###############################################################################
+# Sharded write tests
+
+
+def _create_sharded_array(path, dims, shard, inner, dtype=gdal.GDT_Float32, opts=None):
+    """Create a sharded Zarr v3 array. Returns (dataset, array)."""
+    ds = gdal.GetDriverByName("ZARR").CreateMultiDimensional(
+        str(path), options=["FORMAT=ZARR_V3"]
+    )
+    rg = ds.GetRootGroup()
+    gdal_dims = [rg.CreateDimension(n, None, None, s) for n, s in dims]
+    dt = gdal.ExtendedDataType.Create(dtype)
+    co = [
+        "BLOCKSIZE=" + ",".join(str(s) for s in shard),
+        "SHARD_CHUNK_SHAPE=" + ",".join(str(s) for s in inner),
+    ] + (opts or [])
+    ar = rg.CreateMDArray("data", gdal_dims, dt, co)
+    assert ar is not None
+    return ds, ar
+
+
+@pytest.mark.parametrize("compress", ["NONE", "ZSTD"])
+def test_zarr_write_sharded(tmp_path, compress):
+    """Write a sharded Zarr v3 array and verify round-trip."""
+    compressors = gdal.GetDriverByName("Zarr").GetMetadataItem("COMPRESSORS")
+    if compress == "ZSTD" and "zstd" not in compressors:
+        pytest.skip("compressor zstd not available")
+
+    nrows, ncols = 24, 26
+    expected = [float(i) for i in range(nrows * ncols)]
+
+    ds, ar = _create_sharded_array(
+        tmp_path / "out.zarr",
+        [("y", nrows), ("x", ncols)],
+        [10, 12],
+        [5, 6],
+        opts=[f"COMPRESS={compress}"],
+    )
+    assert ar.Write(struct.pack(f"{len(expected)}f", *expected)) == gdal.CE_None
+    ds = None
+
+    ds = gdal.OpenEx(str(tmp_path / "out.zarr"), gdal.OF_MULTIDIM_RASTER)
+    ar = ds.GetRootGroup().OpenMDArray("data")
+    assert ar.GetBlockSize() == [5, 6]
+    got = list(struct.unpack(f"{nrows * ncols}f", ar.Read()))
+    assert got == expected
+
+
+def test_zarr_write_sharded_nodata(tmp_path):
+    """Write partial data - unwritten region is NaN fill."""
+    inner_y, inner_x = 5, 6
+    ds, ar = _create_sharded_array(
+        tmp_path / "out.zarr", [("y", 10), ("x", 12)], [10, 12], [inner_y, inner_x]
+    )
+    data = struct.pack(
+        f"{inner_y * inner_x}f", *[float(i + 1) for i in range(inner_y * inner_x)]
+    )
+    assert (
+        ar.Write(data, array_start_idx=[0, 0], count=[inner_y, inner_x]) == gdal.CE_None
+    )
+    ds = None
+
+    ds = gdal.OpenEx(str(tmp_path / "out.zarr"), gdal.OF_MULTIDIM_RASTER)
+    ar = ds.GetRootGroup().OpenMDArray("data")
+    written = struct.unpack(
+        f"{inner_y * inner_x}f",
+        ar.Read(array_start_idx=[0, 0], count=[inner_y, inner_x]),
+    )
+    assert list(written) == [float(i + 1) for i in range(inner_y * inner_x)]
+    unwritten = struct.unpack(
+        f"{inner_y * inner_x}f",
+        ar.Read(array_start_idx=[inner_y, inner_x], count=[inner_y, inner_x]),
+    )
+    assert all(math.isnan(v) for v in unwritten)
+
+
+def test_zarr_write_sharded_roundtrip(tmp_path):
+    """Read existing sharded test data, write to new, verify match."""
+    compressors = gdal.GetDriverByName("Zarr").GetMetadataItem("COMPRESSORS")
+    if "zstd" not in compressors:
+        pytest.skip("compressor zstd not available")
+
+    src_ds = gdal.OpenEx("data/zarr/v3/simple_sharding.zarr", gdal.OF_MULTIDIM_RASTER)
+    src_data = src_ds.GetRootGroup().OpenMDArray("simple_sharding").Read()
+
+    ds, ar = _create_sharded_array(
+        tmp_path / "out.zarr",
+        [("y", 24), ("x", 26)],
+        [10, 12],
+        [5, 6],
+        opts=["COMPRESS=ZSTD", "ZSTD_LEVEL=0"],
+    )
+    assert ar.Write(src_data) == gdal.CE_None
+    ds = None
+
+    ds = gdal.OpenEx(str(tmp_path / "out.zarr"), gdal.OF_MULTIDIM_RASTER)
+    assert ds.GetRootGroup().OpenMDArray("data").Read() == src_data
+
+
+def test_zarr_write_sharded_read_modify_write(tmp_path):
+    """Write, reopen in update mode, modify one inner chunk, verify."""
+    nrows, ncols, inner_y, inner_x = 10, 12, 5, 6
+    original = [float(i) for i in range(nrows * ncols)]
+
+    ds, ar = _create_sharded_array(
+        tmp_path / "out.zarr",
+        [("y", nrows), ("x", ncols)],
+        [10, 12],
+        [inner_y, inner_x],
+    )
+    assert ar.Write(struct.pack(f"{len(original)}f", *original)) == gdal.CE_None
+    ds = None
+
+    # Modify bottom-right inner chunk
+    modified = [999.0] * (inner_y * inner_x)
+    ds = gdal.OpenEx(
+        str(tmp_path / "out.zarr"), gdal.OF_MULTIDIM_RASTER | gdal.OF_UPDATE
+    )
+    ar = ds.GetRootGroup().OpenMDArray("data")
+    assert (
+        ar.Write(
+            struct.pack(f"{len(modified)}f", *modified),
+            array_start_idx=[inner_y, inner_x],
+            count=[inner_y, inner_x],
+        )
+        == gdal.CE_None
+    )
+    ds = None
+
+    ds = gdal.OpenEx(str(tmp_path / "out.zarr"), gdal.OF_MULTIDIM_RASTER)
+    ar = ds.GetRootGroup().OpenMDArray("data")
+    got_mod = list(
+        struct.unpack(
+            f"{inner_y * inner_x}f",
+            ar.Read(array_start_idx=[inner_y, inner_x], count=[inner_y, inner_x]),
+        )
+    )
+    assert got_mod == modified
+    got_orig = list(
+        struct.unpack(
+            f"{inner_y * inner_x}f",
+            ar.Read(array_start_idx=[0, 0], count=[inner_y, inner_x]),
+        )
+    )
+    assert got_orig == [
+        float(r * ncols + c) for r in range(inner_y) for c in range(inner_x)
+    ]
+
+
+def test_zarr_write_sharded_explicit_nodata(tmp_path):
+    """Partial write with explicit -9999 nodata."""
+    inner_y, inner_x, nodata = 5, 6, -9999.0
+    ds, ar = _create_sharded_array(
+        tmp_path / "out.zarr", [("y", 10), ("x", 12)], [10, 12], [inner_y, inner_x]
+    )
+    assert ar.SetNoDataValueDouble(nodata) == gdal.CE_None
+    data = struct.pack(
+        f"{inner_y * inner_x}f", *[float(i + 1) for i in range(inner_y * inner_x)]
+    )
+    assert (
+        ar.Write(data, array_start_idx=[0, 0], count=[inner_y, inner_x]) == gdal.CE_None
+    )
+    ds = None
+
+    ds = gdal.OpenEx(str(tmp_path / "out.zarr"), gdal.OF_MULTIDIM_RASTER)
+    ar = ds.GetRootGroup().OpenMDArray("data")
+    assert ar.GetNoDataValueAsDouble() == nodata
+    unwritten = struct.unpack(
+        f"{inner_y * inner_x}f",
+        ar.Read(array_start_idx=[inner_y, inner_x], count=[inner_y, inner_x]),
+    )
+    assert all(v == nodata for v in unwritten)
+
+
+def test_zarr_write_sharded_3d(tmp_path):
+    """3D (band, y, x) sharded array - EO data pattern."""
+    nb, ny, nx = 3, 12, 14
+    n = nb * ny * nx
+    expected = [float(i) for i in range(n)]
+
+    ds, ar = _create_sharded_array(
+        tmp_path / "out.zarr",
+        [("band", nb), ("y", ny), ("x", nx)],
+        [3, 6, 8],
+        [1, 6, 4],
+    )
+    assert ar.Write(struct.pack(f"{n}f", *expected)) == gdal.CE_None
+    ds = None
+
+    ds = gdal.OpenEx(str(tmp_path / "out.zarr"), gdal.OF_MULTIDIM_RASTER)
+    ar = ds.GetRootGroup().OpenMDArray("data")
+    assert ar.GetBlockSize() == [1, 6, 4]
+    assert list(struct.unpack(f"{n}f", ar.Read())) == expected
+
+
+@pytest.mark.parametrize(
+    "opts",
+    [
+        ["BLOCKSIZE=10,10", "SHARD_CHUNK_SHAPE=3,5"],
+        ["BLOCKSIZE=10,10", "SHARD_CHUNK_SHAPE=5"],
+    ],
+    ids=["indivisible", "wrong_dim_count"],
+)
+def test_zarr_write_sharded_invalid(tmp_path, opts):
+    """Invalid sharding creation options should fail."""
+    ds = gdal.GetDriverByName("ZARR").CreateMultiDimensional(
+        str(tmp_path / "out.zarr"), options=["FORMAT=ZARR_V3"]
+    )
+    rg = ds.GetRootGroup()
+    dims = [
+        rg.CreateDimension("y", None, None, 10),
+        rg.CreateDimension("x", None, None, 10),
+    ]
+    with gdal.quiet_errors():
+        ar = rg.CreateMDArray(
+            "data", dims, gdal.ExtendedDataType.Create(gdal.GDT_Float32), opts
+        )
+    assert ar is None
+
+
+def test_zarr_write_sharded_empty_array(tmp_path):
+    """Create sharded array, close without writing - no shard files."""
+    ds, _ar = _create_sharded_array(
+        tmp_path / "out.zarr", [("y", 10), ("x", 10)], [10, 10], [5, 5]
+    )
+    del ds, _ar
+    data_dir = tmp_path / "out.zarr" / "data"
+    if data_dir.exists():
+        assert list(data_dir.rglob("c*")) == []
+
+
+def test_zarr_write_sharded_uint8_nodata255(tmp_path):
+    """uint8 sharded write with non-zero nodata (255)."""
+    inner_y, inner_x = 5, 6
+    ds, ar = _create_sharded_array(
+        tmp_path / "out.zarr",
+        [("y", 10), ("x", 12)],
+        [10, 12],
+        [inner_y, inner_x],
+        dtype=gdal.GDT_Byte,
+    )
+    ar.SetNoDataValueDouble(255)
+    data = struct.pack(f"{inner_y * inner_x}B", *range(inner_y * inner_x))
+    assert (
+        ar.Write(data, array_start_idx=[0, 0], count=[inner_y, inner_x]) == gdal.CE_None
+    )
+    ds = None
+
+    ds = gdal.OpenEx(str(tmp_path / "out.zarr"), gdal.OF_MULTIDIM_RASTER)
+    ar = ds.GetRootGroup().OpenMDArray("data")
+    assert list(
+        struct.unpack(
+            f"{inner_y * inner_x}B",
+            ar.Read(array_start_idx=[0, 0], count=[inner_y, inner_x]),
+        )
+    ) == list(range(inner_y * inner_x))
+    unwritten = struct.unpack(
+        "B" * (5 * 6), ar.Read(array_start_idx=[inner_y, inner_x], count=[5, 6])
+    )
+    assert all(v == 255 for v in unwritten)
+
+
+###############################################################################
+# Test interop: GDAL writes sharded -> zarr-python reads.
+
+
+def test_zarr_write_sharded_interop_zarr_python(tmp_path):
+    np = pytest.importorskip("numpy")
+    zarr = pytest.importorskip("zarr", minversion="3.0")
+
+    nrows, ncols = 12, 14
+    expected = list(range(nrows * ncols))
+
+    ds, ar = _create_sharded_array(
+        tmp_path / "out.zarr", [("y", nrows), ("x", ncols)], [6, 8], [3, 4]
+    )
+    ar.Write(struct.pack(f"{nrows * ncols}f", *[float(v) for v in expected]))
+    del ds, ar
+
+    root = zarr.open_group(
+        zarr.storage.LocalStore(str(tmp_path / "out.zarr")), mode="r"
+    )
+    np.testing.assert_array_equal(
+        np.array(root["data"]),
+        np.array(expected, dtype=np.float32).reshape(nrows, ncols),
+    )

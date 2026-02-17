@@ -2256,7 +2256,7 @@ void JPGDatasetCommon::InitInternalOverviews()
             }
         }
 
-        if (nImplicitOverviews > 0)
+        if (nImplicitOverviews > 0 && m_poCommon)
         {
             ppoActiveDS = &poActiveDS;
             papoInternalOverviews = static_cast<GDALDataset **>(

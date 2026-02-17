@@ -84,7 +84,24 @@ Sharding support
 .. versionadded:: 3.13
 
 `Zarr v3 sharding <https://zarr-specs.readthedocs.io/en/latest/v3/codecs/sharding-indexed/index.html>`__
-is supported in read-only since GDAL 3.13.
+is supported since GDAL 3.13. Write support involves setting the
+:co:`SHARD_CHUNK_SHAPE` array creation option.
+
+Multiscales (overviews / pyramids)
+----------------------------------
+
+.. versionadded:: 3.13
+
+The driver supports reading the Zarr
+`multiscales convention <https://github.com/zarr-conventions/multiscales>`__
+for Zarr V3 datasets. This convention describes a pyramid of arrays at
+decreasing resolutions within a group hierarchy.
+
+When a Zarr V3 array has a parent (or grandparent) group whose
+attributes contain a ``zarr_conventions`` entry with the multiscales UUID and
+a ``multiscales`` attribute with a ``layout`` array, the driver exposes
+lower-resolution levels as overviews via :cpp:func:`GDALMDArray::GetOverview`
+and the classic raster band overview API.
 
 Kerchunk reference stores
 -------------------------
@@ -550,6 +567,17 @@ with ``ARRAY:`` using :program:`gdalmdimtranslate`):
       If not specified, the fastest varying 2 dimensions (the last ones) used a
       block size of 256 samples, and the other ones of 1.
 
+-  .. co:: SHARD_CHUNK_SHAPE
+      :choices: <string>
+      :since: 3.13
+
+      Comma-separated inner chunk dimensions for Zarr V3 sharded storage.
+      When set, :co:`BLOCKSIZE` defines the shard dimensions and this option
+      defines the inner chunk dimensions within each shard.
+      Each value must evenly divide the corresponding :co:`BLOCKSIZE`
+      dimension. For example, ``BLOCKSIZE=256,256`` with
+      ``SHARD_CHUNK_SHAPE=64,64`` creates shards of 4x4=16 inner chunks.
+
 -  .. co:: CHUNK_MEMORY_LAYOUT
       :choices: C, F
       :default: C
@@ -758,3 +786,5 @@ See Also:
 .. spelling:word-list::
     Kerchunk
     Sharding
+    multiscales
+    Multiscales

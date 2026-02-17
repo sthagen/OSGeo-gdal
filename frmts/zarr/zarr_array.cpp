@@ -1714,8 +1714,8 @@ lbl_next_depth:
             if (arrayStep[i] != 0)
             {
                 const auto nextBlockIdx =
-                    std::min((1 + indicesOuterLoop[i] / m_anOuterBlockSize[i]) *
-                                 m_anOuterBlockSize[i],
+                    std::min((1 + indicesOuterLoop[i] / m_anInnerBlockSize[i]) *
+                                 m_anInnerBlockSize[i],
                              arrayStartIdx[i] + count[i] * arrayStep[i]);
                 countInnerLoopInit[i] = static_cast<size_t>(cpl::div_round_up(
                     nextBlockIdx - indicesOuterLoop[i], arrayStep[i]));
@@ -1726,7 +1726,7 @@ lbl_next_depth:
                     indicesOuterLoop[i] == 0 &&
                     countInnerLoopInit[i] == m_aoDims[i]->GetSize();
                 bWriteWholeBlock =
-                    (countInnerLoopInit[i] == m_anOuterBlockSize[i] ||
+                    (countInnerLoopInit[i] == m_anInnerBlockSize[i] ||
                      bWholePartialBlockThisDim);
                 if (bWholePartialBlockThisDim)
                 {
@@ -1812,7 +1812,7 @@ lbl_next_depth:
         m_bCachedBlockEmpty = false;
         if (nDims)
             offsetDstBuffer[0] = static_cast<size_t>(
-                indicesOuterLoop[0] - blockIndices[0] * m_anOuterBlockSize[0]);
+                indicesOuterLoop[0] - blockIndices[0] * m_anInnerBlockSize[0]);
 
         GByte *pabyBlock = &abyBlock[0];
 
@@ -1824,10 +1824,10 @@ lbl_next_depth:
             for (size_t i = dimIdxSubLoop + 1; i < nDims; ++i)
             {
                 nOffset = static_cast<size_t>(
-                    nOffset * m_anOuterBlockSize[i] +
+                    nOffset * m_anInnerBlockSize[i] +
                     (indicesOuterLoop[i] -
-                     blockIndices[i] * m_anOuterBlockSize[i]));
-                step *= m_anOuterBlockSize[i];
+                     blockIndices[i] * m_anInnerBlockSize[i]));
+                step *= m_anInnerBlockSize[i];
             }
             const void *src_ptr = srcPtrStackInnerLoop[dimIdxSubLoop];
             GByte *dst_ptr = pabyBlock + nOffset * nCacheDTSize;
@@ -1994,10 +1994,10 @@ lbl_next_depth:
                     srcPtrStackInnerLoop[dimIdxSubLoop - 1];
                 offsetDstBuffer[dimIdxSubLoop] = static_cast<size_t>(
                     offsetDstBuffer[dimIdxSubLoop - 1] *
-                        m_anOuterBlockSize[dimIdxSubLoop] +
+                        m_anInnerBlockSize[dimIdxSubLoop] +
                     (indicesOuterLoop[dimIdxSubLoop] -
                      blockIndices[dimIdxSubLoop] *
-                         m_anOuterBlockSize[dimIdxSubLoop]));
+                         m_anInnerBlockSize[dimIdxSubLoop]));
                 goto lbl_next_depth_inner_loop;
             lbl_return_to_caller_inner_loop:
                 dimIdxSubLoop--;
@@ -2021,7 +2021,7 @@ lbl_next_depth:
         // This level of loop loops over blocks
         indicesOuterLoop[dimIdx] = arrayStartIdx[dimIdx];
         blockIndices[dimIdx] =
-            indicesOuterLoop[dimIdx] / m_anOuterBlockSize[dimIdx];
+            indicesOuterLoop[dimIdx] / m_anInnerBlockSize[dimIdx];
         while (true)
         {
             dimIdx++;
@@ -2034,13 +2034,13 @@ lbl_next_depth:
 
             size_t nIncr;
             if (static_cast<GUInt64>(arrayStep[dimIdx]) <
-                m_anOuterBlockSize[dimIdx])
+                m_anInnerBlockSize[dimIdx])
             {
                 // Compute index at next block boundary
                 auto newIdx =
                     indicesOuterLoop[dimIdx] +
-                    (m_anOuterBlockSize[dimIdx] -
-                     (indicesOuterLoop[dimIdx] % m_anOuterBlockSize[dimIdx]));
+                    (m_anInnerBlockSize[dimIdx] -
+                     (indicesOuterLoop[dimIdx] % m_anInnerBlockSize[dimIdx]));
                 // And round up compared to arrayStartIdx, arrayStep
                 nIncr = static_cast<size_t>(cpl::div_round_up(
                     newIdx - indicesOuterLoop[dimIdx], arrayStep[dimIdx]));
@@ -2057,7 +2057,7 @@ lbl_next_depth:
                 bufferStride[dimIdx] *
                 static_cast<GPtrDiff_t>(nIncr * nBufferDTSize);
             blockIndices[dimIdx] =
-                indicesOuterLoop[dimIdx] / m_anOuterBlockSize[dimIdx];
+                indicesOuterLoop[dimIdx] / m_anInnerBlockSize[dimIdx];
         }
     }
     if (dimIdx > 0)

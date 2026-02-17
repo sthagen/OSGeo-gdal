@@ -243,15 +243,279 @@ bool ZarrV3CodecShardingIndexed::InitFromConfiguration(
 }
 
 /************************************************************************/
+/*                    ExtractSubArrayFromLargerOne()                    */
+/************************************************************************/
+
+// Inverse of CopySubArrayIntoLargerOne(): extract a contiguous inner chunk
+// from its position in the larger shard buffer.
+static void
+ExtractSubArrayFromLargerOne(const ZarrByteVectorQuickResize &abySrc,
+                             const std::vector<size_t> &anSrcBlockSize,
+                             const std::vector<size_t> &anInnerBlockSize,
+                             const std::vector<size_t> &anInnerBlockIndices,
+                             ZarrByteVectorQuickResize &abyChunk,
+                             const size_t nDTSize)
+{
+    const auto nDims = anInnerBlockSize.size();
+    CPLAssert(nDims > 0);
+    CPLAssert(nDims == anInnerBlockIndices.size());
+    CPLAssert(nDims == anSrcBlockSize.size());
+    // +1 to avoid gcc -Wnull-dereference false positives
+    std::vector<const GByte *> srcPtrStack(nDims + 1);
+    std::vector<size_t> count(nDims + 1);
+    std::vector<size_t> srcStride(nDims + 1);
+
+    size_t nSrcStride = nDTSize;
+    for (size_t iDim = nDims; iDim > 0;)
+    {
+        --iDim;
+        srcStride[iDim] = nSrcStride;
+        nSrcStride *= anSrcBlockSize[iDim];
+    }
+
+    srcPtrStack[0] = abySrc.data();
+    for (size_t iDim = 0; iDim < nDims; ++iDim)
+    {
+        CPLAssert((anInnerBlockIndices[iDim] + 1) * anInnerBlockSize[iDim] <=
+                  anSrcBlockSize[iDim]);
+        srcPtrStack[0] += anInnerBlockIndices[iDim] * anInnerBlockSize[iDim] *
+                          srcStride[iDim];
+    }
+    GByte *pabyDst = abyChunk.data();
+
+    const size_t nLastDimSize = anInnerBlockSize.back() * nDTSize;
+    size_t dimIdx = 0;
+lbl_next_depth:
+    if (dimIdx + 1 == nDims)
+    {
+        memcpy(pabyDst, srcPtrStack[dimIdx], nLastDimSize);
+        pabyDst += nLastDimSize;
+    }
+    else
+    {
+        count[dimIdx] = anInnerBlockSize[dimIdx];
+        while (true)
+        {
+            dimIdx++;
+            srcPtrStack[dimIdx] = srcPtrStack[dimIdx - 1];
+            goto lbl_next_depth;
+        lbl_return_to_caller:
+            dimIdx--;
+            if (--count[dimIdx] == 0)
+                break;
+            srcPtrStack[dimIdx] += srcStride[dimIdx];
+        }
+    }
+    if (dimIdx > 0)
+        goto lbl_return_to_caller;
+}
+
+/************************************************************************/
+/*                            IsAllNoData()                             */
+/************************************************************************/
+
+// Check if a buffer consists entirely of the fill value.
+static bool IsAllNoData(const ZarrByteVectorQuickResize &abyChunk,
+                        const ZarrArrayMetadata &metadata)
+{
+    const size_t nDTSize = metadata.oElt.nativeSize;
+    const size_t nBytes = abyChunk.size();
+
+    if (metadata.abyNoData.empty() ||
+        metadata.abyNoData == std::vector<GByte>(nDTSize, 0))
+    {
+        // Zero fill value: byte-by-byte check (compiler auto-vectorizes)
+        const GByte *p = abyChunk.data();
+        for (size_t i = 0; i < nBytes; ++i)
+        {
+            if (p[i] != 0)
+                return false;
+        }
+        return true;
+    }
+    else
+    {
+        // Non-zero fill value: element-wise compare
+        CPLAssert(metadata.abyNoData.size() == nDTSize);
+        const GByte *p = abyChunk.data();
+        const size_t nCount = nBytes / nDTSize;
+        for (size_t i = 0; i < nCount; ++i)
+        {
+            if (memcmp(p + i * nDTSize, metadata.abyNoData.data(), nDTSize) !=
+                0)
+                return false;
+        }
+        return true;
+    }
+}
+
+/************************************************************************/
 /*                 ZarrV3CodecShardingIndexed::Encode()                 */
 /************************************************************************/
 
-bool ZarrV3CodecShardingIndexed::Encode(const ZarrByteVectorQuickResize &,
-                                        ZarrByteVectorQuickResize &) const
+bool ZarrV3CodecShardingIndexed::Encode(const ZarrByteVectorQuickResize &abySrc,
+                                        ZarrByteVectorQuickResize &abyDst) const
 {
-    CPLError(CE_Failure, CPLE_NotSupported,
-             "ZarrV3CodecShardingIndexed::Encode() not supported");
-    return false;
+    // Compute total number of inner chunks
+    size_t nInnerChunks = 1;
+    for (size_t i = 0; i < m_anInnerBlockSize.size(); ++i)
+    {
+        const size_t nCountInnerChunksThisDim =
+            m_oInputArrayMetadata.anBlockSizes[i] / m_anInnerBlockSize[i];
+        nInnerChunks *= nCountInnerChunksThisDim;
+    }
+
+    const auto nDTSize = m_oInputArrayMetadata.oElt.nativeSize;
+    const size_t nExpectedSrcSize =
+        nDTSize * MultiplyElements(m_oInputArrayMetadata.anBlockSizes);
+    if (abySrc.size() != nExpectedSrcSize)
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "ZarrV3CodecShardingIndexed::Encode(): input buffer size "
+                 "(%" PRIu64 ") != expected (%" PRIu64 ")",
+                 static_cast<uint64_t>(abySrc.size()),
+                 static_cast<uint64_t>(nExpectedSrcSize));
+        return false;
+    }
+
+    // Index: one Location per inner chunk, initially all empty
+    std::vector<Location> anLocations(nInnerChunks,
+                                      {std::numeric_limits<uint64_t>::max(),
+                                       std::numeric_limits<uint64_t>::max()});
+
+    // Accumulate encoded inner chunk data
+    ZarrByteVectorQuickResize abyData;
+    // Reserve approximate capacity: decoded chunk size is close to the upper
+    // bound per chunk (compression may slightly increase size in pathological
+    // cases), but avoids most reallocations.
+    const size_t nDecodedChunkSize =
+        nDTSize * MultiplyElements(m_anInnerBlockSize);
+    // resize+clear = reserve (ZarrByteVectorQuickResize has no reserve())
+    try
+    {
+        abyData.resize(nInnerChunks * nDecodedChunkSize);
+    }
+    catch (const std::exception &)
+    {
+        CPLError(CE_Failure, CPLE_OutOfMemory,
+                 "Cannot allocate memory for accumulated shard data");
+        return false;
+    }
+    abyData.clear();
+    ZarrByteVectorQuickResize abyChunk;
+
+    uint64_t nCurrentOffset = 0;
+    std::vector<size_t> anChunkIndices(m_anInnerBlockSize.size(), 0);
+
+    for (size_t iChunk = 0; iChunk < nInnerChunks; ++iChunk)
+    {
+        // Update chunk coordinates (same iteration order as Decode)
+        if (iChunk > 0)
+        {
+            size_t iDim = m_anInnerBlockSize.size() - 1;
+            while (++anChunkIndices[iDim] ==
+                   m_oInputArrayMetadata.anBlockSizes[iDim] /
+                       m_anInnerBlockSize[iDim])
+            {
+                anChunkIndices[iDim] = 0;
+                --iDim;
+            }
+        }
+
+        // Extract this inner chunk from the shard buffer
+        try
+        {
+            abyChunk.resize(nDecodedChunkSize);
+        }
+        catch (const std::exception &)
+        {
+            CPLError(CE_Failure, CPLE_OutOfMemory,
+                     "Cannot allocate memory for inner chunk");
+            return false;
+        }
+        ExtractSubArrayFromLargerOne(abySrc, m_oInputArrayMetadata.anBlockSizes,
+                                     m_anInnerBlockSize, anChunkIndices,
+                                     abyChunk, nDTSize);
+
+        // Skip empty (all-nodata) chunks
+        if (IsAllNoData(abyChunk, m_oInputArrayMetadata))
+            continue;
+
+        // Encode inner chunk through codec chain (bytes + compressor)
+        if (!m_poCodecSequence->Encode(abyChunk))
+        {
+            CPLError(CE_Failure, CPLE_AppDefined,
+                     "ZarrV3CodecShardingIndexed::Encode(): cannot encode "
+                     "inner chunk %" PRIu64,
+                     static_cast<uint64_t>(iChunk));
+            return false;
+        }
+
+        anLocations[iChunk] = {nCurrentOffset, abyChunk.size()};
+        nCurrentOffset += abyChunk.size();
+        abyData.insert(abyData.end(), abyChunk.begin(), abyChunk.end());
+    }
+
+    // All inner chunks are nodata: signal empty shard via zero-length output
+    if (abyData.empty())
+    {
+        abyDst.clear();
+        return true;
+    }
+
+    // Build index buffer
+    ZarrByteVectorQuickResize abyIndex;
+    const size_t nIndexRawSize = nInnerChunks * sizeof(Location);
+
+    // If index is at start, data offsets must account for the index prefix.
+    // Encode the index once to determine its encoded size (includes CRC32C
+    // overhead), then re-encode below with the adjusted offsets.
+    // Note: currently unreachable in write mode (creation hardcodes "end"),
+    // but kept for completeness with the Decode() start-index path.
+    if (!m_bIndexLocationAtEnd)
+    {
+        // Encode a temporary copy of the index to determine its encoded size
+        abyIndex.resize(nIndexRawSize);
+        memcpy(abyIndex.data(), anLocations.data(), nIndexRawSize);
+        if (!m_poIndexCodecSequence->Encode(abyIndex))
+        {
+            CPLError(
+                CE_Failure, CPLE_AppDefined,
+                "ZarrV3CodecShardingIndexed::Encode(): cannot encode index");
+            return false;
+        }
+        const uint64_t nIndexEncodedSize = abyIndex.size();
+        // Adjust offsets
+        for (auto &loc : anLocations)
+        {
+            if (loc.nOffset != std::numeric_limits<uint64_t>::max())
+                loc.nOffset += nIndexEncodedSize;
+        }
+    }
+
+    // (Re-)encode index with final offsets
+    abyIndex.resize(nIndexRawSize);
+    memcpy(abyIndex.data(), anLocations.data(), nIndexRawSize);
+    if (!m_poIndexCodecSequence->Encode(abyIndex))
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "ZarrV3CodecShardingIndexed::Encode(): cannot encode index");
+        return false;
+    }
+
+    // Assemble output: data + index (or index + data)
+    if (m_bIndexLocationAtEnd)
+    {
+        abyDst = std::move(abyData);
+        abyDst.insert(abyDst.end(), abyIndex.begin(), abyIndex.end());
+    }
+    else
+    {
+        abyDst = std::move(abyIndex);
+        abyDst.insert(abyDst.end(), abyData.begin(), abyData.end());
+    }
+
+    return true;
 }
 
 /************************************************************************/
