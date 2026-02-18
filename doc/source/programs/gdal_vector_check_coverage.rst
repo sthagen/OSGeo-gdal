@@ -84,6 +84,8 @@ Standard Options
 
     .. include:: gdal_options/lco.rst
 
+    .. include:: gdal_options/no_create_empty_layers.rst
+
     .. include:: gdal_options/oo.rst
 
     .. include:: gdal_options/of_vector.rst

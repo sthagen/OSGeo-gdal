@@ -11,6 +11,7 @@
 # SPDX-License-Identifier: MIT
 ###############################################################################
 
+import gdaltest
 import pytest
 
 from osgeo import gdal, ogr
@@ -332,6 +333,42 @@ def test_gdalalg_vector_convert_output_format_multiple_layers(tmp_vsimem, driver
             convert.Run()
         assert gdal.VSIStatL(dst_fname) is None
     else:
+        assert convert.Run()
+
+
+@pytest.mark.parametrize("output_format", ("stream", "MEM"))
+def test_gdalalg_vector_convert_no_create_empty_layers(output_format):
+
+    src_ds = gdal.GetDriverByName("MEM").CreateVector("")
+    with gdal.OpenEx("../ogr/data/poly.shp") as poly_ds:
+        src_ds.CopyLayer(poly_ds.GetLayer(0), "poly_1")
+        src_ds.CopyLayer(poly_ds.GetLayer(0), "poly_2")
+
+    src_ds.GetLayer(0).SetAttributeFilter("EAS_ID=1234567")  # does not exist
+
+    convert = get_convert_alg()
+    convert["input"] = src_ds
+    convert["no-create-empty-layers"] = True
+    convert["output-format"] = output_format
+
+    assert convert.Run()
+
+    dst_ds = convert.Output()
+
+    assert dst_ds.GetLayerCount() == 1
+
+
+@pytest.mark.require_driver("OSM")
+def test_gdalalg_vector_pipeline_no_create_empty_layers_random_layer_read_warning(
+    tmp_vsimem,
+):
+
+    convert = get_convert_alg()
+    convert["input"] = "../ogr/data/osm/test.osm"
+    convert["no-create-empty-layers"] = True
+    convert["output-format"] = "stream"
+
+    with gdaltest.error_raised(gdal.CE_Warning, "Attempting to read features by layer"):
         assert convert.Run()
 
 

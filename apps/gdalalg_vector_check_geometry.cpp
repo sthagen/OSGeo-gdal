@@ -28,8 +28,11 @@
 
 GDALVectorCheckGeometryAlgorithm::GDALVectorCheckGeometryAlgorithm(
     bool standaloneStep)
-    : GDALVectorPipelineStepAlgorithm(NAME, DESCRIPTION, HELP_URL,
-                                      standaloneStep)
+    : GDALVectorPipelineStepAlgorithm(
+          NAME, DESCRIPTION, HELP_URL,
+          ConstructorOptions()
+              .SetStandaloneStep(standaloneStep)
+              .SetNoCreateEmptyLayersArgument(standaloneStep))
 {
     AddArg("include-field", 0,
            _("Fields from input layer to include in output (special values: "
@@ -96,6 +99,11 @@ class GDALInvalidLocationLayer final : public GDALVectorPipelineOutputLayer
     int TestCapability(const char *) const override
     {
         return false;
+    }
+
+    const char *GetDescription() const override
+    {
+        return GetName();
     }
 
     const OGRFeatureDefn *GetLayerDefn() const override

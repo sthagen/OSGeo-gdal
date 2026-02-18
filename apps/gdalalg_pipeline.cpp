@@ -247,6 +247,12 @@ void GDALPipelineStepAlgorithm::AddVectorOutputArgs(
                &m_skipErrors)
             .AddHiddenAlias("skip-failures");  // For ogr2ogr nostalgic people
     }
+    if (m_constructorOptions.addNoCreateEmptyLayersArgument)
+    {
+        AddArg("no-create-empty-layers", 0,
+               _("Avoid creating layers to which no features will be written"),
+               &m_noCreateEmptyLayers);
+    }
 }
 
 /************************************************************************/
@@ -373,7 +379,7 @@ bool GDALPipelineStepAlgorithm::RunImpl(GDALProgressFunc pfnProgress,
                 stepCtxt.m_poNextUsableStep = writeAlg.get();
             if (RunPreStepPipelineValidations() && RunStep(stepCtxt))
             {
-                if (bIsStreaming || bCanHandleNextStep || !bOutputSpecified)
+                if (bCanHandleNextStep || !bOutputSpecified)
                 {
                     ret = true;
                 }
