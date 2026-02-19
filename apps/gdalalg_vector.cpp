@@ -22,6 +22,7 @@
 #include "gdalalg_vector_clip.h"
 #include "gdalalg_vector_combine.h"
 #include "gdalalg_vector_concat.h"
+#include "gdalalg_vector_concave_hull.h"
 #include "gdalalg_vector_convert.h"
 #include "gdalalg_vector_convex_hull.h"
 #include "gdalalg_vector_dissolve.h"
@@ -75,6 +76,7 @@ GDALVectorAlgorithm::GDALVectorAlgorithm()
     RegisterSubAlgorithm<GDALVectorClipAlgorithmStandalone>();
     RegisterSubAlgorithm<GDALVectorCombineAlgorithmStandalone>();
     RegisterSubAlgorithm<GDALVectorConcatAlgorithmStandalone>();
+    RegisterSubAlgorithm<GDALVectorConcaveHullAlgorithmStandalone>();
     RegisterSubAlgorithm<GDALVectorConvertAlgorithm>();
     RegisterSubAlgorithm<GDALVectorConvexHullAlgorithmStandalone>();
     RegisterSubAlgorithm<GDALVectorDissolveAlgorithmStandalone>();
