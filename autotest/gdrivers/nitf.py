@@ -1144,7 +1144,7 @@ def test_nitf_29(tmp_path):
 
     ct = ds.GetRasterBand(1).GetRasterColorTable()
     assert (
-        ct.GetCount() == 129
+        ct.GetCount() == 128
         and ct.GetColorEntry(0) == (255, 255, 255, 255)
         and ct.GetColorEntry(1) == (255, 255, 0, 255)
         and ct.GetColorEntry(2) == (255, 0, 255, 255)
@@ -1159,7 +1159,7 @@ def test_nitf_29(tmp_path):
 
     ct = ds.GetRasterBand(1).GetRasterColorTable()
     assert (
-        ct.GetCount() == 130
+        ct.GetCount() == 128
         and ct.GetColorEntry(0) == (255, 255, 255, 255)
         and ct.GetColorEntry(1) == (255, 255, 0, 255)
         and ct.GetColorEntry(2) == (255, 0, 255, 255)
@@ -6937,3 +6937,1005 @@ def test_nitf_close(tmp_path):
         )
     ds.Close()
     os.remove(tmp_path / "out.ntf")
+
+
+###############################################################################
+
+
+@gdaltest.enable_exceptions()
+def test_nitf_create_02_00(tmp_path):
+
+    filename = tmp_path / "out.ntf"
+    with gdal.GetDriverByName("NITF").Create(
+        filename, 2, 1, options=["FHDR=NITF02.00"]
+    ) as ds:
+        ds.GetRasterBand(1).WriteRaster(0, 0, 2, 1, b"\x01\x02")
+    with gdal.Open(filename) as ds:
+        assert ds.GetMetadataItem("NITF_FHDR") == "NITF02.00"
+        assert ds.GetRasterBand(1).ReadRaster() == b"\x01\x02"
+
+    # Some warnings because the FSDWNG, FSDEVT, ISDWNG, ISDEVT options are not declared (too esoteric)
+    # but let's ensure we produce valid files though
+    with gdal.quiet_errors():
+        gdal.GetDriverByName("NITF").CreateCopy(
+            filename,
+            gdal.Open("data/small_world.tif"),
+            options=[
+                "FHDR=NITF02.00",
+                "FSDWNG=999998",
+                "FSDEVT=FSDEVT content",
+                "ISDWNG=999998",
+                "ISDEVT=ISDEVT content",
+                "ONAME=ONAME",
+                "DES=DES1=02U" + " " * 166 + r"0004ABCD1234567\0890",
+                "TEXT=DATA_0=COUCOU",
+                "TEXT=HEADER_0=ABC",  # This content is invalid but who cares here
+                "CGM=SEGMENT_COUNT=1",
+                "CGM=SEGMENT_0_SLOC_ROW=25",
+                "CGM=SEGMENT_0_SLOC_COL=25",
+                "CGM=SEGMENT_0_SDLVL=2",
+                "CGM=SEGMENT_0_SALVL=1",
+                "CGM=SEGMENT_0_DATA=XYZ",
+            ],
+        )
+    with gdal.Open(filename) as ds:
+        assert [ds.GetRasterBand(i + 1).Checksum() for i in range(3)] == [
+            30111,
+            32302,
+            40026,
+        ]
+        assert ds.GetGeoTransform() == (-180.0, 0.9, 0.0, 90.0, 0.0, -0.9)
+        data = ds.GetMetadata("xml:DES")[0]
+        assert ds.GetMetadataItem("NITF_ONAME") == "ONAME"
+
+        md = ds.GetMetadata("TEXT")
+        assert "DATA_0" in md
+        assert md["DATA_0"] == "COUCOU"
+        assert "HEADER_0" in md
+        assert "ABC  " in md["HEADER_0"]
+
+        md = ds.GetMetadata("CGM")
+        assert "SEGMENT_COUNT" in md
+        assert md["SEGMENT_COUNT"] == "1"
+        assert "SEGMENT_0_DATA" in md
+        assert md["SEGMENT_0_DATA"] == "XYZ"
+
+    expected_data = """<des_list>
+  <des name="DES1">
+    <field name="DESVER" value="02" />
+    <field name="DECLAS" value="U" />
+    <field name="DESCLSY" value="" />
+    <field name="DESCODE" value="" />
+    <field name="DESCTLH" value="" />
+    <field name="DESREL" value="" />
+    <field name="DESDCTP" value="" />
+    <field name="DESDCDT" value="" />
+    <field name="DESDCXM" value="" />
+    <field name="DESDG" value="" />
+    <field name="DESDGDT" value="" />
+    <field name="DESCLTX" value="" />
+    <field name="DESCATP" value="" />
+    <field name="DESCAUT" value="" />
+    <field name="DESCRSN" value="" />
+    <field name="DESSRDT" value="" />
+    <field name="DESCTLN" value="" />
+    <field name="DESSHL" value="0004" />
+    <field name="DESSHF" value="ABCD" />
+    <field name="DESDATA" value="MTIzNDU2NwA4OTA=" />
+  </des>
+</des_list>
+"""
+
+    assert data == expected_data
+
+
+###############################################################################
+
+
+@gdaltest.enable_exceptions()
+def test_nitf_create_cadrg(tmp_path):
+
+    if gdaltest.is_travis_branch("fedora_rawhide"):
+        pytest.skip(
+            "randomly fails on CI, but not when trying locally within a docker image"
+        )
+
+    gdal.alg.raster.rgb_to_palette(
+        input="data/small_world.tif", output=tmp_path / "in.tif", color_count=216
+    )
+
+    gdal.Mkdir(tmp_path / "1", 0o755)
+
+    gdal.Translate(
+        tmp_path / "1" / "out_cadrg.ntf",
+        gdal.Open(tmp_path / "in.tif"),
+        width=1536,
+        height=1536,
+        creationOptions=["PRODUCT_TYPE=CADRG", "SCALE=10000000"],
+    )
+    gdal.Unlink(tmp_path / "1" / "out_cadrg.ntf.aux.xml")
+
+    ds = gdal.Open(tmp_path / "1" / "out_cadrg.ntf")
+    assert ds.RasterCount == 1
+    assert ds.GetRasterBand(1).GetColorTable().GetCount() == 216
+    assert ds.GetRasterBand(1).Checksum() == 41955
+    assert ds.GetMetadata_Dict() == {
+        "NITF_ABPP": "08",
+        "NITF_CCS_COLUMN": "0",
+        "NITF_CCS_ROW": "0",
+        "NITF_CLEVEL": "03",
+        "NITF_ENCRYP": "0",
+        "NITF_FDT": "01000000ZJAN26",
+        "NITF_FHDR": "NITF02.00",
+        "NITF_FSCAUT": "",
+        "NITF_FSCLAS": "U",
+        "NITF_FSCODE": "",
+        "NITF_FSCOP": "00000",
+        "NITF_FSCPYS": "00000",
+        "NITF_FSCTLH": "",
+        "NITF_FSCTLN": "",
+        "NITF_FSDWNG": "",
+        "NITF_FSREL": "",
+        "NITF_FTITLE": "out_cadrg.ntf",
+        "NITF_IALVL": "0",
+        "NITF_IC": "C4",
+        "NITF_ICAT": "MAP",
+        "NITF_ICORDS": "G",
+        "NITF_IDATIM": "01000000ZJAN26",
+        "NITF_IDLVL": "1",
+        "NITF_IGEOLO": "895629N1795258W895629N1795258E895629S1795258E895629S1795258W",
+        "NITF_IID1": "CADRG",
+        "NITF_ILOC_COLUMN": "0",
+        "NITF_ILOC_ROW": "0",
+        "NITF_IMAG": "0.67",
+        "NITF_IMODE": "B",
+        "NITF_IREP": "RGB/LUT",
+        "NITF_ISCAUT": "",
+        "NITF_ISCLAS": "U",
+        "NITF_ISCODE": "",
+        "NITF_ISCTLH": "",
+        "NITF_ISCTLN": "",
+        "NITF_ISDWNG": "",
+        "NITF_ISORCE": "Unknown",
+        "NITF_ISREL": "",
+        "NITF_ITITLE": "out_cadrg.ntf",
+        "NITF_ONAME": "",
+        "NITF_OPHONE": "",
+        "NITF_OSTAID": "GDAL",
+        "NITF_PJUST": "R",
+        "NITF_PVTYPE": "INT",
+        "NITF_STYPE": "",
+        "NITF_TGTID": "",
+        "NITF_RPF_CurrencyDate": "20260101",
+        "NITF_RPF_ProductionDate": "20260101",
+        "NITF_RPF_SignificantDate": "20260101",
+    }
+
+    tres = ds.GetMetadata("xml:TRE")[0]
+    assert """<tre name="RPFHDR" location="file">
+    <field name="LITTLE_BIG_ENDIAN_INDICATOR" value="0" />
+    <field name="HEADER_SECTION_LENGTH" value="48" />
+    <field name="FILENAME" value="out_cadrg.nt" />
+    <field name="NEW_REPLACEMENT_UPDATE_INDICATOR" value="0" />
+    <field name="GOVERNING_STANDARD_NUMBER" value="MIL-C-89038" />
+    <field name="GOVERNING_STANDARD_DATE" value="19941006" />
+    <field name="SECURITY_CLASSIFICATION" value="U" />
+    <field name="SECURITY_COUNTRY_INTERNATIONAL_CODE" value="" />
+    <field name="SECURITY_RELEASE_MARKING" value="" />
+    <field name="LOCATION_SECTION_LOCATION" value="1644" />
+  </tre>""" in tres
+
+    assert """<tre name="RPFIMG" location="image">
+    <field name="LOCATION_SECTION_LENGTH" value="124" />
+    <field name="COMPONENT_LOCATION_OFFSET" value="14" />
+    <field name="NUMBER_OF_COMPONENT_LOCATION_RECORDS" value="11" />
+    <field name="COMPONENT_LOCATION_RECORD_LENGTH" value="10" />
+    <field name="COMPONENT_AGGREGATE_LENGTH" value="288762" />
+    <repeated name="CLR" number="11">
+      <group index="0">
+        <field name="COMPONENT_ID" value="130" />
+        <field name="COMPONENT_LENGTH" value="96" />
+        <field name="COMPONENT_LOCATION" value="1768" />
+        <content ComponentName="CoverageSectionSubheader">
+          <field name="NORTHWEST_LATITUDE" value="90" />
+          <field name="NORTHWEST_LONGITUDE" value="-180" />
+          <field name="SOUTHWEST_LATITUDE" value="-90" />
+          <field name="SOUTHWEST_LONGITUDE" value="-180" />
+          <field name="NORTHEAST_LATITUDE" value="90" />
+          <field name="NORTHEAST_LONGITUDE" value="180" />
+          <field name="SOUTHEAST_LATITUDE" value="-90" />
+          <field name="SOUTHEAST_LONGITUDE" value="180" />""" in tres
+
+    assert """<group index="1">
+        <field name="COMPONENT_ID" value="131" />
+        <field name="COMPONENT_LENGTH" value="6" />
+        <field name="COMPONENT_LOCATION" value="3668" />
+        <content ComponentName="CompressionSectionSubsection">
+          <field name="COMPRESSION_ALGORITHM_ID" value="1" />
+          <field name="NUMBER_OF_COMPRESSION_LOOKUP_OFFSET_RECORDS" value="4" />
+          <field name="NUMBER_OF_COMPRESSION_PARAMETER_OFFSET_RECORDS" value="0" />
+        </content>
+      </group>
+      <group index="2">
+        <field name="COMPONENT_ID" value="132" />
+        <field name="COMPONENT_LENGTH" value="65598" />
+        <field name="COMPONENT_LOCATION" value="3683" />
+        <content ComponentName="CompressionLookupSubsection">
+          <field name="COMPRESSION_LOOKUP_OFFSET_TABLE_OFFSET" value="6" />
+          <field name="COMPRESSION_LOOKUP_TABLE_OFFSET_RECORD_LENGTH" value="14" />
+          <repeated name="COMP_LOOKUP_OFFSET" number="4">
+            <group index="0">
+              <field name="COMPRESSION_LOOKUP_TABLE_ID" value="1" />
+              <field name="NUMBER_OF_COMPRESSION_LOOKUP_RECORDS" value="4096" />
+              <field name="NUMBER_OF_VALUES_PER_COMPRESSION_RECORDS" value="4" />
+              <field name="COMPRESSION_RECORD_VALUE_BIT_LENGTH" value="8" />
+              <field name="COMPRESSION_LOOKUP_TABLE_OFFSET" value="62" />
+            </group>
+            <group index="1">
+              <field name="COMPRESSION_LOOKUP_TABLE_ID" value="2" />
+              <field name="NUMBER_OF_COMPRESSION_LOOKUP_RECORDS" value="4096" />
+              <field name="NUMBER_OF_VALUES_PER_COMPRESSION_RECORDS" value="4" />
+              <field name="COMPRESSION_RECORD_VALUE_BIT_LENGTH" value="8" />
+              <field name="COMPRESSION_LOOKUP_TABLE_OFFSET" value="16446" />
+            </group>
+            <group index="2">
+              <field name="COMPRESSION_LOOKUP_TABLE_ID" value="3" />
+              <field name="NUMBER_OF_COMPRESSION_LOOKUP_RECORDS" value="4096" />
+              <field name="NUMBER_OF_VALUES_PER_COMPRESSION_RECORDS" value="4" />
+              <field name="COMPRESSION_RECORD_VALUE_BIT_LENGTH" value="8" />
+              <field name="COMPRESSION_LOOKUP_TABLE_OFFSET" value="32830" />
+            </group>
+            <group index="3">
+              <field name="COMPRESSION_LOOKUP_TABLE_ID" value="4" />
+              <field name="NUMBER_OF_COMPRESSION_LOOKUP_RECORDS" value="4096" />
+              <field name="NUMBER_OF_VALUES_PER_COMPRESSION_RECORDS" value="4" />
+              <field name="COMPRESSION_RECORD_VALUE_BIT_LENGTH" value="8" />
+              <field name="COMPRESSION_LOOKUP_TABLE_OFFSET" value="49214" />
+            </group>
+          </repeated>
+        </content>
+      </group>
+      <group index="3">
+        <field name="COMPONENT_ID" value="134" />
+        <field name="COMPONENT_LENGTH" value="14" />
+        <field name="COMPONENT_LOCATION" value="1864" />
+        <content ComponentName="ColorGrayscaleSectionSubheader">
+          <field name="NUMBER_OF_COLOR_GRAYSCALE_OFFSET_RECORDS" value="1" />
+          <field name="NUMBER_OF_COLOR_CONVERTER_OFFSET_RECORDS" value="0" />
+          <field name="EXTERNAL_COLOR_GRAYSCALE_FILENAME" value="" />
+        </content>
+      </group>
+      <group index="4">
+        <field name="COMPONENT_ID" value="135" />
+        <field name="COMPONENT_LENGTH" value="1751" />
+        <field name="COMPONENT_LOCATION" value="1878" />
+        <content ComponentName="ColormapSubsection">
+          <field name="COLORMAP_OFFSET_TABLE_OFFSET" value="6" />
+          <field name="COLOR_GRAYSCALE_OFFSET_RECORD_LENGTH" value="17" />
+          <repeated name="COLOR_OFFSET_RECORD" number="1">
+            <group index="0">
+              <field name="COLOR_GRAYSCALE_TABLE_ID" value="2" />
+              <field name="NUMBER_OF_COLOR_GRAYSCALE_RECORDS" value="216" />
+              <field name="COLOR_GRAYSCALE_ELEMENT_LENGTH" value="4" />
+              <field name="HISTOGRAM_RECORD_LENGTH" value="4" />
+              <field name="COLOR_GRAYSCALE_TABLE_OFFSET" value="23" />
+              <field name="HISTOGRAM_TABLE_OFFSET" value="14694" />
+            </group>
+          </repeated>
+        </content>
+      </group>
+      <group index="5">
+        <field name="COMPONENT_ID" value="136" />
+        <field name="COMPONENT_LENGTH" value="28" />
+        <field name="COMPONENT_LOCATION" value="3629" />
+        <content ComponentName="ImageDescriptionSubheader">
+          <field name="NUMBER_OF_SPECTRAL_GROUPS" value="1" />
+          <field name="NUMBER_OF_SUBFRAME_TABLES" value="36" />
+          <field name="NUMBER_OF_SPECTRAL_BAND_TABLES" value="1" />
+          <field name="NUMBER_OF_SPECTRAL_BAND_LINES_PER_IMAGE_ROW" value="1" />
+          <field name="NUMBER_OF_SUBFRAME_IN_EAST_WEST_DIRECTION" value="6" />
+          <field name="NUMBER_OF_SUBFRAME_IN_NORTH_SOUTH_DIRECTION" value="6" />
+          <field name="NUMBER_OF_OUTPUT_COLUMNS_PER_SUBFRAME" value="256" />
+          <field name="NUMBER_OF_OUTPUT_ROWS_PER_SUBFRAME" value="256" />
+          <field name="SUBFRAME_MASK_TABLE_OFFSET" value="4294967295" />
+          <field name="TRANSPARENCY_MASK_TABLE_OFFSET" value="4294967295" />
+        </content>
+      </group>
+      <group index="6">
+        <field name="COMPONENT_ID" value="137" />
+        <field name="COMPONENT_LENGTH" value="9" />
+        <field name="COMPONENT_LOCATION" value="3674" />
+        <content ComponentName="ImageDisplayParametersSubheader">
+          <field name="NUMBER_OF_IMAGE_ROWS" value="64" />
+          <field name="NUMBER_OF_CODES_PER_ROW" value="64" />
+          <field name="IMAGE_CODE_BIT_LENGTH" value="12" />
+        </content>
+      </group>
+      <group index="7">
+        <field name="COMPONENT_ID" value="138" />
+        <field name="COMPONENT_LENGTH" value="6" />
+        <field name="COMPONENT_LOCATION" value="3662" />
+        <content ComponentName="MaskSubsection">
+          <field name="SUBFRAME_SEQUENCE_RECORD_LENGTH" value="0" />
+          <field name="TRANSPARENCY_SEQUENCE_RECORD_LENGTH" value="0" />
+          <field name="TRANSPARENT_OUTPUT_PIXEL_CODE_LENGTH" value="0" />
+        </content>
+      </group>
+      <group index="8">
+        <field name="COMPONENT_ID" value="140" />
+        <field name="COMPONENT_LENGTH" value="221184" />
+        <field name="COMPONENT_LOCATION" value="69281" />
+      </group>
+      <group index="9">
+        <field name="COMPONENT_ID" value="141" />
+        <field name="COMPONENT_LENGTH" value="10" />
+        <field name="COMPONENT_LOCATION" value="290685" />
+        <content ComponentName="AttributeSectionSubheader">
+          <field name="NUMBER_OF_ATTRIBUTE_OFFSET_RECORDS" value="4" />
+          <field name="NUMBER_OF_EXPLICIT_AREAL_COVERAGE_RECORDS" value="0" />
+          <field name="ATTRIBUTE_OFFSET_TABLE_OFFSET" value="0" />
+          <field name="ATTRIBUTE_OFFSET_RECORD_LENGTH" value="8" />
+        </content>
+      </group>
+      <group index="10">
+        <field name="COMPONENT_ID" value="142" />
+        <field name="COMPONENT_LENGTH" value="60" />
+        <field name="COMPONENT_LOCATION" value="290695" />
+        <content ComponentName="AttributeSubsection">
+          <repeated name="AOR" number="4">
+            <group index="0">
+              <field name="ATTRIBUTE_ID" value="1" />
+              <field name="PARAMETER_ID" value="1" />
+              <field name="AREAL_COVERAGE_SEQUENCE_NUMBER" value="0" />
+              <field name="ATTRIBUTE_RECORD_OFFSET" value="32" />
+            </group>
+            <group index="1">
+              <field name="ATTRIBUTE_ID" value="2" />
+              <field name="PARAMETER_ID" value="1" />
+              <field name="AREAL_COVERAGE_SEQUENCE_NUMBER" value="0" />
+              <field name="ATTRIBUTE_RECORD_OFFSET" value="40" />
+            </group>
+            <group index="2">
+              <field name="ATTRIBUTE_ID" value="3" />
+              <field name="PARAMETER_ID" value="1" />
+              <field name="AREAL_COVERAGE_SEQUENCE_NUMBER" value="0" />
+              <field name="ATTRIBUTE_RECORD_OFFSET" value="48" />
+            </group>
+            <group index="3">
+              <field name="ATTRIBUTE_ID" value="7" />
+              <field name="PARAMETER_ID" value="1" />
+              <field name="AREAL_COVERAGE_SEQUENCE_NUMBER" value="0" />
+              <field name="ATTRIBUTE_RECORD_OFFSET" value="56" />
+            </group>
+          </repeated>
+        </content>
+      </group>
+    </repeated>
+  </tre>
+</tres>
+""" in tres
+
+    gdal.Mkdir(tmp_path / "2", 0o755)
+
+    gdal.Translate(
+        tmp_path / "2" / "out_cadrg.ntf",
+        gdal.Open(tmp_path / "1" / "out_cadrg.ntf"),
+        creationOptions=["PRODUCT_TYPE=CADRG", "SCALE=10000000"],
+    )
+
+    alg = gdal.alg.raster.compare(
+        input=tmp_path / "2" / "out_cadrg.ntf",
+        reference=tmp_path / "1" / "out_cadrg.ntf",
+        skip_binary=True,
+    )
+    assert alg.Outputs()["return-code"] == 0
+
+
+###############################################################################
+
+
+@gdaltest.enable_exceptions()
+@pytest.mark.parametrize(
+    "COLOR_QUANTIZATION_BITS,expected_cs", [(5, 29165), (8, 17498)]
+)
+def test_nitf_create_cadrg_color_quantization_bits(
+    tmp_path, COLOR_QUANTIZATION_BITS, expected_cs
+):
+
+    gdal.Translate(
+        tmp_path / "out",
+        gdal.Translate(
+            "", gdal.Open("data/small_world.tif"), format="MEM", projWin=[2, 50, 4, 48]
+        ),
+        format="NITF",
+        creationOptions=[
+            "PRODUCT_TYPE=CADRG",
+            "SCALE=10000000",
+            "COLOR_QUANTIZATION_BITS=" + str(COLOR_QUANTIZATION_BITS),
+        ],
+    )
+
+    ds = gdal.Open(tmp_path / "out" / "RPF" / "ZONE2" / "0000L010.MM2")
+    assert ds.RasterCount == 1
+    assert ds.GetRasterBand(1).GetColorTable().GetCount() == 217
+    assert ds.GetRasterBand(1).Checksum() == expected_cs
+
+
+###############################################################################
+
+
+@gdaltest.enable_exceptions()
+@pytest.mark.parametrize(
+    "color_table_per_frame,expected_cs", [(False, 29165), (True, 60345)]
+)
+def test_nitf_create_cadrg_color_table_per_frame(
+    tmp_path, color_table_per_frame, expected_cs
+):
+
+    creationOptions = [
+        "PRODUCT_TYPE=CADRG",
+        "SCALE=10000000",
+    ]
+    if color_table_per_frame:
+        creationOptions.append("COLOR_TABLE_PER_FRAME=YES")
+
+    gdal.Translate(
+        tmp_path / "out",
+        gdal.Translate(
+            "", gdal.Open("data/small_world.tif"), format="MEM", projWin=[2, 50, 4, 48]
+        ),
+        format="NITF",
+        creationOptions=creationOptions,
+    )
+
+    ds = gdal.Open(tmp_path / "out" / "RPF" / "ZONE2" / "0000L010.MM2")
+    assert ds.RasterCount == 1
+    assert ds.GetRasterBand(1).GetColorTable().GetCount() == 217
+    assert ds.GetRasterBand(1).Checksum() == expected_cs
+
+
+###############################################################################
+
+
+@gdaltest.enable_exceptions()
+def test_nitf_create_cadrg_with_transparency(tmp_path):
+
+    if gdaltest.is_travis_branch("fedora_rawhide"):
+        pytest.skip(
+            "randomly fails on CI, but not when trying locally within a docker image"
+        )
+
+    gdal.alg.raster.pipeline(
+        input="data/small_world.tif",
+        output=tmp_path / "in.tif",
+        pipeline="read ! rgb-to-palette --color-count=216 ! resize --size 1536,1536 ! write",
+    )
+
+    with gdal.Open(tmp_path / "in.tif", gdal.GA_Update) as ds:
+        ds.GetRasterBand(1).SetNoDataValue(216)
+        ds.GetRasterBand(1).WriteRaster(1535, 0, 1, 1, b"\xd8")
+
+    with gdal.Open(tmp_path / "in.tif") as ds:
+        assert ds.GetRasterBand(1).GetNoDataValue() == 216
+        assert ds.GetRasterBand(1).GetColorTable().GetColorEntry(216) == (0, 0, 0, 0)
+
+    gdal.Mkdir(tmp_path / "1", 0o755)
+
+    ds = gdal.Translate(
+        tmp_path / "1" / "out_cadrg.ntf",
+        gdal.Open(tmp_path / "in.tif"),
+        creationOptions=["PRODUCT_TYPE=CADRG", "SCALE=10000000"],
+    )
+    assert ds.GetRasterBand(1).ReadRaster(1534, 0, 2, 2) == b"\xd8" * 4
+    assert ds.GetRasterBand(1).GetColorTable().GetCount() == 217
+    assert ds.GetRasterBand(1).Checksum() == 51475
+
+    tres = ds.GetMetadata("xml:TRE")[0]
+    # print(tres)
+
+    assert """ <group index="5">
+        <field name="COMPONENT_ID" value="136" />
+        <field name="COMPONENT_LENGTH" value="28" />
+        <field name="COMPONENT_LOCATION" value="3636" />
+        <content ComponentName="ImageDescriptionSubheader">
+          <field name="NUMBER_OF_SPECTRAL_GROUPS" value="1" />
+          <field name="NUMBER_OF_SUBFRAME_TABLES" value="36" />
+          <field name="NUMBER_OF_SPECTRAL_BAND_TABLES" value="1" />
+          <field name="NUMBER_OF_SPECTRAL_BAND_LINES_PER_IMAGE_ROW" value="1" />
+          <field name="NUMBER_OF_SUBFRAME_IN_EAST_WEST_DIRECTION" value="6" />
+          <field name="NUMBER_OF_SUBFRAME_IN_NORTH_SOUTH_DIRECTION" value="6" />
+          <field name="NUMBER_OF_OUTPUT_COLUMNS_PER_SUBFRAME" value="256" />
+          <field name="NUMBER_OF_OUTPUT_ROWS_PER_SUBFRAME" value="256" />
+          <field name="SUBFRAME_MASK_TABLE_OFFSET" value="4294967295" />
+          <field name="TRANSPARENCY_MASK_TABLE_OFFSET" value="7" />
+        </content>
+      </group>""" in tres
+
+    assert """<group index="7">
+        <field name="COMPONENT_ID" value="138" />
+        <field name="COMPONENT_LENGTH" value="151" />
+        <field name="COMPONENT_LOCATION" value="3669" />
+        <content ComponentName="MaskSubsection">
+          <field name="SUBFRAME_SEQUENCE_RECORD_LENGTH" value="0" />
+          <field name="TRANSPARENCY_SEQUENCE_RECORD_LENGTH" value="0" />
+          <field name="TRANSPARENT_OUTPUT_PIXEL_CODE_LENGTH" value="8" />
+          <field name="TRANSPARENT_OUTPUT_PIXEL_CODE_" value="216" />
+        </content>
+      </group>""" in tres
+
+
+###############################################################################
+
+
+@gdaltest.enable_exceptions()
+def test_nitf_create_cadrg_auto_tile_north_hemisphere(tmp_path):
+
+    tab_pct = [0]
+
+    def my_progress(pct, msg, user_data):
+        assert pct >= tab_pct[0]
+        tab_pct[0] = pct
+        return True
+
+    gdal.Translate(
+        tmp_path,
+        gdal.Translate(
+            "",
+            gdal.Open("data/small_world.tif"),
+            options="-of VRT -projwin -15 55 15 35",
+        ),
+        creationOptions=["PRODUCT_TYPE=CADRG", "SERIES_CODE=MM", "SCALE=20000000"],
+        format="NITF",
+        callback=my_progress,
+    )
+
+    assert tab_pct == [1.0]
+
+    assert set([x.replace("\\", "/") for x in gdal.ReadDirRecursive(tmp_path)]) == set(
+        [
+            "RPF/",
+            "RPF/A.TOC",
+            "RPF/ZONE2/",
+            "RPF/ZONE2/00003010.MM2",
+            "RPF/ZONE2/0000A010.MM2",
+        ]
+    )
+
+    with gdal.Open(tmp_path / "RPF/ZONE2/00003010.MM2") as ds:
+        assert ds.GetGeoTransform() == pytest.approx(
+            (-18.0, 0.03515625, 0.0, 41.53846153846154, 0.0, -0.027043269230769232)
+        )
+        assert ds.GetRasterBand(1).Checksum() == 42239
+
+    with gdal.Open(tmp_path / "RPF/ZONE2/0000A010.MM2") as ds:
+        assert ds.GetGeoTransform() == pytest.approx(
+            (-18.0, 0.03515625, 0.0, 83.07692307692308, 0.0, -0.027043269230769232)
+        )
+
+    src_ds = gdal.Open(tmp_path / "RPF/ZONE2/00003010.MM2")
+    gdal.Translate(
+        tmp_path / "copy",
+        src_ds,
+        creationOptions=["PRODUCT_TYPE=CADRG", "SERIES_CODE=MM", "SCALE=20000000"],
+        format="NITF",
+    )
+
+    with gdal.Open(tmp_path / "copy/RPF/ZONE2/00003010.MM2") as ds:
+        assert ds.GetGeoTransform() == pytest.approx(
+            (-18.0, 0.03515625, 0.0, 41.53846153846154, 0.0, -0.027043269230769232)
+        )
+        assert ds.GetRasterBand(1).Checksum() == 42239
+
+    src_rgb_ds = gdal.Translate("", src_ds, options="-of VRT -expand rgb")
+    gdal.Translate(
+        tmp_path / "copy2",
+        src_rgb_ds,
+        creationOptions=["PRODUCT_TYPE=CADRG", "SERIES_CODE=MM", "SCALE=20000000"],
+        format="NITF",
+    )
+
+    with gdal.Open(tmp_path / "copy2/RPF/ZONE2/00003010.MM2") as ds:
+        assert ds.GetGeoTransform() == pytest.approx(
+            (-18.0, 0.03515625, 0.0, 41.53846153846154, 0.0, -0.027043269230769232)
+        )
+        assert ds.GetRasterBand(1).Checksum() == 53526
+
+
+###############################################################################
+
+
+@gdaltest.enable_exceptions()
+def test_nitf_create_cadrg_auto_tile_south_hemisphere(tmp_vsimem):
+
+    gdal.Translate(
+        tmp_vsimem,
+        gdal.Translate(
+            "",
+            gdal.Open("data/small_world.tif"),
+            options="-of VRT -projwin -15 -35 15 -55",
+        ),
+        creationOptions=["PRODUCT_TYPE=CADRG", "SERIES_CODE=MM", "SCALE=20000000"],
+        format="NITF",
+    )
+
+    assert gdal.ReadDirRecursive(tmp_vsimem) == [
+        "RPF/",
+        "RPF/A.TOC",
+        "RPF/ZONEB/",
+        "RPF/ZONEB/00003010.MMB",
+        "RPF/ZONEB/0000A010.MMB",
+    ]
+
+    with gdal.Open(tmp_vsimem / "RPF/ZONEB/00003010.MMB") as ds:
+        assert ds.GetGeoTransform() == pytest.approx(
+            (-18.0, 0.03515625, 0.0, -41.53846153846154, 0.0, -0.027043269230769232)
+        )
+
+    with gdal.Open(tmp_vsimem / "RPF/ZONEB/0000A010.MMB") as ds:
+        assert ds.GetGeoTransform() == pytest.approx(
+            (-18.0, 0.03515625, 0.0, 0.0, 0.0, -0.027043269230769232)
+        )
+
+
+###############################################################################
+
+
+@gdaltest.enable_exceptions()
+def test_nitf_create_cadrg_error_cases(tmp_vsimem, tmp_path):
+
+    src_ds = gdal.GetDriverByName("MEM").Create("", 1, 1, 1, gdal.GDT_UInt16)
+    with pytest.raises(
+        Exception, match="CADRG only supports datasets of UInt8 data type"
+    ):
+        gdal.Translate(
+            tmp_vsimem, src_ds, creationOptions=["PRODUCT_TYPE=CADRG"], format="NITF"
+        )
+
+    src_ds = gdal.GetDriverByName("MEM").Create("", 1, 1)
+    with pytest.raises(Exception, match="CADRG only supports datasets with a CRS"):
+        gdal.Translate(
+            tmp_vsimem, src_ds, creationOptions=["PRODUCT_TYPE=CADRG"], format="NITF"
+        )
+
+    src_ds.SetSpatialRef(osr.SpatialReference(epsg=4326))
+    with pytest.raises(
+        Exception, match="CADRG only supports datasets with a geotransform"
+    ):
+        gdal.Translate(
+            tmp_vsimem, src_ds, creationOptions=["PRODUCT_TYPE=CADRG"], format="NITF"
+        )
+
+    src_ds.SetGeoTransform([0, 1, 0, 10, 0, -1])
+    with pytest.raises(
+        Exception,
+        match="CADRG only supports single band input datasets that have an associated color table",
+    ):
+        gdal.Translate(
+            tmp_vsimem, src_ds, creationOptions=["PRODUCT_TYPE=CADRG"], format="NITF"
+        )
+
+    ct = gdal.ColorTable()
+    for i in range(256):
+        ct.SetColorEntry(i, (i, i, i, 255))
+    src_ds.GetRasterBand(1).SetColorTable(ct)
+    with pytest.raises(
+        Exception, match="CADRG only supports up to 216 entries in color table"
+    ):
+        gdal.Translate(
+            tmp_vsimem, src_ds, creationOptions=["PRODUCT_TYPE=CADRG"], format="NITF"
+        )
+
+    src_ds = gdal.GetDriverByName("MEM").Create("", 1, 1, 3)
+    srs = osr.SpatialReference(epsg=4326)
+    srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+    src_ds.SetSpatialRef(srs)
+    src_ds.SetGeoTransform([0, 1, 0, 10, 0, -1])
+    with pytest.raises(
+        Exception, match="Invalid value for DPI"
+    ), gdaltest.error_handler():
+        gdal.Translate(
+            tmp_vsimem,
+            src_ds,
+            creationOptions=["PRODUCT_TYPE=CADRG", "DPI=0"],
+            format="NITF",
+        )
+
+    with pytest.raises(
+        Exception,
+        match="CADRG only supports single-band paletted, RGB or RGBA input datasets",
+    ):
+        gdal.Translate(
+            tmp_vsimem, src_ds, creationOptions=["PRODUCT_TYPE=CADRG"], format="NITF"
+        )
+
+    src_ds.GetRasterBand(1).SetColorInterpretation(gdal.GCI_RedBand)
+    src_ds.GetRasterBand(2).SetColorInterpretation(gdal.GCI_GreenBand)
+    src_ds.GetRasterBand(3).SetColorInterpretation(gdal.GCI_BlueBand)
+    src_ds.GetRasterBand(1).Fill(255)
+
+    with pytest.raises(Exception, match="SCALE must be defined"):
+        gdal.Translate(
+            tmp_vsimem, src_ds, creationOptions=["PRODUCT_TYPE=CADRG"], format="NITF"
+        )
+
+    with pytest.raises(Exception, match="Invalid value for SCALE"):
+        gdal.Translate(
+            tmp_vsimem,
+            src_ds,
+            creationOptions=["PRODUCT_TYPE=CADRG", "SCALE=1"],
+            format="NITF",
+        )
+
+    with gdal.VSIFile(tmp_vsimem / "existing_file", "wb") as f:
+        f.write(b"dummy")
+    with pytest.raises(
+        Exception,
+        match="Given that source dataset dimension do not match a 1536x1536 frame, several frames will be generated and thus the output filename should be a directory name",
+    ):
+        gdal.GetDriverByName("NITF").CreateCopy(
+            tmp_vsimem / "existing_file",
+            src_ds,
+            options=["PRODUCT_TYPE=CADRG", "SERIES_CODE=GN"],
+        )
+
+    with pytest.raises(
+        Exception,
+        match=r"Given that source dataset dimension do not match a 1536x1536 frame, several frames will be generated and thus the output filename should be a directory name \(without a NITF or CADRG file extension\)",
+    ):
+        gdal.GetDriverByName("NITF").CreateCopy(
+            tmp_vsimem / "00003010.GNB",
+            src_ds,
+            options=["PRODUCT_TYPE=CADRG", "SERIES_CODE=GN"],
+        )
+
+    gdal.Mkdir(tmp_path / "out", 0o755)
+    with gdal.VSIFile(tmp_path / "out" / "RPF", "wb") as f:
+        f.write(b"dummy")
+    with pytest.raises(Exception, match="Cannot create directory"):
+        gdal.GetDriverByName("NITF").CreateCopy(
+            tmp_path / "out", src_ds, options=["PRODUCT_TYPE=CADRG", "SERIES_CODE=GN"]
+        )
+
+    gdal.Mkdir(tmp_path / "out2", 0o755)
+    gdal.Mkdir(tmp_path / "out2" / "RPF", 0o755)
+    gdal.Mkdir(tmp_path / "out2" / "RPF" / "ZONE1", 0o755)
+    gdal.Mkdir(tmp_path / "out2" / "RPF" / "ZONE1" / "0000G010.GN1", 0o755)
+    with pytest.raises(Exception, match="Unable to create file"):
+        gdal.GetDriverByName("NITF").CreateCopy(
+            tmp_path / "out2", src_ds, options=["PRODUCT_TYPE=CADRG", "SERIES_CODE=GN"]
+        )
+
+    src_ds.SetGeoTransform([-1000, 1, 0, 10, 0, -1])
+    with pytest.raises(
+        Exception, match="Cannot establish CADRG frames intersecting dataset extent"
+    ):
+        gdal.GetDriverByName("NITF").CreateCopy(
+            tmp_vsimem, src_ds, options=["PRODUCT_TYPE=CADRG", "SERIES_CODE=GN"]
+        )
+
+    srs = osr.SpatialReference()
+    srs.SetFromUserInput("+proj=longlat +a=1")
+    src_ds.SetSpatialRef(srs)
+
+    with pytest.raises(Exception, match="Cannot find coordinate operations"):
+        gdal.Translate(
+            tmp_vsimem,
+            src_ds,
+            creationOptions=["PRODUCT_TYPE=CADRG", "SCALE=20000000"],
+            format="NITF",
+        )
+
+
+###############################################################################
+
+
+@gdaltest.enable_exceptions()
+def test_nitf_create_cadrg_blank_frame_rgb_0(tmp_vsimem):
+
+    src_ds = gdal.GetDriverByName("MEM").Create("", 1536, 1536, 3)
+    src_ds.GetRasterBand(1).SetColorInterpretation(gdal.GCI_RedBand)
+    src_ds.GetRasterBand(2).SetColorInterpretation(gdal.GCI_GreenBand)
+    src_ds.GetRasterBand(3).SetColorInterpretation(gdal.GCI_BlueBand)
+    srs = osr.SpatialReference(epsg=4326)
+    srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+    src_ds.SetSpatialRef(srs)
+    src_ds.SetGeoTransform(
+        [-18.0, 0.03515625, 0.0, 41.53846153846154, 0.0, -0.027043269230769232]
+    )
+    gdal.GetDriverByName("NITF").CreateCopy(
+        tmp_vsimem / "out.ntf",
+        src_ds,
+        options=["PRODUCT_TYPE=CADRG", "SERIES_CODE=MM", "SCALE=20000000", "ZONE=2"],
+    )
+
+    assert gdal.VSIStatL(tmp_vsimem / "out.ntf") is None
+
+
+###############################################################################
+
+
+@gdaltest.enable_exceptions()
+def test_nitf_create_cadrg_blank_frame_rgb_255(tmp_vsimem):
+
+    src_ds = gdal.GetDriverByName("MEM").Create("", 1536, 1536, 3)
+    src_ds.GetRasterBand(1).SetColorInterpretation(gdal.GCI_RedBand)
+    src_ds.GetRasterBand(2).SetColorInterpretation(gdal.GCI_GreenBand)
+    src_ds.GetRasterBand(3).SetColorInterpretation(gdal.GCI_BlueBand)
+    src_ds.GetRasterBand(1).Fill(255)
+    src_ds.GetRasterBand(2).Fill(255)
+    src_ds.GetRasterBand(3).Fill(255)
+    srs = osr.SpatialReference(epsg=4326)
+    srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+    src_ds.SetSpatialRef(srs)
+    src_ds.SetGeoTransform(
+        [-18.0, 0.03515625, 0.0, 41.53846153846154, 0.0, -0.027043269230769232]
+    )
+    gdal.GetDriverByName("NITF").CreateCopy(
+        tmp_vsimem / "out.ntf",
+        src_ds,
+        options=["PRODUCT_TYPE=CADRG", "SERIES_CODE=MM", "SCALE=20000000", "ZONE=2"],
+    )
+
+    assert gdal.VSIStatL(tmp_vsimem / "out.ntf") is None
+
+
+###############################################################################
+
+
+@gdaltest.enable_exceptions()
+def test_nitf_create_cadrg_blank_frame_rgba(tmp_vsimem):
+
+    src_ds = gdal.GetDriverByName("MEM").Create("", 1, 1, 4)
+    src_ds.GetRasterBand(1).SetColorInterpretation(gdal.GCI_RedBand)
+    src_ds.GetRasterBand(2).SetColorInterpretation(gdal.GCI_GreenBand)
+    src_ds.GetRasterBand(3).SetColorInterpretation(gdal.GCI_BlueBand)
+    src_ds.GetRasterBand(4).SetColorInterpretation(gdal.GCI_AlphaBand)
+    srs = osr.SpatialReference(epsg=4326)
+    srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+    src_ds.SetSpatialRef(srs)
+    src_ds.SetGeoTransform([2, 1, 0, 49, 0, -1])
+    gdal.GetDriverByName("NITF").CreateCopy(
+        tmp_vsimem, src_ds, options=["PRODUCT_TYPE=CADRG", "SERIES_CODE=GN"]
+    )
+
+    assert gdal.ReadDirRecursive(tmp_vsimem) == ["RPF/", "RPF/ZONE3/"]
+
+
+###############################################################################
+
+
+@gdaltest.enable_exceptions()
+def test_nitf_create_cadrg_blank_frame_color_table(tmp_vsimem):
+
+    src_ds = gdal.GetDriverByName("MEM").Create("", 1536, 1536, 1)
+    ct = gdal.ColorTable()
+    ct.SetColorEntry(216, (0, 0, 0, 0))
+    src_ds.GetRasterBand(1).SetColorTable(ct)
+    src_ds.GetRasterBand(1).Fill(216)
+    srs = osr.SpatialReference(epsg=4326)
+    srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+    src_ds.SetSpatialRef(srs)
+    src_ds.SetGeoTransform(
+        [-18.0, 0.03515625, 0.0, 41.53846153846154, 0.0, -0.027043269230769232]
+    )
+    gdal.GetDriverByName("NITF").CreateCopy(
+        tmp_vsimem / "out.ntf",
+        src_ds,
+        options=["PRODUCT_TYPE=CADRG", "SERIES_CODE=MM", "SCALE=20000000", "ZONE=2"],
+    )
+
+    assert gdal.VSIStatL(tmp_vsimem / "out.ntf") is None
+
+
+###############################################################################
+
+
+@gdaltest.enable_exceptions()
+def test_nitf_create_cadrg_reprojection_skip_non_intersecting_tiles(tmp_vsimem):
+
+    src_ds = gdal.GetDriverByName("MEM").Create("", 2, 15, 1)
+    ct = gdal.ColorTable()
+    ct.SetColorEntry(0, (255, 0, 0, 255))
+    src_ds.GetRasterBand(1).SetColorTable(ct)
+    srs = osr.SpatialReference(epsg=32661)
+    srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+    src_ds.SetSpatialRef(srs)
+    src_ds.SetGeoTransform([1900000, 100000, 0, 2100000, 0, -100000])
+    assert src_ds.GetExtentWGS84LongLat() == pytest.approx(
+        (-180.0, 180.0, 77.40685853074461, 90.0)
+    )
+    gdal.GetDriverByName("NITF").CreateCopy(
+        tmp_vsimem,
+        src_ds,
+        options=["PRODUCT_TYPE=CADRG", "SERIES_CODE=MM", "SCALE=2000000"],
+    )
+
+    assert gdal.ReadDirRecursive(tmp_vsimem) == [
+        "RPF/",
+        "RPF/A.TOC",
+        "RPF/ZONE8/",
+        "RPF/ZONE8/00008010.MM8",
+        "RPF/ZONE8/00009010.MM8",
+        "RPF/ZONE8/0000S010.MM8",
+        "RPF/ZONE8/0000T010.MM8",
+        "RPF/ZONE9/",
+        "RPF/ZONE9/00002010.MM9",
+        "RPF/ZONE9/00007010.MM9",
+        "RPF/ZONE9/0000C010.MM9",
+    ]
+
+
+###############################################################################
+
+
+@gdaltest.enable_exceptions()
+def test_nitf_create_cadrg_south_pole(tmp_vsimem):
+
+    gdal.GetDriverByName("NITF").CreateCopy(
+        tmp_vsimem,
+        gdal.Open("data/small_world.tif"),
+        options=["PRODUCT_TYPE=CADRG", "ZONE=J", "SCALE=10000000"],
+    )
+
+    assert gdal.ReadDirRecursive(tmp_vsimem) == [
+        "RPF/",
+        "RPF/A.TOC",
+        "RPF/ZONEJ/",
+        "RPF/ZONEJ/00000010.MMJ",
+    ]
+
+    with gdal.Open(tmp_vsimem / "RPF/ZONEJ/00000010.MMJ") as ds:
+        assert ds.GetGeoTransform() == pytest.approx(
+            (
+                -1113194.9079327357,
+                1449.4725363707496,
+                0.0,
+                1113194.9079327357,
+                0.0,
+                -1449.4725363707496,
+            )
+        )
+        assert ds.GetRasterBand(1).Checksum() in (42820, 42938, 43313)
+
+
+###############################################################################
+
+
+@pytest.mark.parametrize(
+    "resampling,expected_cs",
+    [
+        (None, 43024),
+        ("CUBIC", 43024),
+        ("BILINEAR", 43944),
+        ("LANCZOS", 42268),
+        ("NEAREST", 42033),
+    ],
+)
+@gdaltest.enable_exceptions()
+def test_nitf_create_cadrg_resampling(tmp_vsimem, resampling, expected_cs):
+
+    src_ds = gdal.Translate(
+        "",
+        "data/byte.tif",
+        format="MEM",
+        bandList=[1, 1, 1],
+        colorInterpretation=["red", "green", "blue"],
+    )
+    options = ["PRODUCT_TYPE=CADRG", "SCALE=100000"]
+    if resampling:
+        options += ["RESAMPLING=" + resampling]
+    gdal.GetDriverByName("NITF").CreateCopy(
+        tmp_vsimem,
+        src_ds,
+        options=options,
+    )
+
+    assert gdal.ReadDirRecursive(tmp_vsimem) == [
+        "RPF/",
+        "RPF/A.TOC",
+        "RPF/ZONE2/",
+        "RPF/ZONE2/00AEH010.MM2",
+    ]
+
+    with gdal.Open(tmp_vsimem / "RPF/ZONE2/00AEH010.MM2") as ds:
+        assert ds.GetRasterBand(1).Checksum() == expected_cs

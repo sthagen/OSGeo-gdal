@@ -98,7 +98,7 @@ The following open options are available:
             Expose both the attribute table and the color table. Note that in some software this option may cause visualization and/or legend issues.
       RAT
             Expose the attribute table only, without the color table.
-      PER_BAND_ONLY
+      CT
             Expose the color table only, without the attribute table.
 
 Dataset creation options

@@ -38,6 +38,7 @@ static void DumpArray(const std::shared_ptr<GDALGroup> &rootGroup,
 struct GDALMultiDimInfoOptions
 {
     bool bStdoutOutput = false;
+    bool bSummary = false;
     bool bDetailed = false;
     bool bPretty = true;
     size_t nLimitValuesByDim = 0;
@@ -834,6 +835,14 @@ static void DumpArray(const std::shared_ptr<GDALGroup> &rootGroup,
         serializer.AddObjKey("name");
         serializer.Add(array->GetName());
     }
+    else
+    {
+        serializer.AddObjKey("full_name");
+        serializer.Add(array->GetFullName());
+    }
+
+    if (psOptions->bSummary)
+        return;
 
     serializer.AddObjKey("datatype");
     const auto &dt(array->GetDataType());
@@ -1097,19 +1106,24 @@ static void DumpGroup(const std::shared_ptr<GDALGroup> &rootGroup,
             serializer.Add(group->GetFullName());
         }
     }
+    else if (psOptions->bSummary)
+    {
+        serializer.AddObjKey("full_name");
+        serializer.Add(group->GetFullName());
+    }
 
     CPLStringList aosOptionsGetAttr;
     if (psOptions->bDetailed)
         aosOptionsGetAttr.SetNameValue("SHOW_ALL", "YES");
     auto attrs = group->GetAttributes(aosOptionsGetAttr.List());
-    if (!attrs.empty())
+    if (!psOptions->bSummary && !attrs.empty())
     {
         serializer.AddObjKey("attributes");
         DumpAttrs(attrs, serializer, psOptions);
     }
 
     auto dims = group->GetDimensions();
-    if (!dims.empty())
+    if (!psOptions->bSummary && !dims.empty())
     {
         serializer.AddObjKey("dimensions");
         DumpDimensions(rootGroup, dims, serializer, psOptions,
@@ -1117,7 +1131,7 @@ static void DumpGroup(const std::shared_ptr<GDALGroup> &rootGroup,
     }
 
     const auto &types = group->GetDataTypes();
-    if (!types.empty())
+    if (!psOptions->bSummary && !types.empty())
     {
         serializer.AddObjKey("datatypes");
         auto arrayContext(serializer.MakeArrayContext());
@@ -1139,7 +1153,7 @@ static void DumpGroup(const std::shared_ptr<GDALGroup> &rootGroup,
     }
 
     auto papszStructuralInfo = group->GetStructuralInfo();
-    if (papszStructuralInfo)
+    if (!psOptions->bSummary && papszStructuralInfo)
     {
         serializer.AddObjKey("structural_info");
         DumpStructuralInfo(papszStructuralInfo, serializer);
@@ -1202,12 +1216,22 @@ static std::unique_ptr<GDALArgumentParser> GDALMultiDimInfoAppOptionsGetParser(
 
     argParser->add_epilog(_("For more details, consult "
                             "https://gdal.org/programs/gdalmdiminfo.html"));
+    {
+        auto &group = argParser->add_mutually_exclusive_group();
 
-    argParser->add_argument("-detailed")
-        .flag()
-        .store_into(psOptions->bDetailed)
-        .help(_("Most verbose output. Report attribute data types and array "
-                "values."));
+        group.add_argument("-summary")
+            .flag()
+            .store_into(psOptions->bSummary)
+            .help(_("Report only group and array hierarchy, without detailed "
+                    "information on attributes or dimensions."));
+
+        group.add_argument("-detailed")
+            .flag()
+            .store_into(psOptions->bDetailed)
+            .help(
+                _("Most verbose output. Report attribute data types and array "
+                  "values."));
+    }
 
     argParser->add_inverted_logic_flag(
         "-nopretty", &psOptions->bPretty,

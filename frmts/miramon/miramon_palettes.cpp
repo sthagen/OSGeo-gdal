@@ -68,10 +68,10 @@ MMRPalettes::MMRPalettes(MMRRel &fRel, int nIBand) : m_pfRel(&fRel)
     if (m_bIsAutomatic)
     {
         // How many "colors" are involved?
-        CPLString os_Color_N_SimbolsALaTaula = "";
         if (!poBand->GetColor_N_SimbolsALaTaula().empty())
         {
-            GIntBig nBigVal = CPLAtoGIntBig(os_Color_N_SimbolsALaTaula);
+            GIntBig nBigVal =
+                CPLAtoGIntBig(poBand->GetColor_N_SimbolsALaTaula());
             if (nBigVal >= INT_MAX)
                 return;
             m_nRealNPaletteColors = m_nNPaletteColors =
@@ -317,6 +317,7 @@ CPLErr MMRPalettes::GetPaletteColors_DBF(const CPLString &os_Color_Paleta_DBF)
                  "Out of memory allocating working buffer");
         VSIFCloseL(oColorTable.pfDataBase);
         MM_ReleaseMainFields(&oColorTable);
+        return CE_Failure;
     }
     char *pszField = static_cast<char *>(VSI_CALLOC_VERBOSE(1, nBufferSize));
 
@@ -327,6 +328,7 @@ CPLErr MMRPalettes::GetPaletteColors_DBF(const CPLString &os_Color_Paleta_DBF)
         VSIFree(pzsRecord);
         VSIFCloseL(oColorTable.pfDataBase);
         MM_ReleaseMainFields(&oColorTable);
+        return CE_Failure;
     }
 
     m_nNPaletteColors = static_cast<int>(oColorTable.nRecords);  // Safe cast

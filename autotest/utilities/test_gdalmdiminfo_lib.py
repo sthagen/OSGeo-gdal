@@ -113,6 +113,7 @@ def test_gdalmdiminfo_lib_mem_dataset():
   ],
   "arrays": {
     "ar_2d": {
+      "full_name": "/ar_2d",
       "datatype": "Byte",
       "dimensions": [
         "/dim0",
@@ -141,6 +142,7 @@ def test_gdalmdiminfo_lib_mem_dataset():
       ]
     },
     "ar_compound": {
+      "full_name": "/ar_compound",
       "datatype": {
         "name": "mytype",
         "size": 8,
@@ -178,10 +180,6 @@ def test_gdalmdiminfo_lib_mem_dataset():
     }
   }
 }"""
-    try:
-        expected = expected.decode("UTF-8")
-    except Exception:
-        pass
     if ret != expected:
         print(ret)
     assert ret == expected

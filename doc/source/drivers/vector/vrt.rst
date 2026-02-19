@@ -17,6 +17,11 @@ an anchor file for access to non-file oriented datasources.
 
 The virtual files are currently normally prepared by hand.
 
+Note .vrt files starting with
+
+- ``<OGRVRTDataSource>`` are managed by this driver.
+- ``<VRTDataset>`` are managed by the :ref:`raster VRT <raster.vrt>` driver
+
 Driver capabilities
 -------------------
 

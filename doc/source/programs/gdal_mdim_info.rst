@@ -43,9 +43,17 @@ The following options are available:
 Standard options
 ++++++++++++++++
 
+.. option:: --summary
+
+    .. versionadded:: 3.13
+
+    Report only group and array hierarchy, without detailed information on attributes or dimensions.
+    Mutually exclusive with :option:`--detailed`.
+
 .. option:: --detailed
 
     Most verbose output. Report attribute data types and array values.
+    Mutually exclusive with :option:`--summary`.
 
 .. option:: --array <array_name>
 

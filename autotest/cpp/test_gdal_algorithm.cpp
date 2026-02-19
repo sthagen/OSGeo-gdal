@@ -3270,6 +3270,7 @@ TEST_F(test_gdal_algorithm,
                 .SetMinCount(1);
             AddArg("output", 'o', "output value", &m_output_value)
                 .SetMinCharCount(2)
+                .SetMaxCharCount(20)
                 .SetPositional()
                 .SetRequired();
         }
@@ -3308,7 +3309,20 @@ TEST_F(test_gdal_algorithm,
             alg.ParseCommandLineArguments({"x", "something", "output"}));
         EXPECT_STREQ(CPLGetLastErrorMsg(),
                      "Value of argument 'input' is 'x', but should have at "
-                     "least 2 character(s)");
+                     "least 2 characters");
+    }
+
+    {
+        MyAlgorithm alg;
+
+        CPLErrorStateBackuper oErrorHandler(CPLQuietErrorHandler);
+        CPLErrorReset();
+        EXPECT_FALSE(alg.ParseCommandLineArguments(
+            {"input", "something", "output_waaaaaaaay_too_long"}));
+        EXPECT_STREQ(CPLGetLastErrorMsg(),
+                     "Value of argument 'output' is "
+                     "'output_waaaaaaaay_too_long', but should have no "
+                     "more than 20 characters");
     }
 
     {
@@ -3319,7 +3333,7 @@ TEST_F(test_gdal_algorithm,
         EXPECT_FALSE(alg.ParseCommandLineArguments({"input", "x", "output"}));
         EXPECT_STREQ(CPLGetLastErrorMsg(),
                      "Value of argument 'something' is 'x', but should have at "
-                     "least 2 character(s)");
+                     "least 2 characters");
     }
 
     {
@@ -3331,7 +3345,7 @@ TEST_F(test_gdal_algorithm,
             alg.ParseCommandLineArguments({"input", "something", "x"}));
         EXPECT_STREQ(CPLGetLastErrorMsg(),
                      "Value of argument 'output' is 'x', but should have at "
-                     "least 2 character(s)");
+                     "least 2 characters");
     }
 }
 

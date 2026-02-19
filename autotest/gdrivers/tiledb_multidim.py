@@ -598,6 +598,7 @@ def test_tiledb_multidim_array_read_dim_label_and_spatial_ref(epsg_code, axis_ma
                     "_DIM_DIRECTION": {"datatype": "String", "value": "direction"},
                     "_DIM_TYPE": {"datatype": "String", "value": "type"},
                 },
+                "full_name": "/ar/dim0",
                 "nodata_value": "NaN",
                 "values": [3, 2, 0],
             }

@@ -126,11 +126,6 @@ class MMRPalettes
         return m_nNoDataPaletteIndex;
     }
 
-    void SetNoDataPaletteIndex(bool nNoDataPaletteIndexIn)
-    {
-        m_nNoDataPaletteIndex = nNoDataPaletteIndexIn;
-    }
-
     GDALColorEntry GetNoDataDefaultColor() const
     {
         return m_sNoDataColorRGB;

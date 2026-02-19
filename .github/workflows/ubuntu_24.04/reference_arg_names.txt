@@ -32,6 +32,7 @@ burn
 calc
 checksum
 chunk-size
+classification
 color
 color-count
 color-interpretation
@@ -48,6 +49,7 @@ copy-metadata
 copy-overviews
 copy-src-metadata
 copyright
+country-code
 creation-option
 crs
 curvature-coefficient
@@ -237,6 +239,8 @@ position-crs
 position-dataset
 power
 preserve-boundary
+producer-id
+producer-name
 profile
 promote-pixel-value-to-z
 propagate-nodata
@@ -251,6 +255,7 @@ resampling
 resolution
 resume
 return-code
+scale
 scale-axes
 scheme
 sd-filename

@@ -972,40 +972,56 @@ bool GDALAlgorithmArg::RunValidationActions()
         }
     }
 
+    const auto CheckMinCharCount =
+        [this, &ret](const std::string &val, int nMinCharCount)
+    {
+        if (val.size() < static_cast<size_t>(nMinCharCount))
+        {
+            CPLError(CE_Failure, CPLE_IllegalArg,
+                     "Value of argument '%s' is '%s', but should have at least "
+                     "%d character%s",
+                     GetName().c_str(), val.c_str(), nMinCharCount,
+                     nMinCharCount > 1 ? "s" : "");
+            ret = false;
+        }
+    };
+
+    const auto CheckMaxCharCount =
+        [this, &ret](const std::string &val, int nMaxCharCount)
+    {
+        if (val.size() > static_cast<size_t>(nMaxCharCount))
+        {
+            CPLError(
+                CE_Failure, CPLE_IllegalArg,
+                "Value of argument '%s' is '%s', but should have no more than "
+                "%d character%s",
+                GetName().c_str(), val.c_str(), nMaxCharCount,
+                nMaxCharCount > 1 ? "s" : "");
+            ret = false;
+        }
+    };
+
     if (GetType() == GAAT_STRING)
     {
+        const auto &val = Get<std::string>();
         const int nMinCharCount = GetMinCharCount();
         if (nMinCharCount > 0)
         {
-            const auto &val = Get<std::string>();
-            if (val.size() < static_cast<size_t>(nMinCharCount))
-            {
-                CPLError(
-                    CE_Failure, CPLE_IllegalArg,
-                    "Value of argument '%s' is '%s', but should have at least "
-                    "%d character(s)",
-                    GetName().c_str(), val.c_str(), nMinCharCount);
-                ret = false;
-            }
+            CheckMinCharCount(val, nMinCharCount);
         }
+
+        const int nMaxCharCount = GetMaxCharCount();
+        CheckMaxCharCount(val, nMaxCharCount);
     }
     else if (GetType() == GAAT_STRING_LIST)
     {
         const int nMinCharCount = GetMinCharCount();
-        if (nMinCharCount > 0)
+        const int nMaxCharCount = GetMaxCharCount();
+        for (const auto &val : Get<std::vector<std::string>>())
         {
-            for (const auto &val : Get<std::vector<std::string>>())
-            {
-                if (val.size() < static_cast<size_t>(nMinCharCount))
-                {
-                    CPLError(
-                        CE_Failure, CPLE_IllegalArg,
-                        "Value of argument '%s' is '%s', but should have at "
-                        "least %d character(s)",
-                        GetName().c_str(), val.c_str(), nMinCharCount);
-                    ret = false;
-                }
-            }
+            if (nMinCharCount > 0)
+                CheckMinCharCount(val, nMinCharCount);
+            CheckMaxCharCount(val, nMaxCharCount);
         }
     }
     else if (GetType() == GAAT_INTEGER)
