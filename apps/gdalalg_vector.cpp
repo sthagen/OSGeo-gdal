@@ -23,6 +23,7 @@
 #include "gdalalg_vector_combine.h"
 #include "gdalalg_vector_concat.h"
 #include "gdalalg_vector_convert.h"
+#include "gdalalg_vector_convex_hull.h"
 #include "gdalalg_vector_dissolve.h"
 #include "gdalalg_vector_edit.h"
 #include "gdalalg_vector_explode_collections.h"
@@ -75,6 +76,7 @@ GDALVectorAlgorithm::GDALVectorAlgorithm()
     RegisterSubAlgorithm<GDALVectorCombineAlgorithmStandalone>();
     RegisterSubAlgorithm<GDALVectorConcatAlgorithmStandalone>();
     RegisterSubAlgorithm<GDALVectorConvertAlgorithm>();
+    RegisterSubAlgorithm<GDALVectorConvexHullAlgorithmStandalone>();
     RegisterSubAlgorithm<GDALVectorDissolveAlgorithmStandalone>();
     RegisterSubAlgorithm<GDALVectorEditAlgorithmStandalone>();
     RegisterSubAlgorithm<GDALVectorExplodeCollectionsAlgorithmStandalone>();

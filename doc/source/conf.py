@@ -994,6 +994,13 @@ man_pages = [
         1,
     ),
     (
+        "programs/gdal_vector_convex-hull",
+        "gdal-vector-convex-hull",
+        "Compute the convex hull of geometries of a vector dataset",
+        [author_dbaston],
+        1,
+    ),
+    (
         "programs/gdal_vector_swap_xy",
         "gdal-vector-swap-xy",
         "Swap X and Y coordinates of geometries of a vector dataset",
