@@ -15,8 +15,12 @@
 
 #include "cpl_string.h"
 #include "cpl_vsi_virtual.h"
+
+#include "gdal_colortable.h"
+
 #include <string>
 #include <variant>
+#include <vector>
 
 namespace GDALOffsetPatcher
 {
@@ -75,10 +79,20 @@ void Create_CADRG_RPFHDR(GDALOffsetPatcher::OffsetPatcher *offsetPatcher,
                          const std::string &osFilename,
                          CPLStringList &aosOptions);
 
+struct CADRGCreateCopyContext
+{
+    int nReciprocalScale = 0;
+    GDALColorTable oCT2{};
+    std::vector<int> anMapCT1ToCT2{};
+    GDALColorTable oCT3{};
+    std::vector<int> anMapCT1ToCT3{};
+};
+
 std::unique_ptr<CADRGInformation>
 RPFFrameCreateCADRG_TREs(GDALOffsetPatcher::OffsetPatcher *offsetPatcher,
                          const std::string &osFilename, GDALDataset *poSrcDS,
-                         CPLStringList &aosOptions, int nReciprocalScale);
+                         CPLStringList &aosOptions,
+                         const CADRGCreateCopyContext &copyContext);
 
 bool RPFFrameWriteCADRG_RPFIMG(GDALOffsetPatcher::OffsetPatcher *offsetPatcher,
                                VSILFILE *fp, int &nUDIDL);
@@ -100,7 +114,8 @@ int RPFGetCADRGClosestReciprocalScale(GDALDataset *poSrcDS,
 std::variant<bool, std::unique_ptr<GDALDataset>>
 CADRGCreateCopy(const char *pszFilename, GDALDataset *poSrcDS, int bStrict,
                 CSLConstList papszOptions, GDALProgressFunc pfnProgress,
-                void *pProgressData, int nRecLevel, int &nReciprocalScale);
+                void *pProgressData, int nRecLevel,
+                CADRGCreateCopyContext *copyContext);
 
 struct RPFFrameDef
 {

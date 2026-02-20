@@ -7112,6 +7112,8 @@ def test_nitf_create_cadrg(tmp_path):
     }
 
     tres = ds.GetMetadata("xml:TRE")[0]
+    # print(tres)
+
     assert """<tre name="RPFHDR" location="file">
     <field name="LITTLE_BIG_ENDIAN_INDICATOR" value="0" />
     <field name="HEADER_SECTION_LENGTH" value="48" />
@@ -7126,16 +7128,16 @@ def test_nitf_create_cadrg(tmp_path):
   </tre>""" in tres
 
     assert """<tre name="RPFIMG" location="image">
-    <field name="LOCATION_SECTION_LENGTH" value="124" />
+    <field name="LOCATION_SECTION_LENGTH" value="134" />
     <field name="COMPONENT_LOCATION_OFFSET" value="14" />
-    <field name="NUMBER_OF_COMPONENT_LOCATION_RECORDS" value="11" />
+    <field name="NUMBER_OF_COMPONENT_LOCATION_RECORDS" value="12" />
     <field name="COMPONENT_LOCATION_RECORD_LENGTH" value="10" />
-    <field name="COMPONENT_AGGREGATE_LENGTH" value="288762" />
-    <repeated name="CLR" number="11">
+    <field name="COMPONENT_AGGREGATE_LENGTH" value="290952" />
+    <repeated name="CLR" number="12">
       <group index="0">
         <field name="COMPONENT_ID" value="130" />
         <field name="COMPONENT_LENGTH" value="96" />
-        <field name="COMPONENT_LOCATION" value="1768" />
+        <field name="COMPONENT_LOCATION" value="1778" />
         <content ComponentName="CoverageSectionSubheader">
           <field name="NORTHWEST_LATITUDE" value="90" />
           <field name="NORTHWEST_LONGITUDE" value="-180" />
@@ -7149,7 +7151,7 @@ def test_nitf_create_cadrg(tmp_path):
     assert """<group index="1">
         <field name="COMPONENT_ID" value="131" />
         <field name="COMPONENT_LENGTH" value="6" />
-        <field name="COMPONENT_LOCATION" value="3668" />
+        <field name="COMPONENT_LOCATION" value="5868" />
         <content ComponentName="CompressionSectionSubsection">
           <field name="COMPRESSION_ALGORITHM_ID" value="1" />
           <field name="NUMBER_OF_COMPRESSION_LOOKUP_OFFSET_RECORDS" value="4" />
@@ -7159,7 +7161,7 @@ def test_nitf_create_cadrg(tmp_path):
       <group index="2">
         <field name="COMPONENT_ID" value="132" />
         <field name="COMPONENT_LENGTH" value="65598" />
-        <field name="COMPONENT_LOCATION" value="3683" />
+        <field name="COMPONENT_LOCATION" value="5883" />
         <content ComponentName="CompressionLookupSubsection">
           <field name="COMPRESSION_LOOKUP_OFFSET_TABLE_OFFSET" value="6" />
           <field name="COMPRESSION_LOOKUP_TABLE_OFFSET_RECORD_LENGTH" value="14" />
@@ -7198,28 +7200,44 @@ def test_nitf_create_cadrg(tmp_path):
       <group index="3">
         <field name="COMPONENT_ID" value="134" />
         <field name="COMPONENT_LENGTH" value="14" />
-        <field name="COMPONENT_LOCATION" value="1864" />
+        <field name="COMPONENT_LOCATION" value="1874" />
         <content ComponentName="ColorGrayscaleSectionSubheader">
-          <field name="NUMBER_OF_COLOR_GRAYSCALE_OFFSET_RECORDS" value="1" />
-          <field name="NUMBER_OF_COLOR_CONVERTER_OFFSET_RECORDS" value="0" />
+          <field name="NUMBER_OF_COLOR_GRAYSCALE_OFFSET_RECORDS" value="3" />
+          <field name="NUMBER_OF_COLOR_CONVERTER_OFFSET_RECORDS" value="2" />
           <field name="EXTERNAL_COLOR_GRAYSCALE_FILENAME" value="" />
         </content>
       </group>
       <group index="4">
         <field name="COMPONENT_ID" value="135" />
-        <field name="COMPONENT_LENGTH" value="1751" />
-        <field name="COMPONENT_LOCATION" value="1878" />
+        <field name="COMPONENT_LENGTH" value="2169" />
+        <field name="COMPONENT_LOCATION" value="1888" />
         <content ComponentName="ColormapSubsection">
           <field name="COLORMAP_OFFSET_TABLE_OFFSET" value="6" />
           <field name="COLOR_GRAYSCALE_OFFSET_RECORD_LENGTH" value="17" />
-          <repeated name="COLOR_OFFSET_RECORD" number="1">
+          <repeated name="COLOR_OFFSET_RECORD" number="3">
             <group index="0">
               <field name="COLOR_GRAYSCALE_TABLE_ID" value="2" />
               <field name="NUMBER_OF_COLOR_GRAYSCALE_RECORDS" value="216" />
               <field name="COLOR_GRAYSCALE_ELEMENT_LENGTH" value="4" />
               <field name="HISTOGRAM_RECORD_LENGTH" value="4" />
-              <field name="COLOR_GRAYSCALE_TABLE_OFFSET" value="23" />
-              <field name="HISTOGRAM_TABLE_OFFSET" value="14694" />
+              <field name="COLOR_GRAYSCALE_TABLE_OFFSET" value="57" />
+              <field name="HISTOGRAM_TABLE_OFFSET" value="1113" />
+            </group>
+            <group index="1">
+              <field name="COLOR_GRAYSCALE_TABLE_ID" value="2" />
+              <field name="NUMBER_OF_COLOR_GRAYSCALE_RECORDS" value="32" />
+              <field name="COLOR_GRAYSCALE_ELEMENT_LENGTH" value="4" />
+              <field name="HISTOGRAM_RECORD_LENGTH" value="4" />
+              <field name="COLOR_GRAYSCALE_TABLE_OFFSET" value="921" />
+              <field name="HISTOGRAM_TABLE_OFFSET" value="1977" />
+            </group>
+            <group index="2">
+              <field name="COLOR_GRAYSCALE_TABLE_ID" value="2" />
+              <field name="NUMBER_OF_COLOR_GRAYSCALE_RECORDS" value="16" />
+              <field name="COLOR_GRAYSCALE_ELEMENT_LENGTH" value="4" />
+              <field name="HISTOGRAM_RECORD_LENGTH" value="4" />
+              <field name="COLOR_GRAYSCALE_TABLE_OFFSET" value="1049" />
+              <field name="HISTOGRAM_TABLE_OFFSET" value="2105" />
             </group>
           </repeated>
         </content>
@@ -7227,7 +7245,7 @@ def test_nitf_create_cadrg(tmp_path):
       <group index="5">
         <field name="COMPONENT_ID" value="136" />
         <field name="COMPONENT_LENGTH" value="28" />
-        <field name="COMPONENT_LOCATION" value="3629" />
+        <field name="COMPONENT_LOCATION" value="5829" />
         <content ComponentName="ImageDescriptionSubheader">
           <field name="NUMBER_OF_SPECTRAL_GROUPS" value="1" />
           <field name="NUMBER_OF_SUBFRAME_TABLES" value="36" />
@@ -7244,7 +7262,7 @@ def test_nitf_create_cadrg(tmp_path):
       <group index="6">
         <field name="COMPONENT_ID" value="137" />
         <field name="COMPONENT_LENGTH" value="9" />
-        <field name="COMPONENT_LOCATION" value="3674" />
+        <field name="COMPONENT_LOCATION" value="5874" />
         <content ComponentName="ImageDisplayParametersSubheader">
           <field name="NUMBER_OF_IMAGE_ROWS" value="64" />
           <field name="NUMBER_OF_CODES_PER_ROW" value="64" />
@@ -7254,7 +7272,7 @@ def test_nitf_create_cadrg(tmp_path):
       <group index="7">
         <field name="COMPONENT_ID" value="138" />
         <field name="COMPONENT_LENGTH" value="6" />
-        <field name="COMPONENT_LOCATION" value="3662" />
+        <field name="COMPONENT_LOCATION" value="5862" />
         <content ComponentName="MaskSubsection">
           <field name="SUBFRAME_SEQUENCE_RECORD_LENGTH" value="0" />
           <field name="TRANSPARENCY_SEQUENCE_RECORD_LENGTH" value="0" />
@@ -7262,14 +7280,73 @@ def test_nitf_create_cadrg(tmp_path):
         </content>
       </group>
       <group index="8">
-        <field name="COMPONENT_ID" value="140" />
-        <field name="COMPONENT_LENGTH" value="221184" />
-        <field name="COMPONENT_LOCATION" value="69281" />
+        <field name="COMPONENT_ID" value="139" />
+        <field name="COMPONENT_LENGTH" value="1772" />
+        <field name="COMPONENT_LOCATION" value="4057" />
+        <content ComponentName="ColorConverterSubsection">
+          <field name="COLOR_CONVERTER_OFFSET_TABLE_OFFSET" value="8" />
+          <field name="COLOR_CONVERTER_OFFSET_RECORD_LENGTH" value="14" />
+          <field name="COLOR_CONVERTER_RECORD_LENGTH" value="4" />
+          <repeated name="COLOR_CONVERTER_OFFSET_RECORD" number="2">
+            <group index="0">
+              <field name="COLOR_CONVERTER_TABLE_ID" value="5" />
+              <field name="NUMBER_OF_COLOR_CONVERTER_RECORDS" value="216" />
+              <field name="COLOR_CONVERTER_TABLE_OFFSET" value="36" />
+              <field name="SOURCE_OFFSET_TABLE_OFFSET" value="6" />
+              <field name="TARGET_OFFSET_TABLE_OFFSET" value="6" />
+            </group>
+            <group index="1">
+              <field name="COLOR_CONVERTER_TABLE_ID" value="5" />
+              <field name="NUMBER_OF_COLOR_CONVERTER_RECORDS" value="216" />
+              <field name="COLOR_CONVERTER_TABLE_OFFSET" value="900" />
+              <field name="SOURCE_OFFSET_TABLE_OFFSET" value="6" />
+              <field name="TARGET_OFFSET_TABLE_OFFSET" value="23" />
+            </group>
+          </repeated>
+          <repeated name="COLOR_CONVERTER_TABLE" number="2">
+            <group index="0">
+              <repeated number="216">
+                <group index="0">
+                  <field name="TARGET_COLOR_GRAYSCALE_TABLE_ENTRY_NUMBER" value="6" />
+                </group>
+                <group index="1">
+                  <field name="TARGET_COLOR_GRAYSCALE_TABLE_ENTRY_NUMBER" value="19" />
+                </group>""" in tres
+
+    assert """<group index="214">
+                  <field name="TARGET_COLOR_GRAYSCALE_TABLE_ENTRY_NUMBER" value="2" />
+                </group>
+                <group index="215">
+                  <field name="TARGET_COLOR_GRAYSCALE_TABLE_ENTRY_NUMBER" value="31" />
+                </group>
+              </repeated>
+            </group>
+            <group index="1">
+              <repeated number="216">
+                <group index="0">
+                  <field name="TARGET_COLOR_GRAYSCALE_TABLE_ENTRY_NUMBER" value="2" />
+                </group>
+                <group index="1">
+                  <field name="TARGET_COLOR_GRAYSCALE_TABLE_ENTRY_NUMBER" value="9" />
+                </group>""" in tres
+
+    assert """<group index="215">
+                  <field name="TARGET_COLOR_GRAYSCALE_TABLE_ENTRY_NUMBER" value="15" />
+                </group>
+              </repeated>
+            </group>
+          </repeated>
+        </content>
       </group>
       <group index="9">
+        <field name="COMPONENT_ID" value="140" />
+        <field name="COMPONENT_LENGTH" value="221184" />
+        <field name="COMPONENT_LOCATION" value="71481" />
+      </group>
+      <group index="10">
         <field name="COMPONENT_ID" value="141" />
         <field name="COMPONENT_LENGTH" value="10" />
-        <field name="COMPONENT_LOCATION" value="290685" />
+        <field name="COMPONENT_LOCATION" value="292885" />
         <content ComponentName="AttributeSectionSubheader">
           <field name="NUMBER_OF_ATTRIBUTE_OFFSET_RECORDS" value="4" />
           <field name="NUMBER_OF_EXPLICIT_AREAL_COVERAGE_RECORDS" value="0" />
@@ -7277,10 +7354,10 @@ def test_nitf_create_cadrg(tmp_path):
           <field name="ATTRIBUTE_OFFSET_RECORD_LENGTH" value="8" />
         </content>
       </group>
-      <group index="10">
+      <group index="11">
         <field name="COMPONENT_ID" value="142" />
         <field name="COMPONENT_LENGTH" value="60" />
-        <field name="COMPONENT_LOCATION" value="290695" />
+        <field name="COMPONENT_LOCATION" value="292895" />
         <content ComponentName="AttributeSubsection">
           <repeated name="AOR" number="4">
             <group index="0">
@@ -7433,10 +7510,10 @@ def test_nitf_create_cadrg_with_transparency(tmp_path):
     tres = ds.GetMetadata("xml:TRE")[0]
     # print(tres)
 
-    assert """ <group index="5">
+    assert """<group index="5">
         <field name="COMPONENT_ID" value="136" />
         <field name="COMPONENT_LENGTH" value="28" />
-        <field name="COMPONENT_LOCATION" value="3636" />
+        <field name="COMPONENT_LOCATION" value="5844" />
         <content ComponentName="ImageDescriptionSubheader">
           <field name="NUMBER_OF_SPECTRAL_GROUPS" value="1" />
           <field name="NUMBER_OF_SUBFRAME_TABLES" value="36" />
@@ -7454,12 +7531,12 @@ def test_nitf_create_cadrg_with_transparency(tmp_path):
     assert """<group index="7">
         <field name="COMPONENT_ID" value="138" />
         <field name="COMPONENT_LENGTH" value="151" />
-        <field name="COMPONENT_LOCATION" value="3669" />
+        <field name="COMPONENT_LOCATION" value="5877" />
         <content ComponentName="MaskSubsection">
           <field name="SUBFRAME_SEQUENCE_RECORD_LENGTH" value="0" />
           <field name="TRANSPARENCY_SEQUENCE_RECORD_LENGTH" value="0" />
           <field name="TRANSPARENT_OUTPUT_PIXEL_CODE_LENGTH" value="8" />
-          <field name="TRANSPARENT_OUTPUT_PIXEL_CODE_" value="216" />
+          <field name="TRANSPARENT_OUTPUT_PIXEL_CODE" value="216" />
         </content>
       </group>""" in tres
 

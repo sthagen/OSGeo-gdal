@@ -229,7 +229,7 @@ template <class T> class PNNKDTree
     int insert(std::vector<BucketItem<T>> &&vectors, const T &ctxt);
 
     /** Iterate over leaf nodes (that contain buckets) */
-    void iterateOverLeaves(std::function<void(PNNKDTree &)> f);
+    void iterateOverLeaves(const std::function<void(PNNKDTree &)> &f);
 
     /** Perform clustering to reduce the number of buckets from initialBucketCount
      * to targetCount.
@@ -278,7 +278,7 @@ template <class T> class PNNKDTree
     void freeAndMoveToQueue(std::deque<std::unique_ptr<PNNKDTree>> &queueNodes);
 
     int insert(std::vector<BucketItem<T>> &&vectors, int totalCount,
-               std::vector<ValType> &vals,
+               std::vector<std::pair<ValType, int>> &weightedVals,
                std::deque<std::unique_ptr<PNNKDTree>> &queueNodes,
                std::vector<BucketItem<T>> &vectLeft,
                std::vector<BucketItem<T>> &vectRight, const T &ctxt);
@@ -306,12 +306,14 @@ int PNNKDTree<T>::insert(std::vector<BucketItem<T>> &&vectors, const T &ctxt)
     {
         totalCount += it.m_count;
     }
-    std::vector<ValType> vals;
+    std::vector<std::pair<ValType, int>> weightedVals;
     std::deque<std::unique_ptr<PNNKDTree>> queueNodes;
     std::vector<BucketItem<T>> vectLeft;
     std::vector<BucketItem<T>> vectRight;
-    return insert(std::move(vectors), totalCount, vals, queueNodes, vectLeft,
-                  vectRight, ctxt);
+    if (totalCount == 0)
+        return 0;
+    return insert(std::move(vectors), totalCount, weightedVals, queueNodes,
+                  vectLeft, vectRight, ctxt);
 }
 
 /************************************************************************/
@@ -320,7 +322,7 @@ int PNNKDTree<T>::insert(std::vector<BucketItem<T>> &&vectors, const T &ctxt)
 
 template <class T>
 int PNNKDTree<T>::insert(std::vector<BucketItem<T>> &&vectors, int totalCount,
-                         std::vector<ValType> &vals,
+                         std::vector<std::pair<ValType, int>> &weightedVals,
                          std::deque<std::unique_ptr<PNNKDTree>> &queueNodes,
                          std::vector<BucketItem<T>> &vectLeft,
                          std::vector<BucketItem<T>> &vectRight, const T &ctxt)
@@ -551,25 +553,36 @@ int PNNKDTree<T>::insert(std::vector<BucketItem<T>> &&vectors, int totalCount,
 #endif
 
     // Find median value along that dimension
-    vals.reserve(vectors.size());
-    vals.clear();
+    weightedVals.reserve(vectors.size());
+    weightedVals.clear();
     for (const auto &item : vectors)
     {
         const auto d = item.m_vec.get(maxM2_k, ctxt);
-        for (int i = 0; i < item.m_count; ++i)
-            vals.push_back(d);
+        weightedVals.emplace_back(d, item.m_count);
     }
 
-    const auto median_iter = vals.begin() + vals.size() / 2;
-    std::nth_element(vals.begin(), median_iter, vals.end());
-    const auto median = vals[vals.size() / 2];
+    std::sort(weightedVals.begin(), weightedVals.end(),
+              [](const auto &a, const auto &b) { return a.first < b.first; });
+
+    auto median = weightedVals[0].first;
+    int cumulativeCount = 0;
+    const int targetCount = totalCount / 2;
+    for (const auto &[value, count] : weightedVals)
+    {
+        cumulativeCount += count;
+        if (cumulativeCount > targetCount)
+        {
+            median = value;
+            break;
+        }
+    }
 
     // Split the original vectors in a "left" half that is below or equal to
     // the median and a "right" half that is above.
     vectLeft.clear();
-    vectLeft.reserve(vals.size() / 2);
+    vectLeft.reserve(weightedVals.size() / 2);
     vectRight.clear();
-    vectRight.reserve(vals.size() / 2);
+    vectRight.reserve(weightedVals.size() / 2);
     int countLeft = 0;
     int countRight = 0;
     for (auto &item : vectors)
@@ -647,10 +660,11 @@ int PNNKDTree<T>::insert(std::vector<BucketItem<T>> &&vectors, int totalCount,
     { return a.m_vec < b.m_vec; };
     std::sort(vectLeft.begin(), vectLeft.end(), sortFunc);
     std::sort(vectRight.begin(), vectRight.end(), sortFunc);
-    int retLeft = m_left->insert(std::move(vectLeft), countLeft, vals,
+    int retLeft = m_left->insert(std::move(vectLeft), countLeft, weightedVals,
                                  queueNodes, vectors, vectTmp, ctxt);
-    int retRight = m_right->insert(std::move(vectRight), countRight, vals,
-                                   queueNodes, vectors, vectTmp, ctxt);
+    int retRight =
+        m_right->insert(std::move(vectRight), countRight, weightedVals,
+                        queueNodes, vectors, vectTmp, ctxt);
     vectLeft = std::vector<BucketItem<T>>();
     vectRight = std::vector<BucketItem<T>>();
     return (retLeft == 0 || retRight == 0) ? 0 : retLeft + retRight;
@@ -661,7 +675,7 @@ int PNNKDTree<T>::insert(std::vector<BucketItem<T>> &&vectors, int totalCount,
 /************************************************************************/
 
 template <class T>
-void PNNKDTree<T>::iterateOverLeaves(std::function<void(PNNKDTree &)> f)
+void PNNKDTree<T>::iterateOverLeaves(const std::function<void(PNNKDTree &)> &f)
 {
     if (m_left && m_right)
     {
@@ -737,8 +751,8 @@ int PNNKDTree<T>::cluster(int initialBucketCount, int targetCount,
                                 const auto &itemJ =
                                     bucket.m_bucketItems[j + subj];
                                 const double increasedDistortion =
-                                    itemI.m_count * itemJ.m_count *
-                                    static_cast<double>(tabSquaredDist[subj]) /
+                                    static_cast<double>(itemI.m_count) *
+                                    itemJ.m_count * tabSquaredDist[subj] /
                                     (itemI.m_count + itemJ.m_count);
                                 TupleInfo ti;
                                 ti.bucket = &bucket;
@@ -755,9 +769,8 @@ int PNNKDTree<T>::cluster(int initialBucketCount, int targetCount,
                     {
                         const auto &itemJ = bucket.m_bucketItems[j];
                         const double increasedDistortion =
-                            itemI.m_count * itemJ.m_count *
-                            static_cast<double>(itemI.m_vec.squared_distance(
-                                itemJ.m_vec, ctxt)) /
+                            static_cast<double>(itemI.m_count) * itemJ.m_count *
+                            itemI.m_vec.squared_distance(itemJ.m_vec, ctxt) /
                             (itemI.m_count + itemJ.m_count);
                         TupleInfo ti;
                         ti.bucket = &bucket;
@@ -999,10 +1012,10 @@ int PNNKDTree<T>::rebalance(const T &ctxt,
                                    std::move(value.second));
         }
 
-        std::vector<ValType> vals;
+        std::vector<std::pair<ValType, int>> weightedVals;
         std::vector<BucketItem<T>> vectLeft;
         std::vector<BucketItem<T>> vectRight;
-        const int ret = insert(std::move(newLeaves), totalCount, vals,
+        const int ret = insert(std::move(newLeaves), totalCount, weightedVals,
                                queueNodes, vectLeft, vectRight, ctxt);
 #ifdef KDTREE_DEBUG_TIMING
         gettimeofday(&tv2, nullptr);

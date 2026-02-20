@@ -4560,8 +4560,9 @@ GDALDataset *NITFDataset::NITFCreateCopy(const char *pszFilename,
                                          GDALProgressFunc pfnProgress,
                                          void *pProgressData)
 {
+    CADRGCreateCopyContext copyContext;
     return CreateCopy(pszFilename, poSrcDS, bStrict, papszOptions, pfnProgress,
-                      pProgressData, /* nRecLevel = */ 0)
+                      pProgressData, /* nRecLevel = */ 0, &copyContext)
         .release();
 }
 
@@ -4573,7 +4574,7 @@ std::unique_ptr<GDALDataset>
 NITFDataset::CreateCopy(const char *pszFilename, GDALDataset *poSrcDS,
                         int bStrict, CSLConstList papszOptions,
                         GDALProgressFunc pfnProgress, void *pProgressData,
-                        int nRecLevel)
+                        int nRecLevel, CADRGCreateCopyContext *copyContext)
 
 {
     if (nRecLevel == 3)
@@ -4715,12 +4716,11 @@ NITFDataset::CreateCopy(const char *pszFilename, GDALDataset *poSrcDS,
     /* -------------------------------------------------------------------- */
     /*      CADRG related checks and pre-processing                         */
     /* -------------------------------------------------------------------- */
-    int nReciprocalScale = 0;
     if (bIsCADRG)
     {
-        auto ret = CADRGCreateCopy(pszFilename, poSrcDS, bStrict, papszOptions,
-                                   pfnProgress, pProgressData, nRecLevel,
-                                   nReciprocalScale);
+        auto ret =
+            CADRGCreateCopy(pszFilename, poSrcDS, bStrict, papszOptions,
+                            pfnProgress, pProgressData, nRecLevel, copyContext);
         if (std::holds_alternative<std::unique_ptr<GDALDataset>>(ret))
         {
             return std::move(std::get<std::unique_ptr<GDALDataset>>(ret));
@@ -5493,27 +5493,28 @@ NITFDataset::CreateCopy(const char *pszFilename, GDALDataset *poSrcDS,
                 .size();
         aosOptions.SetNameValue("NUMDES", CPLSPrintf("%d", nDES));
 
-        if (nReciprocalScale == 0)
+        if (copyContext->nReciprocalScale == 0)
         {
             bool bGotDPI = false;
             {
                 CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
-                nReciprocalScale =
+                copyContext->nReciprocalScale =
                     RPFGetCADRGClosestReciprocalScale(poSrcDS, 0, bGotDPI);
             }
             if (!bGotDPI)
             {
                 // the one from ADRG typically
                 constexpr double DEFAULT_DPI = 254;
-                nReciprocalScale = RPFGetCADRGClosestReciprocalScale(
-                    poSrcDS, DEFAULT_DPI, bGotDPI);
-                if (!nReciprocalScale)
+                copyContext->nReciprocalScale =
+                    RPFGetCADRGClosestReciprocalScale(poSrcDS, DEFAULT_DPI,
+                                                      bGotDPI);
+                if (!copyContext->nReciprocalScale)
                     return nullptr;
             }
         }
 
-        CADRGInfo = RPFFrameCreateCADRG_TREs(
-            &offsetPatcher, pszFilename, poSrcDS, aosOptions, nReciprocalScale);
+        CADRGInfo = RPFFrameCreateCADRG_TREs(&offsetPatcher, pszFilename,
+                                             poSrcDS, aosOptions, *copyContext);
         if (!CADRGInfo)
         {
             return nullptr;
@@ -5688,9 +5689,9 @@ NITFDataset::CreateCopy(const char *pszFilename, GDALDataset *poSrcDS,
                                         nICOffset, aosOptions.List());
 
         // This will call RPFFrameWriteCADRG_RPFDES()
-        bOK &= NITFWriteExtraSegments(pszFilename, fp.get(), aosCgmMD.List(),
-                                      aosTextMD.List(), &offsetPatcher,
-                                      aosOptions, nReciprocalScale);
+        bOK &= NITFWriteExtraSegments(
+            pszFilename, fp.get(), aosCgmMD.List(), aosTextMD.List(),
+            &offsetPatcher, aosOptions, copyContext->nReciprocalScale);
 
         if (!bOK || !offsetPatcher.Finalize(fp.get()))
             return nullptr;

@@ -403,8 +403,8 @@ static void Create_RPFTOC_FrameFileIndexSubsection(
             const auto oIterSubdirToIdx = oMapSubdirToIdx.find(osSubdir);
             CPLAssert(oIterSubdirToIdx != oMapSubdirToIdx.end());
             poBuffer->AppendUInt32RefForOffset(
-                CPLSPrintf("PATHNAME_RECORD_OFFSET_%u",
-                           static_cast<unsigned>(oIterSubdirToIdx->second)),
+                CPLSPrintf("PATHNAME_RECORD_OFFSET_%d",
+                           oIterSubdirToIdx->second),
                 /* bRelativeToStartOfBuffer = */ true);
             poBuffer->AppendString(StrPadTruncate(
                 CPLGetFilename(frameDesc.osRelativeFilename.c_str()), 12));
@@ -419,13 +419,30 @@ static void Create_RPFTOC_FrameFileIndexSubsection(
         }
     }
 
-    unsigned nIdx = 0;
-    for ([[maybe_unused]] const auto &[osSubdir, unused] : oMapSubdirToIdx)
+    struct SortedDirPrefixes
+    {
+        int nIdx = 0;
+        std::string osSubdir{};
+    };
+
+    std::vector<SortedDirPrefixes> asSortedDirPrefixes;
+    for (const auto &[osSubdir, nIdx] : oMapSubdirToIdx)
+    {
+        SortedDirPrefixes s;
+        s.nIdx = nIdx;
+        s.osSubdir = osSubdir;
+        asSortedDirPrefixes.push_back(std::move(s));
+    }
+    std::sort(asSortedDirPrefixes.begin(), asSortedDirPrefixes.end(),
+              [](const SortedDirPrefixes &a, const SortedDirPrefixes &b)
+              { return a.nIdx < b.nIdx; });
+
+    for (const auto &sortedDirPrefix : asSortedDirPrefixes)
     {
         poBuffer->DeclareOffsetAtCurrentPosition(
-            CPLSPrintf("PATHNAME_RECORD_OFFSET_%u", nIdx));
-        ++nIdx;
-        std::string osPath = "./" + CPLString(osSubdir).replaceAll('\\', '/');
+            CPLSPrintf("PATHNAME_RECORD_OFFSET_%d", sortedDirPrefix.nIdx));
+        std::string osPath =
+            "./" + CPLString(sortedDirPrefix.osSubdir).replaceAll('\\', '/');
         if (osPath.back() != '/')
             osPath += '/';
         poBuffer->AppendUInt16(static_cast<uint16_t>(osPath.size()));

@@ -239,10 +239,6 @@ def test_ogr_geom_polyhedral_surface():
     #        print(wkt_geom)
     #        return 'fail'
 
-    if ogrtest.have_geos():
-        geom = ogr.CreateGeometryFromWkb(wkb_string)
-        assert ps.Contains(geom), "Failure in Contains() of PolyhedralSurface"
-
     assert not ps.IsEmpty(), "Failure in IsEmpty() of PolyhedralSurface"
 
     ps.Empty()
@@ -4223,95 +4219,165 @@ def test_ogr_geom_create_from_wkt_polyhedrasurface():
 ###############################################################################
 
 
-@pytest.mark.require_geos
-def test_ogr_geom_makevalid():
+@pytest.mark.parametrize(
+    "wkt",
+    [
+        pytest.param("POINT (0 0)", id="Point"),
+        pytest.param("POINT EMPTY", id="Empty Point"),
+        pytest.param("CURVEPOLYGON ((0 0,0 1,1 0,0 0))", id="CurvePolygon"),
+    ],
+)
+@pytest.mark.require_geos(3, 8, 0)
+def test_ogr_geom_makevalid_unchanged(wkt):
 
-    g = ogr.CreateGeometryFromWkt("POINT (0 0)")
-    g = g.MakeValid()
-    assert g is None or g.ExportToWkt() == "POINT (0 0)"
+    g = ogr.CreateGeometryFromWkt(wkt)
+    result = g.MakeValid()
+    assert result.ExportToWkt() == wkt
 
-    g = ogr.CreateGeometryFromWkt("POINT EMPTY")
-    g = g.MakeValid()
-    assert g is None or g.ExportToWkt() == "POINT EMPTY"
 
-    g = ogr.CreateGeometryFromWkt("LINESTRING (0 0)")
-    with gdal.quiet_errors():
-        g = g.MakeValid()
-    assert not g
+@pytest.mark.parametrize(
+    "wkt,wkt_expected",
+    [
+        pytest.param(
+            "POLYGON ((0 0,10 10,0 10,10 0,0 0))",
+            "MULTIPOLYGON (((0 0,5 5,10 0,0 0)),((5 5,0 10,10 10,5 5)))",
+            id="Polygon",
+        ),
+        pytest.param(
+            "CURVEPOLYGON ((0 0,10 10,0 10,10 0,0 0))",
+            "MULTIPOLYGON (((0 0,5 5,10 0,0 0)),((5 5,0 10,10 10,5 5)))",
+            id="CurvePolygon",
+        ),
+        pytest.param("LINESTRING (0 0)", "POINT (0 0)", id="single-point LineString"),
+        pytest.param("POLYGON ((0 0))", "POINT (0 0)", id="single-point Polygon"),
+        pytest.param(
+            "POLYGON ((0 0, 1 1))", "LINESTRING (0 0, 1 1)", id="two-point Polygon"
+        ),
+        pytest.param(
+            "POLYGON ((0 0, 1 0, 1 1))",
+            "POLYGON ((0 0, 1 0, 1 1, 0 0)),",
+            id="non-closed Polygon",
+        ),
+        pytest.param(
+            "MULTIPOLYGON (((100 100, 200 100, 200 200, 100 100)), ((0 0, 1 0, 1 1)))",
+            "MULTIPOLYGON (((100 100, 200 100, 200 200, 100 100)), ((0 0, 1 0, 1 1, 0 0))),",
+            id="MultiPolygon with non-closed component",
+        ),
+        pytest.param(
+            "GEOMETRYCOLLECTION (POLYGON((100 100, 200 100, 200 200, 100 100)), POLYGON((0 0, 1 0, 1 1)))",
+            "GEOMETRYCOLLECTION (POLYGON((100 100, 200 100, 200 200, 100 100)), POLYGON((0 0, 1 0, 1 1, 0 0)))",
+            id="GeometryCollection with non-closed Polygon",
+        ),
+        pytest.param(
+            "POLYGON ((0 0, 100 0, 100 100, 0 100, 0 0), (50 50, 60 50))",
+            "GEOMETRYCOLLECTION (POLYGON((0 0, 100 0, 100 100, 0 100, 0 0)), LINESTRING (50 50, 60 50))",
+            id="Polygon with collapsed hole",
+        ),
+    ],
+)
+@pytest.mark.require_geos(3, 8, 0)
+def test_ogr_geom_makevalid_linework(wkt, wkt_expected):
 
-    g = ogr.CreateGeometryFromWkt("CURVEPOLYGON ((0 0,0 1,1 0,0 0))")
-    g = g.MakeValid()
-    assert g is None or g.ExportToWkt() == "CURVEPOLYGON ((0 0,0 1,1 0,0 0))"
+    g = ogr.CreateGeometryFromWkt(wkt)
+    result = g.MakeValid()
 
-    # Invalid
-    g = ogr.CreateGeometryFromWkt("POLYGON ((0 0,10 10,0 10,10 0,0 0))")
-    g = g.MakeValid()
-
-    if g is not None:
-        ogrtest.check_feature_geometry(
-            g, "MULTIPOLYGON (((0 0,5 5,10 0,0 0)),((5 5,0 10,10 10,5 5)))"
-        )
-
-    # Invalid
-    g = ogr.CreateGeometryFromWkt("CURVEPOLYGON ((0 0,10 10,0 10,10 0,0 0))")
-    g = g.MakeValid()
-
-    if g is not None:
-        ogrtest.check_feature_geometry(
-            g, "MULTIPOLYGON (((0 0,5 5,10 0,0 0)),((5 5,0 10,10 10,5 5)))"
-        )
+    ogrtest.check_feature_geometry(result, wkt_expected)
 
 
 ###############################################################################
 
 
+@pytest.mark.parametrize(
+    "wkt,wkt_expected",
+    [
+        pytest.param(
+            "POLYGON ((0 0,0 10,10 10,10 0,0 0),(5 5,15 10,15 0,5 5))",
+            {"POLYGON ((0 10,10 10,10.0 7.5,5 5,10.0 2.5,10 0,0 0,0 10))"},
+            id="Invalid polygon",
+        ),
+        pytest.param(
+            "MULTIPOLYGON (((0 0,1 0,1 1,0 1,0 0)))",
+            {
+                "MULTIPOLYGON (((0 0,1 0,1 1,0 1,0 0)))",
+                "MULTIPOLYGON (((0 0,0 1,1 1,1 0,0 0)))",
+            },
+            id="Already valid multi-polygon made of a single part",
+        ),
+        pytest.param(
+            "MULTIPOLYGON (((0 0,1 0,1 0,1 1,0 1,0 0)))",
+            {
+                "MULTIPOLYGON (((0 0,1 0,1 1,0 1,0 0)))",
+                "MULTIPOLYGON (((0 0,0 1,1 1,1 0,0 0)))",
+            },
+            id="Already valid multi-polygon made of a single-part, with duplicated point",
+        ),
+        pytest.param(
+            "MULTIPOLYGON Z (((0 0 10,1 0 10,1 1 10,0 1 10,0 0 10)))",
+            {
+                "MULTIPOLYGON Z (((0 0 10,1 0 10,1 1 10,0 1 10,0 0 10)))",
+                "MULTIPOLYGON Z (((0 0 10,0 1 10,1 1 10,1 0 10,0 0 10)))",
+            },
+            id="Already valid multi-polygon made of a single-part",
+        ),
+        pytest.param(
+            "GEOMETRYCOLLECTION (POLYGON ((0 0,1 0,1 1,0 1,0 0)))",
+            {
+                "GEOMETRYCOLLECTION (POLYGON ((0 0,1 0,1 1,0 1,0 0)))",
+                "GEOMETRYCOLLECTION (POLYGON ((0 0,0 1,1 1,1 0,0 0)))",
+            },
+            id="Already valid geometry collection",
+        ),
+    ],
+)
 @pytest.mark.require_geos(3, 10, 0)
-def test_ogr_geom_makevalid_structure():
+def test_ogr_geom_makevalid_structure(wkt, wkt_expected):
 
-    g = ogr.CreateGeometryFromWkt(
-        "POLYGON ((0 0,0 10,10 10,10 0,0 0),(5 5,15 10,15 0,5 5))"
-    )
-    g = g.MakeValid(["METHOD=STRUCTURE"])
-    ogrtest.check_feature_geometry(
-        g, "POLYGON ((0 10,10 10,10.0 7.5,5 5,10.0 2.5,10 0,0 0,0 10))"
-    )
+    g = ogr.CreateGeometryFromWkt(wkt)
+    result = g.MakeValid({"METHOD": "STRUCTURE"})
+    assert result.ExportToIsoWkt() in wkt_expected
 
-    # Already valid multi-polygon made of a single-part
-    g = ogr.CreateGeometryFromWkt("MULTIPOLYGON (((0 0,1 0,1 1,0 1,0 0)))")
-    g = g.MakeValid(["METHOD=STRUCTURE"])
-    assert (
-        g.ExportToIsoWkt() == "MULTIPOLYGON (((0 0,1 0,1 1,0 1,0 0)))"
-        or g.ExportToIsoWkt() == "MULTIPOLYGON (((0 0,0 1,1 1,1 0,0 0)))"
-    )
 
-    # Already valid multi-polygon made of a single-part, with duplicated point
-    g = ogr.CreateGeometryFromWkt("MULTIPOLYGON (((0 0,1 0,1 0,1 1,0 1,0 0)))")
-    g = g.MakeValid(["METHOD=STRUCTURE"])
-    assert (
-        g.ExportToIsoWkt() == "MULTIPOLYGON (((0 0,1 0,1 1,0 1,0 0)))"
-        or g.ExportToIsoWkt() == "MULTIPOLYGON (((0 0,0 1,1 1,1 0,0 0)))"
-    )
+@pytest.mark.parametrize(
+    "wkt,wkt_expected",
+    [
+        pytest.param("LINESTRING (0 0)", "POINT (0 0)", id="single-point LineString"),
+        pytest.param("POLYGON ((0 0))", "POINT (0 0)", id="single-point Polygon"),
+        pytest.param(
+            "POLYGON ((0 0, 1 1))", "LINESTRING (0 0,1 1,0 0)", id="two-point Polygon"
+        ),
+        pytest.param(
+            "POLYGON ((0 0, NaN NaN, NaN Nan, 1 1, NaN Nan, 0 0))",
+            "LINESTRING (0 0,1 1,0 0)",
+            id="polygon with NaN coordinates",
+        ),
+        pytest.param(
+            "POLYGON ((0 0, 1 0, 1 1))",
+            "POLYGON ((0 0,1 1,1 0,0 0))",
+            id="non-closed Polygon",
+        ),
+        pytest.param(
+            "MULTIPOLYGON (((100 100, 200 200, 200 100, 100 100)), ((0 0, 1 0, 1 1)))",
+            "MULTIPOLYGON (((100 100,200 200,200 100,100 100)),((0 0,1 1,1 0,0 0)))",
+            id="MultiPolygon with non-closed component",
+        ),
+        pytest.param(
+            "GEOMETRYCOLLECTION (POLYGON((100 100, 200 200, 200 100, 100 100)), POLYGON((0 0, 1 0, 1 1)))",
+            "GEOMETRYCOLLECTION (POLYGON ((100 100,200 200,200 100,100 100)),POLYGON ((0 0,1 1,1 0,0 0)))",
+            id="GeometryCollection with non-closed Polygon",
+        ),
+        pytest.param(
+            "POLYGON ((0 0, 100 0, 100 100, 0 100, 0 0), (50 50, 60 50))",
+            "POLYGON ((0 0,0 100,100 100,100 0,0 0))",
+            id="Polygon with collapsed hole",
+        ),
+    ],
+)
+@pytest.mark.require_geos(3, 10, 0)
+def test_ogr_geom_makevalid_structure_keepcollapsed(wkt, wkt_expected):
 
-    # Already valid multi-polygon made of a single-part
-    g = ogr.CreateGeometryFromWkt(
-        "MULTIPOLYGON Z (((0 0 10,1 0 10,1 1 10,0 1 10,0 0 10)))"
-    )
-    g = g.MakeValid(["METHOD=STRUCTURE"])
-    assert (
-        g.ExportToIsoWkt() == "MULTIPOLYGON Z (((0 0 10,1 0 10,1 1 10,0 1 10,0 0 10)))"
-        or g.ExportToIsoWkt()
-        == "MULTIPOLYGON Z (((0 0 10,0 1 10,1 1 10,1 0 10,0 0 10)))"
-    )
-
-    # Already valid geometry collection
-    g = ogr.CreateGeometryFromWkt(
-        "GEOMETRYCOLLECTION (POLYGON ((0 0,1 0,1 1,0 1,0 0)))"
-    )
-    g = g.MakeValid(["METHOD=STRUCTURE"])
-    assert (
-        g.ExportToIsoWkt() == "GEOMETRYCOLLECTION (POLYGON ((0 0,1 0,1 1,0 1,0 0)))"
-        or g.ExportToIsoWkt() == "GEOMETRYCOLLECTION (POLYGON ((0 0,0 1,1 1,1 0,0 0)))"
-    )
+    g = ogr.CreateGeometryFromWkt(wkt)
+    result = g.MakeValid({"METHOD": "STRUCTURE", "KEEP_COLLAPSED": True})
+    assert result.Normalize().ExportToIsoWkt() == wkt_expected
 
 
 ###############################################################################

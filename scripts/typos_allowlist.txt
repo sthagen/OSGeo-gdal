@@ -361,6 +361,10 @@ for Bosnia and Herzegovina (country code "BA"), limited to the "county" subtype.
         "data/miramon/palettes/Continous/DBF_nodata_end/double_with_nodataI.rel",
         "data/miramon/palettes/Continous/ColorTable/uinteger_with_nodataI.rel",
         "data/miramon/palettes/Continous/LinearLogSimbo/LinearSimboWith0I.rel",
+        "data/miramon/palettes/Continous/ColorTable/directassignement/byte_2x3_6_categsI.rel",
+        "data/miramon/palettes/Continous/ColorTable/directassignement/uinteger_with_nodataI.rel",
+        "data/miramon/palettes/Continous/ColorTable/lineal/byte_2x3_6_categsI.rel",
+        "data/miramon/palettes/Continous/ColorTable/lineal_rare/byte_2x3_6_categsI.rel",
 %apply (int *INOUT) {int *buf_xsize, int *buf_ysize};
 #include <mach/mach.h>
         const bool bForcePaeth = EQUAL(pszGDAL_RASTER_TILE_PNG_FILTER, "PAETH");
@@ -373,3 +377,8 @@ for Bosnia and Herzegovina (country code "BA"), limited to the "county" subtype.
                 (1, 2, "metres"),
             {"depth", "depth", "metres", "1000000", "H5T_FLOAT",
             {"uncertainty", "uncertainty", "metres", "1000000", "H5T_FLOAT",
+    CPLString osIndexsNomsCamps = "1";
+        osIndexsNomsCamps.append(osIndex);
+    AddKeyValue(Key_IndexesNomsCamps, osIndexsNomsCamps);
+        AddKeyValue("IndexsJoinTaula", osIJT);
+    osSectionIn.append(":INOUT");

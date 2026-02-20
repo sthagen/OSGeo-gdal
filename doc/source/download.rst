@@ -7,7 +7,7 @@ Download
 .. only:: html
 
     .. contents::
-       :depth: 3
+       :depth: 4
        :backlinks: none
 
 The GDAL project distributes GDAL as source code and :ref:`Containers` only. :ref:`Binaries` produced by others are available for a variety of platforms and package managers.

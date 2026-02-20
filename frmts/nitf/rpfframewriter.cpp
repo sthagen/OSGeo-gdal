@@ -52,6 +52,9 @@ constexpr int CODEBOOK_MAX_SIZE = 4096;
 constexpr int TRANSPARENT_CODEBOOK_CODE = CODEBOOK_MAX_SIZE - 1;
 constexpr int TRANSPARENT_COLOR_TABLE_ENTRY = CADRG_MAX_COLOR_ENTRY_COUNT;
 
+constexpr int CADRG_SECOND_CT_COUNT = 32;
+constexpr int CADRG_THIRD_CT_COUNT = 16;
+
 constexpr double CADRG_PITCH_IN_CM = 0.0150;  // 150 micrometers
 
 constexpr int DEFAULT_DENSIFY_PTS = 21;
@@ -254,6 +257,8 @@ Create_CADRG_LocationComponent(GDALOffsetPatcher::OffsetPatcher *offsetPatcher)
          "IMAGE_DISPLAY_PARAMETERS_SECTION_LOCATION"},
         {LID_MaskSubsection /* 138 */, "MaskSubsection",
          "MASK_SUBSECTION_LOCATION"},
+        {LID_ColorConverterSubsection /* 139 */, "ColorConverterSubsection",
+         "COLOR_CONVERTER_SUBSECTION"},
         {LID_SpatialDataSubsection /* 140 */, "SpatialDataSubsection",
          "SPATIAL_DATA_SUBSECTION_LOCATION"},
         {LID_AttributeSectionSubheader /* 141 */, "AttributeSectionSubheader",
@@ -1126,6 +1131,9 @@ Create_CADRG_CoverageSection(GDALOffsetPatcher::OffsetPatcher *offsetPatcher,
 /*                 Create_CADRG_ColorGrayscaleSection()                 */
 /************************************************************************/
 
+constexpr GByte NUM_COLOR_TABLES = 3;
+constexpr GByte NUM_COLOR_CONVERTERS = 2;
+
 static void Create_CADRG_ColorGrayscaleSection(
     GDALOffsetPatcher::OffsetPatcher *offsetPatcher)
 {
@@ -1133,8 +1141,8 @@ static void Create_CADRG_ColorGrayscaleSection(
         "ColorGrayscaleSectionSubheader", /* bEndiannessIsLittle = */ false);
     CPLAssert(poBuffer);
     poBuffer->DeclareOffsetAtCurrentPosition("COLOR_GRAYSCALE_LOCATION");
-    poBuffer->AppendByte(1);  // NUMBER_OF_COLOR_GRAYSCALE_OFFSET_RECORDS
-    poBuffer->AppendByte(0);  // NUMBER_OF_COLOR_CONVERTER_OFFSET_RECORDS
+    poBuffer->AppendByte(NUM_COLOR_TABLES);
+    poBuffer->AppendByte(NUM_COLOR_CONVERTERS);
     // EXTERNAL_COLOR_GRAYSCALE_FILENAME
     poBuffer->AppendString(std::string(12, ' '));
 }
@@ -1191,64 +1199,98 @@ static void Create_CADRG_ImageDescriptionSection(
 /*                    Create_CADRG_ColormapSection()                    */
 /************************************************************************/
 
+constexpr uint16_t SZ_UINT16 = 2;
+constexpr uint16_t SZ_UINT32 = 4;
+constexpr uint32_t COLORMAP_OFFSET_TABLE_OFFSET = SZ_UINT32 + SZ_UINT16;
+constexpr uint16_t COLOR_GRAYSCALE_OFFSET_RECORD_LENGTH = 17;
+
 static void Create_CADRG_ColormapSection(
     GDALOffsetPatcher::OffsetPatcher *offsetPatcher, GDALDataset *poSrcDS,
     bool bHasTransparentPixels,
-    const std::vector<BucketItem<ColorTableBased4x4Pixels>> &codebook)
+    const std::vector<BucketItem<ColorTableBased4x4Pixels>> &codebook,
+    const CADRGCreateCopyContext &copyContext)
 {
     auto poBuffer = offsetPatcher->CreateBuffer(
         "ColormapSubsection", /* bEndiannessIsLittle = */ false);
     CPLAssert(poBuffer);
     poBuffer->DeclareOffsetAtCurrentPosition("COLORMAP_LOCATION");
-    constexpr uint32_t HEADER_LENGTH =
-        static_cast<uint32_t>(sizeof(uint32_t) + sizeof(uint16_t));
-    poBuffer->AppendUInt32(HEADER_LENGTH);  // COLORMAP_OFFSET_TABLE_OFFSET
-    constexpr uint16_t RECORD_LENGTH = 17;
-    poBuffer->AppendUInt16(
-        RECORD_LENGTH);  // COLOR_GRAYSCALE_OFFSET_RECORD_LENGTH
-    CPLAssert(poBuffer->GetBuffer().size() == HEADER_LENGTH);
+    poBuffer->AppendUInt32(COLORMAP_OFFSET_TABLE_OFFSET);
+    poBuffer->AppendUInt16(COLOR_GRAYSCALE_OFFSET_RECORD_LENGTH);
+    CPLAssert(poBuffer->GetBuffer().size() == COLORMAP_OFFSET_TABLE_OFFSET);
 
-    poBuffer->AppendUInt16(2);  // color/grayscale table id
-    poBuffer->AppendUInt32(CADRG_MAX_COLOR_ENTRY_COUNT);  // number of colors
+    uint32_t nColorTableOffset =
+        COLORMAP_OFFSET_TABLE_OFFSET +
+        NUM_COLOR_TABLES * COLOR_GRAYSCALE_OFFSET_RECORD_LENGTH;
     // 4=R,G,B,M
     constexpr GByte COLOR_TABLE_ENTRY_SIZE = 4;
-    poBuffer->AppendByte(
-        COLOR_TABLE_ENTRY_SIZE);  // color/grayscale element length
-    poBuffer->AppendUInt16(
-        static_cast<uint16_t>(sizeof(uint32_t)));  // histogram record length
-    poBuffer->AppendUInt32(HEADER_LENGTH +
-                           RECORD_LENGTH);  // color/grayscale table offset
-    poBuffer->AppendUInt32(HEADER_LENGTH + RECORD_LENGTH *
-                                               CADRG_MAX_COLOR_ENTRY_COUNT *
-                                               COLOR_TABLE_ENTRY_SIZE);
-
-    // Write color table
-    const auto poCT = poSrcDS->GetRasterBand(1)->GetColorTable();
-    const int nMaxCTEntries =
-        CADRG_MAX_COLOR_ENTRY_COUNT + (bHasTransparentPixels ? 1 : 0);
-    for (int i = 0; i < nMaxCTEntries; ++i)
+    uint32_t nHistogramTableOffset =
+        COLORMAP_OFFSET_TABLE_OFFSET +
+        NUM_COLOR_TABLES * COLOR_GRAYSCALE_OFFSET_RECORD_LENGTH +
+        (CADRG_MAX_COLOR_ENTRY_COUNT + CADRG_SECOND_CT_COUNT +
+         CADRG_THIRD_CT_COUNT) *
+            COLOR_TABLE_ENTRY_SIZE;
+    for (int i = 0; i < NUM_COLOR_TABLES; ++i)
     {
-        if (i < poCT->GetColorEntryCount())
+        poBuffer->AppendUInt16(2);  // color/grayscale table id
+        // number of colors
+        const uint32_t nColorCount = (i == 0)   ? CADRG_MAX_COLOR_ENTRY_COUNT
+                                     : (i == 1) ? CADRG_SECOND_CT_COUNT
+                                                : CADRG_THIRD_CT_COUNT;
+        poBuffer->AppendUInt32(nColorCount);
+        poBuffer->AppendByte(
+            COLOR_TABLE_ENTRY_SIZE);  // color/grayscale element length
+        poBuffer->AppendUInt16(static_cast<uint16_t>(
+            sizeof(uint32_t)));  // histogram record length
+        // color/grayscale table offset
+        poBuffer->AppendUInt32(nColorTableOffset);
+        nColorTableOffset += nColorCount * COLOR_TABLE_ENTRY_SIZE;
+        // histogram table offset
+        poBuffer->AppendUInt32(nHistogramTableOffset);
+        nHistogramTableOffset +=
+            nColorCount * static_cast<uint32_t>(sizeof(uint32_t));
+    }
+    CPLAssert(poBuffer->GetBuffer().size() ==
+              COLORMAP_OFFSET_TABLE_OFFSET +
+                  NUM_COLOR_TABLES * COLOR_GRAYSCALE_OFFSET_RECORD_LENGTH);
+
+    // Write color tables
+    for (int iCT = 0; iCT < NUM_COLOR_TABLES; ++iCT)
+    {
+        const auto poCT = (iCT == 0)
+                              ? poSrcDS->GetRasterBand(1)->GetColorTable()
+                          : (iCT == 1) ? &(copyContext.oCT2)
+                                       : &(copyContext.oCT3);
+        const int nMaxCTEntries =
+            (iCT == 0)
+                ? CADRG_MAX_COLOR_ENTRY_COUNT + (bHasTransparentPixels ? 1 : 0)
+            : (iCT == 1) ? CADRG_SECOND_CT_COUNT
+                         : CADRG_THIRD_CT_COUNT;
+        for (int i = 0; i < nMaxCTEntries; ++i)
         {
-            auto psEntry = poCT->GetColorEntry(i);
-            poBuffer->AppendByte(static_cast<GByte>(psEntry->c1));
-            poBuffer->AppendByte(static_cast<GByte>(psEntry->c2));
-            poBuffer->AppendByte(static_cast<GByte>(psEntry->c3));
-            // Standard formula to convert R,G,B to gray scale level
-            const int M =
-                (psEntry->c1 * 299 + psEntry->c2 * 587 + psEntry->c3 * 114) /
-                1000;
-            poBuffer->AppendByte(static_cast<GByte>(M));
-        }
-        else
-        {
-            poBuffer->AppendUInt32(0);
+            if (i < poCT->GetColorEntryCount())
+            {
+                const auto psEntry = poCT->GetColorEntry(i);
+                poBuffer->AppendByte(static_cast<GByte>(psEntry->c1));
+                poBuffer->AppendByte(static_cast<GByte>(psEntry->c2));
+                poBuffer->AppendByte(static_cast<GByte>(psEntry->c3));
+                // Standard formula to convert R,G,B to gray scale level
+                const int M = (psEntry->c1 * 299 + psEntry->c2 * 587 +
+                               psEntry->c3 * 114) /
+                              1000;
+                poBuffer->AppendByte(static_cast<GByte>(M));
+            }
+            else
+            {
+                poBuffer->AppendUInt32(0);
+            }
         }
     }
 
     // Compute the number of pixels in the output image per colormap entry
     // (exclude the entry for transparent pixels)
     std::vector<uint32_t> anHistogram(CADRG_MAX_COLOR_ENTRY_COUNT);
+    std::vector<uint32_t> anHistogram2(CADRG_SECOND_CT_COUNT);
+    std::vector<uint32_t> anHistogram3(CADRG_THIRD_CT_COUNT);
     size_t nTotalCount = 0;
     for (const auto &[i, item] : cpl::enumerate(codebook))
     {
@@ -1262,6 +1304,8 @@ static void Create_CADRG_ColormapSection(
             {
                 anHistogram[byVal] += item.m_count;
                 nTotalCount += item.m_count;
+                anHistogram2[copyContext.anMapCT1ToCT2[byVal]] += item.m_count;
+                anHistogram3[copyContext.anMapCT1ToCT3[byVal]] += item.m_count;
             }
         }
     }
@@ -1269,10 +1313,81 @@ static void Create_CADRG_ColormapSection(
                                  poSrcDS->GetRasterYSize());
     CPL_IGNORE_RET_VAL(nTotalCount);
 
-    // Write histogram
+    // Write histograms
     for (auto nCount : anHistogram)
     {
         poBuffer->AppendUInt32(nCount);
+    }
+    for (auto nCount : anHistogram2)
+    {
+        poBuffer->AppendUInt32(nCount);
+    }
+    for (auto nCount : anHistogram3)
+    {
+        poBuffer->AppendUInt32(nCount);
+    }
+}
+
+/************************************************************************/
+/*               Create_CADRG_ColorConverterSubsection()                */
+/************************************************************************/
+
+static void Create_CADRG_ColorConverterSubsection(
+    GDALOffsetPatcher::OffsetPatcher *offsetPatcher, bool bHasTransparentPixels,
+    const CADRGCreateCopyContext &copyContext)
+{
+    auto poBuffer = offsetPatcher->CreateBuffer(
+        "ColorConverterSubsection", /* bEndiannessIsLittle = */ false);
+    CPLAssert(poBuffer);
+    poBuffer->DeclareOffsetAtCurrentPosition("COLOR_CONVERTER_SUBSECTION");
+
+    constexpr uint32_t COLOR_CONVERTER_OFFSET_TABLE_OFFSET =
+        SZ_UINT32 + SZ_UINT16 + SZ_UINT16;
+    poBuffer->AppendUInt32(COLOR_CONVERTER_OFFSET_TABLE_OFFSET);
+    constexpr uint16_t COLOR_CONVERTER_OFFSET_RECORD_LENGTH =
+        SZ_UINT16 + SZ_UINT32 + SZ_UINT32 + SZ_UINT32;
+    poBuffer->AppendUInt16(COLOR_CONVERTER_OFFSET_RECORD_LENGTH);
+    constexpr uint16_t COLOR_CONVERTER_RECORD_LENGTH = SZ_UINT32;
+    poBuffer->AppendUInt16(COLOR_CONVERTER_RECORD_LENGTH);
+    const int numberColorConverterRecords =
+        CADRG_MAX_COLOR_ENTRY_COUNT + (bHasTransparentPixels ? 1 : 0);
+
+    for (int i = 0; i < NUM_COLOR_CONVERTERS; ++i)
+    {
+        constexpr uint16_t COLOR_CONVERTER_TABLE_ID = 5;
+        poBuffer->AppendUInt16(COLOR_CONVERTER_TABLE_ID);
+        poBuffer->AppendUInt32(numberColorConverterRecords);
+        uint32_t colorConverterTableOffset =
+            COLOR_CONVERTER_OFFSET_TABLE_OFFSET +
+            2 * COLOR_CONVERTER_OFFSET_RECORD_LENGTH +
+            i * numberColorConverterRecords * COLOR_CONVERTER_RECORD_LENGTH;
+        poBuffer->AppendUInt32(colorConverterTableOffset);
+        constexpr uint32_t SOURCE_OFFSET_TABLE_OFFSET =
+            COLORMAP_OFFSET_TABLE_OFFSET;
+        poBuffer->AppendUInt32(SOURCE_OFFSET_TABLE_OFFSET);
+        const uint32_t targetOffsetTableOffset =
+            COLORMAP_OFFSET_TABLE_OFFSET +
+            i * COLOR_GRAYSCALE_OFFSET_RECORD_LENGTH;
+        poBuffer->AppendUInt32(targetOffsetTableOffset);
+    }
+
+    for (int iCvt = 0; iCvt < NUM_COLOR_CONVERTERS; ++iCvt)
+    {
+        for (int j = 0; j < numberColorConverterRecords; ++j)
+        {
+            if (j == CADRG_MAX_COLOR_ENTRY_COUNT)
+            {
+                // It is not specified what we should do about the transparent
+                // entry...
+                poBuffer->AppendUInt32(0);
+            }
+            else
+            {
+                poBuffer->AppendUInt32((iCvt == 0)
+                                           ? copyContext.anMapCT1ToCT2[j]
+                                           : copyContext.anMapCT1ToCT3[j]);
+            }
+        }
     }
 }
 
@@ -1469,7 +1584,8 @@ static bool Perform_CADRG_VQ_Compression(
 std::unique_ptr<CADRGInformation>
 RPFFrameCreateCADRG_TREs(GDALOffsetPatcher::OffsetPatcher *offsetPatcher,
                          const std::string &osFilename, GDALDataset *poSrcDS,
-                         CPLStringList &aosOptions, int nReciprocalScale)
+                         CPLStringList &aosOptions,
+                         const CADRGCreateCopyContext &copyContext)
 {
     auto priv = std::make_unique<CADRGInformation::Private>();
     if (!Perform_CADRG_VQ_Compression(poSrcDS, priv->codebook, priv->VQImage,
@@ -1482,11 +1598,15 @@ RPFFrameCreateCADRG_TREs(GDALOffsetPatcher::OffsetPatcher *offsetPatcher,
 
     // Create buffers that will be written into file by RPFFrameWriteCADRG_RPFIMG()s
     Create_CADRG_LocationComponent(offsetPatcher);
-    if (!Create_CADRG_CoverageSection(offsetPatcher, poSrcDS, nReciprocalScale))
+    if (!Create_CADRG_CoverageSection(offsetPatcher, poSrcDS,
+                                      copyContext.nReciprocalScale))
         return nullptr;
     Create_CADRG_ColorGrayscaleSection(offsetPatcher);
     Create_CADRG_ColormapSection(offsetPatcher, poSrcDS,
-                                 priv->bHasTransparentPixels, priv->codebook);
+                                 priv->bHasTransparentPixels, priv->codebook,
+                                 copyContext);
+    Create_CADRG_ColorConverterSubsection(
+        offsetPatcher, priv->bHasTransparentPixels, copyContext);
     Create_CADRG_ImageDescriptionSection(offsetPatcher, poSrcDS,
                                          priv->bHasTransparentPixels);
     return std::make_unique<CADRGInformation>(std::move(priv));
@@ -1504,7 +1624,7 @@ bool RPFFrameWriteCADRG_RPFIMG(GDALOffsetPatcher::OffsetPatcher *offsetPatcher,
     for (const char *pszName :
          {"LocationComponent", "CoverageSectionSubheader",
           "ColorGrayscaleSectionSubheader", "ColormapSubsection",
-          "ImageDescriptionSubheader"})
+          "ColorConverterSubsection", "ImageDescriptionSubheader"})
     {
         const auto poBuffer = offsetPatcher->GetBufferFromName(pszName);
         CPLAssert(poBuffer);
@@ -2147,6 +2267,310 @@ CADRGGetPalettedDataset(GDALDataset *poSrcDS, GDALColorTable *poCT,
 }
 
 /************************************************************************/
+/*                            CADRG_RGB_Type                            */
+/************************************************************************/
+
+struct CADRG_RGB_Type
+{
+};
+
+/************************************************************************/
+/*                        Vector<CADRG_RGB_Type>                        */
+/************************************************************************/
+
+template <> class Vector<CADRG_RGB_Type>
+{
+  private:
+    GByte m_R = 0;
+    GByte m_G = 0;
+    GByte m_B = 0;
+
+    Vector() = default;
+
+  public:
+    explicit Vector(GByte R, GByte G, GByte B) : m_R(R), m_G(G), m_B(B)
+    {
+    }
+
+    static constexpr int DIM_COUNT /* specialize */ = 3;
+
+    static constexpr bool getReturnUInt8 /* specialize */ = true;
+
+    static constexpr bool hasComputeFourSquaredDistances = false;
+
+    inline int get(int i, const CADRG_RGB_Type &) const /* specialize */
+    {
+        return i == 0 ? m_R : i == 1 ? m_G : m_B;
+    }
+
+    inline GByte r() const
+    {
+        return m_R;
+    }
+
+    inline GByte g() const
+    {
+        return m_G;
+    }
+
+    inline GByte b() const
+    {
+        return m_B;
+    }
+
+    /************************************************************************/
+    /*                          squared_distance()                          */
+    /************************************************************************/
+
+    int squared_distance(const Vector &other,
+                         const CADRG_RGB_Type &) const /* specialize */
+    {
+        const int nSqDist1 = square(m_R - other.m_R);
+        const int nSqDist2 = square(m_G - other.m_G);
+        const int nSqDist3 = square(m_B - other.m_B);
+        return nSqDist1 + nSqDist2 + nSqDist3;
+    }
+
+    /************************************************************************/
+    /*                              centroid()                              */
+    /************************************************************************/
+
+    static Vector centroid(const Vector &a, int nA, const Vector &b, int nB,
+                           const CADRG_RGB_Type &) /* specialize */
+    {
+        Vector res;
+        res.m_R = static_cast<GByte>((static_cast<uint64_t>(a.m_R) * nA +
+                                      static_cast<uint64_t>(b.m_R) * nB +
+                                      (nA + nB) / 2) /
+                                     (nA + nB));
+        res.m_G = static_cast<GByte>((static_cast<uint64_t>(a.m_G) * nA +
+                                      static_cast<uint64_t>(b.m_G) * nB +
+                                      (nA + nB) / 2) /
+                                     (nA + nB));
+        res.m_B = static_cast<GByte>((static_cast<uint64_t>(a.m_B) * nA +
+                                      static_cast<uint64_t>(b.m_B) * nB +
+                                      (nA + nB) / 2) /
+                                     (nA + nB));
+        return res;
+    }
+
+    /************************************************************************/
+    /*                           operator == ()                             */
+    /************************************************************************/
+
+    inline bool operator==(const Vector &other) const
+    {
+        return m_R == other.m_R && m_G == other.m_G && m_B == other.m_B;
+    }
+
+    /************************************************************************/
+    /*                           operator < ()                              */
+    /************************************************************************/
+
+    // Purely arbitrary for the purpose of distinguishing a vector from
+    // another one
+    inline bool operator<(const Vector &other) const
+    {
+        const int nA = (m_R) | (m_G << 8) | (m_B << 16);
+        const int nB = (m_R) | (other.m_G << 8) | (other.m_B << 16);
+        return nA < nB;
+    }
+};
+
+/************************************************************************/
+/*                         ComputeColorTables()                         */
+/************************************************************************/
+
+static bool ComputeColorTables(GDALDataset *poSrcDS, GDALColorTable &oCT,
+                               int nColorQuantizationBits,
+                               GDALProgressFunc pfnProgress,
+                               void *pProgressData,
+                               CADRGCreateCopyContext &copyContext)
+
+{
+    std::vector<GUIntBig> anPixelCountPerColorTableEntry;
+    if (poSrcDS->GetRasterCount() >= 3)
+    {
+        if (GDALComputeMedianCutPCT(
+                GDALRasterBand::ToHandle(poSrcDS->GetRasterBand(1)),
+                GDALRasterBand::ToHandle(poSrcDS->GetRasterBand(2)),
+                GDALRasterBand::ToHandle(poSrcDS->GetRasterBand(3)), nullptr,
+                nullptr, nullptr, nullptr, CADRG_MAX_COLOR_ENTRY_COUNT,
+                nColorQuantizationBits, static_cast<GUIntBig *>(nullptr),
+                GDALColorTable::ToHandle(&oCT), pfnProgress, pProgressData,
+                &anPixelCountPerColorTableEntry) != CE_None)
+        {
+            return false;
+        }
+    }
+    else
+    {
+        // Compute histogram of the source dataset
+        const auto poCT = poSrcDS->GetRasterBand(1)->GetColorTable();
+        CPLAssert(poCT);
+        const int nColors =
+            std::min(poCT->GetColorEntryCount(), CADRG_MAX_COLOR_ENTRY_COUNT);
+        for (int i = 0; i < nColors; ++i)
+        {
+            oCT.SetColorEntry(i, poCT->GetColorEntry(i));
+        }
+        anPixelCountPerColorTableEntry.resize(nColors);
+        const int nXSize = poSrcDS->GetRasterXSize();
+        const int nYSize = poSrcDS->GetRasterYSize();
+        std::vector<GByte> abyLine(nXSize);
+        for (int iY = 0; iY < nYSize; ++iY)
+        {
+            if (poSrcDS->GetRasterBand(1)->RasterIO(
+                    GF_Read, 0, iY, nXSize, 1, abyLine.data(), nXSize, 1,
+                    GDT_UInt8, 0, 0, nullptr) != CE_None)
+            {
+                return false;
+            }
+            for (int iX = 0; iX < nXSize; ++iX)
+            {
+                const int nVal = abyLine[iX];
+                if (nVal < nColors)
+                    ++anPixelCountPerColorTableEntry[nVal];
+            }
+        }
+    }
+
+    std::vector<BucketItem<CADRG_RGB_Type>> vectors;
+    const int nColors =
+        std::min(oCT.GetColorEntryCount(), CADRG_MAX_COLOR_ENTRY_COUNT);
+    CPLAssert(anPixelCountPerColorTableEntry.size() >=
+              static_cast<size_t>(nColors));
+
+    GUIntBig nTotalCount = 0;
+    for (int i = 0; i < nColors; ++i)
+    {
+        nTotalCount += anPixelCountPerColorTableEntry[i];
+    }
+
+    // 3 for R,G,B
+    std::map<std::array<GByte, 3>, std::vector<int>> oMapUniqueEntries;
+    for (int i = 0; i < nColors; ++i)
+    {
+        const auto entry = oCT.GetColorEntry(i);
+        if (entry->c4 && anPixelCountPerColorTableEntry[i])
+        {
+            const auto R = static_cast<GByte>(entry->c1);
+            const auto G = static_cast<GByte>(entry->c2);
+            const auto B = static_cast<GByte>(entry->c3);
+            oMapUniqueEntries[std::array<GByte, 3>{R, G, B}].push_back(i);
+        }
+    }
+
+    const int nUniqueColors = static_cast<int>(oMapUniqueEntries.size());
+    for (auto &[RGB, indices] : oMapUniqueEntries)
+    {
+        uint64_t nThisEntryCount = 0;
+        for (int idx : indices)
+            nThisEntryCount += anPixelCountPerColorTableEntry[idx];
+
+        // Rescale pixel counts for primary color table so that their sum
+        // does not exceed INT_MAX, as this is the type of m_count in the
+        // BucketItem class.
+        const int nCountRescaled =
+            std::max(1, static_cast<int>(static_cast<double>(nThisEntryCount) /
+                                         static_cast<double>(nTotalCount) *
+                                         (INT_MAX - nUniqueColors)));
+        Vector<CADRG_RGB_Type> v(RGB[0], RGB[1], RGB[2]);
+        vectors.emplace_back(v, nCountRescaled, std::move(indices));
+    }
+
+    // Create the KD-Tree
+    PNNKDTree<CADRG_RGB_Type> kdtree;
+    CADRG_RGB_Type ctxt;
+
+    int nCodeCount = kdtree.insert(std::move(vectors), ctxt);
+
+    // Compute 32 entry color table
+    if (nCodeCount > CADRG_SECOND_CT_COUNT)
+    {
+        nCodeCount = kdtree.cluster(nCodeCount, CADRG_SECOND_CT_COUNT, ctxt);
+        if (nCodeCount == 0)
+            return false;
+    }
+
+    copyContext.oCT2 = GDALColorTable();
+    copyContext.anMapCT1ToCT2.clear();
+    copyContext.anMapCT1ToCT2.resize(nColors);
+    kdtree.iterateOverLeaves(
+        [&oCT, &copyContext](PNNKDTree<CADRG_RGB_Type> &node)
+        {
+            CPL_IGNORE_RET_VAL(oCT);
+            int i = copyContext.oCT2.GetColorEntryCount();
+            for (auto &item : node.bucketItems())
+            {
+                for (const auto idx : item.m_origVectorIndices)
+                {
+#ifdef DEBUG_VERBOSE
+                    const auto psSrcEntry = oCT.GetColorEntry(idx);
+                    CPLDebugOnly(
+                        "CADRG", "Second CT: %d: %d %d %d <-- %d: %d %d %d", i,
+                        item.m_vec.r(), item.m_vec.g(), item.m_vec.b(), idx,
+                        psSrcEntry->c1, psSrcEntry->c2, psSrcEntry->c3);
+#endif
+                    copyContext.anMapCT1ToCT2[idx] = i;
+                }
+                GDALColorEntry sEntry;
+                sEntry.c1 = item.m_vec.r();
+                sEntry.c2 = item.m_vec.g();
+                sEntry.c3 = item.m_vec.b();
+                sEntry.c4 = 255;
+                copyContext.oCT2.SetColorEntry(i, &sEntry);
+                ++i;
+            }
+        });
+
+    // Compute 16 entry color table
+    if (nCodeCount > CADRG_THIRD_CT_COUNT)
+    {
+        nCodeCount = kdtree.cluster(nCodeCount, CADRG_THIRD_CT_COUNT, ctxt);
+        if (nCodeCount == 0)
+            return false;
+    }
+
+    copyContext.oCT3 = GDALColorTable();
+    copyContext.anMapCT1ToCT3.clear();
+    copyContext.anMapCT1ToCT3.resize(nColors);
+    kdtree.iterateOverLeaves(
+        [&oCT, &copyContext](PNNKDTree<CADRG_RGB_Type> &node)
+        {
+            CPL_IGNORE_RET_VAL(oCT);
+            int i = copyContext.oCT3.GetColorEntryCount();
+            for (auto &item : node.bucketItems())
+            {
+                for (const auto idx : item.m_origVectorIndices)
+                {
+#ifdef DEBUG_VERBOSE
+                    const auto psSrcEntry = oCT.GetColorEntry(idx);
+                    CPLDebugOnly(
+                        "CADRG", "Third CT: %d: %d %d %d <-- %d: %d %d %d", i,
+                        item.m_vec.r(), item.m_vec.g(), item.m_vec.b(), idx,
+                        psSrcEntry->c1, psSrcEntry->c2, psSrcEntry->c3);
+#endif
+                    copyContext.anMapCT1ToCT3[idx] = i;
+                }
+                GDALColorEntry sEntry;
+                sEntry.c1 = item.m_vec.r();
+                sEntry.c2 = item.m_vec.g();
+                sEntry.c3 = item.m_vec.b();
+                sEntry.c4 = 255;
+                copyContext.oCT3.SetColorEntry(i, &sEntry);
+                ++i;
+            }
+        });
+
+    // Add transparency entry to primary color table
+    GDALColorEntry sEntry = {0, 0, 0, 0};
+    oCT.SetColorEntry(TRANSPARENT_COLOR_TABLE_ENTRY, &sEntry);
+
+    return true;
+}
+
+/************************************************************************/
 /*                          CADRGCreateCopy()                           */
 /************************************************************************/
 
@@ -2154,8 +2578,11 @@ CADRGGetPalettedDataset(GDALDataset *poSrcDS, GDALColorTable *poCT,
 std::variant<bool, std::unique_ptr<GDALDataset>>
 CADRGCreateCopy(const char *pszFilename, GDALDataset *poSrcDS, int bStrict,
                 CSLConstList papszOptions, GDALProgressFunc pfnProgress,
-                void *pProgressData, int nRecLevel, int &nReciprocalScale)
+                void *pProgressData, int nRecLevel,
+                CADRGCreateCopyContext *copyContext)
 {
+    int &nReciprocalScale = copyContext->nReciprocalScale;
+
     if (poSrcDS->GetRasterBand(1)->GetRasterDataType() != GDT_UInt8)
     {
         CPLError(CE_Failure, CPLE_AppDefined,
@@ -2434,6 +2861,16 @@ CADRGCreateCopy(const char *pszFilename, GDALDataset *poSrcDS, int bStrict,
                      "have an associated color table");
             return false;
         }
+        dfLastPct = 0.1;
+        std::unique_ptr<void, decltype(&GDALDestroyScaledProgress)> pScaledData(
+            GDALCreateScaledProgress(0, dfLastPct, pfnProgress, pProgressData),
+            GDALDestroyScaledProgress);
+        if (!ComputeColorTables(poSrcDS, oCT, nColorQuantizationBits,
+                                GDALScaledProgress, pScaledData.get(),
+                                *(copyContext)))
+        {
+            return false;
+        }
     }
     else if (poSrcDS->GetRasterCount() >= 3 &&
              poSrcDS->GetRasterBand(1)->GetColorInterpretation() ==
@@ -2454,20 +2891,12 @@ CADRGCreateCopy(const char *pszFilename, GDALDataset *poSrcDS, int bStrict,
                 pScaledData(GDALCreateScaledProgress(0, dfLastPct, pfnProgress,
                                                      pProgressData),
                             GDALDestroyScaledProgress);
-            if (GDALComputeMedianCutPCT(
-                    GDALRasterBand::ToHandle(poSrcDS->GetRasterBand(1)),
-                    GDALRasterBand::ToHandle(poSrcDS->GetRasterBand(2)),
-                    GDALRasterBand::ToHandle(poSrcDS->GetRasterBand(3)),
-                    nullptr, nullptr, nullptr, nullptr,
-                    CADRG_MAX_COLOR_ENTRY_COUNT, nColorQuantizationBits,
-                    static_cast<GUIntBig *>(nullptr),
-                    GDALColorTable::ToHandle(&oCT), GDALScaledProgress,
-                    pScaledData.get()) != CE_None)
+            if (!ComputeColorTables(poSrcDS, oCT, nColorQuantizationBits,
+                                    GDALScaledProgress, pScaledData.get(),
+                                    *(copyContext)))
             {
                 return false;
             }
-            GDALColorEntry sEntry = {0, 0, 0, 0};
-            oCT.SetColorEntry(TRANSPARENT_COLOR_TABLE_ENTRY, &sEntry);
         }
     }
     else
@@ -2492,7 +2921,8 @@ CADRGCreateCopy(const char *pszFilename, GDALDataset *poSrcDS, int bStrict,
                             GDALDestroyScaledProgress);
             return NITFDataset::CreateCopy(
                 pszFilename, poPalettedDS.get(), bStrict, papszOptions,
-                GDALScaledProgress, pScaledData.get(), nRecLevel + 1);
+                GDALScaledProgress, pScaledData.get(), nRecLevel + 1,
+                copyContext);
         }
 
         return true;
@@ -2612,13 +3042,13 @@ CADRGCreateCopy(const char *pszFilename, GDALDataset *poSrcDS, int bStrict,
             {
                 return NITFDataset::CreateCopy(
                     osFilename.c_str(), poSrcDS, bStrict, papszOptions,
-                    pfnProgress, pProgressData, nRecLevel + 1);
+                    pfnProgress, pProgressData, nRecLevel + 1, copyContext);
             }
             else if (poCT)
             {
                 return NITFDataset::CreateCopy(
                     osFilename.c_str(), poSrcDS, bStrict, papszOptions,
-                    pfnProgress, pProgressData, nRecLevel + 1);
+                    pfnProgress, pProgressData, nRecLevel + 1, copyContext);
             }
             else
             {
@@ -2628,7 +3058,8 @@ CADRGCreateCopy(const char *pszFilename, GDALDataset *poSrcDS, int bStrict,
                     return false;
                 return NITFDataset::CreateCopy(
                     osFilename.c_str(), poPalettedDS.get(), bStrict,
-                    papszOptions, pfnProgress, pProgressData, nRecLevel + 1);
+                    papszOptions, pfnProgress, pProgressData, nRecLevel + 1,
+                    copyContext);
             }
         }
         else
@@ -2826,7 +3257,7 @@ CADRGCreateCopy(const char *pszFilename, GDALDataset *poSrcDS, int bStrict,
                              bColorTablePerFrame, &oMutex, &poWarpedDS,
                              &nCurFrameThisZone, &nCurFrameCounter, &bError,
                              &oCT, &aosOptions, &bMissingFramesFound,
-                             &osErrorMsg]()
+                             &osErrorMsg, copyContext]()
                         {
 #ifdef __COVERITY__
 #define LOCK()                                                                 \
@@ -2890,7 +3321,7 @@ CADRGCreateCopy(const char *pszFilename, GDALDataset *poSrcDS, int bStrict,
                                 poDS_CADRG = NITFDataset::CreateCopy(
                                     osFilename.c_str(), poClippedDS.get(),
                                     bStrict, aosOptions.List(), nullptr,
-                                    nullptr, nRecLevel + 1);
+                                    nullptr, nRecLevel + 1, copyContext);
                             }
                             if (!poDS_CADRG)
                             {

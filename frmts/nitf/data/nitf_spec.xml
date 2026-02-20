@@ -2704,7 +2704,7 @@
             <field name="TRANSPARENCY_SEQUENCE_RECORD_LENGTH" length="2" type="UnsignedInt_BigEndian"/>
             <field name="TRANSPARENT_OUTPUT_PIXEL_CODE_LENGTH" length="2" type="UnsignedInt_BigEndian"/>
             <if cond="TRANSPARENT_OUTPUT_PIXEL_CODE_LENGTH=8">
-                <field name="TRANSPARENT_OUTPUT_PIXEL_CODE_" length="1" type="UnsignedInt_BigEndian"/>
+                <field name="TRANSPARENT_OUTPUT_PIXEL_CODE" length="1" type="UnsignedInt_BigEndian"/>
             </if>
         </rpf_component>
 

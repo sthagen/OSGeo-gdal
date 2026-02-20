@@ -25,6 +25,8 @@
 #include <array>
 #include <map>
 
+struct CADRGCreateCopyContext;
+
 CPLErr NITFSetColorInterpretation(NITFImage *psImage, int nBand,
                                   GDALColorInterp eInterp);
 
@@ -181,7 +183,8 @@ class NITFDataset final : public GDALPamDataset
     static std::unique_ptr<GDALDataset>
     CreateCopy(const char *pszFilename, GDALDataset *poSrcDS, int bStrict,
                CSLConstList papszOptions, GDALProgressFunc pfnProgress,
-               void *pProgressData, int nRecLevel);
+               void *pProgressData, int nRecLevel,
+               CADRGCreateCopyContext *copyContext);
     static GDALDataset *NITFDatasetCreate(const char *pszFilename, int nXSize,
                                           int nYSize, int nBands,
                                           GDALDataType eType,

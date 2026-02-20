@@ -2312,3 +2312,22 @@ def test_warp_geolocation_array_with_rotation(tmp_path):
     ds = gdal.Open(tmp_path / "out.tif")
     ref_ds = gdal.Open("data/expected_output_for_geoloc_array_with_rotation.tif")
     assert ds.GetRasterBand(1).Checksum() == ref_ds.GetRasterBand(1).Checksum()
+
+
+@gdaltest.enable_exceptions()
+def test_warp_homography_overview():
+
+    src_ds = gdal.GetDriverByName("MEM").Create("", 10, 10)
+    src_ds.GetRasterBand(1).Fill(255)
+    gcp_ul = gdal.GCP(2, 49, 0.0, -0.5, -0.5)
+    gcp_ll = gdal.GCP(2, 48, 0.0, -0.5, 10.5)
+    gcp_lr = gdal.GCP(3, 48, 0.0, 10.5, 10.5)
+    gcp_ur = gdal.GCP(3, 49, 0.0, 10.5, -0.5)
+    src_ds.SetGCPs([gcp_ul, gcp_ll, gcp_lr, gcp_ur], None)
+    src_ds.BuildOverviews("NEAR", [2])
+
+    warped_vrt = gdal.Warp("", src_ds, format="VRT")
+    assert warped_vrt.GetRasterBand(1).GetOverview(0).ComputeRasterMinMax() == (
+        255,
+        255,
+    )

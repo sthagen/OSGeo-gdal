@@ -53,7 +53,11 @@ enum class RAT_OR_CT
 class MMRDataset final : public GDALPamDataset
 {
   public:
-    explicit MMRDataset(GDALOpenInfo *poOpenInfo);
+    explicit MMRDataset(GDALOpenInfo *poOpenInfo);  // Used in reading
+    MMRDataset(GDALProgressFunc pfnProgress, void *pProgressData,
+               CSLConstList papszOptions, CPLString osFilename,
+               GDALDataset &oSrcDS, const CPLString &osUsrPattern,
+               const CPLString &osPattern);  // Used in writing
     MMRDataset(const MMRDataset &) =
         delete;  // I don't want to construct a MMRDataset from another MMRDataset (effc++)
     MMRDataset &operator=(const MMRDataset &) =
@@ -62,6 +66,11 @@ class MMRDataset final : public GDALPamDataset
 
     static int Identify(GDALOpenInfo *);
     static GDALDataset *Open(GDALOpenInfo *);
+    static GDALDataset *CreateCopy(const char *pszFilename,
+                                   GDALDataset *poSrcDS, int bStrict,
+                                   CSLConstList papszOptions,
+                                   GDALProgressFunc pfnProgress,
+                                   void *pProgressData);
 
     MMRRel *GetRel()
     {
@@ -75,6 +84,7 @@ class MMRDataset final : public GDALPamDataset
 
   private:
     void ReadProjection();
+    void UpdateProjection(GDALDataset &oSrcDS);
     void AssignBandsToSubdataSets();
     void CreateSubdatasetsFromBands();
     bool CreateRasterBands();
@@ -83,6 +93,17 @@ class MMRDataset final : public GDALPamDataset
     int UpdateGeoTransform();
     const OGRSpatialReference *GetSpatialRef() const override;
     CPLErr GetGeoTransform(GDALGeoTransform &gt) const override;
+    static CPLString
+    CreateAssociatedMetadataFileName(const CPLString &osFileName);
+    static CPLString CreatePatternFileName(const CPLString &osFileName,
+                                           const CPLString &osPattern);
+    static bool BandInOptionsList(CSLConstList papszOptions, CPLString pszType,
+                                  CPLString osBand);
+    static bool IsCategoricalBand(GDALDataset &oSrcDS,
+                                  GDALRasterBand &pRasterBand,
+                                  CSLConstList papszOptions,
+                                  CPLString osIndexBand);
+    void WriteRGBMap();
 
     bool IsValid() const
     {
@@ -103,6 +124,24 @@ class MMRDataset final : public GDALPamDataset
 
     // To expose CT, RAT or both
     RAT_OR_CT nRatOrCT = RAT_OR_CT::ALL;
+
+    // For writing part
+    //
+    // EPSG number
+    CPLString m_osEPSG = "";
+    // Global raster dimensions
+    int m_nWidth = 0;
+    int m_nHeight = 0;
+
+    double m_dfMinX = MM_UNDEFINED_STATISTICAL_VALUE;
+    double m_dfMaxX = -MM_UNDEFINED_STATISTICAL_VALUE;
+    double m_dfMinY = MM_UNDEFINED_STATISTICAL_VALUE;
+    double m_dfMaxY = -MM_UNDEFINED_STATISTICAL_VALUE;
+
+    // If a RGB combination can be done, then a map ".mmm" will be generated
+    int m_nIBandR = -1;
+    int m_nIBandG = -1;
+    int m_nIBandB = -1;
 };
 
 #endif  // MMRDATASET_H_INCLUDED

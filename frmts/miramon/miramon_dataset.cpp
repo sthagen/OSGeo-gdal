@@ -43,6 +43,24 @@ void GDALRegister_MiraMon()
     poDriver->SetMetadataItem(GDAL_DMD_SUBDATASETS, "YES");
 
     poDriver->SetMetadataItem(GDAL_DCAP_OPEN, "YES");
+    poDriver->SetMetadataItem(GDAL_DCAP_CREATECOPY, "YES");
+
+    poDriver->SetMetadataItem(
+        GDAL_DMD_CREATIONOPTIONLIST,
+        "<CreationOptionList>"
+        "   <Option name='COMPRESS' type='boolean' description='Indicates  "
+        "whether the file will be compressed in RLE indexed mode'/>"
+        "   <Option name='PATTERN' type='int' description='Indicates the "
+        "pattern used to create the names of the different bands. In the "
+        "case of RGB, the suffixes “_R”, “_G”, and “_B” will be added to "
+        "the base name.'/>"
+        "   <Option name='CATEGORICAL_BANDS' type='string' "
+        "description='Indicates "
+        "which bands have to be treat as categorical.'/>"
+        "   <Option name='CONTINUOUS_BANDS' type='string' "
+        "description='Indicates "
+        "which bands have to be treat as continuous.'/>"
+        "</CreationOptionList>");
 
     poDriver->SetMetadataItem(
         GDAL_DMD_OPENOPTIONLIST,
@@ -57,6 +75,7 @@ void GDALRegister_MiraMon()
         "</OpenOptionList>\n");
 
     poDriver->pfnOpen = MMRDataset::Open;
+    poDriver->pfnCreateCopy = MMRDataset::CreateCopy;
     poDriver->pfnIdentify = MMRDataset::Identify;
 
     GetGDALDriverManager()->RegisterDriver(poDriver);
@@ -65,6 +84,141 @@ void GDALRegister_MiraMon()
 /************************************************************************/
 /*                             MMRDataset()                             */
 /************************************************************************/
+MMRDataset::MMRDataset(GDALProgressFunc pfnProgress, void *pProgressData,
+                       CSLConstList papszOptions, CPLString osRelname,
+                       GDALDataset &oSrcDS, const CPLString &osUsrPattern,
+                       const CPLString &osPattern)
+    : m_bIsValid(false)
+{
+    nBands = oSrcDS.GetRasterCount();
+    if (nBands == 0)
+    {
+        ReportError(osRelname, CE_Failure, CPLE_AppDefined,
+                    "Unable to translate to MiraMon files with zero bands.");
+        return;
+    }
+
+    UpdateProjection(oSrcDS);
+
+    // Getting bands information and creating MMRBand objects.
+    // Also checking if all bands have the same dimensions.
+    bool bNeedOfNomFitxer = (nBands > 1 || !osUsrPattern.empty());
+
+    std::vector<MMRBand> oBands{};
+    oBands.reserve(nBands);
+
+    bool bAllBandsSameDim = true;
+    for (int nIBand = 0; nIBand < nBands; nIBand++)
+    {
+        GDALRasterBand *pRasterBand = oSrcDS.GetRasterBand(nIBand + 1);
+        if (!pRasterBand)
+        {
+            ReportError(
+                osRelname, CE_Failure, CPLE_AppDefined,
+                "Unable to translate the band %d to MiraMon. Process canceled.",
+                nIBand);
+            return;
+        }
+
+        // Detection of the index of the band in the RGB composition (if it applies).
+        CPLString osIndexBand;
+        CPLString osNumberIndexBand;
+        if (pRasterBand->GetColorInterpretation() == GCI_RedBand)
+        {
+            osIndexBand = "R";
+            m_nIBandR = nIBand;
+        }
+        else if (pRasterBand->GetColorInterpretation() == GCI_GreenBand)
+        {
+            osIndexBand = "G";
+            m_nIBandG = nIBand;
+        }
+        else if (pRasterBand->GetColorInterpretation() == GCI_BlueBand)
+        {
+            osIndexBand = "B";
+            m_nIBandB = nIBand;
+        }
+        else if (pRasterBand->GetColorInterpretation() == GCI_AlphaBand)
+            osIndexBand = "Alpha";
+        else
+            osIndexBand = CPLSPrintf("%d", nIBand + 1);
+
+        osNumberIndexBand = CPLSPrintf("%d", nIBand + 1);
+        bool bCategorical = IsCategoricalBand(oSrcDS, *pRasterBand,
+                                              papszOptions, osNumberIndexBand);
+
+        bool bCompressDS =
+            EQUAL(CSLFetchNameValueDef(papszOptions, "COMPRESS", "YES"), "YES");
+
+        // Emplace back a MMRBand
+        oBands.emplace_back(pfnProgress, pProgressData, oSrcDS, nIBand,
+                            CPLGetPathSafe(osRelname), *pRasterBand,
+                            bCompressDS, bCategorical, osPattern, osIndexBand,
+                            bNeedOfNomFitxer);
+        if (!oBands.back().IsValid())
+        {
+            ReportError(
+                osRelname, CE_Failure, CPLE_AppDefined,
+                "Unable to translate the band %d to MiraMon. Process canceled.",
+                nIBand);
+            return;
+        }
+        if (nIBand == 0)
+        {
+            m_nWidth = oBands.back().GetWidth();
+            m_nHeight = oBands.back().GetHeight();
+        }
+        else if (m_nWidth != oBands.back().GetWidth() ||
+                 m_nHeight != oBands.back().GetHeight())
+        {
+            bAllBandsSameDim = false;
+        }
+    }
+
+    // Getting number of columns and rows
+    if (!bAllBandsSameDim)
+    {
+        // It's not an error. MiraMon have Datasets
+        // with dimensions for each band
+        m_nWidth = 0;
+        m_nHeight = 0;
+    }
+    else
+    {
+        // Getting geotransform
+        GDALGeoTransform gt;
+        if (oSrcDS.GetGeoTransform(gt) == CE_None)
+        {
+            m_dfMinX = gt[0];
+            m_dfMaxY = gt[3];
+            m_dfMaxX = m_dfMinX + m_nWidth * gt[1];
+            m_dfMinY = m_dfMaxY + m_nHeight * gt[5];
+        }
+    }
+
+    // Creating the MMRRel object with all the information of the dataset.
+    m_pMMRRel = std::make_unique<MMRRel>(
+        osRelname, bNeedOfNomFitxer, m_osEPSG, m_nWidth, m_nHeight, m_dfMinX,
+        m_dfMaxX, m_dfMinY, m_dfMaxY, std::move(oBands));
+
+    if (!m_pMMRRel->IsValid())
+        return;
+
+    // Lineage is updated with the source dataset information, if any, and with the creation options.
+    m_pMMRRel->UpdateLineage(papszOptions, oSrcDS);
+
+    // Writing all information in files: I.rel, IMG,...
+    if (!m_pMMRRel->Write(oSrcDS))
+    {
+        m_pMMRRel->SetIsValid(false);
+        return;
+    }
+
+    // If the dataset is RGB, we write the .mmm file with the RGB information of the bands.
+    WriteRGBMap();
+
+    m_bIsValid = true;
+}
 
 MMRDataset::MMRDataset(GDALOpenInfo *poOpenInfo)
 {
@@ -200,6 +354,42 @@ GDALDataset *MMRDataset::Open(GDALOpenInfo *poOpenInfo)
     return poDS.release();
 }
 
+/************************************************************************/
+/*                             CreateCopy()                             */
+/************************************************************************/
+GDALDataset *MMRDataset::CreateCopy(const char *pszFilename,
+                                    GDALDataset *poSrcDS, int /*bStrict*/,
+                                    CSLConstList papszOptions,
+                                    GDALProgressFunc pfnProgress,
+                                    void *pProgressData)
+
+{
+    // pszFilename doesn't have extension or must end in "I.rel"
+    const CPLString osFileName = pszFilename;
+    CPLString osRelName = CreateAssociatedMetadataFileName(osFileName);
+    if (osRelName.empty())
+        return nullptr;
+
+    // osPattern is needed to create band names.
+    CPLString osUsrPattern = CSLFetchNameValueDef(papszOptions, "PATTERN", "");
+    CPLString osPattern = CreatePatternFileName(osRelName, osUsrPattern);
+
+    if (osPattern.empty())
+        return nullptr;
+
+    auto poDS = std::make_unique<MMRDataset>(pfnProgress, pProgressData,
+                                             papszOptions, osRelName, *poSrcDS,
+                                             osUsrPattern, osPattern);
+
+    if (!poDS->IsValid())
+        return nullptr;
+
+    poDS->SetDescription(pszFilename);
+    poDS->eAccess = GA_Update;
+
+    return poDS.release();
+}
+
 bool MMRDataset::CreateRasterBands()
 {
     MMRBand *pBand;
@@ -225,20 +415,8 @@ bool MMRDataset::CreateRasterBands()
         }
 
         SetBand(nBands + 1, std::move(poRasterBand));
-
-        MMRRasterBand *poBand =
-            cpl::down_cast<MMRRasterBand *>(GetRasterBand(nIBand + 1));
-
-        pBand = m_pMMRRel->GetBand(nIBand);
-        if (!pBand)
-            return false;
-        if (!pBand->GetFriendlyDescription().empty())
-        {
-            poBand->SetMetadataItem("DESCRIPTION",
-                                    pBand->GetFriendlyDescription());
-        }
     }
-    // Some metadata items must be preserved just in case to be restored
+    // Not used metadata in the REL must be preserved just in case to be restored
     // if they are preserved through translations.
     m_pMMRRel->RELToGDALMetadata(this);
 
@@ -252,7 +430,6 @@ void MMRDataset::ReadProjection()
         return;
 
     CPLString osSRS;
-
     if (!m_pMMRRel->GetMetadataValue("SPATIAL_REFERENCE_SYSTEM:HORIZONTAL",
                                      "HorizontalSystemIdentifier", osSRS) ||
         osSRS.empty())
@@ -268,6 +445,40 @@ void MMRDataset::ReadProjection()
         m_oSRS.importFromEPSG(nEPSG);
 
     return;
+}
+
+void MMRDataset::UpdateProjection(GDALDataset &oSrcDS)
+{
+    const OGRSpatialReference *poSRS = oSrcDS.GetSpatialRef();
+    if (poSRS)
+    {
+        const char *pszTargetKey = nullptr;
+        const char *pszAuthorityName = nullptr;
+        const char *pszAuthorityCode = nullptr;
+
+        // Reading horizontal reference system and horizontal units
+        if (poSRS->IsProjected())
+            pszTargetKey = "PROJCS";
+        else if (poSRS->IsGeographic() || poSRS->IsDerivedGeographic())
+            pszTargetKey = "GEOGCS";
+        else if (poSRS->IsGeocentric())
+            pszTargetKey = "GEOCCS";
+        else if (poSRS->IsLocal())
+            pszTargetKey = "LOCAL_CS";
+
+        if (!poSRS->IsLocal())
+        {
+            pszAuthorityName = poSRS->GetAuthorityName(pszTargetKey);
+            pszAuthorityCode = poSRS->GetAuthorityCode(pszTargetKey);
+        }
+
+        if (pszAuthorityName && pszAuthorityCode &&
+            EQUAL(pszAuthorityName, "EPSG"))
+        {
+            CPLDebugOnly("MiraMon", "Setting EPSG code %s", pszAuthorityCode);
+            m_osEPSG = pszAuthorityCode;
+        }
+    }
 }
 
 /************************************************************************/
@@ -388,6 +599,7 @@ void MMRDataset::CreateSubdatasetsFromBands()
     }
 }
 
+// Checks if two bands should be in the same subdataset
 bool MMRDataset::BandInTheSameDataset(int nIBand1, int nIBand2) const
 {
     if (nIBand1 < 0 || nIBand2 < 0)
@@ -558,4 +770,221 @@ CPLErr MMRDataset::GetGeoTransform(GDALGeoTransform &gt) const
     }
 
     return GDALDataset::GetGeoTransform(gt);
+}
+
+/************************************************************************/
+/*                            REL/IMG names                             */
+/************************************************************************/
+
+// Finds the metadata filename associated to osFileName (usually an IMG file)
+CPLString
+MMRDataset::CreateAssociatedMetadataFileName(const CPLString &osFileName)
+{
+    if (osFileName.empty())
+    {
+        CPLError(CE_Failure, CPLE_OpenFailed, "Expected output file name.");
+        return "";
+    }
+
+    CPLString osRELName = osFileName;
+
+    // If the string finishes in "I.rel" we consider it can be
+    // the associated file to all bands that are documented in this file.
+    if (cpl::ends_with(osFileName, pszExtRasterREL))
+        return osRELName;
+
+    // If the string finishes in ".img" or ".rel" (and not "I.rel")
+    // we consider it can converted to "I.rel"
+    if (cpl::ends_with(osFileName, pszExtRaster) ||
+        cpl::ends_with(osFileName, pszExtREL))
+    {
+        // Extract extension
+        osRELName = CPLResetExtensionSafe(osRELName, "");
+
+        if (!osRELName.length())
+            return "";
+
+        // Extract "."
+        osRELName.resize(osRELName.size() - 1);
+
+        if (!osRELName.length())
+            return "";
+
+        // Add "I.rel"
+        osRELName += pszExtRasterREL;
+        return osRELName;
+    }
+
+    // If the file is not a REL file, let's assume that "I.rel" can be added
+    // to get the REL file.
+    osRELName += pszExtRasterREL;
+    return osRELName;
+}
+
+// Finds the pattern name to the bands
+CPLString MMRDataset::CreatePatternFileName(const CPLString &osFileName,
+                                            const CPLString &osPattern)
+{
+    if (!osPattern.empty())
+        return osPattern;
+
+    CPLString osRELName = osFileName;
+
+    if (!cpl::ends_with(osFileName, pszExtRasterREL))
+        return "";
+
+    // Extract I.rel and path
+    osRELName.resize(osRELName.size() - strlen("I.rel"));
+    return CPLGetBasenameSafe(osRELName);
+}
+
+// Checks if the band is in the list of categorical or continuous bands
+// specified by the user in the creation options.
+bool MMRDataset::BandInOptionsList(CSLConstList papszOptions, CPLString pszType,
+                                   CPLString osIndexBand)
+{
+    if (!papszOptions)
+        return false;
+
+    if (const char *pszCategoricalList =
+            CSLFetchNameValue(papszOptions, pszType))
+    {
+        const CPLStringList aosTokens(
+            CSLTokenizeString2(pszCategoricalList, ",", 0));
+
+        for (int i = 0; i < aosTokens.size(); ++i)
+        {
+            if (EQUAL(aosTokens[i], osIndexBand))
+                return true;
+        }
+    }
+    return false;
+}
+
+// MiraMon needs to know if the band is categorical or continuous to apply the right default symbology.
+bool MMRDataset::IsCategoricalBand(GDALDataset &oSrcDS,
+                                   GDALRasterBand &pRasterBand,
+                                   CSLConstList papszOptions,
+                                   CPLString osIndexBand)
+{
+    bool bUsrCategorical =
+        BandInOptionsList(papszOptions, "CATEGORICAL_BANDS", osIndexBand);
+    bool bUsrContinuous =
+        BandInOptionsList(papszOptions, "CONTINUOUS_BANDS", osIndexBand);
+
+    if (!bUsrCategorical && !bUsrContinuous)
+    {
+        // In case user doesn't specify anything, we try to deduce if the band is categorical or continuous
+        // First we try to see if there is metadata in the source dataset that can help us. We look for a key like
+        // "ATTRIBUTE_DATA$$$TractamentVariable" in the domain "MIRAMON"
+        CPLStringList aosMiraMonMetaData(oSrcDS.GetMetadata(MetadataDomain));
+        if (!aosMiraMonMetaData.empty())
+        {
+            CPLString osClue = CPLSPrintf("ATTRIBUTE_DATA%sTractamentVariable",
+                                          SecKeySeparator);
+            CPLString osTractamentVariable =
+                CSLFetchNameValueDef(aosMiraMonMetaData, osClue, "");
+            if (!osTractamentVariable.empty())
+            {
+                if (EQUAL(osTractamentVariable, "Categorical"))
+                    return true;
+                return false;
+            }
+        }
+
+        // In case of no metadata, we try to deduce if the band is categorical or continuous with some heuristics:
+        if (pRasterBand.GetCategoryNames() != nullptr)
+            return true;
+
+        // In case of floating point data, we consider that the band is continuous.
+        if (pRasterBand.GetRasterDataType() == GDT_Float32 ||
+            pRasterBand.GetRasterDataType() == GDT_Float64)
+            return false;
+
+        // In case of 8 bit integer with a color table, we consider that the band is categorical.
+        if ((pRasterBand.GetRasterDataType() == GDT_UInt8 ||
+             pRasterBand.GetRasterDataType() == GDT_Int8) &&
+            pRasterBand.GetColorTable() != nullptr)
+            return true;
+
+        // In case of the band has a RAT, we consider that the band is categorical.
+        // This is a heuristic that can be wrong in some cases, but in general if
+        // a band has a RAT it's because it has a limited number of values and they are categorical.
+        if (pRasterBand.GetDefaultRAT() != nullptr)
+            return true;
+    }
+    else if (bUsrCategorical && bUsrContinuous)
+    {
+        // User cannot impose both categorical and continuous treatment
+        CPLError(CE_Failure, CPLE_AppDefined, "%s",
+                 "Unable to interpret band as Categorical and Continuous at "
+                 "the same time. Categorical treatment will be used.");
+
+        return true;
+    }
+    else if (bUsrCategorical)
+        return true;
+
+    return false;
+}
+
+// In the RGB case, a map (.mmm) is generated with the RGB information of the bands.
+// This allows to visualize the RGB composition in MiraMon without having to create
+// a map in MiraMon and set the RGB information.
+void MMRDataset::WriteRGBMap()
+{
+    if (m_nIBandR == -1 || m_nIBandG == -1 || m_nIBandB == -1)
+        return;
+
+    CPLString osMapNameAux = m_pMMRRel->GetRELName();
+    CPLString osMapNameAux2 =
+        m_pMMRRel->MMRGetFileNameFromRelName(osMapNameAux, ".mmm");
+
+    auto pMMMap = std::make_unique<MMRRel>(osMapNameAux2);
+    if (!pMMMap->OpenRELFile("wb"))
+        return;
+
+    pMMMap->AddSectionStart(SECTION_VERSIO);
+    pMMMap->AddKeyValue(KEY_Vers, "2");
+    pMMMap->AddKeyValue(KEY_SubVers, "0");
+    pMMMap->AddKeyValue("variant", "b");
+    pMMMap->AddSectionEnd();
+
+    pMMMap->AddSectionStart("DOCUMENT");
+    pMMMap->AddKeyValue("Titol", CPLGetBasenameSafe(osMapNameAux2));
+    pMMMap->AddSectionEnd();
+
+    pMMMap->AddSectionStart("VISTA");
+    pMMMap->AddKeyValue("ordre", "RASTER_RGB_1");
+    pMMMap->AddSectionEnd();
+
+    pMMMap->AddSectionStart("RASTER_RGB_1");
+    pMMMap->AddKeyValue(
+        "FitxerR",
+        CPLGetFilename(m_pMMRRel->GetBand(m_nIBandR)->GetRawBandFileName()));
+    pMMMap->AddKeyValue(
+        "FitxerG",
+        CPLGetFilename(m_pMMRRel->GetBand(m_nIBandG)->GetRawBandFileName()));
+    pMMMap->AddKeyValue(
+        "FitxerB",
+        CPLGetFilename(m_pMMRRel->GetBand(m_nIBandB)->GetRawBandFileName()));
+    pMMMap->AddKeyValue("UnificVisCons", "1");
+    pMMMap->AddKeyValue("visualitzable", "1");
+    pMMMap->AddKeyValue("consultable", "1");
+    pMMMap->AddKeyValue("EscalaMaxima", "0");
+    pMMMap->AddKeyValue("EscalaMinima", "900000000");
+    pMMMap->AddKeyValue("LlegSimb_Vers", "4");
+    pMMMap->AddKeyValue("LlegSimb_SubVers", "5");
+    pMMMap->AddKeyValue("Color_VisibleALleg", "1");
+    CPLString osLlegTitle = "RGB:";
+    osLlegTitle.append(
+        CPLGetFilename(m_pMMRRel->GetBand(m_nIBandR)->GetBandName()));
+    osLlegTitle.append("+");
+    osLlegTitle.append(
+        CPLGetFilename(m_pMMRRel->GetBand(m_nIBandG)->GetBandName()));
+    osLlegTitle.append("+");
+    osLlegTitle.append(
+        CPLGetFilename(m_pMMRRel->GetBand(m_nIBandB)->GetBandName()));
+    pMMMap->AddKeyValue("Color_TitolLlegenda", osLlegTitle);
+    pMMMap->AddSectionEnd();
 }
