@@ -3123,14 +3123,20 @@ CADRGCreateCopy(const char *pszFilename, GDALDataset *poSrcDS, int bStrict,
                     osRPFDir.c_str(),
                     CPLSPrintf("ZONE%c", RPFCADRGZoneNumToChar(frameDef.nZone)),
                     nullptr);
-                VSIMkdir(osZoneDir.c_str(), 0755);
                 VSIStatBufL sStat;
-                if (VSIStatL(osZoneDir.c_str(), &sStat) != 0 ||
-                    !VSI_ISDIR(sStat.st_mode))
+                const bool bDirectoryAlreadyExists =
+                    (VSIStatL(osZoneDir.c_str(), &sStat) == 0);
+                if (!bDirectoryAlreadyExists)
                 {
-                    CPLError(CE_Failure, CPLE_AppDefined,
-                             "Cannot create directory %s", osZoneDir.c_str());
-                    return false;
+                    VSIMkdir(osZoneDir.c_str(), 0755);
+                    if (VSIStatL(osZoneDir.c_str(), &sStat) != 0 ||
+                        !VSI_ISDIR(sStat.st_mode))
+                    {
+                        CPLError(CE_Failure, CPLE_AppDefined,
+                                 "Cannot create directory %s",
+                                 osZoneDir.c_str());
+                        return false;
+                    }
                 }
 
                 CPLStringList aosOptions(papszOptions);
@@ -3169,6 +3175,7 @@ CADRGCreateCopy(const char *pszFilename, GDALDataset *poSrcDS, int bStrict,
                 int nCurFrameThisZone = 0;
                 std::string osErrorMsg;
                 nFrameCountThisZone = 0;
+                int nNonEmptyFrameCountThisZone = 0;
 
                 std::unique_ptr<OGRCoordinateTransformation> poReprojCTToSrcSRS;
                 OGRSpatialReference oSRS;
@@ -3257,7 +3264,8 @@ CADRGCreateCopy(const char *pszFilename, GDALDataset *poSrcDS, int bStrict,
                              bColorTablePerFrame, &oMutex, &poWarpedDS,
                              &nCurFrameThisZone, &nCurFrameCounter, &bError,
                              &oCT, &aosOptions, &bMissingFramesFound,
-                             &osErrorMsg, copyContext]()
+                             &osErrorMsg, &nNonEmptyFrameCountThisZone,
+                             copyContext]()
                         {
 #ifdef __COVERITY__
 #define LOCK()                                                                 \
@@ -3331,18 +3339,23 @@ CADRGCreateCopy(const char *pszFilename, GDALDataset *poSrcDS, int bStrict,
                                 bError = true;
                                 return;
                             }
-                            if (dynamic_cast<NITFDummyDataset *>(
-                                    poDS_CADRG.get()))
-                            {
-                                LOCK();
-                                bMissingFramesFound = true;
-                            }
+                            const bool bIsEmpty =
+                                dynamic_cast<NITFDummyDataset *>(
+                                    poDS_CADRG.get()) != nullptr;
                             poDS_CADRG.reset();
                             VSIUnlink((osFilename + ".aux.xml").c_str());
 
                             LOCK();
                             ++nCurFrameThisZone;
                             ++nCurFrameCounter;
+                            if (bIsEmpty)
+                            {
+                                bMissingFramesFound = true;
+                            }
+                            else
+                            {
+                                ++nNonEmptyFrameCountThisZone;
+                            }
                         };
 
 #ifndef __COVERITY__
@@ -3412,6 +3425,12 @@ CADRGCreateCopy(const char *pszFilename, GDALDataset *poSrcDS, int bStrict,
                     }
                 }
 #endif
+
+                if (!bDirectoryAlreadyExists &&
+                    nNonEmptyFrameCountThisZone == 0)
+                {
+                    VSIRmdir(osZoneDir.c_str());
+                }
             }
 
             const char *pszClassification =

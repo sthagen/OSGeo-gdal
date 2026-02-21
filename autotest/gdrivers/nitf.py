@@ -7875,7 +7875,7 @@ def test_nitf_create_cadrg_blank_frame_rgba(tmp_vsimem):
         tmp_vsimem, src_ds, options=["PRODUCT_TYPE=CADRG", "SERIES_CODE=GN"]
     )
 
-    assert gdal.ReadDirRecursive(tmp_vsimem) == ["RPF/", "RPF/ZONE3/"]
+    assert gdal.ReadDirRecursive(tmp_vsimem) == ["RPF/"]
 
 
 ###############################################################################
