@@ -589,15 +589,11 @@ std::shared_ptr<ZarrGroupBase> ZarrGroupBase::GetParentGroup() const
         if (auto poRootGroup = m_poSharedResource->GetRootGroup())
         {
             const auto nPos = m_osFullName.rfind('/');
-            if (nPos == 0)
-            {
-                poGroup = std::move(poRootGroup);
-            }
-            else if (nPos != std::string::npos)
+            if (nPos != std::string::npos)
             {
                 poGroup = std::dynamic_pointer_cast<ZarrGroupBase>(
-                    poRootGroup->OpenGroupFromFullname(
-                        m_osFullName.substr(0, nPos)));
+                    poRootGroup->OpenGroupFromFullname(m_osFullName.substr(
+                        0, std::max(static_cast<size_t>(1), nPos))));
             }
         }
     }

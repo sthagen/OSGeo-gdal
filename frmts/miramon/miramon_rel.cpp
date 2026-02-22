@@ -1130,10 +1130,7 @@ void MMRRel::UpdateLineage(CSLConstList papszOptions, GDALDataset &oSrcDS)
     m_osInFile = oSrcDS.GetDescription();
     m_osOutFile = m_osRelFileName;
 
-    m_nOptions = CSLCount(papszOptions);
-    m_osOptions.resize(m_nOptions);
-    for (int nIOptions = 0; nIOptions < m_nOptions; nIOptions++)
-        m_osOptions[nIOptions] = CPLStrdup(papszOptions[nIOptions]);
+    m_aosOptions = papszOptions;
 }
 
 bool MMRRel::Write(GDALDataset &oSrcDS)
@@ -1664,16 +1661,12 @@ void MMRRel::WriteCurrentProcess()
         nInOut++;
     }
 
-    for (int iOptions = 0; iOptions < m_nOptions; iOptions++)
+    for (const auto &[pszKey, pszValue] : cpl::IterateNameValue(m_aosOptions))
     {
-        CPLString osOption = m_osOptions[iOptions];
-        size_t nPos = osOption.find('=');
-        if (nPos == std::string::npos)
-            continue;
         CPLString osIdentifierValue = "-co ";
-        osIdentifierValue.append(osOption.substr(0, nPos));
+        osIdentifierValue.append(pszKey);
         WriteINOUTSection(osSection, nInOut, osIdentifierValue, "", "C",
-                          osOption.substr(nPos + 1));
+                          pszValue);
         nInOut++;
     }
     if (m_nNProcesses)

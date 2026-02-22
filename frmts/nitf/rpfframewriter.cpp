@@ -2471,10 +2471,11 @@ static bool ComputeColorTables(GDALDataset *poSrcDS, GDALColorTable &oCT,
         // Rescale pixel counts for primary color table so that their sum
         // does not exceed INT_MAX, as this is the type of m_count in the
         // BucketItem class.
-        const int nCountRescaled =
-            std::max(1, static_cast<int>(static_cast<double>(nThisEntryCount) /
-                                         static_cast<double>(nTotalCount) *
-                                         (INT_MAX - nUniqueColors)));
+        const int nCountRescaled = std::max(
+            1, static_cast<int>(
+                   static_cast<double>(nThisEntryCount) /
+                   static_cast<double>(std::max<GUIntBig>(1, nTotalCount)) *
+                   (INT_MAX - nUniqueColors)));
         Vector<CADRG_RGB_Type> v(RGB[0], RGB[1], RGB[2]);
         vectors.emplace_back(v, nCountRescaled, std::move(indices));
     }
@@ -2495,7 +2496,7 @@ static bool ComputeColorTables(GDALDataset *poSrcDS, GDALColorTable &oCT,
 
     copyContext.oCT2 = GDALColorTable();
     copyContext.anMapCT1ToCT2.clear();
-    copyContext.anMapCT1ToCT2.resize(nColors);
+    copyContext.anMapCT1ToCT2.resize(CADRG_MAX_COLOR_ENTRY_COUNT);
     kdtree.iterateOverLeaves(
         [&oCT, &copyContext](PNNKDTree<CADRG_RGB_Type> &node)
         {
@@ -2534,7 +2535,7 @@ static bool ComputeColorTables(GDALDataset *poSrcDS, GDALColorTable &oCT,
 
     copyContext.oCT3 = GDALColorTable();
     copyContext.anMapCT1ToCT3.clear();
-    copyContext.anMapCT1ToCT3.resize(nColors);
+    copyContext.anMapCT1ToCT3.resize(CADRG_MAX_COLOR_ENTRY_COUNT);
     kdtree.iterateOverLeaves(
         [&oCT, &copyContext](PNNKDTree<CADRG_RGB_Type> &node)
         {
@@ -2861,15 +2862,21 @@ CADRGCreateCopy(const char *pszFilename, GDALDataset *poSrcDS, int bStrict,
                      "have an associated color table");
             return false;
         }
-        dfLastPct = 0.1;
-        std::unique_ptr<void, decltype(&GDALDestroyScaledProgress)> pScaledData(
-            GDALCreateScaledProgress(0, dfLastPct, pfnProgress, pProgressData),
-            GDALDestroyScaledProgress);
-        if (!ComputeColorTables(poSrcDS, oCT, nColorQuantizationBits,
-                                GDALScaledProgress, pScaledData.get(),
-                                *(copyContext)))
+        if (copyContext->oCT2.GetColorEntryCount() == 0)
         {
-            return false;
+            // First time we go through this code path, we need to compute
+            // second and third color table from primary one.
+            dfLastPct = 0.1;
+            std::unique_ptr<void, decltype(&GDALDestroyScaledProgress)>
+                pScaledData(GDALCreateScaledProgress(0, dfLastPct, pfnProgress,
+                                                     pProgressData),
+                            GDALDestroyScaledProgress);
+            if (!ComputeColorTables(poSrcDS, oCT, nColorQuantizationBits,
+                                    GDALScaledProgress, pScaledData.get(),
+                                    *(copyContext)))
+            {
+                return false;
+            }
         }
     }
     else if (poSrcDS->GetRasterCount() >= 3 &&
@@ -3257,15 +3264,14 @@ CADRGCreateCopy(const char *pszFilename, GDALDataset *poSrcDS, int bStrict,
                         ++nFrameCountThisZone;
 
                         const auto task =
-                            [osFilename = std::move(osFilename), dfFrameMinX,
-                             dfFrameMinY, dfFrameMaxX, dfFrameMaxY,
+                            [osFilename = std::move(osFilename), copyContext,
+                             dfFrameMinX, dfFrameMinY, dfFrameMaxX, dfFrameMaxY,
                              bFrameFullyInSrcDS, poCT, nRecLevel,
                              nColorQuantizationBits, bStrict,
                              bColorTablePerFrame, &oMutex, &poWarpedDS,
                              &nCurFrameThisZone, &nCurFrameCounter, &bError,
                              &oCT, &aosOptions, &bMissingFramesFound,
-                             &osErrorMsg, &nNonEmptyFrameCountThisZone,
-                             copyContext]()
+                             &osErrorMsg, &nNonEmptyFrameCountThisZone]()
                         {
 #ifdef __COVERITY__
 #define LOCK()                                                                 \
@@ -3326,6 +3332,8 @@ CADRGCreateCopy(const char *pszFilename, GDALDataset *poSrcDS, int bStrict,
                             std::unique_ptr<GDALDataset> poDS_CADRG;
                             if (poClippedDS)
                             {
+                                CADRGCreateCopyContext copyContextCopy(
+                                    *copyContext);
                                 poDS_CADRG = NITFDataset::CreateCopy(
                                     osFilename.c_str(), poClippedDS.get(),
                                     bStrict, aosOptions.List(), nullptr,

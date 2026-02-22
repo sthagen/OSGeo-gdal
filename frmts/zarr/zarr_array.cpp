@@ -1157,6 +1157,44 @@ bool ZarrArray::IRead(const GUInt64 *arrayStartIdx, const size_t *count,
         bufferStride = bufferStrideMod.data();
     }
 
+    // Auto-parallel: prefetch multi-chunk reads via IAdviseRead().
+    // arrayStep[i] guaranteed positive after negative-step normalization above.
+    if (nDims >= 2 && m_oChunkCache.empty())
+    {
+        const char *pszNumThreads =
+            CPLGetConfigOption("GDAL_NUM_THREADS", nullptr);
+        if (pszNumThreads != nullptr)
+        {
+            size_t nReqChunks = 1;
+            for (size_t i = 0; i < nDims; ++i)
+            {
+                const uint64_t startBlock =
+                    arrayStartIdx[i] / m_anInnerBlockSize[i];
+                const uint64_t endBlock =
+                    (arrayStartIdx[i] +
+                     (count[i] - 1) * static_cast<uint64_t>(arrayStep[i])) /
+                    m_anInnerBlockSize[i];
+                nReqChunks *= static_cast<size_t>(endBlock - startBlock + 1);
+            }
+            if (nReqChunks > 1)
+            {
+                // IAdviseRead expects the contiguous element count per
+                // dimension, not the strided output count.  When step > 1,
+                // expand count to cover the full element range.
+                std::vector<size_t> anAdjustedCount(nDims);
+                for (size_t i = 0; i < nDims; ++i)
+                {
+                    anAdjustedCount[i] =
+                        1 + (count[i] - 1) * static_cast<size_t>(arrayStep[i]);
+                }
+                CPLStringList aosOptions;
+                aosOptions.SetNameValue("NUM_THREADS", pszNumThreads);
+                CPL_IGNORE_RET_VAL(IAdviseRead(
+                    arrayStartIdx, anAdjustedCount.data(), aosOptions.List()));
+            }
+        }
+    }
+
     std::vector<uint64_t> indicesOuterLoop(nDims + 1);
     std::vector<GByte *> dstPtrStackOuterLoop(nDims + 1);
 
@@ -3734,11 +3772,11 @@ std::shared_ptr<ZarrGroupBase> ZarrArray::GetParentGroup() const
         if (auto poRootGroup = m_poSharedResource->GetRootGroup())
         {
             const auto nPos = m_osFullName.rfind('/');
-            if (nPos != 0 && nPos != std::string::npos)
+            if (nPos != std::string::npos)
             {
                 poGroup = std::dynamic_pointer_cast<ZarrGroupBase>(
-                    poRootGroup->OpenGroupFromFullname(
-                        m_osFullName.substr(0, nPos)));
+                    poRootGroup->OpenGroupFromFullname(m_osFullName.substr(
+                        0, std::max(static_cast<size_t>(1), nPos))));
             }
         }
     }

@@ -12,6 +12,7 @@
  ****************************************************************************/
 
 #include <algorithm>
+#include <cassert>
 
 #include "miramon_dataset.h"
 #include "miramon_rasterband.h"
@@ -840,8 +841,9 @@ CPLString MMRDataset::CreatePatternFileName(const CPLString &osFileName,
 
 // Checks if the band is in the list of categorical or continuous bands
 // specified by the user in the creation options.
-bool MMRDataset::BandInOptionsList(CSLConstList papszOptions, CPLString pszType,
-                                   CPLString osIndexBand)
+bool MMRDataset::BandInOptionsList(CSLConstList papszOptions,
+                                   const CPLString &pszType,
+                                   const CPLString &osIndexBand)
 {
     if (!papszOptions)
         return false;
@@ -865,7 +867,7 @@ bool MMRDataset::BandInOptionsList(CSLConstList papszOptions, CPLString pszType,
 bool MMRDataset::IsCategoricalBand(GDALDataset &oSrcDS,
                                    GDALRasterBand &pRasterBand,
                                    CSLConstList papszOptions,
-                                   CPLString osIndexBand)
+                                   const CPLString &osIndexBand)
 {
     bool bUsrCategorical =
         BandInOptionsList(papszOptions, "CATEGORICAL_BANDS", osIndexBand);
@@ -959,15 +961,18 @@ void MMRDataset::WriteRGBMap()
     pMMMap->AddSectionEnd();
 
     pMMMap->AddSectionStart("RASTER_RGB_1");
-    pMMMap->AddKeyValue(
-        "FitxerR",
-        CPLGetFilename(m_pMMRRel->GetBand(m_nIBandR)->GetRawBandFileName()));
-    pMMMap->AddKeyValue(
-        "FitxerG",
-        CPLGetFilename(m_pMMRRel->GetBand(m_nIBandG)->GetRawBandFileName()));
-    pMMMap->AddKeyValue(
-        "FitxerB",
-        CPLGetFilename(m_pMMRRel->GetBand(m_nIBandB)->GetRawBandFileName()));
+    auto poRedBand = m_pMMRRel->GetBand(m_nIBandR);
+    auto poGreenBand = m_pMMRRel->GetBand(m_nIBandG);
+    auto poBlueBand = m_pMMRRel->GetBand(m_nIBandB);
+    assert(poRedBand);
+    assert(poGreenBand);
+    assert(poBlueBand);
+    pMMMap->AddKeyValue("FitxerR",
+                        CPLGetFilename(poRedBand->GetRawBandFileName()));
+    pMMMap->AddKeyValue("FitxerG",
+                        CPLGetFilename(poGreenBand->GetRawBandFileName()));
+    pMMMap->AddKeyValue("FitxerB",
+                        CPLGetFilename(poBlueBand->GetRawBandFileName()));
     pMMMap->AddKeyValue("UnificVisCons", "1");
     pMMMap->AddKeyValue("visualitzable", "1");
     pMMMap->AddKeyValue("consultable", "1");
@@ -977,14 +982,11 @@ void MMRDataset::WriteRGBMap()
     pMMMap->AddKeyValue("LlegSimb_SubVers", "5");
     pMMMap->AddKeyValue("Color_VisibleALleg", "1");
     CPLString osLlegTitle = "RGB:";
-    osLlegTitle.append(
-        CPLGetFilename(m_pMMRRel->GetBand(m_nIBandR)->GetBandName()));
+    osLlegTitle.append(CPLGetFilename(poRedBand->GetBandName()));
     osLlegTitle.append("+");
-    osLlegTitle.append(
-        CPLGetFilename(m_pMMRRel->GetBand(m_nIBandG)->GetBandName()));
+    osLlegTitle.append(CPLGetFilename(poGreenBand->GetBandName()));
     osLlegTitle.append("+");
-    osLlegTitle.append(
-        CPLGetFilename(m_pMMRRel->GetBand(m_nIBandB)->GetBandName()));
+    osLlegTitle.append(CPLGetFilename(poBlueBand->GetBandName()));
     pMMMap->AddKeyValue("Color_TitolLlegenda", osLlegTitle);
     pMMMap->AddSectionEnd();
 }

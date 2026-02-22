@@ -424,8 +424,7 @@ class MMRRel
     // Lineage
     CPLString m_osInFile = "";
     CPLString m_osOutFile = "";
-    int m_nOptions = 0;
-    std::vector<CPLString> m_osOptions{};
+    CPLStringList m_aosOptions{};
 
     // Number of processes in the lineage.
     // It is incremented each time a process is added

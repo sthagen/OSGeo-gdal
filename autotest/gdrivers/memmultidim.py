@@ -90,6 +90,10 @@ def test_mem_md_subgroup():
     assert subsubg is not None
     assert subsubg.GetFullName() == "/subgroup/subsubgroup"
 
+    root_from_fullname = rg.OpenGroupFromFullname("/")
+    assert root_from_fullname is not None
+    assert root_from_fullname.GetFullName() == "/"
+
     subg.CreateMDArray("myarray", [], gdal.ExtendedDataType.Create(gdal.GDT_UInt8))
     array = rg.OpenMDArrayFromFullname("/subgroup/myarray")
     assert array is not None

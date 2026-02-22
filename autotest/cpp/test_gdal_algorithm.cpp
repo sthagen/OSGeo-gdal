@@ -3440,12 +3440,14 @@ TEST_F(test_gdal_algorithm, various)
 
     {
         MyAlgorithm alg;
+        alg.SetCalledFromCommandLine();
         EXPECT_TRUE(alg.ParseCommandLineArguments({"-h"}));
         EXPECT_TRUE(alg.IsHelpRequested());
     }
 
     {
         MyAlgorithm alg;
+        alg.SetCalledFromCommandLine();
         EXPECT_TRUE(alg.ParseCommandLineArguments({"--help"}));
         EXPECT_TRUE(alg.IsHelpRequested());
     }
@@ -3458,6 +3460,7 @@ TEST_F(test_gdal_algorithm, various)
 
     {
         MyAlgorithm alg;
+        alg.SetCalledFromCommandLine();
         EXPECT_TRUE(alg.ParseCommandLineArguments({"--json-usage"}));
         EXPECT_TRUE(alg.IsJSONUsageRequested());
     }
@@ -4078,6 +4081,7 @@ TEST_F(test_gdal_algorithm, subalgorithms)
 
     {
         MyAlgorithm alg(hasRun);
+        alg.SetCalledFromCommandLine();
         EXPECT_TRUE(alg.ParseCommandLineArguments({"subalg", "-h"}));
         EXPECT_TRUE(alg.IsHelpRequested());
         EXPECT_TRUE(alg.ValidateArguments());

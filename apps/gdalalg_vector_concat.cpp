@@ -496,7 +496,8 @@ bool GDALVectorConcatAlgorithm::RunImpl(GDALProgressFunc pfnProgress,
         GDALVectorWriteAlgorithm writeAlg;
         for (auto &arg : writeAlg.GetArgs())
         {
-            if (arg->GetName() != GDAL_ARG_NAME_OUTPUT_LAYER)
+            if (!arg->IsHidden() &&
+                arg->GetName() != GDAL_ARG_NAME_OUTPUT_LAYER)
             {
                 auto stepArg = GetArg(arg->GetName());
                 if (stepArg && stepArg->IsExplicitlySet())

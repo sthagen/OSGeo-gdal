@@ -510,8 +510,13 @@ The following dataset open options are available:
 Multi-threaded caching
 ----------------------
 
-The driver implements the :cpp:func:`GDALMDArray::AdviseRead` method. This
-proceed to multi-threaded decoding of the tiles that intersect the area of
+Starting with GDAL 3.13, when the :config:`GDAL_NUM_THREADS` configuration
+option is set and a read request spans multiple chunks, the driver automatically
+decodes chunks in parallel, similar to the GeoTIFF driver behavior
+(since GDAL 3.6). No application changes are needed.
+
+The driver also implements the :cpp:func:`GDALMDArray::AdviseRead` method for
+explicit multi-threaded pre-fetching of tiles that intersect the area of
 interest specified. A sufficient cache size must be specified. The call is
 blocking.
 

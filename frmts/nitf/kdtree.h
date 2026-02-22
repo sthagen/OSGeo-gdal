@@ -507,7 +507,7 @@ int PNNKDTree<T>::insert(std::vector<BucketItem<T>> &&vectors, int totalCount,
                         const int valMulCount = val * item.m_count;
                         sum += valMulCount;
                         // It's fine to cast to int64 after multiplication
-                        sumSquare += static_cast<int64_t>(val * valMulCount);
+                        sumSquare += cpl::fits_on<int64_t>(val * valMulCount);
                     }
                     const double M2 =
                         static_cast<double>(sumSquare * totalCount -

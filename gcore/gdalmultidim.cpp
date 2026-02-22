@@ -1274,7 +1274,9 @@ GDALGroup::GetInnerMostGroup(const std::string &osPathOrArrayOrDim,
         CSLTokenizeString2(osPathOrArrayOrDim.c_str(), "/", 0));
     if (aosTokens.size() == 0)
     {
-        return nullptr;
+        // "/" case: the root group itself is the innermost group
+        osLastPart.clear();
+        return poCurGroup;
     }
 
     for (int i = 0; i < aosTokens.size() - 1; i++)
@@ -1467,6 +1469,8 @@ GDALGroup::OpenGroupFromFullname(const std::string &osFullName,
     auto poGroup(GetInnerMostGroup(osFullName, curGroupHolder, osName));
     if (poGroup == nullptr)
         return nullptr;
+    if (osName.empty())
+        return m_pSelf.lock();
     return poGroup->OpenGroup(osName, papszOptions);
 }
 

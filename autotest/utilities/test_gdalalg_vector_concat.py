@@ -353,7 +353,9 @@ def test_gdalalg_vector_concat_mode_single():
     alg["output-format"] = "MEM"
     alg["mode"] = "single"
     alg["output-layer"] = "my-output-layer"
-    assert alg.Run()
+    with gdaltest.disable_exceptions():
+        with gdaltest.error_raised(gdal.CE_None):
+            assert alg.Run()
     ds = alg["output"].GetDataset()
     assert ds.GetLayerCount() == 1
     assert ds.GetLayer(0).GetName() == "my-output-layer"
