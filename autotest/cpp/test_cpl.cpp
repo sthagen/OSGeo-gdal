@@ -44,6 +44,7 @@
 #include "cpl_vsi_virtual.h"
 #include "cpl_threadsafe_queue.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <limits>
@@ -595,8 +596,8 @@ TEST_F(test_cpl, CPLRecode)
             break;
         }
 
-        size_t nLength =
-            MIN(strlen(pszDecodedString), sizeof(oReferenceString.szEncoding));
+        size_t nLength = std::min(strlen(pszDecodedString),
+                                  sizeof(oReferenceString.szEncoding));
         bool bOK =
             (memcmp(pszDecodedString, oReferenceString.szString, nLength) == 0);
         // FIXME Some tests fail on Mac. Not sure why, but do not error out just

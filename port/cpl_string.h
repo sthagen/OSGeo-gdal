@@ -309,6 +309,9 @@ extern "C++"
 #ifndef DOXYGEN_SKIP
 #include <string>
 #include <vector>
+#if __cplusplus >= 201703L || (defined(_MSVC_LANG) && _MSVC_LANG >= 201703L)
+#include <string_view>
+#endif
 #endif
 
 // VC++ implicitly applies __declspec(dllexport) to template base classes
@@ -530,6 +533,11 @@ extern "C++"
         {
             AddString(osStr.c_str());
         }
+
+#if defined(DOXYGEN_SKIP) || __cplusplus >= 201703L ||                         \
+    (defined(_MSVC_LANG) && _MSVC_LANG >= 201703L)
+        void push_back(std::string_view svStr);
+#endif
 
         CPLStringList &InsertString(int nInsertAtLineNo, const char *pszNewLine)
         {

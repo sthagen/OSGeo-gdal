@@ -85,6 +85,8 @@ bool ZarrV2Array::Flush()
 
     bool ret = ZarrV2Array::FlushDirtyBlock();
 
+    m_anCachedBlockIndices.clear();
+
     if (m_bDefinitionModified)
     {
         if (!Serialize())

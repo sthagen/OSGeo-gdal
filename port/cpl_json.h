@@ -19,6 +19,9 @@
 #include <initializer_list>
 #include <iterator>
 #include <string>
+#if __cplusplus >= 201703L || (defined(_MSVC_LANG) && _MSVC_LANG >= 201703L)
+#include <string_view>
+#endif
 #include <vector>
 
 /**
@@ -115,6 +118,11 @@ class CPL_DLL CPLJSONObject
   public:
     // setters
     void Add(const std::string &osName, const std::string &osValue);
+#if defined(DOXYGEN_SKIP) || __cplusplus >= 201703L ||                         \
+    (defined(_MSVC_LANG) && _MSVC_LANG >= 201703L)
+
+    void Add(const std::string &osName, std::string_view svValue);
+#endif
     void Add(const std::string &osName, const char *pszValue);
     void Add(const std::string &osName, double dfValue);
     void Add(const std::string &osName, int nValue);
@@ -309,6 +317,11 @@ class CPL_DLL CPLJSONArray : public CPLJSONObject
     void AddNull();
     void Add(const CPLJSONObject &oValue);
     void Add(const std::string &osValue);
+#if defined(DOXYGEN_SKIP) || __cplusplus >= 201703L ||                         \
+    (defined(_MSVC_LANG) && _MSVC_LANG >= 201703L)
+
+    void Add(std::string_view svValue);
+#endif
     void Add(const char *pszValue);
     void Add(double dfValue);
     void Add(int nValue);

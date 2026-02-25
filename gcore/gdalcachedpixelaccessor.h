@@ -47,7 +47,8 @@ class GDALCachedPixelAccessor
     };
 
     int m_nCachedTileCount = 0;
-    std::array<CachedTile, CACHED_TILE_COUNT> m_aCachedTiles{};
+    std::array<CachedTile, static_cast<size_t>(CACHED_TILE_COUNT)>
+        m_aCachedTiles{};
 
     bool LoadTile(int nTileX, int nTileY);
     bool FlushTile(int iSlot);

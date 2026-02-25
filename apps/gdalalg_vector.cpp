@@ -20,8 +20,10 @@
 #include "gdalalg_vector_check_coverage.h"
 #include "gdalalg_vector_clean_coverage.h"
 #include "gdalalg_vector_clip.h"
+#include "gdalalg_vector_combine.h"
 #include "gdalalg_vector_concat.h"
 #include "gdalalg_vector_convert.h"
+#include "gdalalg_vector_dissolve.h"
 #include "gdalalg_vector_edit.h"
 #include "gdalalg_vector_explode_collections.h"
 #include "gdalalg_vector_grid.h"
@@ -70,8 +72,10 @@ GDALVectorAlgorithm::GDALVectorAlgorithm()
     RegisterSubAlgorithm<GDALVectorCheckGeometryAlgorithmStandalone>();
     RegisterSubAlgorithm<GDALVectorCleanCoverageAlgorithmStandalone>();
     RegisterSubAlgorithm<GDALVectorClipAlgorithmStandalone>();
+    RegisterSubAlgorithm<GDALVectorCombineAlgorithmStandalone>();
     RegisterSubAlgorithm<GDALVectorConcatAlgorithmStandalone>();
     RegisterSubAlgorithm<GDALVectorConvertAlgorithm>();
+    RegisterSubAlgorithm<GDALVectorDissolveAlgorithmStandalone>();
     RegisterSubAlgorithm<GDALVectorEditAlgorithmStandalone>();
     RegisterSubAlgorithm<GDALVectorExplodeCollectionsAlgorithmStandalone>();
     RegisterSubAlgorithm<GDALVectorGridAlgorithmStandalone>();

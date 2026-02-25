@@ -4844,7 +4844,7 @@ int MMResizeMiraMonFieldValue(struct MiraMonFieldValue **pFieldValue,
         return 0;
 
     nPrevMax = *nMax;
-    nNewMax = MAX(nNum + nIncr, nProposedMax);
+    nNewMax = CPL_MAX(nNum + nIncr, nProposedMax);
     if (MMCheckSize_t(nNewMax, sizeof(**pFieldValue)))
     {
         return 1;
@@ -4879,7 +4879,7 @@ int MMResizeMiraMonPolygonArcs(struct MM_PAL_MEM **pFID,
         return 0;
 
     nPrevMax = *nMax;
-    nNewMax = MAX(nNum + nIncr, nProposedMax);
+    nNewMax = CPL_MAX(nNum + nIncr, nProposedMax);
     if (MMCheckSize_t(nNewMax, sizeof(**pFID)))
     {
         return 1;
@@ -4914,7 +4914,7 @@ int MMResizeMiraMonRecord(struct MiraMonRecord **pMiraMonRecord,
         return 0;
 
     nPrevMax = *nMax;
-    nNewMax = MAX(nNum + nIncr, nProposedMax);
+    nNewMax = CPL_MAX(nNum + nIncr, nProposedMax);
     if (MMCheckSize_t(nNewMax, sizeof(**pMiraMonRecord)))
     {
         return 1;
@@ -4949,7 +4949,7 @@ int MMResizeZSectionDescrPointer(struct MM_ZD **pZDescription, GUInt64 *nMax,
         return 0;
 
     nPrevMax = *nMax;
-    nNewMax = MAX(nNum + nIncr, nProposedMax);
+    nNewMax = CPL_MAX(nNum + nIncr, nProposedMax);
     if (MMCheckSize_t(nNewMax, sizeof(**pZDescription)))
     {
         return 1;
@@ -4983,7 +4983,7 @@ int MMResizeNodeHeaderPointer(struct MM_NH **pNodeHeader, GUInt64 *nMax,
         return 0;
 
     nPrevMax = *nMax;
-    nNewMax = MAX(nNum + nIncr, nProposedMax);
+    nNewMax = CPL_MAX(nNum + nIncr, nProposedMax);
     if (MMCheckSize_t(nNewMax, sizeof(**pNodeHeader)))
     {
         return 1;
@@ -5016,7 +5016,7 @@ int MMResizeArcHeaderPointer(struct MM_AH **pArcHeader, GUInt64 *nMax,
         return 0;
 
     nPrevMax = *nMax;
-    nNewMax = MAX(nNum + nIncr, nProposedMax);
+    nNewMax = CPL_MAX(nNum + nIncr, nProposedMax);
     if (MMCheckSize_t(nNewMax, sizeof(**pArcHeader)))
     {
         return 1;
@@ -5049,7 +5049,7 @@ int MMResizePolHeaderPointer(struct MM_PH **pPolHeader, GUInt64 *nMax,
         return 0;
 
     nPrevMax = *nMax;
-    nNewMax = MAX(nNum + nIncr, nProposedMax);
+    nNewMax = CPL_MAX(nNum + nIncr, nProposedMax);
     if (MMCheckSize_t(nNewMax, sizeof(**pPolHeader)))
     {
         return 1;
@@ -5085,7 +5085,7 @@ int MMResize_MM_N_VERTICES_TYPE_Pointer(MM_N_VERTICES_TYPE **pVrt,
         return 0;
 
     nPrevMax = *nMax;
-    nNewMax = MAX(nNum + nIncr, nProposedMax);
+    nNewMax = CPL_MAX(nNum + nIncr, nProposedMax);
     if (MMCheckSize_t(nNewMax, sizeof(**pVrt)))
     {
         return 1;
@@ -5116,7 +5116,7 @@ int MMResizeVFGPointer(char **pInt, MM_INTERNAL_FID *nMax, MM_INTERNAL_FID nNum,
         return 0;
 
     nPrevMax = *nMax;
-    nNewMax = MAX(nNum + nIncr, nProposedMax);
+    nNewMax = CPL_MAX(nNum + nIncr, nProposedMax);
     if (MMCheckSize_t(nNewMax, sizeof(**pInt)))
     {
         return 1;
@@ -5149,7 +5149,7 @@ int MMResizeMM_POINT2DPointer(struct MM_POINT_2D **pPoint2D,
         return 0;
 
     nPrevMax = *nMax;
-    nNewMax = MAX(nNum + nIncr, nProposedMax);
+    nNewMax = CPL_MAX(nNum + nIncr, nProposedMax);
     if (MMCheckSize_t(nNewMax, sizeof(**pPoint2D)))
     {
         return 1;
@@ -5183,7 +5183,7 @@ int MMResizeDoublePointer(MM_COORD_TYPE **pDouble, MM_N_VERTICES_TYPE *nMax,
         return 0;
 
     nPrevMax = *nMax;
-    nNewMax = MAX(nNum + nIncr, nProposedMax);
+    nNewMax = CPL_MAX(nNum + nIncr, nProposedMax);
     if (MMCheckSize_t(nNewMax, sizeof(**pDouble)))
     {
         return 1;

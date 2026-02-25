@@ -2902,6 +2902,10 @@ bool CPL_DLL GDALMDArrayGetRawBlockInfo(GDALMDArrayH hArray,
 
 int CPL_DLL GDALMDArrayGetOverviewCount(GDALMDArrayH hArray);
 GDALMDArrayH CPL_DLL GDALMDArrayGetOverview(GDALMDArrayH hArray, int nIdx);
+CPLErr CPL_DLL GDALMDArrayBuildOverviews(
+    GDALMDArrayH hArray, const char *pszResampling, int nOverviews,
+    const int *panOverviewList, GDALProgressFunc pfnProgress,
+    void *pProgressData, CSLConstList papszOptions);
 
 void CPL_DLL GDALReleaseArrays(GDALMDArrayH *arrays, size_t nCount);
 int CPL_DLL GDALMDArrayCache(GDALMDArrayH hArray, CSLConstList papszOptions);

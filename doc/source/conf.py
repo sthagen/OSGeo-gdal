@@ -880,6 +880,13 @@ man_pages = [
         1,
     ),
     (
+        "programs/gdal_vector_combine",
+        "gdal-vector-combine",
+        "Combine geometries into geometry collections",
+        [author_dbaston],
+        1,
+    ),
+    (
         "programs/gdal_vector_concat",
         "gdal-vector-concat",
         "Concatenate vector datasets",
@@ -891,6 +898,13 @@ man_pages = [
         "gdal-vector-convert",
         "Convert a vector dataset",
         [author_evenr],
+        1,
+    ),
+    (
+        "programs/gdal_vector_dissolve",
+        "gdal-vector-dissolve",
+        "Unions the elements of each feature's geometry.",
+        [author_dbaston],
         1,
     ),
     (

@@ -18,6 +18,8 @@
 #include "gdaljp2abstractdataset.h"
 #include "gdaljp2metadata.h"
 #include "ogr_spatialref.h"
+
+#include <algorithm>
 #include <string>
 
 #include "mrsiddrivercore.h"
@@ -879,7 +881,7 @@ CPLErr MrSIDDataset::IRasterIO(GDALRWFlag eRWFlag, int nXOff, int nYOff,
     /* -------------------------------------------------------------------- */
     int iOverview = 0;
     double dfZoomMag =
-        MIN((nXSize / (double)nBufXSize), (nYSize / (double)nBufYSize));
+        std::min((nXSize / (double)nBufXSize), (nYSize / (double)nBufYSize));
 
     for (nZoomMag = 1; nZoomMag * 2 < (dfZoomMag + 0.1) &&
                        iOverview < poParentDS->nOverviewCount;
@@ -2800,7 +2802,7 @@ char *MrSIDDataset::GetOGISDefn(GTIFDefn *psDefnIn)
         double adfParam[10];
         int i;
 
-        for (i = 0; i < MIN(10, psDefnIn->nParms); i++)
+        for (i = 0; i < std::min(10, psDefnIn->nParms); i++)
             adfParam[i] = psDefnIn->ProjParm[i];
         for (; i < 10; i++)
             adfParam[i] = 0;

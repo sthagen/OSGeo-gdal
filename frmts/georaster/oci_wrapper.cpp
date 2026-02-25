@@ -13,6 +13,8 @@
 
 #include "oci_wrapper.h"
 
+#include <algorithm>
+
 static const OW_CellDepth ahOW_CellDepth[] = {{"8BIT_U", GDT_UInt8},
                                               {"16BIT_U", GDT_UInt16},
                                               {"16BIT_S", GDT_Int16},
@@ -831,7 +833,7 @@ bool OWConnection::GetNextField(OCIParam *phTable, int nIndex, char *pszName,
         }
     }
 
-    nNameLength = MIN(nNameLength, OWNAME);
+    nNameLength = std::min<ub4>(nNameLength, OWNAME);
 
     strncpy(pszName, pszFieldName, nNameLength);
     pszName[nNameLength] = '\0';

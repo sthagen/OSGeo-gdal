@@ -268,7 +268,7 @@ WCSDataset201::GetCoverageRequest(bool scaled, int nBufXSize, int nBufYSize,
                              ((double)nBufXSize + 0.5));
             double fy = fabs((extent[3] - extent[1]) / m_gt.yscale /
                              ((double)nBufYSize + 0.5));
-            tmp.Printf("&SCALEFACTOR=%.15g", MIN(fx, fy));
+            tmp.Printf("&SCALEFACTOR=%.15g", std::min(fx, fy));
         }
         else
         {

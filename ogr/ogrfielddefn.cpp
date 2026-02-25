@@ -14,6 +14,7 @@
 #include "cpl_port.h"
 #include "ogr_feature.h"
 
+#include <algorithm>
 #include <cstring>
 
 #include "ogr_api.h"
@@ -1251,7 +1252,7 @@ void OGRFieldDefn::SetWidth(int nWidthIn)
                  "OGRFieldDefn::SetWidth() not allowed on a sealed object");
         return;
     }
-    nWidth = MAX(0, nWidthIn);
+    nWidth = std::max(0, nWidthIn);
 }
 
 /************************************************************************/

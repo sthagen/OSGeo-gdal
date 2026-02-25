@@ -8869,6 +8869,48 @@ class GDALDatasetFromArray final : public GDALPamDataset
         return m_oMDD.GetMetadataItem(pszName, pszDomain);
     }
 
+    CPLErr IBuildOverviews(const char *pszResampling, int nOverviews,
+                           const int *panOverviewList, int nListBands,
+                           const int *panBandList, GDALProgressFunc pfnProgress,
+                           void *pProgressData,
+                           CSLConstList papszOptions) override
+    {
+        // Try the multidimensional array path. Use quiet handler to
+        // suppress the "not supported" error from the base class stub.
+        bool bNotSupported = false;
+        std::string osErrMsg;
+        CPLErr eSavedClass = CE_None;
+        int nSavedNo = CPLE_None;
+        {
+            CPLErrorHandlerPusher oQuiet(CPLQuietErrorHandler);
+            CPLErr eErr = m_poArray->BuildOverviews(
+                pszResampling, nOverviews, panOverviewList, pfnProgress,
+                pProgressData, papszOptions);
+            if (eErr == CE_None)
+            {
+                m_bOverviewsDiscovered = false;
+                m_apoOverviews.clear();
+                return CE_None;
+            }
+            nSavedNo = CPLGetLastErrorNo();
+            eSavedClass = CPLGetLastErrorType();
+            osErrMsg = CPLGetLastErrorMsg();
+            bNotSupported = (nSavedNo == CPLE_NotSupported);
+        }
+        if (!bNotSupported)
+        {
+            // Re-emit the error that was suppressed by the quiet handler.
+            CPLError(eSavedClass, nSavedNo, "%s", osErrMsg.c_str());
+            return CE_Failure;
+        }
+        // Driver doesn't implement BuildOverviews - fall back to
+        // default path (e.g. external .ovr file).
+        CPLErrorReset();
+        return GDALDataset::IBuildOverviews(
+            pszResampling, nOverviews, panOverviewList, nListBands, panBandList,
+            pfnProgress, pProgressData, papszOptions);
+    }
+
     void DiscoverOverviews()
     {
         if (!m_bOverviewsDiscovered)
@@ -15660,4 +15702,76 @@ GDALMDArrayH GDALMDArrayGetOverview(GDALMDArrayH hArray, int nIdx)
     if (!poOverview)
         return nullptr;
     return new GDALMDArrayHS(poOverview);
+}
+
+/************************************************************************/
+/*                    GDALMDArray::BuildOverviews()                     */
+/************************************************************************/
+
+/** Build overviews for this array.
+ *
+ * Creates reduced resolution copies of this array using the specified
+ * resampling method. The driver is responsible for storing the overview
+ * arrays and any associated metadata (e.g., multiscales convention for Zarr).
+ *
+ * For arrays with more than 2 dimensions, only the spatial dimensions
+ * (last two by default, or as specified by the spatial:dimensions
+ * attribute) are downsampled. Non-spatial dimensions are preserved.
+ *
+ * Overview factors need not be sorted; the implementation will sort and
+ * deduplicate them. Each level is resampled sequentially from the
+ * previous level (e.g., 4x is built from 2x, not from the base).
+ *
+ * This method can also be invoked via GDALDataset::BuildOverviews()
+ * when the dataset was obtained through GDALMDArray::AsClassicDataset().
+ *
+ * @note The Zarr v3 implementation replaces all existing overviews on each
+ * call, unlike GDALDataset::BuildOverviews() which may add new levels.
+ *
+ * @note Currently only implemented by the Zarr v3 driver.
+ *
+ * @param pszResampling Resampling method name (e.g., "NEAREST", "AVERAGE").
+ *                      If nullptr or empty, defaults to "NEAREST".
+ * @param nOverviews Number of overview levels to build. Pass 0 to remove
+ *                   all existing overviews.
+ * @param panOverviewList Array of overview decimation factors (e.g., 2, 4, 8).
+ *                        Each factor must be >= 2. May be nullptr when
+ *                        nOverviews is 0.
+ * @param pfnProgress Progress callback, or nullptr.
+ * @param pProgressData Progress callback user data.
+ * @param papszOptions Driver-specific options, or nullptr.
+ * @return CE_None on success, CE_Failure otherwise.
+ * @since GDAL 3.13
+ */
+CPLErr GDALMDArray::BuildOverviews(CPL_UNUSED const char *pszResampling,
+                                   CPL_UNUSED int nOverviews,
+                                   CPL_UNUSED const int *panOverviewList,
+                                   CPL_UNUSED GDALProgressFunc pfnProgress,
+                                   CPL_UNUSED void *pProgressData,
+                                   CPL_UNUSED CSLConstList papszOptions)
+{
+    CPLError(CE_Failure, CPLE_NotSupported,
+             "BuildOverviews() not supported by this driver");
+    return CE_Failure;
+}
+
+/************************************************************************/
+/*                     GDALMDArrayBuildOverviews()                      */
+/************************************************************************/
+
+/** \brief Build overviews for a multidimensional array.
+ *
+ * This is the same as the C++ method GDALMDArray::BuildOverviews().
+ *
+ * @since GDAL 3.13
+ */
+CPLErr GDALMDArrayBuildOverviews(GDALMDArrayH hArray, const char *pszResampling,
+                                 int nOverviews, const int *panOverviewList,
+                                 GDALProgressFunc pfnProgress,
+                                 void *pProgressData, CSLConstList papszOptions)
+{
+    VALIDATE_POINTER1(hArray, __func__, CE_Failure);
+    return hArray->m_poImpl->BuildOverviews(pszResampling, nOverviews,
+                                            panOverviewList, pfnProgress,
+                                            pProgressData, papszOptions);
 }

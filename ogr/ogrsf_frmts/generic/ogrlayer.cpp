@@ -743,6 +743,8 @@ OGRErr OGR_L_GetExtent3D(OGRLayerH hLayer, int iGeomField,
  @param pszQuery query in restricted SQL WHERE format, or NULL to clear the
  current query.
 
+ @see GetAttrQueryString() to retrieve the currently installed query string.
+
  @return OGRERR_NONE if successfully installed, or an error code if the
  query expression is in error, or some other failure occurs.
  */

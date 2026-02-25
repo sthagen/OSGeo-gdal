@@ -999,14 +999,6 @@ GDALDatasetH GDALTranslate(const char *pszDest, GDALDatasetH hSrcDataset,
             psOptions->srcWin.dfYSize =
                 std::ceil(psOptions->srcWin.dfYSize - 0.001);
         }
-
-        /*if( !bQuiet )
-            fprintf( stdout,
-                     "Computed -srcwin %g %g %g %g from projected window.\n",
-                     srcWin.dfXOff,
-                     srcWin.dfYOff,
-                     srcWin.dfXSize,
-                     srcWin.dfYSize ); */
     }
 
     /* -------------------------------------------------------------------- */
@@ -1015,15 +1007,15 @@ GDALDatasetH GDALTranslate(const char *pszDest, GDALDatasetH hSrcDataset,
     if (poSrcDS->GetRasterXSize() != 0 && poSrcDS->GetRasterYSize() != 0 &&
         (psOptions->srcWin.dfXSize <= 0 || psOptions->srcWin.dfYSize <= 0))
     {
-        CPLError(
-            CE_Failure, CPLE_AppDefined,
-            "Error: %s-srcwin %g %g %g %g has negative width and/or height.",
-            (psOptions->dfULX != 0.0 || psOptions->dfULY != 0.0 ||
-             psOptions->dfLRX != 0.0 || psOptions->dfLRY != 0.0)
-                ? "Computed "
-                : "",
-            psOptions->srcWin.dfXOff, psOptions->srcWin.dfYOff,
-            psOptions->srcWin.dfXSize, psOptions->srcWin.dfYSize);
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "Error: %ssource window (x,y)=(%g,%g), (width,height)=(%g,%g) "
+                 "has negative width and/or height.",
+                 (psOptions->dfULX != 0.0 || psOptions->dfULY != 0.0 ||
+                  psOptions->dfLRX != 0.0 || psOptions->dfLRY != 0.0)
+                     ? "Computed "
+                     : "",
+                 psOptions->srcWin.dfXOff, psOptions->srcWin.dfYOff,
+                 psOptions->srcWin.dfXSize, psOptions->srcWin.dfYSize);
         return nullptr;
     }
 

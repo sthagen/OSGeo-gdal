@@ -25,6 +25,7 @@ static XSModel *getGrammarPool(XMLGrammarPool *pool)
 #include "ogr_gmlas.h"
 #include "ogr_pgdump.h"
 
+#include <algorithm>
 #include <list>
 
 static OGRwkbGeometryType GetOGRGeometryType(XSTypeDefinition *poTypeDef);
@@ -1381,6 +1382,7 @@ bool GMLASSchemaAnalyzer::InstantiateClassFromEltDeclaration(
 /*                 SetFieldTypeAndWidthFromDefinition()                 */
 /************************************************************************/
 
+/* static */
 void GMLASSchemaAnalyzer::SetFieldTypeAndWidthFromDefinition(
     XSSimpleTypeDefinition *poST, GMLASField &oField)
 {
@@ -1399,7 +1401,7 @@ void GMLASSchemaAnalyzer::SetFieldTypeAndWidthFromDefinition(
                 XSSimpleTypeDefinition::FACET_MAXLENGTH);
         }
         if (maxLength != nullptr)
-            nMaxLength = MAX(nMaxLength, atoi(transcode(maxLength)));
+            nMaxLength = std::max(nMaxLength, atoi(transcode(maxLength)));
         poST = reinterpret_cast<XSSimpleTypeDefinition *>(poST->getBaseType());
     }
 

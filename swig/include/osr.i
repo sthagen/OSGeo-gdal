@@ -550,7 +550,7 @@ public:
     int bNorth = FALSE;
     int nZone = OSRGetUTMZone( self, &bNorth );
     if( !bNorth )
-        nZone = -1 * ABS(nZone);
+        nZone = -nZone;
     return nZone;
   }
 

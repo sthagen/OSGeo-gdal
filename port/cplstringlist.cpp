@@ -471,6 +471,32 @@ CPLStringList &CPLStringList::AddString(const std::string &newString)
 }
 
 /************************************************************************/
+/*                             push_back()                              */
+/************************************************************************/
+
+/**
+ * Add a string to the list.
+ *
+ * A copy of the passed in string is made and inserted in the list.
+ *
+ * @param svStr the string to add to the list.
+ *
+ * @since 3.13
+ */
+
+void CPLStringList::push_back(std::string_view svStr)
+
+{
+    char *pszDupString =
+        static_cast<char *>(VSI_MALLOC_VERBOSE(svStr.size() + 1));
+    if (pszDupString == nullptr)
+        return;
+    memcpy(pszDupString, svStr.data(), svStr.size());
+    pszDupString[svStr.size()] = 0;
+    CPL_IGNORE_RET_VAL(AddStringDirectly(pszDupString));
+}
+
+/************************************************************************/
 /*                            AddNameValue()                            */
 /************************************************************************/
 

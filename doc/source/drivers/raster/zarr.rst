@@ -103,6 +103,16 @@ a ``multiscales`` attribute with a ``layout`` array, the driver exposes
 lower-resolution levels as overviews via :cpp:func:`GDALMDArray::GetOverview`
 and the classic raster band overview API.
 
+Overviews can be generated using :cpp:func:`GDALMDArray::BuildOverviews` or
+equivalently via :cpp:func:`GDALDataset::BuildOverviews` on datasets obtained
+through :cpp:func:`GDALMDArray::AsClassicDataset`. For arrays with more than
+two dimensions, only the spatial dimensions are downsampled; non-spatial
+dimensions (e.g., time) are preserved. Each overview level is resampled
+sequentially from the previous level (e.g., 4x from 2x, not from base).
+Codec settings are inherited from the source array. Calling
+``BuildOverviews`` replaces all existing overviews (unlike the default
+``GDALDataset::BuildOverviews`` behavior which adds new levels).
+
 Kerchunk reference stores
 -------------------------
 

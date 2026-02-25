@@ -25,6 +25,7 @@
 #include "georaster_priv.h"
 #include "georasterdrivercore.h"
 
+#include <algorithm>
 #include <memory>
 
 //  ---------------------------------------------------------------------------
@@ -691,7 +692,8 @@ boolean GeoRasterDataset::JP2_CopyDirect(const char *pszJP2Filename,
 
             while (nCount < nDataLength)
             {
-                const size_t nChunk = (size_t)MIN(nCache, nDataLength - nCount);
+                const size_t nChunk =
+                    (size_t)std::min(nCache, nDataLength - nCount);
 
                 const size_t nSize = VSIFReadL(pBuffer, 1, nChunk, fpInput);
 
@@ -774,7 +776,7 @@ boolean GeoRasterDataset::JPEG_CopyDirect(const char *pszJPGFilename,
 
         while (nCount < nDataLength)
         {
-            size_t nChunk = (size_t)MIN(nCache, nDataLength - nCount);
+            size_t nChunk = (size_t)std::min(nCache, nDataLength - nCount);
 
             size_t nSize = VSIFReadL(pBuffer, 1, nChunk, fpInput);
 
@@ -1772,7 +1774,7 @@ GDALDataset *GeoRasterDataset::CreateCopy(const char *pszFilename,
 
         // Number of pyramid levels is the number of resolutions - 1
 
-        poDstDS->poGeoRaster->SetMaxLevel(MAX(1, nJP2Resolution - 1));
+        poDstDS->poGeoRaster->SetMaxLevel(std::max(1, nJP2Resolution - 1));
     }
     else if (poDstDS->poGeoRaster->nBandBlockSize == 1)
     {
@@ -1790,12 +1792,13 @@ GDALDataset *GeoRasterDataset::CreateCopy(const char *pszFilename,
             for (int iYOffset = 0, iYBlock = 0; iYOffset < nYSize;
                  iYOffset += nBlockYSize, iYBlock++)
             {
-                const int nBlockRows = MIN(nBlockYSize, nYSize - iYOffset);
+                const int nBlockRows = std::min(nBlockYSize, nYSize - iYOffset);
                 for (int iXOffset = 0, iXBlock = 0; iXOffset < nXSize;
                      iXOffset += nBlockXSize, iXBlock++)
                 {
 
-                    const int nBlockCols = MIN(nBlockXSize, nXSize - iXOffset);
+                    const int nBlockCols =
+                        std::min(nBlockXSize, nXSize - iXOffset);
 
                     eErr = poSrcBand->RasterIO(
                         GF_Read, iXOffset, iYOffset, nBlockCols, nBlockRows,
@@ -1839,11 +1842,11 @@ GDALDataset *GeoRasterDataset::CreateCopy(const char *pszFilename,
         for (int iYOffset = 0, iYBlock = 0; iYOffset < nYSize;
              iYOffset += nBlockYSize, iYBlock++)
         {
-            const int nBlockRows = MIN(nBlockYSize, nYSize - iYOffset);
+            const int nBlockRows = std::min(nBlockYSize, nYSize - iYOffset);
             for (int iXOffset = 0, iXBlock = 0; iXOffset < nXSize;
                  iXOffset += nBlockXSize, iXBlock++)
             {
-                const int nBlockCols = MIN(nBlockXSize, nXSize - iXOffset);
+                const int nBlockCols = std::min(nBlockXSize, nXSize - iXOffset);
 
                 for (int iBand = 1; iBand <= poSrcDS->GetRasterCount(); iBand++)
                 {
@@ -2502,7 +2505,7 @@ CPLErr GeoRasterDataset::SetSpatialRef(const OGRSpatialReference *poSRS)
         CPLSPrintf("DECLARE\n"
                    "  MAX_SRID NUMBER := 0;\n"
                    "BEGIN\n"
-                   "  SELECT MAX(SRID) INTO MAX_SRID FROM MDSYS.CS_SRS;\n"
+                   "  SELECT std::max(SRID) INTO MAX_SRID FROM MDSYS.CS_SRS;\n"
                    "  MAX_SRID := MAX_SRID + 1;\n"
                    "  INSERT INTO MDSYS.CS_SRS (SRID, WKTEXT, CS_NAME)\n"
                    "        VALUES (MAX_SRID, '%s', '%s');\n"

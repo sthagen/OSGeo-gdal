@@ -16,6 +16,8 @@
  **********************************************************************/
 #include "postgisraster.h"
 
+#include <algorithm>
+
 /**
  * \brief Constructor.
  *
@@ -53,10 +55,10 @@ PostGISRasterRasterBand::PostGISRasterRasterBand(PostGISRasterDataset *poDSIn,
      ******************************************************************/
     nBlockXSize = atoi(CPLGetConfigOption(
         "PR_BLOCKXSIZE",
-        CPLSPrintf("%d", MIN(MAX_BLOCK_SIZE, this->nRasterXSize))));
+        CPLSPrintf("%d", std::min(MAX_BLOCK_SIZE, this->nRasterXSize))));
     nBlockYSize = atoi(CPLGetConfigOption(
         "PR_BLOCKYSIZE",
-        CPLSPrintf("%d", MIN(MAX_BLOCK_SIZE, this->nRasterYSize))));
+        CPLSPrintf("%d", std::min(MAX_BLOCK_SIZE, this->nRasterYSize))));
 
 #ifdef DEBUG_VERBOSE
     CPLDebug("PostGIS_Raster",

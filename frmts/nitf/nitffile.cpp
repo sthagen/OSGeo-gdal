@@ -1291,7 +1291,7 @@ int NITFCreateEx(const char *pszFilename, int nPixels, int nLines, int nBands,
                     nICOM = 9;
                 }
                 PLACE(nCur + nOffset, NICOM, CPLSPrintf("%01d", nICOM));
-                nToWrite = MIN(nICOM * 80, nLenICOM);
+                nToWrite = std::min(nICOM * 80, nLenICOM);
                 bOK &= VSIFWriteL(pszRecodedICOM, 1, nToWrite, fp) == nToWrite;
                 nOffset += nICOM * 80;
                 CPLFree(pszRecodedICOM);
@@ -1568,17 +1568,17 @@ int NITFCreateEx(const char *pszFilename, int nPixels, int nLines, int nBands,
     if (nBands > 9 || nIM > 20 || nPixels > 2048 || nLines > 2048 ||
         nNPPBH > 2048 || nNPPBV > 2048 || nCur > 52428799)
     {
-        nCLevel = MAX(nCLevel, 5);
+        nCLevel = std::max(nCLevel, 5);
     }
     if (nPixels > 8192 || nLines > 8192 || nNPPBH > 8192 || nNPPBV > 8192 ||
         nCur > 1073741833 || nDES > 10)
     {
-        nCLevel = MAX(nCLevel, 6);
+        nCLevel = std::max(nCLevel, 6);
     }
     if (nBands > 256 || nPixels > 65536 || nLines > 65536 ||
         nCur > 2147483647 || nDES > 50)
     {
-        nCLevel = MAX(nCLevel, 7);
+        nCLevel = std::max(nCLevel, 7);
     }
     OVR(2, 9, CLEVEL, CPLSPrintf("%02d", nCLevel));
 
@@ -1628,7 +1628,7 @@ static bool NITFWriteOption(VSILFILE *psFile, CSLConstList papszOptions,
     }
 
     bOK &= NITFGotoOffset(psFile, nLocation);
-    nToWrite = MIN(nWidth, strlen(pszRecodedValue));
+    nToWrite = std::min(nWidth, strlen(pszRecodedValue));
     bOK &= VSIFWriteL(pszRecodedValue, 1, nToWrite, psFile) == nToWrite;
     CPLFree(pszRecodedValue);
     return bOK;
@@ -1760,8 +1760,8 @@ NITFWriteTREsFromOptions(VSILFILE *fp, vsi_l_offset nOffsetIXSHDL,
         }
 
         pszTREName = CPLStrdup(papszOptions[iOption] + nTREPrefixLen);
-        pszTREName[MIN(6, pszSpace - (papszOptions[iOption] + nTREPrefixLen))] =
-            '\0';
+        pszTREName[std::min<size_t>(
+            6, pszSpace - (papszOptions[iOption] + nTREPrefixLen))] = '\0';
         pszEscapedContents = pszSpace + 1;
 
         pszUnescapedContents = CPLUnescapeString(
@@ -1892,7 +1892,7 @@ static bool NITFWriteBLOCKA(VSILFILE *fp, vsi_l_offset nOffsetIXSHDL,
             memset(szBLOCKA + iStart, ' ', iSize);
             /* unsigned is always >= 0 */
             /* memcpy( szBLOCKA + iStart +
-             * MAX((size_t)0,iSize-strlen(pszValue)), */
+             * std::max((size_t)0,iSize-strlen(pszValue)), */
             memcpy(szBLOCKA + iStart +
                        (iSize - static_cast<int>(strlen(pszValue))),
                    pszValue, strlen(pszValue));

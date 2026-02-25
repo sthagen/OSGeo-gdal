@@ -3149,3 +3149,69 @@ def test_ogr_mem_timestamp_with_offset_arrow_api(tmp_vsimem):
     f = lyr.GetNextFeature()
     assert f["id"] == 4
     assert f["dt"] == "2025/12/20 22:30:56"
+
+
+###############################################################################
+
+
+@gdaltest.enable_exceptions()
+def test_ogr_mem_arrow_string_view():
+    pa = pytest.importorskip("pyarrow")
+    if not hasattr(pa, "string_view"):
+        pytest.skip("no string_view support: too old pyarrow version")
+
+    sv_values = ["foo", "foo", "longer than twelve char", "longer than twelve char bis"]
+    sv_list_values = [sv_values, None, ["bar"], None]
+    sv_fixed_size_list_values = [
+        ["foo", "bar"],
+        [None, None],
+        ["longer than twelve char", "baz"],
+        None,
+    ]
+    expected_sv_fixed_size_list_values = [
+        ["foo", "bar"],
+        ["", ""],
+        ["longer than twelve char", "baz"],
+        None,
+    ]
+
+    map_sv_values = [{"a": "b"}, None, None, None]
+    expected_map_sv_values = ['{"a":"b"}', None, None, None]
+
+    map_sv_list_values = [{"a": ["b", "c"]}, None, None, None]
+    expected_map_sv_list_values = ['{"a":["b","c"]}', None, None, None]
+
+    tab = pa.table(
+        {
+            "sv_field": pa.array(sv_values, pa.string_view()),
+            "sv_list_field": pa.array(sv_list_values, pa.list_(pa.string_view())),
+            "sv_large_list_field": pa.array(
+                sv_list_values, pa.large_list(pa.string_view())
+            ),
+            "sv_fixed_size_list_field": pa.array(
+                sv_fixed_size_list_values, pa.list_(pa.string_view(), 2)
+            ),
+            "map_sv_field": pa.array(
+                map_sv_values, pa.map_(pa.string(), pa.string_view())
+            ),
+            "map_sv_list_field": pa.array(
+                map_sv_list_values, pa.map_(pa.string(), pa.list_(pa.string_view()))
+            ),
+        }
+    )
+
+    ds = ogr.GetDriverByName("MEM").CreateDataSource("")
+    lyr = ds.CreateLayer("test")
+    py_schema = tab.schema
+    for i in range(len(py_schema)):
+        lyr.CreateFieldFromPyArrowSchema(py_schema[i])
+    lyr.WriteArrow(tab)
+
+    assert [f["sv_field"] for f in lyr] == sv_values
+    assert [f["sv_list_field"] for f in lyr] == sv_list_values
+    assert [f["sv_large_list_field"] for f in lyr] == sv_list_values
+    assert [
+        f["sv_fixed_size_list_field"] for f in lyr
+    ] == expected_sv_fixed_size_list_values
+    assert [f["map_sv_field"] for f in lyr] == expected_map_sv_values
+    assert [f["map_sv_list_field"] for f in lyr] == expected_map_sv_list_values

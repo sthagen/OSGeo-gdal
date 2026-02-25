@@ -101,8 +101,10 @@ target_sources(appslib PRIVATE
   gdalalg_vector_check_geometry.cpp
   gdalalg_vector_clip.cpp
   gdalalg_vector_clean_coverage.cpp
+  gdalalg_vector_combine.cpp
   gdalalg_vector_concat.cpp
   gdalalg_vector_convert.cpp
+  gdalalg_vector_dissolve.cpp
   gdalalg_vector_edit.cpp
   gdalalg_vector_pipeline.cpp
   gdalalg_vector_rasterize.cpp
@@ -328,7 +330,6 @@ if (BUILD_APPS)
   add_executable(dumpoverviews EXCLUDE_FROM_ALL dumpoverviews.cpp)
   add_executable(gdalflattenmask EXCLUDE_FROM_ALL gdalflattenmask.c)
   add_executable(gdaltorture EXCLUDE_FROM_ALL gdaltorture.cpp)
-  add_executable(gdal2ogr EXCLUDE_FROM_ALL gdal2ogr.c)
   add_executable(gdalasyncread EXCLUDE_FROM_ALL gdalasyncread.cpp)
   add_executable(multireadtest EXCLUDE_FROM_ALL multireadtest.cpp)
   if(NOT MSVC AND CMAKE_THREAD_LIBS_INIT)
@@ -341,7 +342,6 @@ if (BUILD_APPS)
 
   set(APPS_NON_DEFAULT_TARGETS
       dumpoverviews
-      gdal2ogr
       gdalasyncread
       gdaltorture
       gdalflattenmask

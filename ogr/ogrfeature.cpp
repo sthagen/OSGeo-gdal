@@ -4466,6 +4466,59 @@ void OGRFeature::SetField(int iField, const char *pszValue)
 }
 
 /************************************************************************/
+/*                              SetField()                              */
+/************************************************************************/
+
+/**
+ * \brief Set field to string value.
+ *
+ * OFTInteger fields will be set based on an atoi() conversion of the string.
+ * OFTInteger64 fields will be set based on an CPLAtoGIntBig() conversion of the
+ * string.  OFTReal fields will be set based on an CPLAtof() conversion of the
+ * string.  Other field types may be unaffected.
+ *
+ * This method is the same as the C function OGR_F_SetFieldString().
+ *
+ * @note This method has only an effect on the in-memory feature object. If
+ * this object comes from a layer and the modifications must be serialized back
+ * to the datasource, OGR_L_SetFeature() must be used afterwards. Or if this is
+ * a new feature, OGR_L_CreateFeature() must be used afterwards.
+ *
+ * @param iField the field to fetch, from 0 to GetFieldCount()-1.
+ * @param svValue the value to assign.
+ * @since 3.13
+ */
+
+void OGRFeature::SetField(int iField, std::string_view svValue)
+
+{
+    const OGRFieldDefn *poFDefn = poDefn->GetFieldDefn(iField);
+    if (poFDefn == nullptr)
+        return;
+    if (poFDefn->GetType() == OFTString)
+    {
+        if (IsFieldSetAndNotNullUnsafe(iField))
+            CPLFree(pauFields[iField].String);
+
+        pauFields[iField].String =
+            static_cast<char *>(VSI_MALLOC_VERBOSE(svValue.size() + 1));
+        if (pauFields[iField].String)
+        {
+            memcpy(pauFields[iField].String, svValue.data(), svValue.size());
+            pauFields[iField].String[svValue.size()] = 0;
+        }
+        else
+        {
+            OGR_RawField_SetUnset(&pauFields[iField]);
+        }
+    }
+    else
+    {
+        SetField(iField, std::string(svValue).c_str());
+    }
+}
+
+/************************************************************************/
 /*                        OGR_F_SetFieldString()                        */
 /************************************************************************/
 

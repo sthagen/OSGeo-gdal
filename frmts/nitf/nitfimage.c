@@ -4545,14 +4545,14 @@ static void NITFPossibleIGEOLOReorientation(NITFImage *psImage)
     /* -------------------------------------------------------------------- */
     {
 
-        double dfXMax = MAX(MAX(psImage->dfULX, psImage->dfURX),
-                            MAX(psImage->dfLRX, psImage->dfLLX));
-        double dfXMin = MIN(MIN(psImage->dfULX, psImage->dfURX),
-                            MIN(psImage->dfLRX, psImage->dfLLX));
-        double dfYMax = MAX(MAX(psImage->dfULY, psImage->dfURY),
-                            MAX(psImage->dfLRY, psImage->dfLLY));
-        double dfYMin = MIN(MIN(psImage->dfULY, psImage->dfURY),
-                            MIN(psImage->dfLRY, psImage->dfLLY));
+        double dfXMax = CPL_MAX(CPL_MAX(psImage->dfULX, psImage->dfURX),
+                                CPL_MAX(psImage->dfLRX, psImage->dfLLX));
+        double dfXMin = CPL_MIN(CPL_MIN(psImage->dfULX, psImage->dfURX),
+                                CPL_MIN(psImage->dfLRX, psImage->dfLLX));
+        double dfYMax = CPL_MAX(CPL_MAX(psImage->dfULY, psImage->dfURY),
+                                CPL_MAX(psImage->dfLRY, psImage->dfLLY));
+        double dfYMin = CPL_MIN(CPL_MIN(psImage->dfULY, psImage->dfURY),
+                                CPL_MIN(psImage->dfLRY, psImage->dfLLY));
         double dfXPivot = (dfXMax + dfXMin) * 0.5;
         double dfYPivot = (dfYMax + dfYMin) * 0.5;
 

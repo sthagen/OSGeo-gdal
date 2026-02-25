@@ -46,6 +46,7 @@ PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 #include "cpl_conv.h"
 #include "cpl_string.h"
 
+#include <algorithm>
 #include <limits>
 
 #define PQexec this_is_an_error
@@ -1540,7 +1541,7 @@ OGRFeature *OGRPGLayer::GetNextRawFeature()
 
         OGRPGClearResult(hCursorResult);
 
-        iNextShapeId = MAX(1, iNextShapeId);
+        iNextShapeId = std::max<GIntBig>(1, iNextShapeId);
         return nullptr;
     }
 
@@ -1570,7 +1571,7 @@ OGRFeature *OGRPGLayer::GetNextRawFeature()
     {
         CloseCursor();
 
-        iNextShapeId = MAX(1, iNextShapeId);
+        iNextShapeId = std::max<GIntBig>(1, iNextShapeId);
 
         return nullptr;
     }

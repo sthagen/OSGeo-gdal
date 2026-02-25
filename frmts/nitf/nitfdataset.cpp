@@ -20,11 +20,11 @@
 
 #include "gdal_mdreader.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <algorithm>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -6072,15 +6072,15 @@ static bool NITFPatchImageLength(const char *pszFilename, VSILFILE *fp,
             const unsigned int nCLevelOri = nCLevel;
             if (nFileLen > 2147483647)
             {
-                nCLevel = MAX(nCLevel, 7U);
+                nCLevel = std::max(nCLevel, 7U);
             }
             else if (nFileLen > 1073741833)
             {
-                nCLevel = MAX(nCLevel, 6U);
+                nCLevel = std::max(nCLevel, 6U);
             }
             else if (nFileLen > 52428799)
             {
-                nCLevel = MAX(nCLevel, 5U);
+                nCLevel = std::max(nCLevel, 5U);
             }
             if (nCLevel != nCLevelOri)
             {

@@ -1108,6 +1108,12 @@ class CPL_DLL GDALMDArray : virtual public GDALAbstractMDArray,
 
     virtual std::shared_ptr<GDALMDArray> GetOverview(int idx) const;
 
+    virtual CPLErr BuildOverviews(const char *pszResampling, int nOverviews,
+                                  const int *panOverviewList,
+                                  GDALProgressFunc pfnProgress,
+                                  void *pProgressData,
+                                  CSLConstList papszOptions);
+
     //! @cond Doxygen_Suppress
     static constexpr GUInt64 COPY_COST = 1000;
 

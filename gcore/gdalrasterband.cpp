@@ -15,6 +15,7 @@
 #include "cpl_port.h"
 #include "cpl_float.h"
 
+#include <algorithm>
 #include <cassert>
 #include <climits>
 #include <cmath>
@@ -23,7 +24,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <algorithm>
 #include <limits>
 #include <memory>
 #include <new>
@@ -11324,8 +11324,10 @@ bool GDALMDRasterIOFromBand(GDALRasterBand *poBand, GDALRWFlag eRWFlag,
             ? static_cast<int>(arrayStartIdx[iDimY])
             : static_cast<int>(arrayStartIdx[iDimY] -
                                (count[iDimY] - 1) * -arrayStep[iDimY]);
-    const int nSizeX = static_cast<int>(count[iDimX] * ABS(arrayStep[iDimX]));
-    const int nSizeY = static_cast<int>(count[iDimY] * ABS(arrayStep[iDimY]));
+    const int nSizeX =
+        static_cast<int>(count[iDimX] * std::abs(arrayStep[iDimX]));
+    const int nSizeY =
+        static_cast<int>(count[iDimY] * std::abs(arrayStep[iDimY]));
     GByte *pabyBuffer = static_cast<GByte *>(pBuffer);
     int nStrideXSign = 1;
     if (arrayStep[iDimX] < 0)

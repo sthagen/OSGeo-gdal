@@ -1290,6 +1290,17 @@ public:
     return GDALMDArrayGetOverview(self, idx);
   }
 
+%apply (int nList, int* pList) { (int overviewlist, int *pOverviews) };
+  CPLErr BuildOverviews( const char *resampling = "NEAREST",
+                         int overviewlist = 0, int *pOverviews = 0,
+                         GDALProgressFunc callback = NULL,
+                         void *callback_data = NULL,
+                         char **options = NULL ) {
+    return GDALMDArrayBuildOverviews( self, resampling,
+        overviewlist, pOverviews, callback, callback_data, options );
+  }
+%clear (int overviewlist, int *pOverviews);
+
 } /* extend */
 }; /* GDALMDArrayH */
 

@@ -579,6 +579,7 @@ Decompressor
 decompressors
 decrementing
 decrypted
+deduplicate
 Deegree
 defacto
 define'ed
@@ -1886,6 +1887,7 @@ multiproc
 multiprocess
 multireadtest
 multirecords
+multiscales
 multispectral
 multistring
 multisurface

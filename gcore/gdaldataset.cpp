@@ -13,6 +13,7 @@
 
 #include "cpl_port.h"
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <climits>
@@ -21,7 +22,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <algorithm>
 #include <limits>
 #include <map>
 #include <mutex>
@@ -12289,9 +12289,9 @@ bool GDALMDArrayFromDataset::ReadWrite(
             : static_cast<int>(arrayStartIdx[m_iYDim] -
                                (count[m_iYDim] - 1) * -arrayStep[m_iYDim]);
     const int nSizeX =
-        static_cast<int>(count[m_iXDim] * ABS(arrayStep[m_iXDim]));
+        static_cast<int>(count[m_iXDim] * std::abs(arrayStep[m_iXDim]));
     const int nSizeY =
-        static_cast<int>(count[m_iYDim] * ABS(arrayStep[m_iYDim]));
+        static_cast<int>(count[m_iYDim] * std::abs(arrayStep[m_iYDim]));
     GByte *pabyBuffer = static_cast<GByte *>(pBuffer);
     int nStrideXSign = 1;
     if (arrayStep[m_iXDim] < 0)
