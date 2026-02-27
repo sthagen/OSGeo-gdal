@@ -743,7 +743,8 @@ lbl_next:
             anRequests.push_back({info.anStartIdx, info.anCount});
 
         std::vector<ZarrByteVectorQuickResize> aResults;
-        if (!poCodecs->BatchDecodePartial(fp.get(), anRequests, aResults))
+        if (!poCodecs->BatchDecodePartial(fp.get(), work.posFilename->c_str(),
+                                          anRequests, aResults))
             return;
 
         // Type-convert outside mutex (CPU-bound, thread-local data)
@@ -828,6 +829,15 @@ lbl_next:
 bool ZarrV3Array::IAdviseRead(const GUInt64 *arrayStartIdx, const size_t *count,
                               CSLConstList papszOptions) const
 {
+    // For sharded arrays, batch all needed inner chunks via
+    // PreloadShardedBlocks (BatchDecodePartial + ReadMultiRange) instead
+    // of the per-block LoadBlockData path below.
+    if (m_poCodecs && m_poCodecs->SupportsPartialDecoding())
+    {
+        PreloadShardedBlocks(arrayStartIdx, count);
+        return true;
+    }
+
     std::vector<uint64_t> anIndicesCur;
     int nThreadsMax = 0;
     std::vector<uint64_t> anReqBlocksIndices;
@@ -1386,6 +1396,8 @@ bool ZarrV3Array::FlushSingleShard(const std::string &osFilename,
         bRet = false;
     }
     VSIFCloseL(fp);
+    if (bRet)
+        ZarrEraseShardIndexFromCache(osFilename);
     return bRet;
 }
 

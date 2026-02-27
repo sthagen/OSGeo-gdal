@@ -15,9 +15,8 @@ coordinate system information with a datasource, merge layers from
 different datasources into a single data source, or even just to provide
 an anchor file for access to non-file oriented datasources.
 
-The virtual files are currently normally prepared by hand.
-However an unofficial test script can be found at
-https://github.com/OSGeo/gdal/blob/master/swig/python/gdal-utils/osgeo_utils/samples/ogr2vrt.py
+Vector virtual files may be prepared by hand, however e.g.,
+:program:`ogrmerge`, such as in ``ogrmerge -o merged.vrt *.shp`` can also be used.
 
 Note .vrt files starting with
 
