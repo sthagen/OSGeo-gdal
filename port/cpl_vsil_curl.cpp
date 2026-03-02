@@ -21,6 +21,7 @@
 #include <memory>
 #include <numeric>
 #include <set>
+#include <string_view>
 
 #include "cpl_aws.h"
 #include "cpl_json.h"
@@ -110,6 +111,8 @@ int VSICurlUninstallReadCbk(VSILFILE * /* fp */)
 
 #define unchecked_curl_easy_setopt(handle, opt, param)                         \
     CPL_IGNORE_RET_VAL(curl_easy_setopt(handle, opt, param))
+
+constexpr const char *const VSICURL_PREFIXES[] = {"/vsicurl/", "/vsicurl?"};
 
 /***********************************************************ù************/
 /*                    VSICurlAuthParametersChanged()                    */
@@ -307,6 +310,26 @@ static int VSICurlIsFileInList(CSLConstList papszList, const char *pszTarget)
 }
 
 /************************************************************************/
+/*                      StartsWithVSICurlPrefix()                       */
+/************************************************************************/
+
+static bool
+StartsWithVSICurlPrefix(const char *pszFilename,
+                        std::string *posFilenameAfterPrefix = nullptr)
+{
+    for (const char *pszPrefix : VSICURL_PREFIXES)
+    {
+        if (STARTS_WITH(pszFilename, pszPrefix))
+        {
+            if (posFilenameAfterPrefix)
+                *posFilenameAfterPrefix = pszFilename + strlen(pszPrefix);
+            return true;
+        }
+    }
+    return false;
+}
+
+/************************************************************************/
 /*                     VSICurlGetURLFromFilename()                      */
 /************************************************************************/
 
@@ -319,8 +342,7 @@ static std::string VSICurlGetURLFromFilename(
     if (ppszPlanetaryComputerCollection)
         *ppszPlanetaryComputerCollection = nullptr;
 
-    if (!STARTS_WITH(pszFilename, "/vsicurl/") &&
-        !STARTS_WITH(pszFilename, "/vsicurl?"))
+    if (!StartsWithVSICurlPrefix(pszFilename))
         return pszFilename;
 
     if (pbPlanetaryComputerURLSigning)
@@ -4465,9 +4487,15 @@ VSICurlFilesystemHandlerBase::Open(const char *pszFilename,
                                    const char *pszAccess, bool bSetError,
                                    CSLConstList papszOptions)
 {
-    if (!STARTS_WITH_CI(pszFilename, GetFSPrefix().c_str()) &&
-        !STARTS_WITH_CI(pszFilename, "/vsicurl?"))
+    std::string osFilenameAfterPrefix;
+    if (cpl::starts_with(std::string_view(pszFilename), GetFSPrefix()))
+    {
+        osFilenameAfterPrefix = pszFilename + GetFSPrefix().size();
+    }
+    else if (!StartsWithVSICurlPrefix(pszFilename, &osFilenameAfterPrefix))
+    {
         return nullptr;
+    }
 
     if (strchr(pszAccess, 'w') != nullptr || strchr(pszAccess, '+') != nullptr)
     {
@@ -4507,8 +4535,7 @@ VSICurlFilesystemHandlerBase::Open(const char *pszFilename,
     bool bForceExistsCheck = false;
     FileProp cachedFileProp;
     if (!bSkipReadDir &&
-        !(GetCachedFileProp(osFilename.c_str() + strlen(GetFSPrefix().c_str()),
-                            cachedFileProp) &&
+        !(GetCachedFileProp(osFilenameAfterPrefix.c_str(), cachedFileProp) &&
           cachedFileProp.eExists == EXIST_YES) &&
         strchr(CPLGetFilename(osFilename.c_str()), '.') != nullptr &&
         !STARTS_WITH(CPLGetExtensionSafe(osFilename.c_str()).c_str(), "zip") &&
@@ -4973,6 +5000,27 @@ std::string VSICurlFilesystemHandler::GetStreamingFilename(
     if (STARTS_WITH(osFilename.c_str(), GetFSPrefix().c_str()))
         return "/vsicurl_streaming/" + osFilename.substr(GetFSPrefix().size());
     return osFilename;
+}
+
+/************************************************************************/
+/*                GetHintForPotentiallyRecognizedPath()                 */
+/************************************************************************/
+
+std::string VSICurlFilesystemHandler::GetHintForPotentiallyRecognizedPath(
+    const std::string &osPath)
+{
+    if (!StartsWithVSICurlPrefix(osPath.c_str()) &&
+        !cpl::starts_with(osPath, GetStreamingFilename(GetFSPrefix())))
+    {
+        for (const char *pszPrefix : {"http://", "https://"})
+        {
+            if (cpl::starts_with(osPath, pszPrefix))
+            {
+                return GetFSPrefix() + osPath;
+            }
+        }
+    }
+    return std::string();
 }
 
 /************************************************************************/
@@ -5500,9 +5548,11 @@ std::set<std::string> VSICurlFilesystemHandlerBase::GetS3IgnoredStorageClasses()
 int VSICurlFilesystemHandlerBase::Stat(const char *pszFilename,
                                        VSIStatBufL *pStatBuf, int nFlags)
 {
-    if (!STARTS_WITH_CI(pszFilename, GetFSPrefix().c_str()) &&
-        !STARTS_WITH_CI(pszFilename, "/vsicurl?"))
+    if (!cpl::starts_with(std::string_view(pszFilename), GetFSPrefix()) &&
+        !StartsWithVSICurlPrefix(pszFilename))
+    {
         return -1;
+    }
 
     memset(pStatBuf, 0, sizeof(VSIStatBufL));
 
@@ -6481,8 +6531,10 @@ struct curl_slist *VSICurlSetCreationHeadersFromOptions(
 void VSIInstallCurlFileHandler(void)
 {
     auto poHandler = std::make_shared<cpl::VSICurlFilesystemHandler>();
-    VSIFileManager::InstallHandler("/vsicurl/", poHandler);
-    VSIFileManager::InstallHandler("/vsicurl?", poHandler);
+    for (const char *pszPrefix : VSICURL_PREFIXES)
+    {
+        VSIFileManager::InstallHandler(pszPrefix, poHandler);
+    }
 }
 
 /************************************************************************/
