@@ -1670,20 +1670,8 @@ bool OGRFeature::IsFieldNull(int iField) const
     if (iSpecialField >= 0)
     {
         // Special fields (FID, geometry, style, area) are virtual/derived
-        // values that have no nullable state. They can only be set or unset,
-        // but cannot be explicitly assigned a null value as regular fields
-        // can. IsFieldSet() should be used to test whether a special field
-        // has a value.
-        switch (iSpecialField)
-        {
-            case SPF_FID:
-            case SPF_OGR_GEOMETRY:
-            case SPF_OGR_STYLE:
-            case SPF_OGR_GEOM_WKT:
-            case SPF_OGR_GEOM_AREA:
-            default:
-                return false;
-        }
+        // values that have no nullable state.
+        return false;
     }
     else
     {
