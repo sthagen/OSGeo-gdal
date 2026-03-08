@@ -1772,8 +1772,6 @@ void CPL_STDCALL GDALWarpResolveWorkingDataType(GDALWarpOptions *psOptions)
         return;
     }
 
-    psOptions->eWorkingDataType = GDT_UInt8;
-
     // If none of the provided input nodata values can be represented in the
     // data type of the corresponding source band, ignore them.
     if (psOptions->hSrcDS && psOptions->padfSrcNoDataReal)
@@ -1858,6 +1856,9 @@ void CPL_STDCALL GDALWarpResolveWorkingDataType(GDALWarpOptions *psOptions)
                 psOptions->padfDstNoDataImag[iBand], true);
         }
     }
+
+    if (psOptions->eWorkingDataType == GDT_Unknown)
+        psOptions->eWorkingDataType = GDT_UInt8;
 
     const bool bApplyVerticalShift = CPLFetchBool(
         psOptions->papszWarpOptions, "APPLY_VERTICAL_SHIFT", false);
