@@ -3816,7 +3816,6 @@ GDALDataset *GTiffDataset::Open(GDALOpenInfo *poOpenInfo)
     {
         auto oAccumulator = oErrorAccumulator.InstallForCurrentScope();
         CPL_IGNORE_RET_VAL(oAccumulator);
-        CPLSetCurrentErrorHandlerCatchDebug(FALSE);
         const bool bDeferStrileLoading = CPLTestBool(
             CPLGetConfigOption("GTIFF_USE_DEFER_STRILE_LOADING", "YES"));
         l_hTIFF = VSI_TIFFOpen(
