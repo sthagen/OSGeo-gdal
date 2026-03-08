@@ -3625,37 +3625,37 @@ bool GDALTileIndexDataset::GetSourceDesc(const std::string &osTileName,
             }
 
             // Second pass to create a warped source VRT whose
-            // extent is aligned on the one of the target VRT
+            // extent is aligned on the one of the target GTI
             GDALGeoTransform warpDSGT;
             const auto eErr = poWarpDS->GetGeoTransform(warpDSGT);
             CPL_IGNORE_RET_VAL(eErr);
             CPLAssert(eErr == CE_None);
-            const double dfVRTMinX = m_gt.xorig;
-            const double dfVRTResX = m_gt.xscale;
-            const double dfVRTMaxY = m_gt.yorig;
-            const double dfVRTResYAbs = -m_gt.yscale;
+            const double dfGTIMinX = m_gt.xorig;
+            const double dfGTIResX = m_gt.xscale;
+            const double dfGTIMaxY = m_gt.yorig;
+            const double dfGTIResYAbs = -m_gt.yscale;
             const double dfWarpMinX =
-                std::floor((warpDSGT.xorig - dfVRTMinX) / dfVRTResX) *
-                    dfVRTResX +
-                dfVRTMinX;
+                std::floor((warpDSGT.xorig - dfGTIMinX) / dfGTIResX) *
+                    dfGTIResX +
+                dfGTIMinX;
             const double dfWarpMaxX =
                 std::ceil((warpDSGT.xorig +
                            warpDSGT.xscale * poWarpDS->GetRasterXSize() -
-                           dfVRTMinX) /
-                          dfVRTResX) *
-                    dfVRTResX +
-                dfVRTMinX;
+                           dfGTIMinX) /
+                          dfGTIResX) *
+                    dfGTIResX +
+                dfGTIMinX;
             const double dfWarpMaxY =
-                dfVRTMaxY -
-                std::floor((dfVRTMaxY - warpDSGT.yorig) / dfVRTResYAbs) *
-                    dfVRTResYAbs;
+                dfGTIMaxY -
+                std::floor((dfGTIMaxY - warpDSGT.yorig) / dfGTIResYAbs) *
+                    dfGTIResYAbs;
             const double dfWarpMinY =
-                dfVRTMaxY -
-                std::ceil((dfVRTMaxY -
+                dfGTIMaxY -
+                std::ceil((dfGTIMaxY -
                            (warpDSGT.yorig +
                             warpDSGT.yscale * poWarpDS->GetRasterYSize())) /
-                          dfVRTResYAbs) *
-                    dfVRTResYAbs;
+                          dfGTIResYAbs) *
+                    dfGTIResYAbs;
 
             aosOptions.AddString("-te");
             aosOptions.AddString(CPLSPrintf("%.17g", dfWarpMinX));
@@ -3664,8 +3664,8 @@ bool GDALTileIndexDataset::GetSourceDesc(const std::string &osTileName,
             aosOptions.AddString(CPLSPrintf("%.17g", dfWarpMaxY));
 
             aosOptions.AddString("-tr");
-            aosOptions.AddString(CPLSPrintf("%.17g", dfVRTResX));
-            aosOptions.AddString(CPLSPrintf("%.17g", dfVRTResYAbs));
+            aosOptions.AddString(CPLSPrintf("%.17g", dfGTIResX));
+            aosOptions.AddString(CPLSPrintf("%.17g", dfGTIResYAbs));
 
             if (bAddAlphaToVRT)
                 aosOptions.AddString("-dstalpha");
