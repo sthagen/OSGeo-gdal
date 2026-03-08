@@ -1669,8 +1669,21 @@ bool OGRFeature::IsFieldNull(int iField) const
     const int iSpecialField = iField - poDefn->GetFieldCountUnsafe();
     if (iSpecialField >= 0)
     {
-        // FIXME?
-        return false;
+        // Special fields (FID, geometry, style, area) are virtual/derived
+        // values that have no nullable state. They can only be set or unset,
+        // but cannot be explicitly assigned a null value as regular fields
+        // can. IsFieldSet() should be used to test whether a special field
+        // has a value.
+        switch (iSpecialField)
+        {
+            case SPF_FID:
+            case SPF_OGR_GEOMETRY:
+            case SPF_OGR_STYLE:
+            case SPF_OGR_GEOM_WKT:
+            case SPF_OGR_GEOM_AREA:
+            default:
+                return false;
+        }
     }
     else
     {
