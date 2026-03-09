@@ -1307,7 +1307,7 @@ std::shared_ptr<GDALMDArray> ZarrV3Group::CreateMDArray(
     poArray->SetFilename(osFilename);
     poArray->SetDimSeparator(pszDimSeparator);
     poArray->SetDtype(dtype);
-    const auto osLastCodecName =
+    const std::string osLastCodecName =
         oCodecs.Size() > 0 ? oCodecs[oCodecs.Size() - 1].GetString("name")
                            : std::string();
     if (!osLastCodecName.empty() && osLastCodecName != "bytes" &&
