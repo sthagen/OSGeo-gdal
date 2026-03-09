@@ -260,6 +260,7 @@ PostGIS, ...), the following layer metadata items may be set:
   When using :ref:`gdal_driver_gti_create`, the value is automatically set to
   match interleave mode among the input sources. Accessing sources whose
   interleave mode differs from the exposed value may result in reduced performance.
+  See :ref:`raster_data_model_interleave_mode` for more details.
 
 All overviews *must* have exactly the same extent as the full resolution
 virtual mosaic. The GTI driver does not check that, and if that condition is

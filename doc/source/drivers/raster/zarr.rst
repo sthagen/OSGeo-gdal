@@ -749,6 +749,7 @@ The following options are creation options of the classic raster API only:
       The default value is BAND in Create() mode. In CreateCopy() mode, the
       default value is the value of the INTERLEAVE metadata item of the
       IMAGE_STRUCTURE metadata domain of the source dataset, if set.
+      See :ref:`raster_data_model_interleave_mode` for more details.
 
 
 Examples
