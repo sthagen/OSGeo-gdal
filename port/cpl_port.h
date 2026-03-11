@@ -802,6 +802,173 @@ extern "C++"
  */
 #define CPL_LSBUINT32PTR(x) CPL_STATIC_CAST(GUInt32, CPL_LSBINT32PTR(x))
 
+#if defined(__cplusplus) && !defined(CPL_SUPRESS_CPLUSPLUS)
+
+extern "C++"
+{
+#include <cstddef>
+#include <cstdint>
+
+    /** Return the provided value as a LSB ordered one.
+     *
+     * Only available for primitive types: [u]int[8|16|32|64], float and double.
+     */
+    template <class T>
+    T CPL_AS_LSB(T)
+#ifndef DOXYGEN_SKIP
+        = delete
+#endif
+        ;
+
+    /*! @cond Doxygen_Suppress */
+    template <> inline int8_t CPL_AS_LSB<int8_t>(int8_t x)
+    {
+        return x;
+    }
+
+    template <> inline uint8_t CPL_AS_LSB<uint8_t>(uint8_t x)
+    {
+        return x;
+    }
+
+    template <> inline int16_t CPL_AS_LSB<int16_t>(int16_t x)
+    {
+        CPL_LSBPTR16(&x);
+        return x;
+    }
+
+    template <> inline uint16_t CPL_AS_LSB<uint16_t>(uint16_t x)
+    {
+        CPL_LSBPTR16(&x);
+        return x;
+    }
+
+    template <> inline int32_t CPL_AS_LSB<int32_t>(int32_t x)
+    {
+        CPL_LSBPTR32(&x);
+        return x;
+    }
+
+    template <> inline uint32_t CPL_AS_LSB<uint32_t>(uint32_t x)
+    {
+        CPL_LSBPTR32(&x);
+        return x;
+    }
+
+    template <> inline int64_t CPL_AS_LSB<int64_t>(int64_t x)
+    {
+        CPL_LSBPTR64(&x);
+        return x;
+    }
+
+    template <> inline uint64_t CPL_AS_LSB<uint64_t>(uint64_t x)
+    {
+        CPL_LSBPTR64(&x);
+        return x;
+    }
+
+    template <> inline float CPL_AS_LSB<float>(float x)
+    {
+        CPL_LSBPTR32(&x);
+        return x;
+    }
+
+    template <> inline double CPL_AS_LSB<double>(double x)
+    {
+        CPL_LSBPTR64(&x);
+        return x;
+    }
+
+    /*! @endcond */
+
+    /** Return a primitive type from a memory buffer containing its LSB
+     * ordered byte sequence
+     *
+     * Only available for primitive types: [u]int[8|16|32|64], float and double.
+     */
+    template <class T> inline T CPL_FROM_LSB(const void *ptr)
+    {
+        T x;
+        memcpy(&x, ptr, sizeof(x));
+        return CPL_AS_LSB(x);
+    }
+
+    /** Return the byte swapped version of the provided value.
+     *
+     * Only available for primitive types: [u]int[8|16|32|64], float and double.
+     */
+    template <class T>
+    T CPL_SWAP(T)
+#ifndef DOXYGEN_SKIP
+        = delete
+#endif
+        ;
+
+    /*! @cond Doxygen_Suppress */
+    template <> inline int8_t CPL_SWAP<int8_t>(int8_t x)
+    {
+        return x;
+    }
+
+    template <> inline uint8_t CPL_SWAP<uint8_t>(uint8_t x)
+    {
+        return x;
+    }
+
+    template <> inline uint16_t CPL_SWAP<uint16_t>(uint16_t x)
+    {
+        return CPL_SWAP16(x);
+    }
+
+    template <> inline int16_t CPL_SWAP<int16_t>(int16_t x)
+    {
+        uint16_t ux = CPL_SWAP16(x);
+        memcpy(&x, &ux, sizeof(x));
+        return x;
+    }
+
+    template <> inline uint32_t CPL_SWAP<uint32_t>(uint32_t x)
+    {
+        return CPL_SWAP32(x);
+    }
+
+    template <> inline int32_t CPL_SWAP<int32_t>(int32_t x)
+    {
+        uint32_t ux = CPL_SWAP32(x);
+        memcpy(&x, &ux, sizeof(x));
+        return x;
+    }
+
+    template <> inline uint64_t CPL_SWAP<uint64_t>(uint64_t x)
+    {
+        return CPL_SWAP64(x);
+    }
+
+    template <> inline int64_t CPL_SWAP<int64_t>(int64_t x)
+    {
+        uint64_t ux = CPL_SWAP64(x);
+        memcpy(&x, &ux, sizeof(x));
+        return x;
+    }
+
+    template <> inline float CPL_SWAP<float>(float x)
+    {
+        float ret = x;
+        CPL_SWAP32PTR(&ret);
+        return ret;
+    }
+
+    template <> inline double CPL_SWAP<double>(double x)
+    {
+        double ret = x;
+        CPL_SWAP64PTR(&ret);
+        return ret;
+    }
+
+    /*! @endcond */
+}
+#endif  // defined(__cplusplus) && defined(GDAL_COMPILATION)
+
 /*! @cond Doxygen_Suppress */
 /* Utility macro to explicitly mark intentionally unreferenced parameters. */
 #ifndef UNREFERENCED_PARAM
