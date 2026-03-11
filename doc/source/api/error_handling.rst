@@ -253,7 +253,7 @@ Example:
 Debug messages that must appear only in GDAL Debug builds (typically because
 they are emitted in a performance critical loop) can be emitted with
 :c:macro:`CPLDebugOnly`. Those calls are completely omitted in release builds.
-And fr debug messages that must be emitted only once during the lifetime of the
+For debug messages that must be emitted only once during the lifetime of the
 process, ``CPLDebugOnce`` can be used.
 
 
