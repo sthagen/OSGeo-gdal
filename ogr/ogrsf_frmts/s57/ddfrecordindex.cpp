@@ -20,8 +20,7 @@
 /************************************************************************/
 
 DDFRecordIndex::DDFRecordIndex()
-    : bSorted(false), nRecordCount(0), nRecordMax(0), nLastObjlPos(0),
-      nLastObjl(0), pasRecords(nullptr)
+    : bSorted(false), nRecordCount(0), nRecordMax(0), pasRecords(nullptr)
 {
 }
 
@@ -57,9 +56,6 @@ void DDFRecordIndex::Clear()
 
     nRecordCount = 0;
     nRecordMax = 0;
-
-    nLastObjlPos = 0;
-    nLastObjl = 0;
 
     CPLFree(pasRecords);
     pasRecords = nullptr;
@@ -124,44 +120,6 @@ DDFRecord *DDFRecordIndex::FindRecord(int nKey)
         else
             return pasRecords[nTestIndex].poRecord;
     }
-
-    return nullptr;
-}
-
-/************************************************************************/
-/*                       FindRecordByObjl()                             */
-/*      Rodney Jensen                                                   */
-/*      Though the returned pointer is not const, it should be          */
-/*      considered internal to the index and not modified or freed      */
-/*      by application code.                                            */
-/************************************************************************/
-
-DDFRecord *DDFRecordIndex::FindRecordByObjl(int nObjl)
-{
-    if (!bSorted)
-        Sort();
-
-    /* -------------------------------------------------------------------- */
-    /*      Do a linear search based on the nObjl to find the desired record. */
-    /* -------------------------------------------------------------------- */
-    int nMinIndex = 0;
-    if (nLastObjl != nObjl)
-        nLastObjlPos = 0;
-
-    for (nMinIndex = nLastObjlPos; nMinIndex < nRecordCount; nMinIndex++)
-    {
-        if (nObjl == pasRecords[nMinIndex].poRecord->GetIntSubfield("FRID", 0,
-                                                                    "OBJL", 0))
-        {
-            // Add 1.  Do not want to look at same again.
-            nLastObjlPos = nMinIndex + 1;
-            nLastObjl = nObjl;
-            return pasRecords[nMinIndex].poRecord;
-        }
-    }
-
-    nLastObjlPos = 0;
-    nLastObjl = 0;
 
     return nullptr;
 }
