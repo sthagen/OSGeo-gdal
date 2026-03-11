@@ -1191,6 +1191,7 @@ GDALDatasetH GDALTileIndexInternal(const char *pszDest,
         topSchema.children = topSchemasPointers.data();
     }
 
+    CPLXMLTreeCloser psRoot(nullptr);
     if (!psOptions->osGTIFilename.empty())
     {
         if (!psOptions->aosMetadata.empty())
@@ -1199,28 +1200,29 @@ GDALDatasetH GDALTileIndexInternal(const char *pszDest,
                      "-mo is not supported when -gti_filename is used");
             return nullptr;
         }
-        CPLXMLNode *psRoot =
-            CPLCreateXMLNode(nullptr, CXT_Element, "GDALTileIndexDataset");
-        CPLCreateXMLElementAndValue(psRoot, "IndexDataset", pszDest);
-        CPLCreateXMLElementAndValue(psRoot, "IndexLayer", poLayer->GetName());
-        CPLCreateXMLElementAndValue(psRoot, "LocationField",
+        psRoot.reset(
+            CPLCreateXMLNode(nullptr, CXT_Element, "GDALTileIndexDataset"));
+        CPLCreateXMLElementAndValue(psRoot.get(), "IndexDataset", pszDest);
+        CPLCreateXMLElementAndValue(psRoot.get(), "IndexLayer",
+                                    poLayer->GetName());
+        CPLCreateXMLElementAndValue(psRoot.get(), "LocationField",
                                     psOptions->osLocationField.c_str());
         if (!std::isnan(psOptions->xres))
         {
-            CPLCreateXMLElementAndValue(psRoot, "ResX",
+            CPLCreateXMLElementAndValue(psRoot.get(), "ResX",
                                         CPLSPrintf("%.18g", psOptions->xres));
-            CPLCreateXMLElementAndValue(psRoot, "ResY",
+            CPLCreateXMLElementAndValue(psRoot.get(), "ResY",
                                         CPLSPrintf("%.18g", psOptions->yres));
         }
         if (!std::isnan(psOptions->xmin))
         {
-            CPLCreateXMLElementAndValue(psRoot, "MinX",
+            CPLCreateXMLElementAndValue(psRoot.get(), "MinX",
                                         CPLSPrintf("%.18g", psOptions->xmin));
-            CPLCreateXMLElementAndValue(psRoot, "MinY",
+            CPLCreateXMLElementAndValue(psRoot.get(), "MinY",
                                         CPLSPrintf("%.18g", psOptions->ymin));
-            CPLCreateXMLElementAndValue(psRoot, "MaxX",
+            CPLCreateXMLElementAndValue(psRoot.get(), "MaxX",
                                         CPLSPrintf("%.18g", psOptions->xmax));
-            CPLCreateXMLElementAndValue(psRoot, "MaxY",
+            CPLCreateXMLElementAndValue(psRoot.get(), "MaxY",
                                         CPLSPrintf("%.18g", psOptions->ymax));
         }
 
@@ -1260,7 +1262,7 @@ GDALDatasetH GDALTileIndexInternal(const char *pszDest,
 
         for (int i = 0; i < nBandCount; ++i)
         {
-            auto psBand = CPLCreateXMLNode(psRoot, CXT_Element, "Band");
+            auto psBand = CPLCreateXMLNode(psRoot.get(), CXT_Element, "Band");
             CPLAddXMLAttributeAndValue(psBand, "band", CPLSPrintf("%d", i + 1));
             if (!psOptions->osDataType.empty())
             {
@@ -1299,13 +1301,8 @@ GDALDatasetH GDALTileIndexInternal(const char *pszDest,
 
         if (psOptions->bMaskBand)
         {
-            CPLCreateXMLElementAndValue(psRoot, "MaskBand", "true");
+            CPLCreateXMLElementAndValue(psRoot.get(), "MaskBand", "true");
         }
-        int res =
-            CPLSerializeXMLTreeToFile(psRoot, psOptions->osGTIFilename.c_str());
-        CPLDestroyXMLNode(psRoot);
-        if (!res)
-            return nullptr;
     }
     else
     {
@@ -1791,6 +1788,8 @@ GDALDatasetH GDALTileIndexInternal(const char *pszDest,
 
     int iCur = 0;
     int nTotal = nSrcCount + 1;
+    int nBandInterleavedCount = 0;
+    int nPixelInterleavedCount = 0;
     while (true)
     {
         const std::string osSrcFilename = oGDALTileIndexTileIterator.next();
@@ -1849,6 +1848,19 @@ GDALDatasetH GDALTileIndexInternal(const char *pszDest,
                 if (bFailOnErrors)
                     return nullptr;
                 continue;
+            }
+        }
+
+        if (poSrcDS->GetRasterCount() > 1)
+        {
+            const char *pszInterleaving =
+                poSrcDS->GetMetadataItem("INTERLEAVE", "IMAGE_STRUCTURE");
+            if (pszInterleaving)
+            {
+                if (EQUAL(pszInterleaving, "BAND"))
+                    ++nBandInterleavedCount;
+                else if (EQUAL(pszInterleaving, "PIXEL"))
+                    ++nPixelInterleavedCount;
             }
         }
 
@@ -2846,6 +2858,29 @@ GDALDatasetH GDALTileIndexInternal(const char *pszDest,
     }
     if (psOptions->pfnProgress)
         psOptions->pfnProgress(1.0, "", psOptions->pProgressData);
+
+    if (nBandInterleavedCount > 0 &&
+        nBandInterleavedCount > nPixelInterleavedCount)
+    {
+        if (psRoot)
+            CPLCreateXMLElementAndValue(psRoot.get(), "Interleave", "Band");
+        else
+            poLayer->SetMetadataItem("INTERLEAVE", "BAND");
+    }
+    else if (nPixelInterleavedCount > 0)
+    {
+        if (psRoot)
+            CPLCreateXMLElementAndValue(psRoot.get(), "Interleave", "Pixel");
+        else
+            poLayer->SetMetadataItem("INTERLEAVE", "PIXEL");
+    }
+
+    if (!psOptions->osGTIFilename.empty())
+    {
+        if (!CPLSerializeXMLTreeToFile(psRoot.get(),
+                                       psOptions->osGTIFilename.c_str()))
+            return nullptr;
+    }
 
     if (bIsSTACGeoParquet && nBatchSize != 0 && !FlushArrays())
     {

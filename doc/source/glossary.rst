@@ -42,6 +42,18 @@ The GDAL glossary contains terms and acronyms found throughout the GDAL document
 
         A data type representing one of two values: True or False, commonly used in logical operations and conditions.
 
+    BIL
+
+        Band Interleaved by Line multi-sample pixel organization. See :ref:`raster_data_model_interleave_mode` for more details.
+
+    BIP
+
+        Band Interleaved by Pixel multi-sample pixel organization. See :ref:`raster_data_model_interleave_mode` for more details.
+
+    BSQ
+
+        Band SeQuential multi-sample pixel organization. See :ref:`raster_data_model_interleave_mode` for more details.
+
     Coordinate Epoch
 
         The date tied to spatial coordinates in a dynamic reference frame, used to account for positional changes over time (e.g., due to tectonic motion).

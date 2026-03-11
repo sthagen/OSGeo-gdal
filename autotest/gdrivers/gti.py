@@ -3297,3 +3297,66 @@ def test_gti_reprojected_no_out_of_sync_warning(index_filename):
     gti_ds = gdal.OpenEx(index_filename, open_options=["WARPING_MEMORY=100MB"])
     with gdaltest.error_raised(gdal.CE_None):
         gti_ds.ReadRaster(0, 0, 500, 500)
+
+
+###############################################################################
+
+
+def test_gti_band_interleave(tmp_vsimem):
+
+    # Slightly different dst_crs than the source one from the point of view
+    # of SpatialReference.IsSame(), but not enough to cause pixel differences
+    # during reprojection
+    gdal.alg.driver.gti.create(
+        input="data/small_world.tif",
+        output=tmp_vsimem / "out.gti.gpkg",
+        dst_crs="+proj=longlat +ellps=WGS84",
+    )
+
+    src_ds = gdal.Open("data/small_world.tif")
+
+    ds = gdal.Open(tmp_vsimem / "out.gti.gpkg")
+    assert ds.GetMetadataItem("INTERLEAVE", "IMAGE_STRUCTURE") == "BAND"
+    assert ds.GetRasterBand(1).ReadRaster() == src_ds.GetRasterBand(1).ReadRaster()
+    # test caching
+    assert ds.GetRasterBand(1).ReadRaster() == src_ds.GetRasterBand(1).ReadRaster()
+    assert ds.GetRasterBand(2).ReadRaster() == src_ds.GetRasterBand(2).ReadRaster()
+    assert ds.GetRasterBand(3).ReadRaster() == src_ds.GetRasterBand(3).ReadRaster()
+
+    ds = gdal.Open(tmp_vsimem / "out.gti.gpkg")
+    assert ds.ReadRaster(band_list=[3, 2, 1]) == src_ds.ReadRaster(band_list=[3, 2, 1])
+
+
+###############################################################################
+
+
+def test_gti_band_interleave_rgba(tmp_vsimem):
+
+    gdal.Warp(
+        tmp_vsimem / "in.tif",
+        "data/small_world.tif",
+        options="-dstalpha -co INTERLEAVE=BAND",
+    )
+
+    # Slightly different dst_crs than the source one from the point of view
+    # of SpatialReference.IsSame(), but not enough to cause pixel differences
+    # during reprojection
+    gdal.alg.driver.gti.create(
+        input=tmp_vsimem / "in.tif",
+        output=tmp_vsimem / "out.gti.gpkg",
+        dst_crs="+proj=longlat +ellps=WGS84",
+    )
+
+    src_ds = gdal.Open(tmp_vsimem / "in.tif")
+
+    ds = gdal.Open(tmp_vsimem / "out.gti.gpkg")
+    assert ds.GetMetadataItem("INTERLEAVE", "IMAGE_STRUCTURE") == "BAND"
+    assert ds.GetRasterBand(1).ReadRaster() == src_ds.GetRasterBand(1).ReadRaster()
+    assert ds.GetRasterBand(2).ReadRaster() == src_ds.GetRasterBand(2).ReadRaster()
+    assert ds.GetRasterBand(3).ReadRaster() == src_ds.GetRasterBand(3).ReadRaster()
+    assert ds.GetRasterBand(4).ReadRaster() == src_ds.GetRasterBand(4).ReadRaster()
+
+    ds = gdal.Open(tmp_vsimem / "out.gti.gpkg")
+    assert ds.ReadRaster(band_list=[4, 3, 2, 1]) == src_ds.ReadRaster(
+        band_list=[4, 3, 2, 1]
+    )
