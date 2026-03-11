@@ -1483,6 +1483,11 @@ MEMDataset *MEMDataset::Create(const char * /* pszFilename */, int nXSize,
             poNewBand = new MEMRasterBand(poDS, iBand + 1, apbyBandData[iBand],
                                           eType, 0, 0, iBand == 0);
 
+        if (const char *pszNBITS = CSLFetchNameValue(papszOptions, "NBITS"))
+        {
+            poNewBand->SetMetadataItem("NBITS", pszNBITS, "IMAGE_STRUCTURE");
+        }
+
         poDS->SetBand(iBand + 1, poNewBand);
     }
 
@@ -3511,6 +3516,7 @@ void GDALRegister_MEM()
         "       <Value>BAND</Value>"
         "       <Value>PIXEL</Value>"
         "   </Option>"
+        "  <Option name='NBITS' type='int' description='Bit depth per band'/>"
         "</CreationOptionList>");
 
     poDriver->SetMetadataItem(GDAL_DCAP_VECTOR, "YES");

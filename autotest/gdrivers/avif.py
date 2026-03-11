@@ -29,6 +29,14 @@ def has_avif_encoder():
     return drv is not None and drv.GetMetadataItem("DMD_CREATIONOPTIONLIST") is not None
 
 
+def avif_encoder_supports_16_bit():
+    return (
+        has_avif_encoder()
+        and "Valid values are 8, 10, 12 and 16"
+        in gdal.GetDriverByName("AVIF").GetMetadataItem(gdal.DMD_CREATIONOPTIONLIST)
+    )
+
+
 def _has_geoheif_support():
     drv = gdal.GetDriverByName("AVIF")
     return drv and drv.GetMetadataItem("SUPPORTS_GEOHEIF", "AVIF")
@@ -234,13 +242,14 @@ def test_avif_creation_errors(tmp_vsimem):
             out_filename, src_ds, options=["NBITS=10"]
         )
 
-    src_ds = gdal.GetDriverByName("MEM").Create("", 1, 1, 1, gdal.GDT_UInt16)
-    with pytest.raises(
-        Exception, match="Invalid/inconsistent bit depth w.r.t data type"
-    ):
-        gdal.GetDriverByName("AVIF").CreateCopy(
-            out_filename, src_ds, options=["NBITS=8"]
-        )
+    if not avif_encoder_supports_16_bit():
+        src_ds = gdal.GetDriverByName("MEM").Create("", 1, 1, 1, gdal.GDT_UInt16)
+        with pytest.raises(
+            Exception, match="Invalid/inconsistent bit depth w.r.t data type"
+        ):
+            gdal.GetDriverByName("AVIF").CreateCopy(
+                out_filename, src_ds, options=["NBITS=8"]
+            )
 
     src_ds = gdal.GetDriverByName("MEM").Create("", 1, 1)
     src_ds.GetRasterBand(1).SetColorTable(gdal.ColorTable())
@@ -378,3 +387,42 @@ def test_avif_close(tmp_path):
     )
     ds.Close()
     os.remove(tmp_path / "out.avif")
+
+
+###############################################################################
+
+
+@pytest.mark.skipif(
+    not avif_encoder_supports_16_bit(), reason="libavif encoder does not support 16 bit"
+)
+@pytest.mark.parametrize("depth", [10, 12, 16])
+@pytest.mark.parametrize("quality", [60, 100])
+def test_avif_16bit(tmp_vsimem, depth, quality):
+
+    max_val = (1 << depth) - 1
+    src_ds = gdal.Translate(
+        "",
+        "data/byte.tif",
+        options=f"-of MEM -scale 0 255 0 {max_val} -co NBITS={depth} -ot UInt16",
+    )
+
+    gdal.GetDriverByName("AVIF").CreateCopy(
+        tmp_vsimem / "out.avif", src_ds, options=[f"QUALITY={quality}"]
+    )
+
+    gdal.Unlink(tmp_vsimem / "out.avif.aux.xml")
+
+    ds = gdal.Open(tmp_vsimem / "out.avif")
+    assert ds.GetRasterBand(1).DataType == gdal.GDT_UInt16
+    assert (
+        ds.GetRasterBand(1).GetMetadataItem("NBITS", "IMAGE_STRUCTURE") == None
+        if depth == 16
+        else str(depth)
+    )
+    if quality == 100:
+        assert ds.GetRasterBand(1).ReadRaster() == src_ds.GetRasterBand(1).ReadRaster()
+    else:
+        assert ds.GetRasterBand(1).ReadRaster() != src_ds.GetRasterBand(1).ReadRaster()
+        assert ds.GetRasterBand(1).ComputeRasterMinMax(False) == pytest.approx(
+            src_ds.GetRasterBand(1).ComputeRasterMinMax(False), rel=0.1
+        )
