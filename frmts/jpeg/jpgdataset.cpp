@@ -5060,12 +5060,22 @@ GDALDataset *JPGDataset::CreateCopyStage2(
     sCInfo.image_height = nYSize;
     sCInfo.input_components = nBands;
 
+    int eGDALColorSpace;
     if (nBands == 3)
+    {
+        eGDALColorSpace = JCS_RGB;
         sCInfo.in_color_space = JCS_RGB;
+    }
     else if (nBands == 1)
+    {
+        eGDALColorSpace = JCS_GRAYSCALE;
         sCInfo.in_color_space = JCS_GRAYSCALE;
+    }
     else
+    {
+        eGDALColorSpace = JCS_CMYK;
         sCInfo.in_color_space = JCS_UNKNOWN;
+    }
 
     jpeg_set_defaults(&sCInfo);
 
@@ -5353,6 +5363,7 @@ GDALDataset *JPGDataset::CreateCopyStage2(
     }
 
     JPGDataset *poJPG_DS = new JPGDataset();
+    poJPG_DS->eGDALColorSpace = eGDALColorSpace;
     poJPG_DS->nRasterXSize = nXSize;
     poJPG_DS->nRasterYSize = nYSize;
     for (int i = 0; i < nBands; i++)
