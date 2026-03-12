@@ -861,7 +861,8 @@ int OGRGeoJSONDataSource::ReadFromService(GDALOpenInfo *poOpenInfo,
     /* -------------------------------------------------------------------- */
     /*      Fetch the GeoJSON result.                                        */
     /* -------------------------------------------------------------------- */
-    CPLHTTPResult *pResult = GeoJSONHTTPFetchWithContentTypeHeader(pszSource);
+    CPLHTTPResult *pResult = GeoJSONHTTPFetchWithContentTypeHeader(
+        pszSource, /* bCanUsePOST = */ osJSonFlavor_ == "ESRIJSON", poOpenInfo);
     if (!pResult)
     {
         return FALSE;

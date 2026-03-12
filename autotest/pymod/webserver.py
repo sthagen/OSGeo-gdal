@@ -236,7 +236,9 @@ class BaseMockedHttpHandler:
             if req_resp.expected_body:
                 content = request.rfile.read(int(request.headers["Content-Length"]))
                 if content != req_resp.expected_body:
-                    sys.stderr.write("Did not get expected content: %s\n" % content)
+                    sys.stderr.write(
+                        f"Did not get expected content: got '{content}', instead of '{req_resp.expected_body}'\n"
+                    )
                     request.send_response(400)
                     request.send_header("Content-Length", 0)
                     request.end_headers()

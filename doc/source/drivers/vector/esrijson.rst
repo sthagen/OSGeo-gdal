@@ -66,12 +66,22 @@ The following open options are supported:
       through results with a ArcGIS Feature Service endpoint. Has only effect
       for ArcGIS servers >= 10.3 and layers with supportsPagination=true capability.
 
+-  .. oo:: HTTP_METHOD
+      :choices: AUTO, GET, POST
+      :default: AUTO
+      :since: 3.13
+
+      Which HTTP request method to use to send requests to the server. In AUTO
+      mode (the default), GET will be used, unless the URL exceeds 256 characters.
+      When it does, the query parameters (the part of the URL after '?') will
+      be sent in the body of a POST request.
+
 Examples
 --------
 
 .. example::
-   :title: Read the result of a FeatureService request against a GeoServices REST server 
-   
+   :title: Read the result of a FeatureService request against a GeoServices REST server
+
    Note that this server does not support paging.
 
    .. code-block:: bash
