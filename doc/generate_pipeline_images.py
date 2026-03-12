@@ -36,3 +36,16 @@ gdal raster pipeline
 """
     output_fn = f"{IMAGE_ROOT}/programs/gdal_pipeline_output_nested.svg"
     generate_diagram(pipeline, output_fn, docs_root="../programs")
+
+
+def test_gdal_vector_pipeline():
+    pipeline = """
+gdal vector pipeline
+    ! read natural_earth_vector.gpkg --layer ne_110m_populated_places_simple
+    ! filter --where "worldcity = 1"
+    ! select --fields "_ogr_geometry_,name"
+    ! reproject --dst-crs=ESRI:53009
+    ! write worldcity_53009.geojson --overwrite
+"""
+    output_fn = f"{IMAGE_ROOT}/programs/gdal_pipeline_vector_example.svg"
+    generate_diagram(pipeline, output_fn, docs_root="../programs", vertical=True)
