@@ -31,11 +31,36 @@
 #include "cpl_vsi.h"
 #include "gdal.h"
 #include "gdal_frmts.h"
+#include "gdal_mem.h"
 
 struct MEMDataset::Private
 {
     std::shared_ptr<GDALGroup> m_poRootGroup{};
 };
+
+/************************************************************************/
+/*                             MEMCreate()                              */
+/************************************************************************/
+
+/**
+ * Create a new in-memory raster dataset.
+ *
+ * @param nXSize Width of created raster in pixels.
+ * @param nYSize Height of created raster in pixels.
+ * @param nBands Number of bands.
+ * @param eType Type of raster bands.
+ * @param papszOptions MEM driver creation options.
+ *
+ * @return NULL on failure, or a new MEM dataset handle on success.
+ */
+
+GDALDatasetH MEMCreate(int nXSize, int nYSize, int nBands, GDALDataType eType,
+                       CSLConstList papszOptions)
+
+{
+    return GDALDataset::ToHandle(
+        MEMDataset::Create("", nXSize, nYSize, nBands, eType, papszOptions));
+}
 
 /************************************************************************/
 /*                        MEMCreateRasterBand()                         */

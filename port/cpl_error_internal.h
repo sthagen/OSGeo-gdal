@@ -14,7 +14,7 @@
 #ifndef CPL_ERROR_INTERNAL_H_INCLUDED
 #define CPL_ERROR_INTERNAL_H_INCLUDED
 
-#ifdef GDAL_COMPILATION
+#if defined(GDAL_COMPILATION) || defined(DOXYGEN_SKIP)
 // internal only
 
 #include "cpl_error.h"
@@ -27,17 +27,30 @@
 /*                   CPLErrorHandlerAccumulatorStruct                   */
 /************************************************************************/
 
+/** Class that stores details about an emitted error.
+ *
+ * Returned by CPLErrorAccumulator::GetErrors()
+ *
+ * @since 3.11
+ */
 class CPL_DLL CPLErrorHandlerAccumulatorStruct
 {
   public:
+    /** Error level */
     CPLErr type;
+
+    /** Error number */
     CPLErrorNum no;
+
+    /** Error message */
     CPLString msg{};
 
+    /** Default constructor */
     CPLErrorHandlerAccumulatorStruct() : type(CE_None), no(CPLE_None)
     {
     }
 
+    /** Constructor */
     CPLErrorHandlerAccumulatorStruct(CPLErr eErrIn, CPLErrorNum noIn,
                                      const char *msgIn)
         : type(eErrIn), no(noIn), msg(msgIn)
@@ -65,6 +78,9 @@ class CPL_DLL CPLErrorAccumulator
     /** Constructor */
     CPLErrorAccumulator() = default;
 
+    /** Object returned by InstallForCurrentScope() during life-time of which,
+     * errors are redirected to the CPLErrorAccumulator instance.
+     */
     struct CPL_DLL Context
     {
         ~Context();

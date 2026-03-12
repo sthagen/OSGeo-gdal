@@ -519,7 +519,7 @@ void DDFFieldDefn::BuildSubfields()
 /*      Extract a substring terminated by a comma (or end of            */
 /*      string).  Commas in brackets are ignored as terminated with     */
 /*      bracket nesting understood gracefully.  If the returned         */
-/*      string would being and end with a bracket then strip off the    */
+/*      string would begin and end with a bracket then strip off the    */
 /*      brackets.                                                       */
 /*                                                                      */
 /*      Given a string like "(A,3(B,C),D),X,Y)" return "A,3(B,C),D".    */

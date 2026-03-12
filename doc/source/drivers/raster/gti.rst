@@ -253,6 +253,15 @@ PostGIS, ...), the following layer metadata items may be set:
   ``OVERVIEW_<idx>_DATASET`` and/or ``OVERVIEW_<idx>_LAYER`` may also be
   specified to point to another tile index.
 
+* ``INTERLEAVE=<val>`` (starting with GDAL 3.13) where ``<val>`` can be
+  ``PIXEL`` or ``BAND`` specifies how pixels belonging to multiple bands are
+  grouped together. This setting affects performance, both how external code
+  accesses pixel values, and internal operation of the driver.
+  When using :ref:`gdal_driver_gti_create`, the value is automatically set to
+  match interleave mode among the input sources. Accessing sources whose
+  interleave mode differs from the exposed value may result in reduced performance.
+  See :ref:`raster_data_model_interleave_mode` for more details.
+
 All overviews *must* have exactly the same extent as the full resolution
 virtual mosaic. The GTI driver does not check that, and if that condition is
 not met, subsampled pixel request will lead to incorrect result.
@@ -396,6 +405,8 @@ mentioned in the previous section.
                 <OOI key="YMAX">3</OOI>
             </OpenOptions>
         </Overview>
+
+        <Interleave>Band|Pixel</Interleave>            <!-- optional -->
 
     </GDALTileIndexDataset>
 
