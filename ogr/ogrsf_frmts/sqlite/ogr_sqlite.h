@@ -462,7 +462,7 @@ class OGRSQLiteViewLayer final : public OGRSQLiteLayer
     CPLString m_osQuery{};
     bool m_bHasCheckedSpatialIndexTable = false;
 
-    OGRSQLiteGeomFormat m_eGeomFormat = OSGF_None;
+    OGRSQLiteGeomFormat m_eGeomFormat = OSGF_Unknown;
     CPLString m_osGeomColumn{};
     bool m_bHasSpatialIndex = false;
 
