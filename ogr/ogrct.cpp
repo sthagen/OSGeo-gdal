@@ -2914,7 +2914,8 @@ int OGRProjCT::TransformWithErrorCodes(size_t nCount, double *x, double *y,
                             CPLDebug("OGRCT", "Reprojection failed, err = %d",
                                      err);
                         else
-                            CPLDebug("OGRCT", "%s", pszError);
+                            CPLDebug("OGRCT", "%s for xIn=%.10g yIn=%.10g",
+                                     pszError, xIn, yIn);
                     }
                 }
                 else if (nErrorCount == 20)
