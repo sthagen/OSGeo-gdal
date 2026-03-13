@@ -337,6 +337,11 @@ with one of them being an output nested pipeline inside an input nested pipeline
 
    .. image:: ../../images/programs/gdal_pipeline_output_nested.svg
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 
 Examples
 --------

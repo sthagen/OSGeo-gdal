@@ -229,6 +229,11 @@ edit data.
 
 Geometries are reported in OGC WKT format.
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 C API
 -----
 

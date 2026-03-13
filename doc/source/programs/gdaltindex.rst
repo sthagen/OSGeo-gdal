@@ -330,6 +330,11 @@ Examples
 
        gdaltindex tile_index.gti.gpkg -ot Byte -tr 60 60 -colorinterp Red,Green,Blue --optfile my_list.txt
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 C API
 -----
 

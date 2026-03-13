@@ -73,6 +73,10 @@ Standard Options
 
         Which output raster format to use.
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
 
 Examples
 --------

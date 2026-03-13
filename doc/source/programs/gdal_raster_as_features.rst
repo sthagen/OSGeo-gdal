@@ -78,6 +78,11 @@ Standard Options
 
    .. include:: gdal_options/update.rst
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 Examples
 --------
 
@@ -86,17 +91,17 @@ Examples
 
    .. code-block:: bash
 
-       gdal pipeline read input.tif ! 
+       gdal pipeline read input.tif !
                 reclassify -m "[-inf, 150)=1; DEFAULT=NO_DATA" !
-                as-features --geometry-type point --skip-nodata ! 
+                as-features --geometry-type point --skip-nodata !
                 write out.shp
 
 
 .. example::
    :title: Create a polygon grid dividing the globe into 1-degree chunks
-   
+
    .. code-block:: bash
 
-       gdal pipeline create --bbox -180,-90,180,90 --size 360,180 ! 
+       gdal pipeline create --bbox -180,-90,180,90 --size 360,180 !
                 as-features --geometry-type polygon !
                 write grid.shp

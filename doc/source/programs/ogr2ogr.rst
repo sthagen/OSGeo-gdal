@@ -693,6 +693,11 @@ classic algorithm using an iterative feature based approach. If that flag is
 needed with GDAL >= 3.9, please file an issue on the
 `GDAL issue tracker <https://github.com/OSGeo/gdal/issues>`__.
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 C API
 -----
 

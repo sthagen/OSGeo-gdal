@@ -71,6 +71,11 @@ Options
 
     Report failures if file type is unidentified.
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 Examples
 --------
 

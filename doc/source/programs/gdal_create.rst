@@ -87,6 +87,11 @@ like creating a PDF file from a XML composition file.
 
     The destination file name.
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 Examples
 --------
 

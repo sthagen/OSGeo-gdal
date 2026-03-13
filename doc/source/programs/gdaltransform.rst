@@ -154,6 +154,11 @@ If an input image file is provided, input is in pixel/line coordinates on that
 image.  If an output file is provided, output is in pixel/line coordinates
 on that image.
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 Examples
 --------
 

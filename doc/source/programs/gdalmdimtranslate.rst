@@ -163,6 +163,11 @@ The following command line parameters can appear in any order.
 
     The destination file name.
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 C API
 -----
 

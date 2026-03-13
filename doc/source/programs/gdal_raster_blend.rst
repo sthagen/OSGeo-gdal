@@ -326,6 +326,10 @@ The following blending operators are available:
 
         output_{C} = input_{C} * overlay_{A} / (1 - overlay_{C} / overlay_{A}) + overlay_{C} * (1 - input_{A}) + input_{C} * (1 - overlay_{A})
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
 
 Examples
 --------

@@ -293,6 +293,10 @@ The following configuration options are available to further customize the JPEG 
 
     QUALITY is a integer between 1-100. Default is 75.
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
 
 Examples
 --------

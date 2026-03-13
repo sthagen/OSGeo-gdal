@@ -197,6 +197,11 @@ Post-vectorization geometric operations are applied in the following order:
 * optional simplification (:option:`-simplify`)
 * limitation of number of points (:option:`-max_points`)
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 C API
 -----
 

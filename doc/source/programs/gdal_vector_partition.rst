@@ -150,6 +150,11 @@ Standard Options
 
     .. include:: gdal_options/skip_errors.rst
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 Examples
 --------
 
