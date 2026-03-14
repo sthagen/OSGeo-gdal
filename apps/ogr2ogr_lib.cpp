@@ -508,6 +508,11 @@ struct TargetLayerInfo
     const char *m_pszGeomField = nullptr;
     std::vector<int> m_anDateTimeFieldIdx{};
     bool m_bSupportCurves = false;
+    bool m_bSupportZ = false;
+    bool m_bSupportM = false;
+    bool m_bHasWarnedAboutCurves = false;
+    bool m_bHasWarnedAboutZ = false;
+    bool m_bHasWarnedAboutM = false;
     OGRArrowArrayStream m_sArrowArrayStream{};
 
     void CheckSameCoordinateOperation() const;
@@ -5874,6 +5879,10 @@ SetupTargetLayer::Setup(OGRLayer *poSrcLayer, const char *pszNewLayerName,
 
     psInfo->m_bSupportCurves =
         CPL_TO_BOOL(poDstLayer->TestCapability(OLCCurveGeometries));
+    psInfo->m_bSupportZ =
+        CPL_TO_BOOL(poDstLayer->TestCapability(OLCZGeometries));
+    psInfo->m_bSupportM =
+        CPL_TO_BOOL(poDstLayer->TestCapability(OLCMeasuredGeometries));
 
     psInfo->m_sArrowArrayStream = std::move(streamSrc);
 
@@ -7326,6 +7335,41 @@ bool LayerTranslator::Translate(
                         poDstGeometry = OGRGeometryFactory::forceTo(
                             std::move(poDstGeometry),
                             static_cast<OGRwkbGeometryType>(eGType));
+                    }
+                }
+
+                if (poDstGeometry && !psOptions->bQuiet)
+                {
+                    if (!psInfo->m_bHasWarnedAboutCurves &&
+                        !psInfo->m_bSupportCurves &&
+                        OGR_GT_IsNonLinear(poDstGeometry->getGeometryType()))
+                    {
+                        CPLError(CE_Warning, CPLE_AppDefined,
+                                 "Attempt to write curve geometries to layer "
+                                 "%s that does not support them. They will be "
+                                 "linearized",
+                                 poDstLayer->GetDescription());
+                        psInfo->m_bHasWarnedAboutCurves = true;
+                    }
+                    if (!psInfo->m_bHasWarnedAboutZ && !psInfo->m_bSupportZ &&
+                        OGR_GT_HasZ(poDstGeometry->getGeometryType()))
+                    {
+                        CPLError(CE_Warning, CPLE_AppDefined,
+                                 "Attempt to write Z geometries to layer %s "
+                                 "that does not support them. Z component will "
+                                 "be discarded",
+                                 poDstLayer->GetDescription());
+                        psInfo->m_bHasWarnedAboutZ = true;
+                    }
+                    if (!psInfo->m_bHasWarnedAboutM && !psInfo->m_bSupportM &&
+                        OGR_GT_HasM(poDstGeometry->getGeometryType()))
+                    {
+                        CPLError(CE_Warning, CPLE_AppDefined,
+                                 "Attempt to write M geometries to layer %s "
+                                 "that does not support them. M component will "
+                                 "be discarded",
+                                 poDstLayer->GetDescription());
+                        psInfo->m_bHasWarnedAboutM = true;
                     }
                 }
 
