@@ -322,6 +322,10 @@ Nested pipeline
 
 See :ref:`gdal_nested_pipeline`.
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
 
 Examples
 --------

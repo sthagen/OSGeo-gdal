@@ -225,6 +225,11 @@ Standard options
 
     For example: ``--fetched-metadata TIFFTAG_DATETIME,creation_date,DateTime``
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 Examples
 --------
 

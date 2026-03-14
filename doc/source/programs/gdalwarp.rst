@@ -828,6 +828,10 @@ where cutline.csv content is like:
 
     gdalwarp -overwrite in_dem.tif out_dem.tif -s_srs EPSG:4326+5773 -t_srs EPSG:4979
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
 
 C API
 -----

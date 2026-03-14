@@ -167,6 +167,11 @@ Standard Options
         Whether the output dataset must be opened in update mode. Implies that
         it already exists.
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 Examples
 --------
 

@@ -499,6 +499,11 @@ The value -9999 is used as the output nodata value.
 
 There are no specific options.
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 C API
 -----
 

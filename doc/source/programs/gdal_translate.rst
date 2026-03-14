@@ -443,6 +443,11 @@ source band, a mask band, an alpha band will not be used during resampling
 
 .. include:: nodata_handling_gdaladdo_gdal_translate.rst
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 C API
 -----
 

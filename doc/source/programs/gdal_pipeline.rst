@@ -337,6 +337,11 @@ with one of them being an output nested pipeline inside an input nested pipeline
 
    .. image:: ../../images/programs/gdal_pipeline_output_nested.svg
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 
 Examples
 --------
@@ -361,3 +366,26 @@ Examples
    .. code-block:: bash
 
         $ gdal pipeline raster_reproject.gdalg.json --input=my.gpkg --output=out.tif --dst-crs=EPSG:32631
+
+.. example::
+   :title: Buffer a line dataset to create a new polygon dataset
+   :id: gdal-pipeline-buffer-line
+
+   This example uses a ``lines.gpkg`` dataset containing a single layer named ``lines``,
+   with a geometry field named ``geom`` and an integer attribute named ``width``. The value
+   of this attribute is used as the buffer distance for each feature.
+
+   .. code-block:: bash
+
+        gdal vector pipeline \
+            ! read lines.gpkg \
+            ! sql "SELECT fid, ST_Buffer(geom, width) AS geom FROM lines" \
+            ! set-geom-type --geometry-type Polygon \
+            ! write buffered-lines.gpkg --output-layer=BufferedLines --overwrite --overwrite-layer
+
+   .. note::
+
+      When creating derived geometries using SQL, avoid using ``SELECT *``.
+      Including the original geometry field will result in multiple geometry
+      columns in the output. Instead, explicitly list the required attributes
+      and return a single geometry column.

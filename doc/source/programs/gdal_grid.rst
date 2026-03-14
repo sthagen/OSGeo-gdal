@@ -495,6 +495,11 @@ Or just use :ref:`gdal_merge`, to combine the one-band files into a single one:
     gdal_merge -separate a.tif b.tif c.tif -o d.tif
 
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 C API
 -----
 

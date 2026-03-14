@@ -172,6 +172,11 @@ The gdalinfo will report all of the following (if known):
 -  Band unit type (i.e.. "meters" or "feet" for elevation bands).
 -  Band pseudo-color tables.
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 C API
 -----
 

@@ -178,11 +178,17 @@ Standard Options
 
     .. include:: gdal_options/update.rst
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 Examples
 --------
 
 .. example::
    :title: Burn a shapefile into a raster
+   :id: gdal-vector-rasterize-burn
 
     The following would burn all polygons from :file:`mask.shp` into the RGB TIFF file :file:`work.tif` with the color red (RGB = 255,0,0).
 

@@ -318,6 +318,10 @@ Standard Options
 
         Defaults to PNG.
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
 
 Examples
 --------
