@@ -4197,6 +4197,12 @@ int CPL_STDCALL GDALGeneralCmdLineProcessor(int nArgc, char ***ppapszArgv,
                 /*ok*/ printf(
                     "  Supports: Creating geometry fields with NOT NULL "
                     "constraint.\n");
+            if (CPLFetchBool(papszMD, GDAL_DCAP_CURVE_GEOMETRIES, false))
+                /*ok*/ printf("  Supports: Curve geometries.\n");
+            if (CPLFetchBool(papszMD, GDAL_DCAP_Z_GEOMETRIES, false))
+                /*ok*/ printf("  Supports: 3D (Z) geometries.\n");
+            if (CPLFetchBool(papszMD, GDAL_DCAP_MEASURED_GEOMETRIES, false))
+                /*ok*/ printf("  Supports: Measured (M) geometries.\n");
             if (CPLFetchBool(papszMD, GDAL_DCAP_HONOR_GEOM_COORDINATE_PRECISION,
                              false))
                 /*ok*/ printf("  Supports: Writing geometries with given "
