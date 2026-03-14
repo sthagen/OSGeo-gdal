@@ -257,6 +257,11 @@ Options
 
     Turn on verbose mode.
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 Examples
 ++++++++
 

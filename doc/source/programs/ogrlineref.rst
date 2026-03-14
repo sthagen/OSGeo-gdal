@@ -158,6 +158,11 @@ Also some information is written to the stdout.
 
     The input end linear distance
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 Examples
 --------
 

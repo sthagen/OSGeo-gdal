@@ -51,6 +51,11 @@ Program-Specific Options
    If input geometries have multiple parts, combine them into a GeometryCollection
    of the input geometries.
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 Standard Options
 ----------------
 
@@ -63,7 +68,7 @@ Standard Options
     .. include:: gdal_options/if.rst
 
     .. include:: gdal_options/lco.rst
-       
+
     .. include:: gdal_options/oo.rst
 
     .. include:: gdal_options/of_vector.rst

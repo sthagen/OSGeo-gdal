@@ -116,6 +116,11 @@ The processing is all done in 8bit (Bytes).
 If the output file is omitted, the processed results will be written back
 to the input file - which must support update.
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 C API
 -----
 

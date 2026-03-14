@@ -17,6 +17,11 @@ Synopsis
 
 .. program-output:: gdal --help-doc
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 Examples
 --------
 

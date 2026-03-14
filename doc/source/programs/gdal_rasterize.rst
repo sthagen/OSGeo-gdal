@@ -214,6 +214,11 @@ The resolution or size must be specified using the :option:`-tr` or :option:`-ts
 rasters.  The target raster will be overwritten if it already exists and any of
 these creation-related options are used.
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 C API
 -----
 

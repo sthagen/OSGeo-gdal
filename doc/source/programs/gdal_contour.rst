@@ -140,6 +140,11 @@ be on the right, i.e. a line string goes clockwise around a top.
 
     .. versionadded:: 3.10
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 C API
 -----
 

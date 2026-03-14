@@ -267,6 +267,11 @@ The :config:`GDAL_NUM_THREADS` configuration option can be set to
 ``ALL_CPUS`` or a integer value to specify the number of threads to use for
 overview computation.
 
+.. Return status code
+.. ------------------
+
+.. include:: return_code.rst
+
 C API
 -----
 
