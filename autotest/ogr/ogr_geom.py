@@ -5132,3 +5132,103 @@ def test_ogr_geom_create_from_envelope():
         g.ExportToWkt()
         == "POLYGON ((424788 25211,424788 279799,581555 279799,581555 25211,424788 25211))"
     )
+
+
+@gdaltest.enable_exceptions()
+@pytest.mark.parametrize(
+    "wkt,altitude_mode,expected_kml",
+    [
+        ("POINT EMPTY", None, "<Point/>"),
+        ("POINT(1 2)", None, "<Point><coordinates>1,2</coordinates></Point>"),
+        ("POINT Z (1 2 3)", None, "<Point><coordinates>1,2,3</coordinates></Point>"),
+        (
+            "LINESTRING EMPTY",
+            None,
+            "<LineString><coordinates></coordinates></LineString>",
+        ),
+        (
+            "LINESTRING (1 2)",
+            None,
+            "<LineString><coordinates>1,2</coordinates></LineString>",
+        ),
+        (
+            "LINESTRING (1 2)",
+            "relativeToGround",
+            "<LineString><altitudeMode>relativeToGround</altitudeMode><coordinates>1,2</coordinates></LineString>",
+        ),
+        (
+            "LINESTRING (1 2,3 4)",
+            None,
+            "<LineString><coordinates>1,2 3,4</coordinates></LineString>",
+        ),
+        (
+            "LINESTRING Z (1 2 3)",
+            None,
+            "<LineString><coordinates>1,2,3</coordinates></LineString>",
+        ),
+        ("POLYGON EMPTY", None, "<Polygon></Polygon>"),
+        (
+            "POLYGON ((1 2))",
+            None,
+            "<Polygon><outerBoundaryIs><LinearRing><coordinates>1,2</coordinates></LinearRing></outerBoundaryIs></Polygon>",
+        ),
+        (
+            "POLYGON ((1 2 3))",
+            None,
+            "<Polygon><outerBoundaryIs><LinearRing><coordinates>1,2,3</coordinates></LinearRing></outerBoundaryIs></Polygon>",
+        ),
+        (
+            "POLYGON ((1 2),(3 4))",
+            None,
+            "<Polygon><outerBoundaryIs><LinearRing><coordinates>1,2</coordinates></LinearRing></outerBoundaryIs><innerBoundaryIs><LinearRing><coordinates>3,4</coordinates></LinearRing></innerBoundaryIs></Polygon>",
+        ),
+        ("MULTIPOINT EMPTY", None, "<MultiGeometry></MultiGeometry>"),
+        (
+            "MULTIPOINT ((1 2))",
+            None,
+            "<MultiGeometry><Point><coordinates>1,2</coordinates></Point></MultiGeometry>",
+        ),
+        (
+            "MULTILINESTRING ((1 2))",
+            None,
+            "<MultiGeometry><LineString><coordinates>1,2</coordinates></LineString></MultiGeometry>",
+        ),
+        (
+            "MULTIPOLYGON (((1 2)))",
+            None,
+            "<MultiGeometry><Polygon><outerBoundaryIs><LinearRing><coordinates>1,2</coordinates></LinearRing></outerBoundaryIs></Polygon></MultiGeometry>",
+        ),
+        (
+            "GEOMETRYCOLLECTION (POINT(1 2))",
+            None,
+            "<MultiGeometry><Point><coordinates>1,2</coordinates></Point></MultiGeometry>",
+        ),
+    ],
+)
+def test_ogr_geom_export_to_kml(wkt, altitude_mode, expected_kml):
+
+    g = ogr.CreateGeometryFromWkt(wkt)
+    assert g.ExportToKML(altitude_mode) == expected_kml
+
+
+@gdaltest.enable_exceptions()
+@pytest.mark.parametrize(
+    "wkt,error_msg",
+    [
+        ("POINT (100 100)", "Latitude 100.000000 is invalid"),
+        ("POINT Z (100 100 0)", "Latitude 100.000000 is invalid"),
+        ("LINESTRING (100 100)", "Latitude 100.000000 is invalid"),
+        ("POLYGON ((100 100))", "Latitude 100.000000 is invalid"),
+        ("POLYGON ((0 0),(100 100))", "Latitude 100.000000 is invalid"),
+        ("POINT M (1 2 3)", "Unsupported geometry type in KML: Measured Point"),
+        (
+            "GEOMETRYCOLLECTION (POINT M (1 2 3))",
+            "Unsupported geometry type in KML: Measured Point",
+        ),
+    ],
+)
+def test_ogr_geom_export_to_kml_errors(wkt, error_msg):
+
+    g = ogr.CreateGeometryFromWkt(wkt)
+    with pytest.raises(Exception, match=error_msg):
+        g.ExportToKML()
