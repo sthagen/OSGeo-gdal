@@ -14,6 +14,7 @@
 #define CEOS_H
 
 #include "cpl_conv.h"
+#include "stdint.h"
 
 CPL_C_START
 
@@ -283,7 +284,7 @@ void GetCeosSARImageDescInfo(CeosSARVolume_t *volume,
                              CeosSARImageDescRecipe_t *recipe);
 
 void CalcCeosSARImageFilePosition(CeosSARVolume_t *volume, int channel,
-                                  int line, int *record, int *file_offset);
+                                  int line, int *record, uint64_t *file_offset);
 
 int32 GetCeosSARImageData(CeosSARVolume_t *volume,
                           CeosRecord_t *processed_data_record, int channel,

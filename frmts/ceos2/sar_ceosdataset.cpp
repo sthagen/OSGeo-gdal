@@ -227,11 +227,10 @@ CPLErr SAR_CEOSRasterBand::IReadBlock(int /* nBlockXOff */, int nBlockYOff,
 
     struct CeosSARImageDesc *ImageDesc = &(poGDS->sVolume.ImageDesc);
 
-    int offsetStart = 0;
+    uint64_t offset = 0;
     CalcCeosSARImageFilePosition(&(poGDS->sVolume), nBand, nBlockYOff + 1,
-                                 nullptr, &offsetStart);
+                                 nullptr, &offset);
 
-    vsi_l_offset offset = offsetStart;
     offset += ImageDesc->ImageDataStart;
 
     /* -------------------------------------------------------------------- */
@@ -1715,13 +1714,12 @@ void SAR_CEOSDataset::ScanForGCPs()
         if (nGCPCount > nGCPMax - 3)
             break;
 
-        int nFileOffset;
+        uint64_t nFileOffset;
         CalcCeosSARImageFilePosition(&sVolume, 1, iScanline + 1, nullptr,
                                      &nFileOffset);
 
         GInt32 anRecord[192 / 4];
-        if (VSIFSeekL(fpImage, static_cast<vsi_l_offset>(nFileOffset),
-                      SEEK_SET) != 0 ||
+        if (VSIFSeekL(fpImage, nFileOffset, SEEK_SET) != 0 ||
             VSIFReadL(anRecord, 1, 192, fpImage) != 192)
             break;
 
@@ -2083,20 +2081,21 @@ GDALDataset *SAR_CEOSDataset::Open(GDALOpenInfo *poOpenInfo)
     /* -------------------------------------------------------------------- */
     else
     {
-        int StartData;
+        uint64_t StartData;
         CalcCeosSARImageFilePosition(psVolume, 1, 1, nullptr, &StartData);
 
         /*StartData += psImageDesc->ImageDataStart; */
 
-        int nLineSize, nLineSize2;
-        CalcCeosSARImageFilePosition(psVolume, 1, 1, nullptr, &nLineSize);
-        CalcCeosSARImageFilePosition(psVolume, 1, 2, nullptr, &nLineSize2);
+        uint64_t nLineOff1, nLineOff2;
+        CalcCeosSARImageFilePosition(psVolume, 1, 1, nullptr, &nLineOff1);
+        CalcCeosSARImageFilePosition(psVolume, 1, 2, nullptr, &nLineOff2);
 
-        nLineSize = nLineSize2 - nLineSize;
+        const int nLineSize = static_cast<int>(nLineOff2 - nLineOff1);
 
         for (int iBand = 0; iBand < psImageDesc->NumChannels; iBand++)
         {
-            int nStartData, nPixelOffset, nLineOffset;
+            uint64_t nStartData;
+            int nPixelOffset, nLineOffset;
 
             if (psImageDesc->ChannelInterleaving == CEOS_IL_PIXEL)
             {
