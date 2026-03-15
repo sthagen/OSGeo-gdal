@@ -77,6 +77,9 @@ Link_t *AddLink(Link_t *psList, Link_t *psLink);
 #define CEOS_IMAGRY_OPT_FILE 2
 #define CEOS_TRAILER_FILE 3
 #define CEOS_NULL_VOL_FILE 4
+
+#define CEOS_FILE_COUNT 5
+
 #define CEOS_ANY_FILE -1
 
 /* Defines for Recipe values */

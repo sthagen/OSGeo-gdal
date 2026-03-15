@@ -32,7 +32,14 @@ static GInt16 CastToGInt16(float val)
     return static_cast<GInt16>(val);
 }
 
-static const char *const CeosExtension[][6] = {
+// CeosExtension[][i] ordered by i:
+// CEOS_VOLUME_DIR_FILE = 0
+// CEOS_LEADER_FILE     = 1
+// CEOS_IMAGRY_OPT_FILE = 2
+// CEOS_TRAILER_FILE    = 3
+// CEOS_NULL_VOL_FILE   = 4
+// and last item (idx 5) is the method to derive auxiliary filenames
+static const char *const CeosExtension[][CEOS_FILE_COUNT + 1] = {
     {"vol", "led", "img", "trl", "nul", "ext"},
     {"vol", "lea", "img", "trl", "nul", "ext"},
     {"vol", "led", "img", "tra", "nul", "ext"},
@@ -1847,49 +1854,50 @@ GDALDataset *SAR_CEOSDataset::Open(GDALOpenInfo *poOpenInfo)
     else
         nBand = 0;
 
-    for (int iFile = 0; iFile < 5; iFile++)
+    for (int iFile = 0; iFile < CEOS_FILE_COUNT; iFile++)
     {
         /* skip image file ... we already did it */
-        if (iFile == 2)
+        if (iFile == CEOS_IMAGRY_OPT_FILE)
             continue;
 
-        int e = 0;
-        while (CeosExtension[e][iFile] != nullptr)
+        for (int e = 0; CeosExtension[e][iFile] != nullptr; ++e)
         {
             std::string osFilename;
 
+            const char *const pszMethod = CeosExtension[e][CEOS_FILE_COUNT];
+            const char *const pszFilePart = CeosExtension[e][iFile];
+
             /* build filename */
-            if (EQUAL(CeosExtension[e][5], "base"))
+            if (EQUAL(pszMethod, "base"))
             {
                 char szMadeBasename[32];
 
-                snprintf(szMadeBasename, sizeof(szMadeBasename),
-                         CeosExtension[e][iFile], nBand);
+                snprintf(szMadeBasename, sizeof(szMadeBasename), pszFilePart,
+                         nBand);
                 osFilename =
                     CPLFormFilenameSafe(pszPath, szMadeBasename, pszExtension);
             }
-            else if (EQUAL(CeosExtension[e][5], "ext"))
-            {
-                osFilename = CPLFormFilenameSafe(pszPath, pszBasename,
-                                                 CeosExtension[e][iFile]);
-            }
-            else if (EQUAL(CeosExtension[e][5], "whole"))
+            else if (EQUAL(pszMethod, "ext"))
             {
                 osFilename =
-                    CPLFormFilenameSafe(pszPath, CeosExtension[e][iFile], "");
+                    CPLFormFilenameSafe(pszPath, pszBasename, pszFilePart);
+            }
+            else if (EQUAL(pszMethod, "whole"))
+            {
+                osFilename = CPLFormFilenameSafe(pszPath, pszFilePart, "");
             }
 
             // This is for SAR SLC as per the SAR Toolbox (from ASF).
-            else if (EQUAL(CeosExtension[e][5], "ext2"))
+            else if (EQUAL(pszMethod, "ext2"))
             {
                 char szThisExtension[32];
 
                 if (strlen(pszExtension) > 3)
                     snprintf(szThisExtension, sizeof(szThisExtension), "%s%s",
-                             CeosExtension[e][iFile], pszExtension + 3);
+                             pszFilePart, pszExtension + 3);
                 else
                     snprintf(szThisExtension, sizeof(szThisExtension), "%s",
-                             CeosExtension[e][iFile]);
+                             pszFilePart);
 
                 osFilename =
                     CPLFormFilenameSafe(pszPath, pszBasename, szThisExtension);
@@ -1925,16 +1933,16 @@ GDALDataset *SAR_CEOSDataset::Open(GDALOpenInfo *poOpenInfo)
                 {
                     switch (iFile)
                     {
-                        case 0:
+                        case CEOS_VOLUME_DIR_FILE:
                             psVolume->VolumeDirectoryFile = TRUE;
                             break;
-                        case 1:
+                        case CEOS_LEADER_FILE:
                             psVolume->SARLeaderFile = TRUE;
                             break;
-                        case 3:
+                        case CEOS_TRAILER_FILE:
                             psVolume->SARTrailerFile = TRUE;
                             break;
-                        case 4:
+                        case CEOS_NULL_VOL_FILE:
                             psVolume->NullVolumeDirectoryFile = TRUE;
                             break;
                     }
@@ -1945,8 +1953,6 @@ GDALDataset *SAR_CEOSDataset::Open(GDALOpenInfo *poOpenInfo)
 
                 CPL_IGNORE_RET_VAL(VSIFCloseL(process_fp));
             }
-
-            e++;
         }
     }
 
