@@ -1718,6 +1718,18 @@ void SAR_CEOSDataset::ScanForGCPs()
         return;
     }
 
+    if (GetRasterBand(1)->GetRasterDataType() == GDT_CFloat32)
+    {
+        const char *pszVolSetId = GetMetadataItem("CEOS_VOLSET_ID");
+        if (pszVolSetId && (STARTS_WITH(pszVolSetId, "ALOS2  SAR") ||
+                            STARTS_WITH(pszVolSetId, "ALOS4  SAR")))
+        {
+            // No GCPs in those products. Helps for performance when
+            // reading in zip archives (particularly on network)
+            return;
+        }
+    }
+
     /* -------------------------------------------------------------------- */
     /*      Just sample fix scanlines through the image for GCPs, to        */
     /*      return 15 GCPs.  That is an adequate coverage for most          */
