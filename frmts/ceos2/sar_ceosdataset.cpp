@@ -127,6 +127,7 @@ class SAR_CEOSDataset final : public GDALPamDataset
 
     char **papszTempMD;
 
+    bool m_bHasScannedForGCP = false;
     OGRSpatialReference m_oSRS{};
     int nGCPCount;
     GDAL_GCP *pasGCPList;
@@ -713,6 +714,8 @@ SAR_CEOSDataset::~SAR_CEOSDataset()
 int SAR_CEOSDataset::GetGCPCount()
 
 {
+    if (!m_bHasScannedForGCP)
+        ScanForGCPs();
     return nGCPCount;
 }
 
@@ -723,6 +726,8 @@ int SAR_CEOSDataset::GetGCPCount()
 const OGRSpatialReference *SAR_CEOSDataset::GetGCPSpatialRef() const
 
 {
+    if (!m_bHasScannedForGCP)
+        const_cast<SAR_CEOSDataset *>(this)->ScanForGCPs();
     if (nGCPCount > 0)
         return &m_oSRS;
 
@@ -736,6 +741,8 @@ const OGRSpatialReference *SAR_CEOSDataset::GetGCPSpatialRef() const
 const GDAL_GCP *SAR_CEOSDataset::GetGCPs()
 
 {
+    if (!m_bHasScannedForGCP)
+        ScanForGCPs();
     return pasGCPList;
 }
 
@@ -1678,6 +1685,8 @@ int SAR_CEOSDataset::ScanForMapProjection()
 void SAR_CEOSDataset::ScanForGCPs()
 
 {
+    m_bHasScannedForGCP = true;
+
     /* -------------------------------------------------------------------- */
     /*      Do we have a standard 180 bytes of prefix data (192 bytes       */
     /*      including the record marker information)?  If not, it is        */
@@ -2148,11 +2157,6 @@ GDALDataset *SAR_CEOSDataset::Open(GDALOpenInfo *poOpenInfo)
     /*      Collect metadata.                                               */
     /* -------------------------------------------------------------------- */
     poDS->ScanForMetadata();
-
-    /* -------------------------------------------------------------------- */
-    /*      Check for GCPs.                                                 */
-    /* -------------------------------------------------------------------- */
-    poDS->ScanForGCPs();
 
     /* -------------------------------------------------------------------- */
     /*      Initialize any PAM information.                                 */
