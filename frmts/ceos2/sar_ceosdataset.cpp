@@ -70,11 +70,15 @@ static const char *const CeosExtension[][CEOS_FILE_COUNT + 1] = {
     /* Radarsat-1 ASF */
     {"", "L", "D", "", "", "ext"},
 
+    /* PALSAR-2 ALOS2 / PALSAR-3 ALOS4 */
+    {"VOL", "LED", "", "TRL", "", "ALOS2-ALOS4"},
+
     /* end marker */
     {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr}};
 
 static int ProcessData(VSILFILE *fp, int fileid, CeosSARVolume_t *sar,
-                       int max_records, vsi_l_offset max_bytes);
+                       int max_records, vsi_l_offset max_bytes,
+                       bool bSilentWrongRecordNumber);
 
 static CeosTypeCode_t QuadToTC(int a, int b, int c, int d)
 {
@@ -1834,7 +1838,7 @@ GDALDataset *SAR_CEOSDataset::Open(GDALOpenInfo *poOpenInfo)
 
     psVolume->ImagryOptionsFile = TRUE;
     if (ProcessData(poDS->fpImage, CEOS_IMAGRY_OPT_FILE, psVolume, 4,
-                    VSI_L_OFFSET_MAX) != CE_None)
+                    VSI_L_OFFSET_MAX, false) != CE_None)
     {
         return nullptr;
     }
@@ -1853,6 +1857,18 @@ GDALDataset *SAR_CEOSDataset::Open(GDALOpenInfo *poOpenInfo)
         nBand = atoi(pszBasename + 4);
     else
         nBand = 0;
+
+    const bool bIsALOS2Or4 =
+        strlen(pszBasename) >= strlen("IMG-HH-ALOS2") &&
+        EQUALN(pszBasename, "IMG-", strlen("IMG-")) &&
+        (EQUALN(pszBasename + strlen("IMG-HH"), "-ALOS2", strlen("-ALOS2")) ||
+         EQUALN(pszBasename + strlen("IMG-HH"), "-ALOS4", strlen("-ALOS4")));
+    if (bIsALOS2Or4 && strlen(pszExtension) >= 3 &&
+        pszExtension[strlen(pszExtension) - 3] == '-' &&
+        pszExtension[strlen(pszExtension) - 2] == 'F')
+    {
+        pszExtension[strlen(pszExtension) - 3] = 0;
+    }
 
     for (int iFile = 0; iFile < CEOS_FILE_COUNT; iFile++)
     {
@@ -1903,6 +1919,28 @@ GDALDataset *SAR_CEOSDataset::Open(GDALOpenInfo *poOpenInfo)
                     CPLFormFilenameSafe(pszPath, pszBasename, szThisExtension);
             }
 
+            else if (EQUAL(pszMethod, "ALOS2-ALOS4"))
+            {
+                if (bIsALOS2Or4 && CeosExtension[e][iFile][0] != 0)
+                {
+                    osFilename = CPLFormFilenameSafe(
+                        pszPath,
+                        std::string(pszFilePart)
+                            .append(pszBasename + strlen("IMG-HH"))
+                            .c_str(),
+                        pszExtension);
+                }
+                else
+                {
+                    continue;
+                }
+            }
+
+            else
+            {
+                CPLError(CE_Fatal, CPLE_AppDefined, "should not happen");
+            }
+
             /* try to open */
             VSILFILE *process_fp = VSIFOpenL(osFilename.c_str(), "rb");
 
@@ -1928,8 +1966,11 @@ GDALDataset *SAR_CEOSDataset::Open(GDALOpenInfo *poOpenInfo)
                     CSLAddString(poDS->papszExtraFiles, osFilename.c_str());
 
                 CPL_IGNORE_RET_VAL(VSIFSeekL(process_fp, 0, SEEK_END));
+                const bool bSilentWrongRecordNumber =
+                    bIsALOS2Or4 && iFile == CEOS_TRAILER_FILE;
                 if (ProcessData(process_fp, iFile, psVolume, -1,
-                                VSIFTellL(process_fp)) == 0)
+                                VSIFTellL(process_fp),
+                                bSilentWrongRecordNumber) == 0)
                 {
                     switch (iFile)
                     {
@@ -2182,7 +2223,8 @@ GDALDataset *SAR_CEOSDataset::Open(GDALOpenInfo *poOpenInfo)
 /*                            ProcessData()                             */
 /************************************************************************/
 static int ProcessData(VSILFILE *fp, int fileid, CeosSARVolume_t *sar,
-                       int max_records, vsi_l_offset max_bytes)
+                       int max_records, vsi_l_offset max_bytes,
+                       bool bSilentWrongRecordNumber)
 
 {
     unsigned char temp_buffer[CEOS_HEADER_LENGTH];
@@ -2224,13 +2266,25 @@ static int ProcessData(VSILFILE *fp, int fileid, CeosSARVolume_t *sar,
             }
             else
             {
-                CPLError(CE_Failure, CPLE_AppDefined,
-                         "Corrupt CEOS File - got record seq# %d instead of "
-                         "the expected %d.",
-                         record->Sequence, iThisRecord);
+                if (bSilentWrongRecordNumber)
+                {
+                    CPLDebug(
+                        "SAR_CEOS",
+                        "Corrupt CEOS File - got record seq# %d instead of "
+                        "the expected %d.",
+                        record->Sequence, iThisRecord);
+                }
+                else
+                {
+                    CPLError(
+                        CE_Warning, CPLE_AppDefined,
+                        "Corrupt CEOS File - got record seq# %d instead of "
+                        "the expected %d.",
+                        record->Sequence, iThisRecord);
+                }
                 CPLFree(record);
                 CPLFree(temp_body);
-                return CE_Failure;
+                return bSilentWrongRecordNumber ? CE_Warning : CE_Failure;
             }
         }
 
