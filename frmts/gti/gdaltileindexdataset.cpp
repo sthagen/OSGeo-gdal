@@ -3620,7 +3620,7 @@ bool GDALTileIndexDataset::GetSourceDesc(const std::string &osTileName,
         if (!m_oSRS.IsEmpty() && poTileSRS != nullptr &&
             !m_oSRS.IsSame(poTileSRS))
         {
-            CPLDebug("VRT",
+            CPLDebug("GTI",
                      "Tile %s has not the same SRS as the VRT. "
                      "Proceed to on-the-fly warping",
                      osTileName.c_str());
@@ -3640,7 +3640,7 @@ bool GDALTileIndexDataset::GetSourceDesc(const std::string &osTileName,
                   (!m_oSRS.IsEmpty() && poTileSRS && m_oSRS.IsSame(poTileSRS))))
 
         {
-            CPLDebug("VRT",
+            CPLDebug("GTI",
                      "Tile %s is south-up oriented. "
                      "Proceed to on-the-fly warping",
                      osTileName.c_str());
