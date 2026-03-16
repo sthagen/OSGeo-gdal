@@ -115,6 +115,13 @@ static CeosTypeCode_t QuadToTC(int a, int b, int c, int d)
 
 #define RSAT_PROC_PARAM_TC QuadToTC(18, 120, 18, 20)
 
+/* PALSAR-2 ALOS2 */
+// https://www.eorc.jaxa.jp/ALOS/en/alos-2/pdf/product_format_description/PALSAR-2_xx_Format_CEOS_E_g.pdf
+// Table 3.2-3 Record Type of Each Record
+#define LEADER_PLATFORM_POSITION_TC QuadToTC(18, 30, 18, 20)
+#define LEADER_PLATFORM_ATTITUDE_TC QuadToTC(18, 40, 18, 20)
+#define LEADER_PLATFORM_RADIOMETRIC_TC QuadToTC(18, 50, 18, 20)
+
 /************************************************************************/
 /* ==================================================================== */
 /*                              SAR_CEOSDataset                         */
@@ -1182,6 +1189,209 @@ void SAR_CEOSDataset::ScanForMetadata()
 
         if (szField[0] == 'H' || szField[0] == 'V')
             SetMetadataItem("CEOS_GAIN_SETTING", szField);
+    }
+
+    /* -------------------------------------------------------------------- */
+    /*      PALSAR-2 ALOS2 Platform position data                           */
+    /* -------------------------------------------------------------------- */
+    record = FindCeosRecord(sVolume.RecordList, LEADER_PLATFORM_POSITION_TC,
+                            CEOS_LEADER_FILE, -1, -1);
+    if (record && record->Length > 387)
+    {
+        // Table 3.3-7 Platform position data records
+        // of https://www.eorc.jaxa.jp/ALOS/en/alos-2/pdf/product_format_description/PALSAR-2_xx_Format_CEOS_E_g.pdf
+        constexpr FieldDef asFieldDefs[] = {
+            {"CEOS_PLATFORM_POS_ORBITAL_ELEMENTS_DESIGNATOR", 13, "A32"},
+            {"CEOS_PLATFORM_POS_ORBITAL_ELEMENT_1", 45, "A16"},
+            {"CEOS_PLATFORM_POS_ORBITAL_ELEMENT_2", 61, "A16"},
+            {"CEOS_PLATFORM_POS_ORBITAL_ELEMENT_3", 77, "A16"},
+            {"CEOS_PLATFORM_POS_ORBITAL_ELEMENT_4", 93, "A16"},
+            {"CEOS_PLATFORM_POS_ORBITAL_ELEMENT_5", 109, "A16"},
+            {"CEOS_PLATFORM_POS_ORBITAL_ELEMENT_6", 125, "A16"},
+            {"CEOS_PLATFORM_POS_NUMBER_POINTS", 141, "A4"},
+            {"CEOS_PLATFORM_POS_YEAR_POINT_1", 145, "A4"},
+            {"CEOS_PLATFORM_POS_MONTH_POINT_1", 149, "A4"},
+            {"CEOS_PLATFORM_POS_DAY_POINT_1", 153, "A4"},
+            {"CEOS_PLATFORM_POS_DAY_IN_YEAR_POINT_1", 157, "A4"},
+            {"CEOS_PLATFORM_POS_SECONDS_OF_DAY_POINT_1", 161, "A22"},
+            {"CEOS_PLATFORM_POS_TIME_INTERVAL_SECONDS", 183, "A22"},
+            {"CEOS_PLATFORM_POS_REF_COORD_SYS", 205, "A64"},
+            {"CEOS_PLATFORM_POS_GREENWICH_MEAN_HOUR_ANGLE_DEG", 269, "A22"},
+            {"CEOS_PLATFORM_POS_ALONG_TRACK_POS_ERROR_METERS", 291, "A16"},
+            {"CEOS_PLATFORM_POS_ACROSS_TRACK_POS_ERROR_METERS", 307, "A16"},
+            {"CEOS_PLATFORM_POS_RADIAL_POS_ERROR_METERS", 323, "A16"},
+            {"CEOS_PLATFORM_POS_ALONG_TRACK_VELOCITY_ERROR_METERS_PER_SEC", 339,
+             "A16"},
+            {"CEOS_PLATFORM_POS_ACROSS_TRACK_VELOCITY_ERROR_METERS_PER_SEC",
+             355, "A16"},
+            {"CEOS_PLATFORM_POS_RADIAL_VELOCITY_ERROR_METERS_PER_SEC", 371,
+             "A16"},
+        };
+        int nPoints = 0;
+        constexpr int OFFSET_POINT_1 = 387;
+        constexpr int POINT_SIZE = 6 * 22;
+        for (const auto &sDef : asFieldDefs)
+        {
+            GetCeosField(record, sDef.nOffsetInRecord, sDef.pszFormat, szField);
+            CPLString osField(szField);
+            osField.Trim();
+            if (!osField.empty())
+            {
+                SetMetadataItem(sDef.pszMetadataItemName, osField.c_str());
+                if (EQUAL(sDef.pszMetadataItemName,
+                          "CEOS_PLATFORM_POS_NUMBER_DATA_POINTS"))
+                {
+                    nPoints = std::clamp(atoi(osField), 0,
+                                         (record->Length - OFFSET_POINT_1) /
+                                             POINT_SIZE);
+                }
+            }
+        }
+
+        constexpr FieldDef asPointFieldDefs[] = {
+            {"VECTOR_X_METERS", 0, "A22"},
+            {"VECTOR_Y_METERS", 22, "A22"},
+            {"VECTOR_Z_METERS", 44, "A22"},
+            {"VECTOR_X_DERIV_METERS_PER_SEC", 66, "A22"},
+            {"VECTOR_Y_DERIV_METERS_PER_SEC", 88, "A22"},
+            {"VECTOR_Z_DERIV_METERS_PER_SEC", 110, "A22"},
+        };
+        for (int iPnt = 0; iPnt < nPoints; ++iPnt)
+        {
+            for (const auto &sDef : asPointFieldDefs)
+            {
+                GetCeosField(record,
+                             sDef.nOffsetInRecord + OFFSET_POINT_1 +
+                                 iPnt * POINT_SIZE,
+                             sDef.pszFormat, szField);
+                CPLString osField(szField);
+                osField.Trim();
+                if (!osField.empty())
+                {
+                    SetMetadataItem(std::string("CEOS_PLATFORM_POS_")
+                                        .append(sDef.pszMetadataItemName)
+                                        .append("_POINT_")
+                                        .append(std::to_string(iPnt + 1))
+                                        .c_str(),
+                                    osField.c_str());
+                }
+            }
+        }
+
+        {
+            GetCeosField(record, 4101, "A1", szField);
+            CPLString osField(szField);
+            osField.Trim();
+            if (!osField.empty())
+            {
+                SetMetadataItem("CEOS_PLATFORM_POS_LEAP_SECOND",
+                                osField.c_str());
+            }
+        }
+    }
+
+    /* -------------------------------------------------------------------- */
+    /*      PALSAR-2 ALOS2 Platform attitude data                           */
+    /* -------------------------------------------------------------------- */
+    record = FindCeosRecord(sVolume.RecordList, LEADER_PLATFORM_ATTITUDE_TC,
+                            CEOS_LEADER_FILE, -1, -1);
+    if (record)
+    {
+        // Table 3.3-8 Attitude data records
+        // of https://www.eorc.jaxa.jp/ALOS/en/alos-2/pdf/product_format_description/PALSAR-2_xx_Format_CEOS_E_g.pdf
+
+        int nPoints = 0;
+        constexpr int OFFSET_POINT_1 = 17;
+        constexpr int POINT_SIZE = 120;
+        {
+            GetCeosField(record, 13, "A4", szField);
+            CPLString osField(szField);
+            osField.Trim();
+            if (!osField.empty())
+            {
+                SetMetadataItem("CEOS_PLATFORM_ATT_NUMBER_POINTS",
+                                osField.c_str());
+                nPoints =
+                    std::clamp(atoi(osField), 0,
+                               (record->Length - OFFSET_POINT_1) / POINT_SIZE);
+            }
+        }
+
+        constexpr FieldDef asFieldDefs[] = {
+            {"DAY_OF_YEAR", 17, "A4"},
+            {"MILLISECOND_OF_DAY", 21, "A8"},
+            {"PITCH_QUALITY_FLAG", 29, "A4"},
+            {"ROLL_QUALITY_FLAG", 33, "A4"},
+            {"YAW_QUALITY_FLAG", 37, "A4"},
+            {"PITCH_DEG", 41, "A14"},
+            {"ROLL_DEG", 55, "A14"},
+            {"YAW_DEG", 69, "A14"},
+            {"PITCH_RATE_QUALITY_FLAG", 83, "A4"},
+            {"ROL_RATE_QUALITY_FLAG", 87, "A4"},
+            {"YAW_RATE_QUALITY_FLAG", 91, "A4"},
+            {"PITCH_RATE", 95, "A14"},
+            {"ROLL_RATE", 109, "A14"},
+            {"YAW_RATE", 123, "A14"},
+        };
+        for (int iPnt = 0; iPnt < nPoints; ++iPnt)
+        {
+            for (const auto &sDef : asFieldDefs)
+            {
+                GetCeosField(record, sDef.nOffsetInRecord + iPnt * POINT_SIZE,
+                             sDef.pszFormat, szField);
+                CPLString osField(szField);
+                osField.Trim();
+                if (!osField.empty())
+                {
+                    SetMetadataItem(std::string("CEOS_PLATFORM_ATT_")
+                                        .append(sDef.pszMetadataItemName)
+                                        .append("_POINT_")
+                                        .append(std::to_string(iPnt + 1))
+                                        .c_str(),
+                                    osField.c_str());
+                }
+            }
+        }
+    }
+
+    /* -------------------------------------------------------------------- */
+    /*      PALSAR-2 ALOS2 Platform radiometric data                        */
+    /* -------------------------------------------------------------------- */
+    record = FindCeosRecord(sVolume.RecordList, LEADER_PLATFORM_RADIOMETRIC_TC,
+                            CEOS_LEADER_FILE, -1, -1);
+    if (record)
+    {
+        // Table 3.3-9 Radiometric data records
+        // of https://www.eorc.jaxa.jp/ALOS/en/alos-2/pdf/product_format_description/PALSAR-2_xx_Format_CEOS_E_g.pdf
+        constexpr FieldDef asFieldDefs[] = {
+            {"CEOS_PLATFORM_RADIOMETRIC_CALIBRATION_FACTOR", 21, "A16"},
+            {"CEOS_PLATFORM_RADIOMETRIC_DT_1_1_REAL", 37, "A16"},
+            {"CEOS_PLATFORM_RADIOMETRIC_DT_1_1_IMAG", 53, "A16"},
+            {"CEOS_PLATFORM_RADIOMETRIC_DT_1_2_REAL", 69, "A16"},
+            {"CEOS_PLATFORM_RADIOMETRIC_DT_1_2_IMAG", 85, "A16"},
+            {"CEOS_PLATFORM_RADIOMETRIC_DT_2_1_REAL", 101, "A16"},
+            {"CEOS_PLATFORM_RADIOMETRIC_DT_2_1_IMAG", 117, "A16"},
+            {"CEOS_PLATFORM_RADIOMETRIC_DT_2_2_REAL", 133, "A16"},
+            {"CEOS_PLATFORM_RADIOMETRIC_DT_2_2_IMAG", 149, "A16"},
+            {"CEOS_PLATFORM_RADIOMETRIC_DR_1_1_REAL", 165, "A16"},
+            {"CEOS_PLATFORM_RADIOMETRIC_DR_1_1_IMAG", 181, "A16"},
+            {"CEOS_PLATFORM_RADIOMETRIC_DR_1_2_REAL", 197, "A16"},
+            {"CEOS_PLATFORM_RADIOMETRIC_DR_1_2_IMAG", 213, "A16"},
+            {"CEOS_PLATFORM_RADIOMETRIC_DR_2_1_REAL", 229, "A16"},
+            {"CEOS_PLATFORM_RADIOMETRIC_DR_2_1_IMAG", 245, "A16"},
+            {"CEOS_PLATFORM_RADIOMETRIC_DR_2_2_REAL", 261, "A16"},
+            {"CEOS_PLATFORM_RADIOMETRIC_DR_2_2_IMAG", 277, "A16"},
+        };
+        for (const auto &sDef : asFieldDefs)
+        {
+            GetCeosField(record, sDef.nOffsetInRecord, sDef.pszFormat, szField);
+            CPLString osField(szField);
+            osField.Trim();
+            if (!osField.empty())
+            {
+                SetMetadataItem(sDef.pszMetadataItemName, osField.c_str());
+            }
+        }
     }
 }
 

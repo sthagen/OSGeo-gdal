@@ -12,6 +12,7 @@
 
 #include "ceos.h"
 
+#include "cpl_error.h"
 #include <assert.h>
 
 /* Function implementations of functions described in ceos.h */
@@ -150,6 +151,10 @@ void GetCeosField(const CeosRecord_t *record, int32 start_byte,
     /* Check for out of bounds */
     if (start_byte + field_size - 1 > record->Length)
     {
+        CPLError(CE_Failure, CPLE_AppDefined,
+                 "Cannot read field. Would require record to be at least %d "
+                 "bytes large, whereas it is only %d",
+                 start_byte + field_size - 1, record->Length);
         return;
     }
 
