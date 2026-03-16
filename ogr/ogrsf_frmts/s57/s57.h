@@ -218,9 +218,6 @@ class CPL_DLL DDFRecordIndex
     int nRecordCount;
     int nRecordMax;
 
-    int nLastObjlPos;  // Added for FindRecordByObjl().
-    int nLastObjl;     // Added for FindRecordByObjl().
-
     DDFIndexedRecord *pasRecords;
 
     void Sort();
@@ -233,8 +230,6 @@ class CPL_DLL DDFRecordIndex
     bool RemoveRecord(int nKey);
 
     DDFRecord *FindRecord(int nKey);
-
-    DDFRecord *FindRecordByObjl(int nObjl);  // Added for FindRecordByObjl().
 
     void Clear();
 

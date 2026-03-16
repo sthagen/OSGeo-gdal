@@ -5241,8 +5241,10 @@ static void GDALCopyWholeRasterGetSwathSize(GDALRasterBand *poSrcPrototypeBand,
  * <ul>
  * <li>"INTERLEAVE=PIXEL/BAND" to force pixel (resp. band) interleaved read and
  * write access pattern (this does not modify the layout of the destination
- * data)</li> <li>"COMPRESSED=YES" to force alignment on target dataset block
- * sizes to achieve best compression.</li> <li>"SKIP_HOLES=YES" to skip chunks
+ * data)</li>
+ * <li>"COMPRESSED=YES" to force alignment on target dataset block
+ * sizes to achieve best compression.</li>
+ * <li>"SKIP_HOLES=YES" to skip chunks
  * for which GDALGetDataCoverageStatus() returns GDAL_DATA_COVERAGE_STATUS_EMPTY
  * (GDAL &gt;= 2.2)</li>
  * </ul>
