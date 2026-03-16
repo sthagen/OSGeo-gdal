@@ -12,6 +12,8 @@
 
 #include "ceos.h"
 
+#include <assert.h>
+
 /* Function implementations of functions described in ceos.h */
 
 void CeosUpdateHeaderFromBuffer(CeosRecord_t *record);
@@ -130,18 +132,19 @@ void PutCeosRecordStruct(CeosRecord_t *record, const void *struct_ptr)
     }
 }
 
-void GetCeosField(CeosRecord_t *record, int32 start_byte, const char *format,
-                  void *value)
+void GetCeosField(const CeosRecord_t *record, int32 start_byte,
+                  const char *format, void *value)
 {
-    int field_size;
     char *d_ptr;
     char *mod_buf = NULL;
 
-    field_size = atoi(format + 1);
+    const int field_size = atoi(format + 1);
+    assert(field_size >= 1);
 
-    if (field_size < 1)
+    if (format[0] == 'a' || format[0] == 'A')
     {
-        return;
+        ((char *)value)[0] = 0;
+        ((char *)value)[field_size] = 0;
     }
 
     /* Check for out of bounds */
@@ -156,7 +159,7 @@ void GetCeosField(CeosRecord_t *record, int32 start_byte, const char *format,
     }
 
     memcpy(mod_buf, record->Buffer + (start_byte - 1), field_size);
-    mod_buf[field_size] = '\0';
+    mod_buf[field_size] = 0;
 
     /* Switch on format type */
     switch (format[0])
