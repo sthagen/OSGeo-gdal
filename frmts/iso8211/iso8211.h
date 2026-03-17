@@ -196,7 +196,7 @@ class CPL_ODLL DDFModule
     // One DirEntry per field.
     std::vector<std::unique_ptr<DDFFieldDefn>> apoFieldDefns{};
 
-    DDFRecord *poRecord = nullptr;
+    std::unique_ptr<DDFRecord> poRecord{};
 
     // Ownership of DDFRecord in this set is very particular
     // See DDFRecord::Clone() doc

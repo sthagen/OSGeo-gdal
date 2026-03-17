@@ -70,14 +70,7 @@ void DDFModule::Close()
         fpDDF = nullptr;
     }
 
-    /* -------------------------------------------------------------------- */
-    /*      Cleanup the working record.                                     */
-    /* -------------------------------------------------------------------- */
-    if (poRecord != nullptr)
-    {
-        delete poRecord;
-        poRecord = nullptr;
-    }
+    poRecord.reset();
 
     for (auto *poClone : oSetClones)
     {
@@ -548,10 +541,10 @@ DDFRecord *DDFModule::ReadRecord()
 
 {
     if (poRecord == nullptr)
-        poRecord = new DDFRecord(this);
+        poRecord = std::make_unique<DDFRecord>(this);
 
     if (poRecord->Read())
-        return poRecord;
+        return poRecord.get();
     else
         return nullptr;
 }
