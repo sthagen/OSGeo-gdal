@@ -91,14 +91,7 @@ void DDFModule::Close()
     CPLFree(papoClones);
     papoClones = nullptr;
 
-    /* -------------------------------------------------------------------- */
-    /*      Cleanup the field definitions.                                  */
-    /* -------------------------------------------------------------------- */
-    for (int i = 0; i < nFieldDefnCount; i++)
-        delete papoFieldDefns[i];
-    CPLFree(papoFieldDefns);
-    papoFieldDefns = nullptr;
-    nFieldDefnCount = 0;
+    apoFieldDefns.clear();
 }
 
 /************************************************************************/
@@ -295,12 +288,10 @@ int DDFModule::Open(const char *pszFilename, int bFailQuietly)
             return FALSE;
         }
 
-        DDFFieldDefn *poFDefn = new DDFFieldDefn();
+        auto poFDefn = std::make_unique<DDFFieldDefn>();
         if (poFDefn->Initialize(this, szTag, nFieldLength,
                                 pachRecord + _fieldAreaStart + nFieldPos))
-            AddField(poFDefn);
-        else
-            delete poFDefn;
+            AddField(std::move(poFDefn));
     }
 
     CPLFree(pachRecord);
@@ -365,20 +356,18 @@ int DDFModule::Create(const char *pszFilename)
     /* -------------------------------------------------------------------- */
     /*      Prepare all the field definition information.                   */
     /* -------------------------------------------------------------------- */
-    int iField;
-
     _recLength =
         24 +
-        nFieldDefnCount * (_sizeFieldLength + _sizeFieldPos + _sizeFieldTag) +
+        GetFieldCount() * (_sizeFieldLength + _sizeFieldPos + _sizeFieldTag) +
         1;
 
     _fieldAreaStart = _recLength;
 
-    for (iField = 0; iField < nFieldDefnCount; iField++)
+    for (auto &poFieldDefn : apoFieldDefns)
     {
         int nLength;
 
-        papoFieldDefns[iField]->GenerateDDREntry(this, nullptr, &nLength);
+        poFieldDefn->GenerateDDREntry(this, nullptr, &nLength);
         _recLength += nLength;
     }
 
@@ -409,7 +398,7 @@ int DDFModule::Create(const char *pszFilename)
     /*      Write out directory entries.                                    */
     /* -------------------------------------------------------------------- */
     int nOffset = 0;
-    for (iField = 0; iField < nFieldDefnCount; iField++)
+    for (auto &poFieldDefn : apoFieldDefns)
     {
         char achDirEntry[255];
         char szFormat[32];
@@ -418,12 +407,11 @@ int DDFModule::Create(const char *pszFilename)
         CPLAssert(_sizeFieldLength + _sizeFieldPos + _sizeFieldTag <
                   (int)sizeof(achDirEntry));
 
-        papoFieldDefns[iField]->GenerateDDREntry(this, nullptr, &nLength);
+        poFieldDefn->GenerateDDREntry(this, nullptr, &nLength);
 
-        CPLAssert((int)strlen(papoFieldDefns[iField]->GetName()) ==
-                  _sizeFieldTag);
+        CPLAssert((int)strlen(poFieldDefn->GetName()) == _sizeFieldTag);
         snprintf(achDirEntry, sizeof(achDirEntry), "%s",
-                 papoFieldDefns[iField]->GetName());
+                 poFieldDefn->GetName());
         snprintf(szFormat, sizeof(szFormat), "%%0%dd", (int)_sizeFieldLength);
         snprintf(achDirEntry + _sizeFieldTag,
                  sizeof(achDirEntry) - _sizeFieldTag, szFormat, nLength);
@@ -444,12 +432,12 @@ int DDFModule::Create(const char *pszFilename)
     /* -------------------------------------------------------------------- */
     /*      Write out the field descriptions themselves.                    */
     /* -------------------------------------------------------------------- */
-    for (iField = 0; iField < nFieldDefnCount; iField++)
+    for (auto &poFieldDefn : apoFieldDefns)
     {
         char *pachData = nullptr;
         int nLength = 0;
 
-        papoFieldDefns[iField]->GenerateDDREntry(this, &pachData, &nLength);
+        poFieldDefn->GenerateDDREntry(this, &pachData, &nLength);
         bRet &= VSIFWriteL(pachData, nLength, 1, fpDDF) > 0;
         CPLFree(pachData);
     }
@@ -471,7 +459,7 @@ int DDFModule::Create(const char *pszFilename)
  * @param fp The standard IO file handle to write to.  i.e. stderr.
  */
 
-void DDFModule::Dump(FILE *fp)
+void DDFModule::Dump(FILE *fp) const
 
 {
     fprintf(fp, "DDFModule:\n");
@@ -490,9 +478,9 @@ void DDFModule::Dump(FILE *fp)
     fprintf(fp, "    _sizeFieldPos = %d\n", _sizeFieldPos);
     fprintf(fp, "    _sizeFieldTag = %d\n", _sizeFieldTag);
 
-    for (int i = 0; i < nFieldDefnCount; i++)
+    for (const auto &poFieldDefn : apoFieldDefns)
     {
-        papoFieldDefns[i]->Dump(fp);
+        poFieldDefn->Dump(fp);
     }
 }
 
@@ -517,29 +505,27 @@ void DDFModule::Dump(FILE *fp)
 const DDFFieldDefn *DDFModule::FindFieldDefn(const char *pszFieldName) const
 
 {
-    int i;
-
     /* -------------------------------------------------------------------- */
     /*      This pass tries to reduce the cost of comparing strings by      */
     /*      first checking the first character, and by using strcmp()       */
     /* -------------------------------------------------------------------- */
-    for (i = 0; i < nFieldDefnCount; i++)
+    for (const auto &poFieldDefn : apoFieldDefns)
     {
-        const char *pszThisName = papoFieldDefns[i]->GetName();
+        const char *pszThisName = poFieldDefn->GetName();
 
         if (*pszThisName == *pszFieldName && *pszFieldName != '\0' &&
             strcmp(pszFieldName + 1, pszThisName + 1) == 0)
-            return papoFieldDefns[i];
+            return poFieldDefn.get();
     }
 
     /* -------------------------------------------------------------------- */
     /*      Now do a more general check.  Application code may not          */
     /*      always use the correct name case.                               */
     /* -------------------------------------------------------------------- */
-    for (i = 0; i < nFieldDefnCount; i++)
+    for (const auto &poFieldDefn : apoFieldDefns)
     {
-        if (EQUAL(pszFieldName, papoFieldDefns[i]->GetName()))
-            return papoFieldDefns[i];
+        if (EQUAL(pszFieldName, poFieldDefn->GetName()))
+            return poFieldDefn.get();
     }
 
     return nullptr;
@@ -589,13 +575,10 @@ DDFRecord *DDFModule::ReadRecord()
  * @param poNewFDefn definition to be added to the module.
  */
 
-void DDFModule::AddField(DDFFieldDefn *poNewFDefn)
+void DDFModule::AddField(std::unique_ptr<DDFFieldDefn> poNewFDefn)
 
 {
-    nFieldDefnCount++;
-    papoFieldDefns = (DDFFieldDefn **)CPLRealloc(
-        papoFieldDefns, sizeof(void *) * nFieldDefnCount);
-    papoFieldDefns[nFieldDefnCount - 1] = poNewFDefn;
+    apoFieldDefns.push_back(std::move(poNewFDefn));
 }
 
 /************************************************************************/
@@ -612,10 +595,10 @@ void DDFModule::AddField(DDFFieldDefn *poNewFDefn)
 DDFFieldDefn *DDFModule::GetField(int i)
 
 {
-    if (i < 0 || i >= nFieldDefnCount)
+    if (i < 0 || static_cast<size_t>(i) >= apoFieldDefns.size())
         return nullptr;
     else
-        return papoFieldDefns[i];
+        return apoFieldDefns[i].get();
 }
 
 /************************************************************************/

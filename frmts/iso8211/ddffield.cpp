@@ -51,7 +51,7 @@ void DDFField::Initialize(DDFFieldDefn *poDefnIn, const char *pachDataIn,
  * @param fp The standard IO file handle to write to.  i.e. stderr
  */
 
-void DDFField::Dump(FILE *fp)
+void DDFField::Dump(FILE *fp) const
 
 {
     int nMaxRepeat = 8;

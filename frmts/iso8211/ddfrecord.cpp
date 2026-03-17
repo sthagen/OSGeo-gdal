@@ -60,7 +60,7 @@ DDFRecord::~DDFRecord()
  * @param fp The standard IO file handle to write to.  i.e. stderr
  */
 
-void DDFRecord::Dump(FILE *fp)
+void DDFRecord::Dump(FILE *fp) const
 
 {
     fprintf(fp, "DDFRecord:\n");

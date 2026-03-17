@@ -140,7 +140,7 @@ int main(int nArgc, char *papszArgv[])
         if (psIter->eType == CXT_Element &&
             strcmp(psIter->pszValue, "DDFFieldDefn") == 0)
         {
-            DDFFieldDefn *poFDefn = new DDFFieldDefn();
+            auto poFDefn = std::make_unique<DDFFieldDefn>();
 
             DDF_data_struct_code eStructCode = dsc_elementary;
             const char *pszStructCode =
@@ -207,7 +207,7 @@ int main(int nArgc, char *papszArgv[])
             if (pszFormatControls)
                 poFDefn->SetFormatControls(pszFormatControls);
 
-            oModule.AddField(poFDefn);
+            oModule.AddField(std::move(poFDefn));
         }
         else if (psIter->eType == CXT_Element &&
                  strcmp(psIter->pszValue, "DDFRecord") == 0)

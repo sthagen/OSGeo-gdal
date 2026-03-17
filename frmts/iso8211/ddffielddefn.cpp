@@ -369,7 +369,7 @@ int DDFFieldDefn::Initialize(DDFModule *poModuleIn, const char *pszTagIn,
  * @param fp The standard IO file handle to write to.  i.e. stderr
  */
 
-void DDFFieldDefn::Dump(FILE *fp)
+void DDFFieldDefn::Dump(FILE *fp) const
 
 {
     const char *pszValue = "";

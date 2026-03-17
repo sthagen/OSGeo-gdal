@@ -202,7 +202,7 @@ int DDFSubfieldDefn::SetFormat(const char *pszFormat)
  * @param fp The standard IO file handle to write to.  i.e. stderr
  */
 
-void DDFSubfieldDefn::Dump(FILE *fp)
+void DDFSubfieldDefn::Dump(FILE *fp) const
 
 {
     fprintf(fp, "    DDFSubfieldDefn:\n");

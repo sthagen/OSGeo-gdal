@@ -17,6 +17,8 @@
 #include "cpl_vsi.h"
 
 #include <array>
+#include <memory>
+#include <vector>
 
 /**
   General data type
@@ -81,7 +83,7 @@ class CPL_ODLL DDFModule
                    int nSizeFieldLength = 3, int nSizeFieldPos = 4,
                    int nSizeFieldTag = 4);
 
-    void Dump(FILE *fp);
+    void Dump(FILE *fp) const;
 
     DDFRecord *ReadRecord();
     void Rewind(long) = delete;
@@ -99,11 +101,11 @@ class CPL_ODLL DDFModule
 
     int GetFieldCount() const
     {
-        return nFieldDefnCount;
+        return static_cast<int>(apoFieldDefns.size());
     }
 
     DDFFieldDefn *GetField(int);
-    void AddField(DDFFieldDefn *poNewFDefn);
+    void AddField(std::unique_ptr<DDFFieldDefn> poNewFDefn);
 
     // This is really just for internal use.
     int GetFieldControlLength() const
@@ -191,8 +193,7 @@ class CPL_ODLL DDFModule
     int _sizeFieldTag = 0;
 
     // One DirEntry per field.
-    int nFieldDefnCount = 0;
-    DDFFieldDefn **papoFieldDefns = nullptr;
+    std::vector<std::unique_ptr<DDFFieldDefn>> apoFieldDefns{};
 
     DDFRecord *poRecord = nullptr;
 
@@ -249,7 +250,7 @@ class CPL_ODLL DDFFieldDefn
     int Initialize(DDFModule *poModule, const char *pszTag, int nSize,
                    const char *pachRecord);
 
-    void Dump(FILE *fp);
+    void Dump(FILE *fp) const;
 
     /** Fetch a pointer to the field name (tag).
      * @return this is an internal copy and should not be freed.
@@ -432,7 +433,7 @@ class CPL_ODLL DDFSubfieldDefn
     int GetDefaultValue(char *pachData, int nBytesAvailable,
                         int *pnBytesUsed) const;
 
-    void Dump(FILE *fp);
+    void Dump(FILE *fp) const;
 
     /**
       Binary format: this is the digit immediately following the B or b for
@@ -499,7 +500,7 @@ class CPL_ODLL DDFRecord
     DDFRecord *Clone();
     DDFRecord *CloneOn(DDFModule *);
 
-    void Dump(FILE *);
+    void Dump(FILE *) const;
 
     /** Get the number of DDFFields on this record. */
     int GetFieldCount() const
@@ -668,7 +669,7 @@ class CPL_ODLL DDFField
 
     void Initialize(DDFFieldDefn *, const char *pszData, int nSize);
 
-    void Dump(FILE *fp);
+    void Dump(FILE *fp) const;
 
     const char *GetSubfieldData(const DDFSubfieldDefn *, int * = nullptr,
                                 int = 0) const;
