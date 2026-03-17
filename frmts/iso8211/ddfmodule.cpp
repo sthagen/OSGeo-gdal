@@ -14,6 +14,7 @@
 #include "cpl_port.h"
 #include "iso8211.h"
 
+#include <array>
 #include <cstdio>
 #include <cstring>
 
@@ -29,17 +30,7 @@
  * The constructor.
  */
 
-DDFModule::DDFModule()
-    : fpDDF(nullptr), bReadOnly(TRUE), nFirstRecordOffset(0),
-      _interchangeLevel('\0'), _inlineCodeExtensionIndicator('\0'),
-      _versionNumber('\0'), _appIndicator('\0'), _fieldControlLength(9),
-      _recLength(0), _leaderIden('L'), _fieldAreaStart(0), _sizeFieldLength(0),
-      _sizeFieldPos(0), _sizeFieldTag(0), nFieldDefnCount(0),
-      papoFieldDefns(nullptr), poRecord(nullptr), nCloneCount(0),
-      nMaxCloneCount(0), papoClones(nullptr)
-{
-    strcpy(_extendedCharSet, " ! ");
-}
+DDFModule::DDFModule() = default;
 
 /************************************************************************/
 /*                             ~DDFModule()                             */
@@ -210,7 +201,6 @@ int DDFModule::Open(const char *pszFilename, int bFailQuietly)
         _extendedCharSet[0] = achLeader[17];
         _extendedCharSet[1] = achLeader[18];
         _extendedCharSet[2] = achLeader[19];
-        _extendedCharSet[3] = '\0';
         _sizeFieldLength = DDFScanInt(achLeader + 20, 1);
         _sizeFieldPos = DDFScanInt(achLeader + 21, 1);
         _sizeFieldTag = DDFScanInt(achLeader + 23, 1);
@@ -330,7 +320,8 @@ int DDFModule::Open(const char *pszFilename, int bFailQuietly)
 
 int DDFModule::Initialize(char chInterchangeLevel, char chLeaderIden,
                           char chCodeExtensionIndicator, char chVersionNumber,
-                          char chAppIndicator, const char *pszExtendedCharSet,
+                          char chAppIndicator,
+                          const std::array<char, 3> &achExtendedCharSet,
                           int nSizeFieldLength, int nSizeFieldPos,
                           int nSizeFieldTag)
 
@@ -340,8 +331,7 @@ int DDFModule::Initialize(char chInterchangeLevel, char chLeaderIden,
     _inlineCodeExtensionIndicator = chCodeExtensionIndicator;
     _versionNumber = chVersionNumber;
     _appIndicator = chAppIndicator;
-    snprintf(_extendedCharSet, sizeof(_extendedCharSet), "%s",
-             pszExtendedCharSet);
+    _extendedCharSet = achExtendedCharSet;
     _sizeFieldLength = nSizeFieldLength;
     _sizeFieldPos = nSizeFieldPos;
     _sizeFieldTag = nSizeFieldTag;
@@ -407,7 +397,7 @@ int DDFModule::Create(const char *pszFilename)
              (int)_fieldControlLength);
     snprintf(achLeader + 12, sizeof(achLeader) - 12, "%05d",
              (int)_fieldAreaStart);
-    memcpy(achLeader + 17, _extendedCharSet, 3);
+    memcpy(achLeader + 17, _extendedCharSet.data(), 3);
     snprintf(achLeader + 20, sizeof(achLeader) - 20, "%1d",
              (int)_sizeFieldLength);
     snprintf(achLeader + 21, sizeof(achLeader) - 21, "%1d", (int)_sizeFieldPos);
@@ -492,7 +482,8 @@ void DDFModule::Dump(FILE *fp)
             _inlineCodeExtensionIndicator);
     fprintf(fp, "    _versionNumber = %c\n", _versionNumber);
     fprintf(fp, "    _appIndicator = %c\n", _appIndicator);
-    fprintf(fp, "    _extendedCharSet = `%s'\n", _extendedCharSet);
+    fprintf(fp, "    _extendedCharSet = `%c%c%c'\n", _extendedCharSet[0],
+            _extendedCharSet[1], _extendedCharSet[2]);
     fprintf(fp, "    _fieldControlLength = %d\n", _fieldControlLength);
     fprintf(fp, "    _fieldAreaStart = %d\n", _fieldAreaStart);
     fprintf(fp, "    _sizeFieldLength = %d\n", _sizeFieldLength);

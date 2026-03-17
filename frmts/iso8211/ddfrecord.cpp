@@ -29,10 +29,7 @@ constexpr int nLeaderSize = 24;
 /************************************************************************/
 
 DDFRecord::DDFRecord(DDFModule *poModuleIn)
-    : poModule(poModuleIn), nReuseHeader(FALSE), nFieldOffset(0),
-      _sizeFieldTag(poModuleIn->GetSizeFieldTag()), _sizeFieldPos(5),
-      _sizeFieldLength(5), nDataSize(0), pachData(nullptr), nFieldCount(0),
-      paoFields(nullptr), bIsClone(FALSE)
+    : poModule(poModuleIn), _sizeFieldTag(poModuleIn->GetSizeFieldTag())
 {
 }
 
@@ -67,7 +64,7 @@ void DDFRecord::Dump(FILE *fp)
 
 {
     fprintf(fp, "DDFRecord:\n");
-    fprintf(fp, "    nReuseHeader = %d\n", nReuseHeader);
+    fprintf(fp, "    bReuseHeader = %d\n", bReuseHeader);
     fprintf(fp, "    nDataSize = %d\n", nDataSize);
     fprintf(fp, "    _sizeFieldLength=%d, _sizeFieldPos=%d, _sizeFieldTag=%d\n",
             _sizeFieldLength, _sizeFieldPos, _sizeFieldTag);
@@ -97,7 +94,7 @@ int DDFRecord::Read()
     /*      Redefine the record on the basis of the header if needed.       */
     /*      As a side effect this will read the data for the record as well.*/
     /* -------------------------------------------------------------------- */
-    if (!nReuseHeader)
+    if (!bReuseHeader)
     {
         return ReadHeader();
     }
@@ -211,7 +208,7 @@ void DDFRecord::Clear()
 
     pachData = nullptr;
     nDataSize = 0;
-    nReuseHeader = FALSE;
+    bReuseHeader = FALSE;
 }
 
 /************************************************************************/
@@ -281,7 +278,7 @@ int DDFRecord::ReadHeader()
     }
 
     if (_leaderIden == 'R')
-        nReuseHeader = TRUE;
+        bReuseHeader = TRUE;
 
     nFieldOffset = _fieldAreaStart - nLeaderSize;
 
@@ -962,7 +959,7 @@ DDFRecord *DDFRecord::Clone()
 {
     DDFRecord *poNR = new DDFRecord(poModule);
 
-    poNR->nReuseHeader = FALSE;
+    poNR->bReuseHeader = FALSE;
     poNR->nFieldOffset = nFieldOffset;
 
     poNR->nDataSize = nDataSize;

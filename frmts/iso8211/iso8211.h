@@ -16,6 +16,8 @@
 #include "cpl_port.h"
 #include "cpl_vsi.h"
 
+#include <array>
+
 /**
   General data type
     */
@@ -74,7 +76,8 @@ class CPL_ODLL DDFModule
     int Initialize(char chInterchangeLevel = '3', char chLeaderIden = 'L',
                    char chCodeExtensionIndicator = 'E',
                    char chVersionNumber = '1', char chAppIndicator = ' ',
-                   const char *pszExtendedCharSet = " ! ",
+                   const std::array<char, 3> &achExtendedCharSet = {' ', '!',
+                                                                    ' '},
                    int nSizeFieldLength = 3, int nSizeFieldPos = 4,
                    int nSizeFieldTag = 4);
 
@@ -158,7 +161,7 @@ class CPL_ODLL DDFModule
         return _appIndicator;
     }
 
-    const char *GetExtendedCharSet() const
+    const std::array<char, 3> &GetExtendedCharSet() const
     {
         return _extendedCharSet;
     }
@@ -169,33 +172,33 @@ class CPL_ODLL DDFModule
     }
 
   private:
-    VSILFILE *fpDDF;
-    int bReadOnly;
-    vsi_l_offset nFirstRecordOffset;
+    VSILFILE *fpDDF = nullptr;
+    bool bReadOnly = false;
+    vsi_l_offset nFirstRecordOffset = 0;
 
-    char _interchangeLevel;
-    char _inlineCodeExtensionIndicator;
-    char _versionNumber;
-    char _appIndicator;
-    int _fieldControlLength;
-    char _extendedCharSet[4];
+    char _interchangeLevel = '\0';
+    char _inlineCodeExtensionIndicator = '\0';
+    char _versionNumber = '\0';
+    char _appIndicator = '\0';
+    int _fieldControlLength = 9;
+    std::array<char, 3> _extendedCharSet = {' ', '!', ' '};
 
-    int _recLength;
-    char _leaderIden;
-    int _fieldAreaStart;
-    int _sizeFieldLength;
-    int _sizeFieldPos;
-    int _sizeFieldTag;
+    int _recLength = 0;
+    char _leaderIden = 'L';
+    int _fieldAreaStart = 0;
+    int _sizeFieldLength = 0;
+    int _sizeFieldPos = 0;
+    int _sizeFieldTag = 0;
 
     // One DirEntry per field.
-    int nFieldDefnCount;
-    DDFFieldDefn **papoFieldDefns;
+    int nFieldDefnCount = 0;
+    DDFFieldDefn **papoFieldDefns = nullptr;
 
-    DDFRecord *poRecord;
+    DDFRecord *poRecord = nullptr;
 
-    int nCloneCount;
-    int nMaxCloneCount;
-    DDFRecord **papoClones;
+    int nCloneCount = 0;
+    int nMaxCloneCount = 0;
+    DDFRecord **papoClones = nullptr;
 };
 
 /************************************************************************/
@@ -290,7 +293,7 @@ class CPL_ODLL DDFFieldDefn
      * @see DDFField::GetRepeatCount()
      * @return TRUE if the field is marked as repeating.
      */
-    int IsRepeating() const
+    bool IsRepeating() const
     {
         return bRepeatingSubfields;
     }
@@ -298,9 +301,9 @@ class CPL_ODLL DDFFieldDefn
     static char *ExpandFormat(const char *);
 
     /** this is just for an S-57 hack for swedish data */
-    void SetRepeatingFlag(int n)
+    void SetRepeatingFlag(bool bRepeating)
     {
-        bRepeatingSubfields = n;
+        bRepeatingSubfields = bRepeating;
     }
 
     char *GetDefaultValue(int *pnSize);
@@ -330,25 +333,25 @@ class CPL_ODLL DDFFieldDefn
   private:
     static char *ExtractSubstring(const char *);
 
-    DDFModule *poModule;
-    char *pszTag;
+    DDFModule *poModule = nullptr;
+    char *pszTag = nullptr;
 
-    char *_fieldName;
-    char *_arrayDescr;
-    char *_formatControls;
+    char *_fieldName = nullptr;
+    char *_arrayDescr = nullptr;
+    char *_formatControls = nullptr;
 
-    int bRepeatingSubfields;
-    int nFixedWidth;  // zero if variable.
+    bool bRepeatingSubfields = false;
+    int nFixedWidth = 0;  // zero if variable.
 
     void BuildSubfields();
     int ApplyFormats();
 
-    DDF_data_struct_code _data_struct_code;
+    DDF_data_struct_code _data_struct_code = dsc_elementary;
 
-    DDF_data_type_code _data_type_code;
+    DDF_data_type_code _data_type_code = dtc_char_string;
 
-    int nSubfieldCount;
-    DDFSubfieldDefn **papoSubfields;
+    int nSubfieldCount = 0;
+    DDFSubfieldDefn **papoSubfields = nullptr;
 
     CPL_DISALLOW_COPY_ASSIGN(DDFFieldDefn)
 };
@@ -451,27 +454,27 @@ class CPL_ODLL DDFSubfieldDefn
     }
 
   private:
-    char *pszName;  // a.k.a. subfield mnemonic
-    char *pszFormatString;
+    char *pszName = nullptr;  // a.k.a. subfield mnemonic
+    char *pszFormatString = nullptr;
 
-    DDFDataType eType;
-    DDFBinaryFormat eBinaryFormat;
+    DDFDataType eType = DDFString;
+    DDFBinaryFormat eBinaryFormat = NotBinary;
 
     /* -------------------------------------------------------------------- */
     /*      bIsVariable determines whether we using the                     */
     /*      chFormatDelimiter (TRUE), or the fixed width (FALSE).           */
     /* -------------------------------------------------------------------- */
-    int bIsVariable;
+    bool bIsVariable = true;
 
-    char chFormatDelimiter;
-    int nFormatWidth;
+    char chFormatDelimiter = DDF_UNIT_TERMINATOR;
+    int nFormatWidth = 0;
 
     /* -------------------------------------------------------------------- */
     /*      Fetched string cache.  This is where we hold the values         */
     /*      returned from ExtractStringData().                              */
     /* -------------------------------------------------------------------- */
-    mutable int nMaxBufChars;
-    mutable char *pachBuffer;
+    mutable int nMaxBufChars = 0;
+    mutable char *pachBuffer = nullptr;
 };
 
 /************************************************************************/
@@ -576,9 +579,9 @@ class CPL_ODLL DDFRecord
     int Write();
 
     // Advanced uses for 8211dump/8211createfromxml
-    int GetReuseHeader() const
+    bool GetReuseHeader() const
     {
-        return nReuseHeader;
+        return bReuseHeader;
     }
 
     int GetSizeFieldTag() const
@@ -596,7 +599,6 @@ class CPL_ODLL DDFRecord
         return _sizeFieldLength;
     }
 
-    // void        SetReuseHeader(int bFlag) { nReuseHeader = bFlag; }
     void SetSizeFieldTag(int nVal)
     {
         _sizeFieldTag = nVal;
@@ -625,23 +627,23 @@ class CPL_ODLL DDFRecord
   private:
     int ReadHeader();
 
-    DDFModule *poModule;
+    DDFModule *poModule = nullptr;
 
-    int nReuseHeader;
+    bool bReuseHeader = false;
 
-    int nFieldOffset;  // field data area, not dir entries.
+    int nFieldOffset = 0;  // field data area, not dir entries.
 
-    int _sizeFieldTag;
-    int _sizeFieldPos;
-    int _sizeFieldLength;
+    int _sizeFieldTag = 0;
+    int _sizeFieldPos = 5;
+    int _sizeFieldLength = 5;
 
-    int nDataSize;  // Whole record except leader with header
-    char *pachData;
+    int nDataSize = 0;  // Whole record except leader with header
+    char *pachData = nullptr;
 
-    int nFieldCount;
-    DDFField *paoFields;
+    int nFieldCount = 0;
+    DDFField *paoFields = nullptr;
 
-    int bIsClone;
+    bool bIsClone = false;
 };
 
 /************************************************************************/
@@ -662,9 +664,7 @@ class CPL_ODLL DDFRecord
 class CPL_ODLL DDFField
 {
   public:
-    DDFField() : poDefn(nullptr), nDataSize(0), pachData(nullptr)
-    {
-    }
+    DDFField() = default;
 
     void Initialize(DDFFieldDefn *, const char *pszData, int nSize);
 
@@ -705,11 +705,11 @@ class CPL_ODLL DDFField
     }
 
   private:
-    DDFFieldDefn *poDefn;
+    DDFFieldDefn *poDefn = nullptr;
 
-    int nDataSize;
+    int nDataSize = 0;
 
-    const char *pachData;
+    const char *pachData = nullptr;
 };
 
 #endif /* ndef ISO8211_H_INCLUDED */

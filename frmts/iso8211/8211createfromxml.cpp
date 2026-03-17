@@ -14,6 +14,8 @@
 #include "cpl_minixml.h"
 #include "cpl_string.h"
 #include "iso8211.h"
+
+#include <array>
 #include <map>
 #include <string>
 
@@ -105,12 +107,9 @@ int main(int nArgc, char *papszArgv[])
     chAppIndicator = CPLGetXMLValue(poXMLDDFModule, "_appIndicator",
                                     CPLSPrintf("%c", chAppIndicator))[0];
 
-    const char *pszExtendedCharSet = " ! ";
     char szExtendedCharSet[4];
-    snprintf(
-        szExtendedCharSet, sizeof(szExtendedCharSet), "%s",
-        CPLGetXMLValue(poXMLDDFModule, "_extendedCharSet", pszExtendedCharSet));
-    pszExtendedCharSet = szExtendedCharSet;
+    snprintf(szExtendedCharSet, sizeof(szExtendedCharSet), "%s",
+             CPLGetXMLValue(poXMLDDFModule, "_extendedCharSet", " ! "));
     int nSizeFieldLength = 3;
     nSizeFieldLength = atoi(CPLGetXMLValue(poXMLDDFModule, "_sizeFieldLength",
                                            CPLSPrintf("%d", nSizeFieldLength)));
@@ -122,10 +121,12 @@ int main(int nArgc, char *papszArgv[])
                                         CPLSPrintf("%d", nSizeFieldTag)));
 
     DDFModule oModule;
-    oModule.Initialize(chInterchangeLevel, chLeaderIden,
-                       chCodeExtensionIndicator, chVersionNumber,
-                       chAppIndicator, pszExtendedCharSet, nSizeFieldLength,
-                       nSizeFieldPos, nSizeFieldTag);
+    oModule.Initialize(
+        chInterchangeLevel, chLeaderIden, chCodeExtensionIndicator,
+        chVersionNumber, chAppIndicator,
+        std::array<char, 3>{szExtendedCharSet[0], szExtendedCharSet[1],
+                            szExtendedCharSet[2]},
+        nSizeFieldLength, nSizeFieldPos, nSizeFieldTag);
     oModule.SetFieldControlLength(atoi(
         CPLGetXMLValue(poXMLDDFModule, "_fieldControlLength",
                        CPLSPrintf("%d", oModule.GetFieldControlLength()))));

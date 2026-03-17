@@ -29,14 +29,7 @@
 /*                            DDFFieldDefn()                            */
 /************************************************************************/
 
-DDFFieldDefn::DDFFieldDefn()
-    : poModule(nullptr), pszTag(nullptr), _fieldName(nullptr),
-      _arrayDescr(nullptr), _formatControls(nullptr),
-      bRepeatingSubfields(FALSE), nFixedWidth(0),
-      _data_struct_code(dsc_elementary), _data_type_code(dtc_char_string),
-      nSubfieldCount(0), papoSubfields(nullptr)
-{
-}
+DDFFieldDefn::DDFFieldDefn() = default;
 
 /************************************************************************/
 /*                           ~DDFFieldDefn()                            */

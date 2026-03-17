@@ -28,11 +28,7 @@
 /*                          DDFSubfieldDefn()                           */
 /************************************************************************/
 
-DDFSubfieldDefn::DDFSubfieldDefn()
-    : pszName(nullptr), pszFormatString(CPLStrdup("")), eType(DDFString),
-      eBinaryFormat(NotBinary), bIsVariable(TRUE),
-      chFormatDelimiter(DDF_UNIT_TERMINATOR), nFormatWidth(0), nMaxBufChars(0),
-      pachBuffer(nullptr)
+DDFSubfieldDefn::DDFSubfieldDefn() : pszFormatString(CPLStrdup(""))
 {
 }
 

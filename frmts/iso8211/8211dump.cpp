@@ -90,7 +90,10 @@ int main(int nArgc, char **papszArgv)
                    oModule.GetCodeExtensionIndicator());
             printf(" _versionNumber=\"%c\"", oModule.GetVersionNumber());
             printf(" _appIndicator=\"%c\"", oModule.GetAppIndicator());
-            printf(" _extendedCharSet=\"%s\"", oModule.GetExtendedCharSet());
+            printf(" _extendedCharSet=\"%c%c%c\"",
+                   oModule.GetExtendedCharSet()[0],
+                   oModule.GetExtendedCharSet()[1],
+                   oModule.GetExtendedCharSet()[2]);
             printf(" _fieldControlLength=\"%d\"",
                    oModule.GetFieldControlLength());
             printf(" _sizeFieldLength=\"%d\"", oModule.GetSizeFieldLength());
