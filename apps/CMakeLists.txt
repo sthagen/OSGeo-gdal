@@ -133,6 +133,7 @@ target_sources(appslib PRIVATE
   gdalalg_vector_layer_algebra.cpp
   gdalalg_vector_output_abstract.cpp
   gdalalg_vector_partition.cpp
+  gdalalg_vector_rename_layer.cpp
   gdalalg_vector_reproject.cpp
   gdalalg_vector_select.cpp
   gdalalg_vector_set_field_type.cpp

@@ -31,6 +31,7 @@ Available sub-commands
 - :ref:`gdal_vector_partition`
 - :ref:`gdal_vector_pipeline`
 - :ref:`gdal_vector_rasterize`
+- :ref:`gdal_vector_rename_layer`
 - :ref:`gdal_vector_reproject`
 - :ref:`gdal_vector_select`
 - :ref:`gdal_vector_set_field_type`

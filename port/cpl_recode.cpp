@@ -289,6 +289,7 @@ bool CPLIsASCII(const char *pabyData, size_t nLen)
 
  * @param chReplacementChar character which will be used when the input stream
  *                          contains a non ASCII character. Must be valid ASCII!
+ *                          or NUL
  *
  * @return a new string that must be freed with CPLFree().
  *
@@ -305,9 +306,12 @@ char *CPLForceToASCII(const char *pabyData, int nLen, char chReplacementChar)
     {
         if (*reinterpret_cast<const unsigned char *>(pszPtr) > 127)
         {
-            pszOutputString[i] = chReplacementChar;
-            ++pszPtr;
-            ++i;
+            if (chReplacementChar)
+            {
+                pszOutputString[i] = chReplacementChar;
+                ++pszPtr;
+                ++i;
+            }
         }
         else
         {
@@ -338,7 +342,7 @@ char *CPLForceToASCII(const char *pabyData, int nLen, char chReplacementChar)
  * @param chReplacementChar character which will be used when the input stream
  *                          contains a non ASCII character that cannot be
  *                          substituted with an equivalent ASCII character.
- *                          Must be valid ASCII!
+ *                          Must be valid ASCII! or NUL.
  *
  * @return a new string that must be freed with CPLFree().
  *

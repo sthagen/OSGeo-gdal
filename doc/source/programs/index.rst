@@ -222,6 +222,7 @@ Vector commands
    gdal_vector_pipeline
    gdal_vector_rasterize
    gdal_vector_read
+   gdal_vector_rename_layer
    gdal_vector_reproject
    gdal_vector_select
    gdal_vector_segmentize
@@ -261,6 +262,7 @@ Vector commands
     - :ref:`gdal_vector_partition`: Partition a vector dataset into multiple files
     - :ref:`gdal_vector_rasterize`: Burns vector geometries into a raster
     - :ref:`gdal_vector_read`: Read a vector dataset (pipeline only)
+    - :ref:`gdal_vector_rename_layer`: Rename layer(s) of a vector dataset
     - :ref:`gdal_vector_reproject`: Reproject a vector dataset
     - :ref:`gdal_vector_segmentize`: Segmentize geometries of a vector dataset
     - :ref:`gdal_vector_select`: Select a subset of fields from a vector dataset.
