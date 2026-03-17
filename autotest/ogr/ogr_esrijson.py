@@ -755,3 +755,72 @@ def test_ogr_esrijson_force_opening_url():
 
     drv = gdal.IdentifyDriverEx("http://example.com", allowed_drivers=["ESRIJSON"])
     assert drv.GetDescription() == "ESRIJSON"
+
+
+###############################################################################
+# Test reading http:// resource
+
+
+@pytest.mark.require_curl()
+def test_ogr_esrijson_read_from_http_POST():
+
+    import webserver
+
+    webserver_process, webserver_port = webserver.launch(
+        handler=webserver.DispatcherHttpHandler
+    )
+    if webserver_port == 0:
+        pytest.skip()
+
+    response = b"""
+        {
+        "objectIdFieldName" : "objectid",
+        "geometryType" : "esriGeometryPoint",
+        "fields" : [
+            {
+            "name" : "objectid",
+            "alias" : "Object ID",
+            "type" : "esriFieldTypeOID"
+            },
+
+        ],
+        "features" : [
+            {
+            "geometry" : {
+                "x" : 2,
+                "y" : 49,
+                "z" : 1
+            },
+            "attributes" : {
+                "objectid" : 1
+            }
+            }
+        ]
+        }
+        """
+
+    handler = webserver.SequentialHandler()
+    handler.add(
+        "POST",
+        "/foo",
+        200,
+        {"Content-Length": len(response)},
+        response,
+        expected_headers={
+            "Accept": "text/plain, application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        expected_body=b"f=json&where=1%3D1&bla=" + b"x" * 256,
+    )
+
+    try:
+        with webserver.install_http_handler(handler):
+            ds = ogr.Open(
+                f"ESRIJSON:http://localhost:{webserver_port}/foo?f=json&where=1%3D1&bla="
+                + "x" * 256
+            )
+        assert ds is not None
+        lyr = ds.GetLayer(0)
+        assert lyr.GetFeatureCount() == 1
+    finally:
+        webserver.server_stop(webserver_process, webserver_port)
