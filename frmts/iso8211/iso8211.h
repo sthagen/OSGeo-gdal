@@ -243,8 +243,8 @@ class CPL_ODLL DDFFieldDefn
                const char *pszDescription, DDF_data_struct_code eDataStructCode,
                DDF_data_type_code eDataTypeCode,
                const char *pszFormat = nullptr);
-    void AddSubfield(DDFSubfieldDefn *poNewSFDefn,
-                     int bDontAddToFormat = FALSE);
+    void AddSubfield(std::unique_ptr<DDFSubfieldDefn> poNewSFDefn,
+                     bool bDontAddToFormat = false);
     void AddSubfield(const char *pszName, const char *pszFormat);
     int GenerateDDREntry(DDFModule *poModule, char **ppachData, int *pnLength);
 
@@ -272,7 +272,7 @@ class CPL_ODLL DDFFieldDefn
     /** Get the number of subfields. */
     int GetSubfieldCount() const
     {
-        return nSubfieldCount;
+        return static_cast<int>(apoSubfields.size());
     }
 
     const DDFSubfieldDefn *GetSubfield(int i) const;
@@ -352,8 +352,7 @@ class CPL_ODLL DDFFieldDefn
 
     DDF_data_type_code _data_type_code = dtc_char_string;
 
-    int nSubfieldCount = 0;
-    DDFSubfieldDefn **papoSubfields = nullptr;
+    std::vector<std::unique_ptr<DDFSubfieldDefn>> apoSubfields{};
 
     CPL_DISALLOW_COPY_ASSIGN(DDFFieldDefn)
 };

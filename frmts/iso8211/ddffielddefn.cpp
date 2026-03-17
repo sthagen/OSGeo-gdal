@@ -42,10 +42,6 @@ DDFFieldDefn::~DDFFieldDefn()
     CPLFree(_fieldName);
     CPLFree(_arrayDescr);
     CPLFree(_formatControls);
-
-    for (int i = 0; i < nSubfieldCount; i++)
-        delete papoSubfields[i];
-    CPLFree(papoSubfields);
 }
 
 /************************************************************************/
@@ -55,28 +51,26 @@ DDFFieldDefn::~DDFFieldDefn()
 void DDFFieldDefn::AddSubfield(const char *pszName, const char *pszFormat)
 
 {
-    DDFSubfieldDefn *poSFDefn = new DDFSubfieldDefn;
+    auto poSFDefn = std::make_unique<DDFSubfieldDefn>();
 
     poSFDefn->SetName(pszName);
     poSFDefn->SetFormat(pszFormat);
-    AddSubfield(poSFDefn);
+    AddSubfield(std::move(poSFDefn));
 }
 
 /************************************************************************/
 /*                            AddSubfield()                             */
 /************************************************************************/
 
-void DDFFieldDefn::AddSubfield(DDFSubfieldDefn *poNewSFDefn,
-                               int bDontAddToFormat)
+void DDFFieldDefn::AddSubfield(std::unique_ptr<DDFSubfieldDefn> poNewSFDefn,
+                               bool bDontAddToFormat)
 
 {
-    nSubfieldCount++;
-    papoSubfields = static_cast<DDFSubfieldDefn **>(
-        CPLRealloc(papoSubfields, sizeof(void *) * nSubfieldCount));
-    papoSubfields[nSubfieldCount - 1] = poNewSFDefn;
-
     if (bDontAddToFormat)
+    {
+        apoSubfields.push_back(std::move(poNewSFDefn));
         return;
+    }
 
     /* -------------------------------------------------------------------- */
     /*      Add this format to the format list.  We don't bother            */
@@ -116,6 +110,8 @@ void DDFFieldDefn::AddSubfield(DDFSubfieldDefn *poNewSFDefn,
         (_arrayDescr[0] != '*' || strlen(_arrayDescr) > 1))
         strcat(_arrayDescr, "!");
     strcat(_arrayDescr, poNewSFDefn->GetName());
+
+    apoSubfields.push_back(std::move(poNewSFDefn));
 }
 
 /************************************************************************/
@@ -444,8 +440,8 @@ void DDFFieldDefn::Dump(FILE *fp) const
 
     fprintf(fp, "      _data_type_code = %s\n", pszValue);
 
-    for (int i = 0; i < nSubfieldCount; i++)
-        papoSubfields[i]->Dump(fp);
+    for (const auto &poSubfield : apoSubfields)
+        poSubfield->Dump(fp);
 }
 
 /************************************************************************/
@@ -497,10 +493,10 @@ void DDFFieldDefn::BuildSubfields()
     const int nSFCount = CSLCount(papszSubfieldNames);
     for (int iSF = 0; iSF < nSFCount; iSF++)
     {
-        DDFSubfieldDefn *poSFDefn = new DDFSubfieldDefn;
+        auto poSFDefn = std::make_unique<DDFSubfieldDefn>();
 
         poSFDefn->SetName(papszSubfieldNames[iSF]);
-        AddSubfield(poSFDefn, TRUE);
+        AddSubfield(std::move(poSFDefn), true);
     }
 
     CSLDestroy(papszSubfieldNames);
@@ -763,14 +759,14 @@ int DDFFieldDefn::ApplyFormats()
         // isn't encountered in any formats we care about so we just
         // blow.
 
-        if (iFormatItem >= nSubfieldCount)
+        if (iFormatItem >= GetSubfieldCount())
         {
             CPLError(CE_Warning, static_cast<CPLErrorNum>(CPLE_DiscardedFormat),
                      "Got more formats than subfields for field `%s'.", pszTag);
             break;
         }
 
-        if (!papoSubfields[iFormatItem]->SetFormat(pszPastPrefix))
+        if (!apoSubfields[iFormatItem]->SetFormat(pszPastPrefix))
         {
             CSLDestroy(papszFormatItems);
             return FALSE;
@@ -782,7 +778,7 @@ int DDFFieldDefn::ApplyFormats()
     /* -------------------------------------------------------------------- */
     CSLDestroy(papszFormatItems);
 
-    if (iFormatItem < nSubfieldCount)
+    if (iFormatItem < GetSubfieldCount())
     {
         CPLError(CE_Warning, static_cast<CPLErrorNum>(CPLE_DiscardedFormat),
                  "Got less formats than subfields for field `%s'.", pszTag);
@@ -794,16 +790,16 @@ int DDFFieldDefn::ApplyFormats()
     /*      too.  This is important for repeating fields.                   */
     /* -------------------------------------------------------------------- */
     nFixedWidth = 0;
-    for (int i = 0; i < nSubfieldCount; i++)
+    for (auto &poSubfield : apoSubfields)
     {
-        if (papoSubfields[i]->GetWidth() == 0)
+        if (poSubfield->GetWidth() == 0)
         {
             nFixedWidth = 0;
             break;
         }
         else
         {
-            if (nFixedWidth > INT_MAX - papoSubfields[i]->GetWidth())
+            if (nFixedWidth > INT_MAX - poSubfield->GetWidth())
             {
                 CPLError(CE_Warning,
                          static_cast<CPLErrorNum>(CPLE_DiscardedFormat),
@@ -811,7 +807,7 @@ int DDFFieldDefn::ApplyFormats()
                          _formatControls);
                 return FALSE;
             }
-            nFixedWidth += papoSubfields[i]->GetWidth();
+            nFixedWidth += poSubfield->GetWidth();
         }
     }
 
@@ -834,10 +830,10 @@ const DDFSubfieldDefn *
 DDFFieldDefn::FindSubfieldDefn(const char *pszMnemonic) const
 
 {
-    for (int i = 0; i < nSubfieldCount; i++)
+    for (const auto &poSubfield : apoSubfields)
     {
-        if (EQUAL(papoSubfields[i]->GetName(), pszMnemonic))
-            return papoSubfields[i];
+        if (EQUAL(poSubfield->GetName(), pszMnemonic))
+            return poSubfield.get();
     }
 
     return nullptr;
@@ -860,13 +856,13 @@ DDFFieldDefn::FindSubfieldDefn(const char *pszMnemonic) const
 const DDFSubfieldDefn *DDFFieldDefn::GetSubfield(int i) const
 
 {
-    if (i < 0 || i >= nSubfieldCount)
+    if (i < 0 || static_cast<size_t>(i) >= apoSubfields.size())
     {
         CPLAssert(false);
         return nullptr;
     }
 
-    return papoSubfields[i];
+    return apoSubfields[i].get();
 }
 
 /************************************************************************/
@@ -885,12 +881,11 @@ char *DDFFieldDefn::GetDefaultValue(int *pnSize)
     /* -------------------------------------------------------------------- */
     int nTotalSize = 0;
 
-    for (int iSubfield = 0; iSubfield < nSubfieldCount; iSubfield++)
+    for (auto &poSubfield : apoSubfields)
     {
         int nSubfieldSize = 0;
 
-        if (!papoSubfields[iSubfield]->GetDefaultValue(nullptr, 0,
-                                                       &nSubfieldSize))
+        if (!poSubfield->GetDefaultValue(nullptr, 0, &nSubfieldSize))
             return nullptr;
         nTotalSize += nSubfieldSize;
     }
@@ -907,12 +902,12 @@ char *DDFFieldDefn::GetDefaultValue(int *pnSize)
     /*      Loop again, collecting actual default values.                   */
     /* -------------------------------------------------------------------- */
     int nOffset = 0;
-    for (int iSubfield = 0; iSubfield < nSubfieldCount; iSubfield++)
+    for (auto &poSubfield : apoSubfields)
     {
         int nSubfieldSize;
 
-        if (!papoSubfields[iSubfield]->GetDefaultValue(
-                pachData + nOffset, nTotalSize - nOffset, &nSubfieldSize))
+        if (!poSubfield->GetDefaultValue(pachData + nOffset,
+                                         nTotalSize - nOffset, &nSubfieldSize))
         {
             CPLAssert(false);
             return nullptr;
