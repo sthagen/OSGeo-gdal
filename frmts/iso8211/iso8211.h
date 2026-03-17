@@ -18,6 +18,7 @@
 
 #include <array>
 #include <memory>
+#include <set>
 #include <vector>
 
 /**
@@ -197,9 +198,9 @@ class CPL_ODLL DDFModule
 
     DDFRecord *poRecord = nullptr;
 
-    int nCloneCount = 0;
-    int nMaxCloneCount = 0;
-    DDFRecord **papoClones = nullptr;
+    // Ownership of DDFRecord in this set is very particular
+    // See DDFRecord::Clone() doc
+    std::set<DDFRecord *> oSetClones{};
 };
 
 /************************************************************************/

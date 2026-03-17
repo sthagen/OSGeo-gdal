@@ -14,6 +14,7 @@
 #include "cpl_port.h"
 #include "iso8211.h"
 
+#include <algorithm>
 #include <array>
 #include <cstdio>
 #include <cstring>
@@ -78,18 +79,12 @@ void DDFModule::Close()
         poRecord = nullptr;
     }
 
-    /* -------------------------------------------------------------------- */
-    /*      Cleanup the clones.                                             */
-    /* -------------------------------------------------------------------- */
-    for (int i = 0; i < nCloneCount; i++)
+    for (auto *poClone : oSetClones)
     {
-        papoClones[i]->RemoveIsCloneFlag();
-        delete papoClones[i];
+        poClone->RemoveIsCloneFlag();
+        delete poClone;
     }
-    nCloneCount = 0;
-    nMaxCloneCount = 0;
-    CPLFree(papoClones);
-    papoClones = nullptr;
+    oSetClones.clear();
 
     apoFieldDefns.clear();
 }
@@ -611,20 +606,7 @@ DDFFieldDefn *DDFModule::GetField(int i)
 void DDFModule::AddCloneRecord(DDFRecord *poRecordIn)
 
 {
-    /* -------------------------------------------------------------------- */
-    /*      Do we need to grow the container array?                         */
-    /* -------------------------------------------------------------------- */
-    if (nCloneCount == nMaxCloneCount)
-    {
-        nMaxCloneCount = nCloneCount * 2 + 20;
-        papoClones = (DDFRecord **)CPLRealloc(papoClones,
-                                              nMaxCloneCount * sizeof(void *));
-    }
-
-    /* -------------------------------------------------------------------- */
-    /*      Add to the list.                                                */
-    /* -------------------------------------------------------------------- */
-    papoClones[nCloneCount++] = poRecordIn;
+    oSetClones.insert(poRecordIn);
 }
 
 /************************************************************************/
@@ -634,19 +616,9 @@ void DDFModule::AddCloneRecord(DDFRecord *poRecordIn)
 void DDFModule::RemoveCloneRecord(DDFRecord *poRecordIn)
 
 {
-    int i;
-
-    for (i = 0; i < nCloneCount; i++)
-    {
-        if (papoClones[i] == poRecordIn)
-        {
-            papoClones[i] = papoClones[nCloneCount - 1];
-            nCloneCount--;
-            return;
-        }
-    }
-
-    CPLAssert(false);
+    auto oIter = oSetClones.find(poRecordIn);
+    CPLAssert(oIter != oSetClones.end());
+    oSetClones.erase(oIter);
 }
 
 /************************************************************************/

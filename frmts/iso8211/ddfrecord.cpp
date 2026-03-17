@@ -957,9 +957,9 @@ const char *DDFRecord::GetStringSubfield(const char *pszField, int iFieldIndex,
 DDFRecord *DDFRecord::Clone()
 
 {
-    DDFRecord *poNR = new DDFRecord(poModule);
+    auto poNR = std::make_unique<DDFRecord>(poModule);
 
-    poNR->bReuseHeader = FALSE;
+    poNR->bReuseHeader = false;
     poNR->nFieldOffset = nFieldOffset;
 
     poNR->nDataSize = nDataSize;
@@ -979,10 +979,9 @@ DDFRecord *DDFRecord::Clone()
                                       paoFields[i].GetDataSize());
     }
 
-    poNR->bIsClone = TRUE;
-    poModule->AddCloneRecord(poNR);
-
-    return poNR;
+    poNR->bIsClone = true;
+    poModule->AddCloneRecord(poNR.get());
+    return poNR.release();
 }
 
 /************************************************************************/
@@ -1044,7 +1043,6 @@ DDFRecord *DDFRecord::CloneOn(DDFModule *poTargetModule)
     poModule->RemoveCloneRecord(poClone);
     poClone->poModule = poTargetModule;
     poTargetModule->AddCloneRecord(poClone);
-
     return poClone;
 }
 
