@@ -4033,7 +4033,13 @@ static OGRBoolean OGRGEOSBooleanPredicate(
  * This function is built on the GEOS >= 3.8 library, check it for the
  * definition of the geometry operation. If OGR is built without the GEOS >= 3.8
  * library, this function will return a clone of the input geometry if it is
- * valid, or NULL if it is invalid
+ * valid, or NULL if it is invalid.
+ *
+ * Certain geometries cannot be read using GEOS, for example if Polygon rings
+ * are not closed or do not contain enough vertices. If a geometry cannot be
+ * read by GEOS, NULL will be returned. Starting with GDAL 3.13, GDAL will
+ * attempt to modify these geometries such that they can be read and
+ * repaired by GEOS.
  *
  * @param papszOptions NULL terminated list of options, or NULL. The following
  * options are available:
