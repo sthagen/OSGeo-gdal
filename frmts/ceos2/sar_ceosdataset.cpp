@@ -2134,7 +2134,7 @@ static int ProcessData(VSILFILE *fp, int fileid, CeosSARVolume_t *sar,
                 {
                     CPLDebug(
                         "SAR_CEOS",
-                        "Corrupt CEOS File - got record seq# %d instead of "
+                        "Corrupted CEOS File - got record seq# %d instead of "
                         "the expected %d.",
                         record->Sequence, iThisRecord);
                 }
@@ -2142,7 +2142,7 @@ static int ProcessData(VSILFILE *fp, int fileid, CeosSARVolume_t *sar,
                 {
                     CPLError(
                         CE_Warning, CPLE_AppDefined,
-                        "Corrupt CEOS File - got record seq# %d instead of "
+                        "Corrupted CEOS File - got record seq# %d instead of "
                         "the expected %d.",
                         record->Sequence, iThisRecord);
                 }
