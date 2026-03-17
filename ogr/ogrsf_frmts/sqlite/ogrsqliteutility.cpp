@@ -1102,3 +1102,25 @@ bool SQLHasRemainingContent(const char *pszTail)
     }
     return false;
 }
+
+/************************************************************************/
+/*                       SQLGetSQLite3DataType()                        */
+/************************************************************************/
+
+const char *SQLGetSQLite3DataType(int nSQLite3DataType)
+{
+    switch (nSQLite3DataType)
+    {
+        case SQLITE_NULL:
+            return "NULL";
+        case SQLITE_TEXT:
+            return "TEXT";
+        case SQLITE_INTEGER:
+            return "INTEGER";
+        case SQLITE_FLOAT:
+            return "FLOAT";
+        case SQLITE_BLOB:
+            return "BLOB";
+    }
+    return "(unknown)";
+}

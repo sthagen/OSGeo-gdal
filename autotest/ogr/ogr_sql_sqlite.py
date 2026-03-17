@@ -2501,3 +2501,30 @@ def test_ogr_sql_sqlite_detect_multiple_statements(sql, error_expected):
     else:
         with ds.ExecuteSQL(sql, dialect="SQLite"):
             pass
+
+
+###############################################################################
+# Test https://github.com/OSGeo/gdal/issues/14113
+
+
+def test_ogr_sql_sqlite_null_geometry_in_first_row():
+
+    if ogrtest.has_spatialite is False:
+        pytest.skip("Spatialite not available")
+
+    if gdaltest.is_travis_branch("ubuntu_2004"):
+        pytest.skip("fails on that platform")
+
+    with ogr.Open("data/poly.shp") as ds:
+        with ds.ExecuteSQL(
+            "SELECT geom FROM (SELECT ST_Buffer(geometry, -100) AS geom FROM poly) ORDER BY geom IS NULL DESC",
+            dialect="SQLite",
+        ) as sql_lyr:
+            assert sql_lyr.GetGeometryColumn() == "geom"
+
+            for i in range(2):
+                f = sql_lyr.GetNextFeature()
+                assert f.GetGeometryRef() is None
+
+            f = sql_lyr.GetNextFeature()
+            assert f.GetGeometryRef() is not None

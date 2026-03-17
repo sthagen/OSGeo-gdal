@@ -3428,7 +3428,7 @@ def test_ogr2ogr_lib_wrapdateline_useless():
 @pytest.mark.require_driver("GPKG")
 def test_ogr2ogr_lib_create_field_failure(tmp_vsimem):
 
-    # Fails because we don't recognize NULL as a geometry content
+    # Fails because we don't recognize 1 as a geometry content
     with pytest.raises(
         Exception,
         match="Cannot create field geom. It has the same name as the geometry field",
@@ -3436,7 +3436,7 @@ def test_ogr2ogr_lib_create_field_failure(tmp_vsimem):
         gdal.VectorTranslate(
             tmp_vsimem / "out.gpkg",
             "../ogr/data/poly.shp",
-            options='-dialect SQLITE -nlt POINT -sql "SELECT NULL AS geom FROM poly"',
+            options='-dialect SQLITE -nlt POINT -sql "SELECT 1 AS geom FROM poly"',
         )
 
     with gdaltest.error_raised(
@@ -3446,7 +3446,7 @@ def test_ogr2ogr_lib_create_field_failure(tmp_vsimem):
         gdal.VectorTranslate(
             tmp_vsimem / "out.gpkg",
             "../ogr/data/poly.shp",
-            options='-dialect SQLITE -nlt POINT -sql "SELECT NULL AS geom FROM poly" -skip',
+            options='-dialect SQLITE -nlt POINT -sql "SELECT 1 AS geom FROM poly" -skip',
         )
 
     with gdal.GetDriverByName("GPKG").CreateVector(tmp_vsimem / "out.gpkg") as ds:
@@ -3463,7 +3463,7 @@ def test_ogr2ogr_lib_create_field_failure(tmp_vsimem):
                 accessMode="append",
                 addFields=True,
                 SQLDialect="SQLITE",
-                SQLStatement="SELECT NULL AS geom FROM poly",
+                SQLStatement="SELECT 1 AS geom FROM poly",
                 layerName="test",
             )
 
@@ -3477,7 +3477,7 @@ def test_ogr2ogr_lib_create_field_failure(tmp_vsimem):
                 accessMode="append",
                 addFields=True,
                 SQLDialect="SQLITE",
-                SQLStatement="SELECT NULL AS geom FROM poly",
+                SQLStatement="SELECT 1 AS geom FROM poly",
                 layerName="test",
                 skipFailures=True,
             )

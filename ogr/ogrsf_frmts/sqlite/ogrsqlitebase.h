@@ -34,11 +34,11 @@
 
 enum OGRSQLiteGeomFormat
 {
-    OSGF_None = 0,
-    OSGF_WKT = 1,
-    OSGF_WKB = 2,
-    OSGF_FGF = 3,
-    OSGF_SpatiaLite = 4
+    OSGF_WKT,
+    OSGF_WKB,
+    OSGF_FGF,
+    OSGF_SpatiaLite,
+    OSGF_Unknown,
 };
 
 /************************************************************************/
@@ -58,7 +58,7 @@ class OGRSQLiteGeomFieldDefn final : public OGRGeomFieldDefn
     int m_nSRSId = -1;
     int m_iCol; /* ordinal of geometry field in SQL statement */
     bool m_bTriedAsSpatiaLite = false;
-    OGRSQLiteGeomFormat m_eGeomFormat = OSGF_None;
+    OGRSQLiteGeomFormat m_eGeomFormat = OSGF_Unknown;
     OGREnvelope m_oCachedExtent{};
     bool m_bCachedExtentIsValid = false;
     bool m_bHasSpatialIndex = false;
