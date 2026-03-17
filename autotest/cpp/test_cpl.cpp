@@ -5766,4 +5766,106 @@ TEST_F(test_cpl, cpl_enumerate)
     }
 }
 
+TEST_F(test_cpl, CPL_SWAP)
+{
+    {
+        uint8_t x = 1;
+        EXPECT_EQ(CPL_SWAP(x), x);
+        EXPECT_EQ(CPL_AS_LSB(x), x);
+    }
+    {
+        int8_t x = 1;
+        EXPECT_EQ(CPL_SWAP(x), x);
+        EXPECT_EQ(CPL_AS_LSB(x), x);
+    }
+    {
+        uint16_t x = 0x0123;
+        auto y = CPL_SWAP(x);
+        EXPECT_NE(y, x);
+        EXPECT_EQ(CPL_SWAP(y), x);
+#if CPL_IS_LSB
+        EXPECT_EQ(CPL_AS_LSB(x), x);
+#else
+        EXPECT_EQ(CPL_AS_LSB(x), CPL_SWAP(x));
+#endif
+    }
+    {
+        int16_t x = 0x0123;
+        auto y = CPL_SWAP(x);
+        EXPECT_NE(y, x);
+        EXPECT_EQ(CPL_SWAP(y), x);
+#if CPL_IS_LSB
+        EXPECT_EQ(CPL_AS_LSB(x), x);
+#else
+        EXPECT_EQ(CPL_AS_LSB(x), CPL_SWAP(x));
+#endif
+    }
+    {
+        uint32_t x = 0x01234567;
+        auto y = CPL_SWAP(x);
+        EXPECT_NE(y, x);
+        EXPECT_EQ(CPL_SWAP(y), x);
+#if CPL_IS_LSB
+        EXPECT_EQ(CPL_AS_LSB(x), x);
+#else
+        EXPECT_EQ(CPL_AS_LSB(x), CPL_SWAP(x));
+#endif
+    }
+    {
+        int32_t x = 0x01234567;
+        auto y = CPL_SWAP(x);
+        EXPECT_NE(y, x);
+        EXPECT_EQ(CPL_SWAP(y), x);
+#if CPL_IS_LSB
+        EXPECT_EQ(CPL_AS_LSB(x), x);
+#else
+        EXPECT_EQ(CPL_AS_LSB(x), CPL_SWAP(x));
+#endif
+    }
+    {
+        uint64_t x = (static_cast<uint64_t>(0x01234567) << 32) | 0x89ABCDEF;
+        auto y = CPL_SWAP(x);
+        EXPECT_NE(y, x);
+        EXPECT_EQ(CPL_SWAP(y), x);
+#if CPL_IS_LSB
+        EXPECT_EQ(CPL_AS_LSB(x), x);
+#else
+        EXPECT_EQ(CPL_AS_LSB(x), CPL_SWAP(x));
+#endif
+    }
+    {
+        int64_t x = (static_cast<int64_t>(0x01234567) << 32) | 0x89ABCDEF;
+        auto y = CPL_SWAP(x);
+        EXPECT_NE(y, x);
+        EXPECT_EQ(CPL_SWAP(y), x);
+#if CPL_IS_LSB
+        EXPECT_EQ(CPL_AS_LSB(x), x);
+#else
+        EXPECT_EQ(CPL_AS_LSB(x), CPL_SWAP(x));
+#endif
+    }
+    {
+        float x = 1.5;
+        auto y = CPL_SWAP(x);
+        EXPECT_NE(y, x);
+        EXPECT_EQ(CPL_SWAP(y), x);
+#if CPL_IS_LSB
+        EXPECT_EQ(CPL_AS_LSB(x), x);
+#else
+        EXPECT_EQ(CPL_AS_LSB(x), CPL_SWAP(x));
+#endif
+    }
+    {
+        double x = 1.5;
+        auto y = CPL_SWAP(x);
+        EXPECT_NE(y, x);
+        EXPECT_EQ(CPL_SWAP(y), x);
+#if CPL_IS_LSB
+        EXPECT_EQ(CPL_AS_LSB(x), x);
+#else
+        EXPECT_EQ(CPL_AS_LSB(x), CPL_SWAP(x));
+#endif
+    }
+}
+
 }  // namespace

@@ -2376,6 +2376,7 @@ pathname
 PAux
 pauxdataset
 pbCannotBeExactlyRepresented
+pbError
 pbf
 pbHasNoData
 pbHasNoDataValue
