@@ -8775,28 +8775,6 @@ class GDALDatasetFromArray final : public GDALPamDataset
         : m_poArray(array), m_iXDim(iXDim), m_iYDim(iYDim),
           m_aosOptions(aosOptions)
     {
-        // Initialize an overview filename from the filename of the array
-        // and its name.
-        const std::string &osFilename = m_poArray->GetFilename();
-        if (!osFilename.empty())
-        {
-            m_osOvrFilename = osFilename;
-            m_osOvrFilename += '.';
-            for (char ch : m_poArray->GetName())
-            {
-                if ((ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z') ||
-                    (ch >= 'a' && ch <= 'z') || ch == '_')
-                {
-                    m_osOvrFilename += ch;
-                }
-                else
-                {
-                    m_osOvrFilename += '_';
-                }
-            }
-            m_osOvrFilename += ".ovr";
-            oOvManager.Initialize(this);
-        }
     }
 
     static std::unique_ptr<GDALDatasetFromArray>
@@ -8860,13 +8838,53 @@ class GDALDatasetFromArray final : public GDALPamDataset
     const char *GetMetadataItem(const char *pszName,
                                 const char *pszDomain) override
     {
-        if (!m_osOvrFilename.empty() && pszName &&
-            EQUAL(pszName, "OVERVIEW_FILE") && pszDomain &&
-            EQUAL(pszDomain, "OVERVIEWS"))
+        const std::string &osFilename = m_poArray->GetFilename();
+        if (!osFilename.empty() && pszName && EQUAL(pszName, "OVERVIEW_FILE") &&
+            pszDomain && EQUAL(pszDomain, "OVERVIEWS"))
         {
-            return m_osOvrFilename.c_str();
+            if (m_osOvrFilename.empty())
+            {
+                // Legacy strategy (pre GDAL 3.13)
+                std::string osOvrFilename = osFilename;
+                osOvrFilename += '.';
+                for (char ch : m_poArray->GetName())
+                {
+                    if ((ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z') ||
+                        (ch >= 'a' && ch <= 'z') || ch == '_')
+                    {
+                        osOvrFilename += ch;
+                    }
+                    else
+                    {
+                        osOvrFilename += '_';
+                    }
+                }
+                osOvrFilename += ".ovr";
+                VSIStatBufL sStatBuf;
+                if (VSIStatL(osOvrFilename.c_str(), &sStatBuf) == 0)
+                {
+                    m_osOvrFilename = std::move(osOvrFilename);
+                }
+                else
+                {
+                    auto poPAM = GDALPamMultiDim::GetPAM(m_poArray);
+                    if (!poPAM)
+                        poPAM = std::make_shared<GDALPamMultiDim>(osFilename);
+                    m_osOvrFilename = poPAM->GetOverviewFilename(
+                        m_poArray->GetFullName(), m_poArray->GetContext());
+                }
+
+                if (!m_osOvrFilename.empty())
+                    oOvManager.Initialize(this, ":::VIRTUAL:::");
+            }
+            return !m_osOvrFilename.empty() ? m_osOvrFilename.c_str() : nullptr;
         }
         return m_oMDD.GetMetadataItem(pszName, pszDomain);
+    }
+
+    bool HasRegisteredPAMOverviewFile()
+    {
+        return GetMetadataItem("OVERVIEW_FILE", "OVERVIEWS") != nullptr;
     }
 
     CPLErr IBuildOverviews(const char *pszResampling, int nOverviews,
@@ -8906,6 +8924,27 @@ class GDALDatasetFromArray final : public GDALPamDataset
         // Driver doesn't implement BuildOverviews - fall back to
         // default path (e.g. external .ovr file).
         CPLErrorReset();
+
+        if (!HasRegisteredPAMOverviewFile())
+        {
+            const std::string &osFilename = m_poArray->GetFilename();
+            if (osFilename.empty())
+            {
+                CPLError(CE_Failure, CPLE_AppDefined,
+                         "No filename associated with array %s",
+                         m_poArray->GetFullName().c_str());
+                return CE_Failure;
+            }
+            auto poPAM = GDALPamMultiDim::GetPAM(m_poArray);
+            if (!poPAM)
+                poPAM = std::make_shared<GDALPamMultiDim>(osFilename);
+            m_osOvrFilename = poPAM->GenerateOverviewFilename(
+                m_poArray->GetFullName(), m_poArray->GetContext());
+            if (m_osOvrFilename.empty())
+                return CE_Failure;
+            oOvManager.Initialize(this, ":::VIRTUAL:::");
+        }
+
         return GDALDataset::IBuildOverviews(
             pszResampling, nOverviews, panOverviewList, nListBands, panBandList,
             pfnProgress, pProgressData, papszOptions);
@@ -9499,10 +9538,13 @@ GDALColorInterp GDALRasterBandFromArray::GetColorInterpretation()
 
 int GDALRasterBandFromArray::GetOverviewCount()
 {
-    const int nPAMCount = GDALPamRasterBand::GetOverviewCount();
-    if (nPAMCount)
-        return nPAMCount;
     auto l_poDS(cpl::down_cast<GDALDatasetFromArray *>(poDS));
+    if (l_poDS->HasRegisteredPAMOverviewFile())
+    {
+        const int nPAMCount = GDALPamRasterBand::GetOverviewCount();
+        if (nPAMCount)
+            return nPAMCount;
+    }
     l_poDS->DiscoverOverviews();
     return static_cast<int>(l_poDS->m_apoOverviews.size());
 }
@@ -9513,10 +9555,13 @@ int GDALRasterBandFromArray::GetOverviewCount()
 
 GDALRasterBand *GDALRasterBandFromArray::GetOverview(int idx)
 {
-    const int nPAMCount = GDALPamRasterBand::GetOverviewCount();
-    if (nPAMCount)
-        return GDALPamRasterBand::GetOverview(idx);
     auto l_poDS(cpl::down_cast<GDALDatasetFromArray *>(poDS));
+    if (l_poDS->HasRegisteredPAMOverviewFile())
+    {
+        const int nPAMCount = GDALPamRasterBand::GetOverviewCount();
+        if (nPAMCount)
+            return GDALPamRasterBand::GetOverview(idx);
+    }
     l_poDS->DiscoverOverviews();
     if (idx < 0 || static_cast<size_t>(idx) >= l_poDS->m_apoOverviews.size())
     {
@@ -14902,6 +14947,7 @@ struct GDALPamMultiDim::Private
         std::shared_ptr<OGRSpatialReference> poSRS{};
         // cppcheck-suppress unusedStructMember
         Statistics stats{};
+        std::string osOvrFilename{};
     };
 
     typedef std::pair<std::string, std::string> NameContext;
@@ -15029,6 +15075,13 @@ void GDALPamMultiDim::Load()
                     CPLGetXMLValue(psStatistics, "ValidSampleCount", "0")));
                 d->m_oMapArray[oKey].stats = sStats;
             }
+
+            const char *pszOverviewFile =
+                CPLGetXMLValue(psIter, "OverviewFile", nullptr);
+            if (pszOverviewFile)
+            {
+                d->m_oMapArray[oKey].osOvrFilename = pszOverviewFile;
+            }
         }
         else
         {
@@ -15104,25 +15157,29 @@ void GDALPamMultiDim::Save()
 
         if (kv.second.stats.bHasStats)
         {
-            CPLXMLNode *psMDArray =
+            CPLXMLNode *psStats =
                 CPLCreateXMLNode(psArrayNode, CXT_Element, "Statistics");
-            CPLCreateXMLElementAndValue(psMDArray, "ApproxStats",
+            CPLCreateXMLElementAndValue(psStats, "ApproxStats",
                                         kv.second.stats.bApproxStats ? "1"
                                                                      : "0");
             CPLCreateXMLElementAndValue(
-                psMDArray, "Minimum",
-                CPLSPrintf("%.17g", kv.second.stats.dfMin));
+                psStats, "Minimum", CPLSPrintf("%.17g", kv.second.stats.dfMin));
             CPLCreateXMLElementAndValue(
-                psMDArray, "Maximum",
-                CPLSPrintf("%.17g", kv.second.stats.dfMax));
+                psStats, "Maximum", CPLSPrintf("%.17g", kv.second.stats.dfMax));
             CPLCreateXMLElementAndValue(
-                psMDArray, "Mean", CPLSPrintf("%.17g", kv.second.stats.dfMean));
+                psStats, "Mean", CPLSPrintf("%.17g", kv.second.stats.dfMean));
             CPLCreateXMLElementAndValue(
-                psMDArray, "StdDev",
+                psStats, "StdDev",
                 CPLSPrintf("%.17g", kv.second.stats.dfStdDev));
             CPLCreateXMLElementAndValue(
-                psMDArray, "ValidSampleCount",
+                psStats, "ValidSampleCount",
                 CPLSPrintf(CPL_FRMT_GUIB, kv.second.stats.nValidCount));
+        }
+
+        if (!kv.second.osOvrFilename.empty())
+        {
+            CPLCreateXMLElementAndValue(psArrayNode, "OverviewFile",
+                                        kv.second.osOvrFilename.c_str());
         }
     }
 
@@ -15146,6 +15203,61 @@ void GDALPamMultiDim::Save()
     {
         oErrorAccumulator.ReplayErrors();
     }
+}
+
+/************************************************************************/
+/*                GDALPamMultiDim::GetOverviewFilename()                */
+/************************************************************************/
+
+/** Return the file name of the overview filene name for the specified
+ * array
+ */
+std::string
+GDALPamMultiDim::GetOverviewFilename(const std::string &osArrayFullName,
+                                     const std::string &osContext)
+{
+    Load();
+    const auto oKey = std::make_pair(osArrayFullName, osContext);
+    auto oIter = d->m_oMapArray.find(oKey);
+    if (oIter != d->m_oMapArray.end())
+        return oIter->second.osOvrFilename;
+
+    return std::string();
+}
+
+/************************************************************************/
+/*             GDALPamMultiDim::GenerateOverviewFilename()              */
+/************************************************************************/
+
+/** Ggenerate an overview filene name for the specified
+ * array
+ */
+std::string
+GDALPamMultiDim::GenerateOverviewFilename(const std::string &osArrayFullName,
+                                          const std::string &osContext)
+{
+    Load();
+
+    constexpr int ARBIRARY_ITERATION_COUNT = 1000;
+    for (int i = 0; i < ARBIRARY_ITERATION_COUNT; ++i)
+    {
+        std::string osOvrFilename(d->m_osFilename);
+        osOvrFilename += '.';
+        osOvrFilename += std::to_string(i);
+        osOvrFilename += ".ovr";
+        VSIStatBufL sStatBuf;
+        if (VSIStatL(osOvrFilename.c_str(), &sStatBuf) != 0)
+        {
+            d->m_bDirty = true;
+            const auto oKey = std::make_pair(osArrayFullName, osContext);
+            d->m_oMapArray[oKey].osOvrFilename = osOvrFilename;
+            return osOvrFilename;
+        }
+    }
+    CPLError(CE_Failure, CPLE_AppDefined,
+             "Cannot establish overview filename for array %s",
+             osArrayFullName.c_str());
+    return std::string();
 }
 
 /************************************************************************/
