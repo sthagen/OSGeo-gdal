@@ -483,6 +483,72 @@ class CPL_ODLL DDFSubfieldDefn
 };
 
 /************************************************************************/
+/*                               DDFField                               */
+/*                                                                      */
+/*      This object represents one field in a DDFRecord.                */
+/************************************************************************/
+
+/**
+ * This object represents one field in a DDFRecord.  This
+ * models an instance of the fields data, rather than its data definition,
+ * which is handled by the DDFFieldDefn class.  Note that a DDFField
+ * doesn't have DDFSubfield children as you would expect.  To extract
+ * subfield values use GetSubfieldData() to find the right data pointer and
+ * then use ExtractIntData(), ExtractFloatData() or ExtractStringData().
+ */
+
+class CPL_ODLL DDFField
+{
+  public:
+    DDFField() = default;
+
+    void Initialize(DDFFieldDefn *, const char *pszData, int nSize);
+
+    void Dump(FILE *fp) const;
+
+    const char *GetSubfieldData(const DDFSubfieldDefn *, int * = nullptr,
+                                int = 0) const;
+
+    const char *GetInstanceData(int nInstance, int *pnSize);
+
+    /**
+     * Return the pointer to the entire data block for this record. This
+     * is an internal copy, and should not be freed by the application.
+     */
+    const char *GetData() const
+    {
+        return pachData;
+    }
+
+    /** Return the number of bytes in the data block returned by GetData(). */
+    int GetDataSize() const
+    {
+        return nDataSize;
+    }
+
+    int GetRepeatCount() const;
+
+    /** Fetch the corresponding DDFFieldDefn. */
+    DDFFieldDefn *GetFieldDefn()
+    {
+        return poDefn;
+    }
+
+    /** Fetch the corresponding DDFFieldDefn. */
+    const DDFFieldDefn *GetFieldDefn() const
+    {
+        return poDefn;
+    }
+
+  private:
+    DDFFieldDefn *poDefn = nullptr;
+
+    int nDataSize = 0;
+
+    const char *pachData = nullptr;
+};
+
+/************************************************************************/
 /*                              DDFRecord                               */
 /*                                                                      */
 /*      Class that contains one DR record from a file.  We read into    */
@@ -509,7 +575,7 @@ class CPL_ODLL DDFRecord
     /** Get the number of DDFFields on this record. */
     int GetFieldCount() const
     {
-        return nFieldCount;
+        return static_cast<int>(aoFields.size());
     }
 
     const DDFField *FindField(const char *, int = 0) const;
@@ -645,76 +711,9 @@ class CPL_ODLL DDFRecord
     int nDataSize = 0;  // Whole record except leader with header
     char *pachData = nullptr;
 
-    int nFieldCount = 0;
-    DDFField *paoFields = nullptr;
+    std::vector<DDFField> aoFields{};
 
     bool bIsClone = false;
-};
-
-/************************************************************************/
-/*                               DDFField                               */
-/*                                                                      */
-/*      This object represents one field in a DDFRecord.                */
-/************************************************************************/
-
-/**
- * This object represents one field in a DDFRecord.  This
- * models an instance of the fields data, rather than its data definition,
- * which is handled by the DDFFieldDefn class.  Note that a DDFField
- * doesn't have DDFSubfield children as you would expect.  To extract
- * subfield values use GetSubfieldData() to find the right data pointer and
- * then use ExtractIntData(), ExtractFloatData() or ExtractStringData().
- */
-
-class CPL_ODLL DDFField
-{
-  public:
-    DDFField() = default;
-
-    void Initialize(DDFFieldDefn *, const char *pszData, int nSize);
-
-    void Dump(FILE *fp) const;
-
-    const char *GetSubfieldData(const DDFSubfieldDefn *, int * = nullptr,
-                                int = 0) const;
-
-    const char *GetInstanceData(int nInstance, int *pnSize);
-
-    /**
-     * Return the pointer to the entire data block for this record. This
-     * is an internal copy, and should not be freed by the application.
-     */
-    const char *GetData() const
-    {
-        return pachData;
-    }
-
-    /** Return the number of bytes in the data block returned by GetData(). */
-    int GetDataSize() const
-    {
-        return nDataSize;
-    }
-
-    int GetRepeatCount() const;
-
-    /** Fetch the corresponding DDFFieldDefn. */
-    DDFFieldDefn *GetFieldDefn()
-    {
-        return poDefn;
-    }
-
-    /** Fetch the corresponding DDFFieldDefn. */
-    const DDFFieldDefn *GetFieldDefn() const
-    {
-        return poDefn;
-    }
-
-  private:
-    DDFFieldDefn *poDefn = nullptr;
-
-    int nDataSize = 0;
-
-    const char *pachData = nullptr;
 };
 
 #endif /* ndef ISO8211_H_INCLUDED */

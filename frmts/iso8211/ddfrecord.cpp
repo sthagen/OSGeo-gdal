@@ -69,9 +69,9 @@ void DDFRecord::Dump(FILE *fp) const
     fprintf(fp, "    _sizeFieldLength=%d, _sizeFieldPos=%d, _sizeFieldTag=%d\n",
             _sizeFieldLength, _sizeFieldPos, _sizeFieldTag);
 
-    for (int i = 0; i < nFieldCount; i++)
+    for (const auto &oField : aoFields)
     {
-        paoFields[i].Dump(fp);
+        oField.Dump(fp);
     }
 }
 
@@ -197,11 +197,7 @@ int DDFRecord::Write()
 void DDFRecord::Clear()
 
 {
-    if (paoFields != nullptr)
-        delete[] paoFields;
-
-    paoFields = nullptr;
-    nFieldCount = 0;
+    aoFields.clear();
 
     if (pachData != nullptr)
         CPLFree(pachData);
@@ -381,7 +377,7 @@ int DDFRecord::ReadHeader()
             return FALSE;
         }
 
-        nFieldCount = 0;
+        int nFieldCount = 0;
         for (i = 0; i + nFieldEntryWidth <= nDataSize; i += nFieldEntryWidth)
         {
             if (pachData[i] == DDF_FIELD_TERMINATOR)
@@ -395,7 +391,7 @@ int DDFRecord::ReadHeader()
         /*      Allocate, and read field definitions. */
         /* --------------------------------------------------------------------
          */
-        paoFields = new DDFField[nFieldCount];
+        aoFields.resize(nFieldCount);
 
         for (i = 0; i < nFieldCount; i++)
         {
@@ -448,10 +444,10 @@ int DDFRecord::ReadHeader()
             /*      Assign info the DDFField. */
             /* --------------------------------------------------------------------
              */
-            paoFields[i].Initialize(poFieldDefn,
-                                    pachData + _fieldAreaStart + nFieldPos -
-                                        nLeaderSize,
-                                    nFieldLength);
+            aoFields[i].Initialize(poFieldDefn,
+                                   pachData + _fieldAreaStart + nFieldPos -
+                                       nLeaderSize,
+                                   nFieldLength);
         }
 
         return TRUE;
@@ -480,7 +476,7 @@ int DDFRecord::ReadHeader()
         /*   Loop over the directory entries, making a pass counting them.   */
         /* ----------------------------------------------------------------- */
         int nFieldEntryWidth = _sizeFieldLength + _sizeFieldPos + _sizeFieldTag;
-        nFieldCount = 0;
+        int nFieldCount = 0;
         int i = 0;
 
         if (nFieldEntryWidth == 0)
@@ -610,7 +606,7 @@ int DDFRecord::ReadHeader()
         /* ----------------------------------------------------------------- */
         /*     Allocate, and read field definitions.                         */
         /* ----------------------------------------------------------------- */
-        paoFields = new DDFField[nFieldCount];
+        aoFields.resize(nFieldCount);
 
         for (i = 0; i < nFieldCount; i++)
         {
@@ -659,10 +655,10 @@ int DDFRecord::ReadHeader()
             /* Assign info the DDFField.                                     */
             /* ------------------------------------------------------------- */
 
-            paoFields[i].Initialize(poFieldDefn,
-                                    pachData + _fieldAreaStart + nFieldPos -
-                                        nLeaderSize,
-                                    nFieldLength);
+            aoFields[i].Initialize(poFieldDefn,
+                                   pachData + _fieldAreaStart + nFieldPos -
+                                       nLeaderSize,
+                                   nFieldLength);
         }
 
         return TRUE;
@@ -689,13 +685,13 @@ int DDFRecord::ReadHeader()
 const DDFField *DDFRecord::FindField(const char *pszName, int iFieldIndex) const
 
 {
-    for (int i = 0; i < nFieldCount; i++)
+    for (const auto &oField : aoFields)
     {
-        const DDFFieldDefn *poFieldDefn = paoFields[i].GetFieldDefn();
+        const DDFFieldDefn *poFieldDefn = oField.GetFieldDefn();
         if (poFieldDefn && EQUAL(poFieldDefn->GetName(), pszName))
         {
             if (iFieldIndex == 0)
-                return paoFields + i;
+                return &oField;
             else
                 iFieldIndex--;
         }
@@ -719,10 +715,10 @@ const DDFField *DDFRecord::FindField(const char *pszName, int iFieldIndex) const
 const DDFField *DDFRecord::GetField(int i) const
 
 {
-    if (i < 0 || i >= nFieldCount)
+    if (i < 0 || static_cast<size_t>(i) >= aoFields.size())
         return nullptr;
     else
-        return paoFields + i;
+        return &(aoFields[i]);
 }
 
 /************************************************************************/
@@ -967,16 +963,15 @@ DDFRecord *DDFRecord::Clone()
     memcpy(poNR->pachData, pachData, nDataSize);
     poNR->pachData[nDataSize] = '\0';
 
-    poNR->nFieldCount = nFieldCount;
-    poNR->paoFields = new DDFField[nFieldCount];
-    for (int i = 0; i < nFieldCount; i++)
+    poNR->aoFields.resize(aoFields.size());
+    for (size_t i = 0; i < aoFields.size(); i++)
     {
         int nOffset;
 
-        nOffset = static_cast<int>(paoFields[i].GetData() - pachData);
-        poNR->paoFields[i].Initialize(paoFields[i].GetFieldDefn(),
-                                      poNR->pachData + nOffset,
-                                      paoFields[i].GetDataSize());
+        nOffset = static_cast<int>(aoFields[i].GetData() - pachData);
+        poNR->aoFields[i].Initialize(aoFields[i].GetFieldDefn(),
+                                     poNR->pachData + nOffset,
+                                     aoFields[i].GetDataSize());
     }
 
     poNR->bIsClone = true;
@@ -1015,9 +1010,9 @@ DDFRecord *DDFRecord::CloneOn(DDFModule *poTargetModule)
     /*      Verify that all fields have a corresponding field definition    */
     /*      on the target module.                                           */
     /* -------------------------------------------------------------------- */
-    for (int i = 0; i < nFieldCount; i++)
+    for (auto &oField : aoFields)
     {
-        DDFFieldDefn *poDefn = paoFields[i].GetFieldDefn();
+        DDFFieldDefn *poDefn = oField.GetFieldDefn();
 
         if (poTargetModule->FindFieldDefn(poDefn->GetName()) == nullptr)
             return nullptr;
@@ -1031,13 +1026,14 @@ DDFRecord *DDFRecord::CloneOn(DDFModule *poTargetModule)
     /* -------------------------------------------------------------------- */
     /*      Update all internal information to reference other module.      */
     /* -------------------------------------------------------------------- */
-    for (int i = 0; i < nFieldCount; i++)
+    for (int i = 0; i < GetFieldCount(); i++)
     {
-        DDFField *poField = poClone->paoFields + i;
-        DDFFieldDefn *poDefn =
-            poTargetModule->FindFieldDefn(poField->GetFieldDefn()->GetName());
+        DDFField *poCloneField = &(poClone->aoFields[i]);
+        DDFFieldDefn *poDefn = poTargetModule->FindFieldDefn(
+            poCloneField->GetFieldDefn()->GetName());
 
-        poField->Initialize(poDefn, poField->GetData(), poField->GetDataSize());
+        poCloneField->Initialize(poDefn, poCloneField->GetData(),
+                                 poCloneField->GetDataSize());
     }
 
     poModule->RemoveCloneRecord(poClone);
@@ -1071,18 +1067,18 @@ DDFRecord *DDFRecord::CloneOn(DDFModule *poTargetModule)
 int DDFRecord::DeleteField(DDFField *poTarget)
 
 {
-    int iTarget, i;
+    int iTarget;
 
     /* -------------------------------------------------------------------- */
     /*      Find which field we are to delete.                              */
     /* -------------------------------------------------------------------- */
-    for (iTarget = 0; iTarget < nFieldCount; iTarget++)
+    for (iTarget = 0; iTarget < GetFieldCount(); iTarget++)
     {
-        if (paoFields + iTarget == poTarget)
+        if (aoFields.data() + iTarget == poTarget)
             break;
     }
 
-    if (iTarget == nFieldCount)
+    if (iTarget == GetFieldCount())
         return FALSE;
 
     /* -------------------------------------------------------------------- */
@@ -1096,12 +1092,7 @@ int DDFRecord::DeleteField(DDFField *poTarget)
     /*      remove the target field, moving down all the other fields       */
     /*      one step in the field list.                                     */
     /* -------------------------------------------------------------------- */
-    for (i = iTarget; i < nFieldCount - 1; i++)
-    {
-        paoFields[i] = paoFields[i + 1];
-    }
-
-    nFieldCount--;
+    aoFields.erase(aoFields.begin() + iTarget);
 
     return TRUE;
 }
@@ -1134,17 +1125,14 @@ int DDFRecord::ResizeField(DDFField *poField, int nNewDataSize)
     /* -------------------------------------------------------------------- */
     /*      Find which field we are to resize.                              */
     /* -------------------------------------------------------------------- */
-    for (iTarget = 0; iTarget < nFieldCount; iTarget++)
+    for (iTarget = 0; iTarget < GetFieldCount(); iTarget++)
     {
-        if (paoFields + iTarget == poField)
+        if (aoFields.data() + iTarget == poField)
             break;
     }
 
-    if (iTarget == nFieldCount)
-    {
-        CPLAssert(false);
+    if (iTarget == GetFieldCount())
         return FALSE;
-    }
 
     /* -------------------------------------------------------------------- */
     /*      Reallocate the data buffer accordingly.                         */
@@ -1171,13 +1159,13 @@ int DDFRecord::ResizeField(DDFField *poField, int nNewDataSize)
     /* -------------------------------------------------------------------- */
     /*      Update fields to point into newly allocated buffer.             */
     /* -------------------------------------------------------------------- */
-    for (i = 0; i < nFieldCount; i++)
+    for (auto &oField : aoFields)
     {
         int nOffset;
 
-        nOffset = static_cast<int>(paoFields[i].GetData() - pachOldData);
-        paoFields[i].Initialize(paoFields[i].GetFieldDefn(), pachData + nOffset,
-                                paoFields[i].GetDataSize());
+        nOffset = static_cast<int>(oField.GetData() - pachOldData);
+        oField.Initialize(oField.GetFieldDefn(), pachData + nOffset,
+                          oField.GetDataSize());
     }
 
     /* -------------------------------------------------------------------- */
@@ -1200,24 +1188,24 @@ int DDFRecord::ResizeField(DDFField *poField, int nNewDataSize)
     /* -------------------------------------------------------------------- */
     if (nBytesToAdd < 0)
     {
-        for (i = iTarget + 1; i < nFieldCount; i++)
+        for (i = iTarget + 1; i < GetFieldCount(); i++)
         {
-            char *pszOldDataLocation = (char *)paoFields[i].GetData();
+            char *pszOldDataLocation = (char *)aoFields[i].GetData();
 
-            paoFields[i].Initialize(paoFields[i].GetFieldDefn(),
-                                    pszOldDataLocation + nBytesToAdd,
-                                    paoFields[i].GetDataSize());
+            aoFields[i].Initialize(aoFields[i].GetFieldDefn(),
+                                   pszOldDataLocation + nBytesToAdd,
+                                   aoFields[i].GetDataSize());
         }
     }
     else
     {
-        for (i = nFieldCount - 1; i > iTarget; i--)
+        for (i = GetFieldCount() - 1; i > iTarget; i--)
         {
-            char *pszOldDataLocation = (char *)paoFields[i].GetData();
+            char *pszOldDataLocation = (char *)aoFields[i].GetData();
 
-            paoFields[i].Initialize(paoFields[i].GetFieldDefn(),
-                                    pszOldDataLocation + nBytesToAdd,
-                                    paoFields[i].GetDataSize());
+            aoFields[i].Initialize(aoFields[i].GetFieldDefn(),
+                                   pszOldDataLocation + nBytesToAdd,
+                                   aoFields[i].GetDataSize());
         }
     }
 
@@ -1252,37 +1240,30 @@ DDFField *DDFRecord::AddField(DDFFieldDefn *poDefn)
     /*      Reallocate the fields array larger by one, and initialize       */
     /*      the new field.                                                  */
     /* -------------------------------------------------------------------- */
-    DDFField *paoNewFields = new DDFField[nFieldCount + 1];
-    if (nFieldCount > 0)
-    {
-        memcpy(paoNewFields, paoFields, sizeof(DDFField) * nFieldCount);
-        delete[] paoFields;
-    }
-    paoFields = paoNewFields;
-    nFieldCount++;
+    aoFields.resize(aoFields.size() + 1);
 
     /* -------------------------------------------------------------------- */
     /*      Initialize the new field properly.                              */
     /* -------------------------------------------------------------------- */
-    if (nFieldCount == 1)
+    if (aoFields.size() == 1)
     {
-        paoFields[0].Initialize(poDefn, GetData(), 0);
+        aoFields[0].Initialize(poDefn, GetData(), 0);
     }
     else
     {
-        paoFields[nFieldCount - 1].Initialize(
+        aoFields.back().Initialize(
             poDefn,
-            paoFields[nFieldCount - 2].GetData() +
-                paoFields[nFieldCount - 2].GetDataSize(),
+            aoFields[GetFieldCount() - 2].GetData() +
+                aoFields[GetFieldCount() - 2].GetDataSize(),
             0);
     }
 
     /* -------------------------------------------------------------------- */
     /*      Initialize field.                                               */
     /* -------------------------------------------------------------------- */
-    CreateDefaultFieldInstance(paoFields + nFieldCount - 1, 0);
+    CreateDefaultFieldInstance(aoFields.data() + GetFieldCount() - 1, 0);
 
-    return paoFields + (nFieldCount - 1);
+    return &(aoFields.back());
 }
 
 /************************************************************************/
@@ -1311,13 +1292,13 @@ int DDFRecord::SetFieldRaw(DDFField *poField, int iIndexWithinField,
     /* -------------------------------------------------------------------- */
     /*      Find which field we are to update.                              */
     /* -------------------------------------------------------------------- */
-    for (iTarget = 0; iTarget < nFieldCount; iTarget++)
+    for (iTarget = 0; iTarget < GetFieldCount(); iTarget++)
     {
-        if (paoFields + iTarget == poField)
+        if (aoFields.data() + iTarget == poField)
             break;
     }
 
-    if (iTarget == nFieldCount)
+    if (iTarget == GetFieldCount())
         return FALSE;
 
     nRepeatCount = poField->GetRepeatCount();
@@ -1408,13 +1389,13 @@ int DDFRecord::UpdateFieldRaw(DDFField *poField, int iIndexWithinField,
     /* -------------------------------------------------------------------- */
     /*      Find which field we are to update.                              */
     /* -------------------------------------------------------------------- */
-    for (iTarget = 0; iTarget < nFieldCount; iTarget++)
+    for (iTarget = 0; iTarget < GetFieldCount(); iTarget++)
     {
-        if (paoFields + iTarget == poField)
+        if (aoFields.data() + iTarget == poField)
             break;
     }
 
-    if (iTarget == nFieldCount)
+    if (iTarget == GetFieldCount())
         return FALSE;
 
     nRepeatCount = poField->GetRepeatCount();
@@ -1487,8 +1468,6 @@ int DDFRecord::UpdateFieldRaw(DDFField *poField, int iIndexWithinField,
 void DDFRecord::ResetDirectory()
 
 {
-    int iField;
-
     /* -------------------------------------------------------------------- */
     /*      Eventually we should try to optimize the size of offset and     */
     /*      field length.                                                   */
@@ -1500,7 +1479,7 @@ void DDFRecord::ResetDirectory()
     int nEntrySize, nDirSize;
 
     nEntrySize = _sizeFieldPos + _sizeFieldLength + _sizeFieldTag;
-    nDirSize = nEntrySize * nFieldCount + 1;
+    nDirSize = nEntrySize * GetFieldCount() + 1;
 
     /* -------------------------------------------------------------------- */
     /*      If the directory size is different than what is currently       */
@@ -1514,15 +1493,13 @@ void DDFRecord::ResetDirectory()
         memcpy(pachNewData + nDirSize, pachData + nFieldOffset,
                nNewDataSize - nDirSize);
 
-        for (iField = 0; paoFields != nullptr && iField < nFieldCount; iField++)
+        for (auto &oField : aoFields)
         {
             int nOffset;
-            DDFField *poField = /*GetField( iField )*/ paoFields + iField;
-
-            nOffset = static_cast<int>(poField->GetData() - pachData -
+            nOffset = static_cast<int>(oField.GetData() - pachData -
                                        nFieldOffset + nDirSize);
-            poField->Initialize(poField->GetFieldDefn(), pachNewData + nOffset,
-                                poField->GetDataSize());
+            oField.Initialize(oField.GetFieldDefn(), pachNewData + nOffset,
+                              oField.GetDataSize());
         }
 
         CPLFree(pachData);
@@ -1534,21 +1511,22 @@ void DDFRecord::ResetDirectory()
     /* -------------------------------------------------------------------- */
     /*      Now set each directory entry.                                   */
     /* -------------------------------------------------------------------- */
-    for (iField = 0; paoFields != nullptr && iField < nFieldCount; iField++)
+    int iField = 0;
+    for (auto &oField : aoFields)
     {
-        DDFField *poField = /*GetField( iField )*/ paoFields + iField;
-        DDFFieldDefn *poDefn = poField->GetFieldDefn();
+        const DDFFieldDefn *poDefn = oField.GetFieldDefn();
         char szFormat[128];
 
         snprintf(szFormat, sizeof(szFormat), "%%%ds%%0%dd%%0%dd", _sizeFieldTag,
                  _sizeFieldLength, _sizeFieldPos);
 
         snprintf(pachData + nEntrySize * iField, nEntrySize + 1, szFormat,
-                 poDefn->GetName(), poField->GetDataSize(),
-                 poField->GetData() - pachData - nFieldOffset);
+                 poDefn->GetName(), oField.GetDataSize(),
+                 oField.GetData() - pachData - nFieldOffset);
+        ++iField;
     }
 
-    pachData[nEntrySize * nFieldCount] = DDF_FIELD_TERMINATOR;
+    pachData[nEntrySize * GetFieldCount()] = DDF_FIELD_TERMINATOR;
 }
 
 /************************************************************************/
