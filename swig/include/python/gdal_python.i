@@ -4112,6 +4112,7 @@ def VectorTranslateOptions(options=None, format=None,
          zRes=None,
          mRes=None,
          setCoordPrecision=True,
+         quiet=False,
          callback=None, callback_data=None):
     """
     Create a VectorTranslateOptions() object that can be passed to
@@ -4247,6 +4248,8 @@ def VectorTranslateOptions(options=None, format=None,
         Geometry M coordinate resolution. Numeric value.
     setCoordPrecision : any
         Set to False to unset the geometry coordinate precision.
+    quiet: bool
+        Whether to suppress some warnings
     callback : any
         callback method
     callback_data : any
@@ -4435,6 +4438,8 @@ def VectorTranslateOptions(options=None, format=None,
             new_options += ['-mRes', str(mRes)]
         if setCoordPrecision is False:
             new_options += ["-unsetCoordPrecision"]
+        if quiet:
+            new_options += ["--quiet"]
 
     if callback is not None:
         new_options += ['-progress']

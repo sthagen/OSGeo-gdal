@@ -146,7 +146,7 @@ def test_gdalalg_raster_tile_basic(tmp_vsimem, tiling_scheme, tilesize):
 
 @pytest.mark.parametrize(
     "tiling_scheme,xyz,addalpha",
-    [("WorldCRS84Quad", True, True), ("geodetic", False, False)],
+    [("WorldCRS84Quad", True, True), ("WorldCRS84Quad", False, False)],
 )
 def test_gdalalg_raster_tile_small_world_geodetic(
     tmp_vsimem, tiling_scheme, xyz, addalpha

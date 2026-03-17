@@ -481,7 +481,7 @@ bool GDALAbstractPipelineAlgorithm::ParseCommandLineArguments(
             m_progressBarRequested = true;
             continue;
         }
-        if (arg == "--quiet")
+        if (arg == "-q" || arg == "--quiet")
         {
             m_quiet = true;
             m_progressBarRequested = false;
@@ -2230,6 +2230,7 @@ bool GDALAbstractPipelineAlgorithm::RunStep(GDALPipelineStepRunContext &ctxt)
             step->m_stdout = true;
         }
         step->m_inputDatasetCanBeOmitted = false;
+        step->m_quiet = m_quiet;
         if (!step->ValidateArguments() || !step->RunStep(stepCtxt))
         {
             ret = false;

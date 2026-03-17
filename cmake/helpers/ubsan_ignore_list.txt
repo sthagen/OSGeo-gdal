@@ -1,0 +1,3 @@
+[unsigned-integer-overflow]
+# std::from_chars() with integer output generates unsigned integer overflow
+fun:*from_chars*

@@ -1729,6 +1729,8 @@ DECLAREContigPutFunc(put16bitbwtile)
 {
     int samplesperpixel = img->samplesperpixel;
     uint32_t **BWmap = img->BWmap;
+    /* Convert pixel skew to byte skew (16-bit samples) */
+    fromskew = fromskew * (2 * samplesperpixel);
 
     (void)y;
     for (; h > 0; --h)
@@ -2224,11 +2226,11 @@ DECLAREContigPutFunc(putcontig8bitYCbCr44tile)
     uint32_t *cp1 = cp + w + toskew;
     uint32_t *cp2 = cp1 + w + toskew;
     uint32_t *cp3 = cp2 + w + toskew;
-    int32_t incr = 3 * w + 4 * toskew;
+    const tmsize_t incr = 3 * (tmsize_t)w + 4 * (tmsize_t)toskew;
 
     (void)y;
     /* adjust fromskew */
-    fromskew = (fromskew / 4) * (4 * 2 + 2);
+    fromskew = (fromskew / 4) * (4 * 4 + 2);
     if ((h & 3) == 0 && (w & 3) == 0)
     {
         for (; h >= 4; h -= 4)
@@ -2364,7 +2366,7 @@ DECLAREContigPutFunc(putcontig8bitYCbCr44tile)
 DECLAREContigPutFunc(putcontig8bitYCbCr42tile)
 {
     uint32_t *cp1 = cp + w + toskew;
-    int32_t incr = 2 * toskew + w;
+    const tmsize_t incr = 2 * (tmsize_t)toskew + w;
 
     (void)y;
     fromskew = (fromskew / 4) * (4 * 2 + 2);
@@ -2522,7 +2524,7 @@ DECLAREContigPutFunc(putcontig8bitYCbCr41tile)
 DECLAREContigPutFunc(putcontig8bitYCbCr22tile)
 {
     uint32_t *cp2;
-    int32_t incr = 2 * toskew + w;
+    const tmsize_t incr = 2 * (tmsize_t)toskew + w;
     (void)y;
     fromskew = (fromskew / 2) * (2 * 2 + 2);
     cp2 = cp + w + toskew;
@@ -2625,7 +2627,7 @@ DECLAREContigPutFunc(putcontig8bitYCbCr21tile)
 DECLAREContigPutFunc(putcontig8bitYCbCr12tile)
 {
     uint32_t *cp2;
-    int32_t incr = 2 * toskew + w;
+    const tmsize_t incr = 2 * (tmsize_t)toskew + w;
     (void)y;
     fromskew = (fromskew / 1) * (1 * 2 + 2);
     cp2 = cp + w + toskew;

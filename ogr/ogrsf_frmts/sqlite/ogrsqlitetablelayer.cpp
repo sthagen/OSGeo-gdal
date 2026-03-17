@@ -179,7 +179,7 @@ CPLErr OGRSQLiteTableLayer::Initialize(const char *m_pszTableNameIn,
 
 static OGRSQLiteGeomFormat GetGeomFormat(const char *pszGeomFormat)
 {
-    OGRSQLiteGeomFormat eGeomFormat = OSGF_None;
+    OGRSQLiteGeomFormat eGeomFormat = OSGF_Unknown;
     if (pszGeomFormat)
     {
         if (EQUAL(pszGeomFormat, "WKT"))
@@ -444,7 +444,7 @@ CPLErr OGRSQLiteTableLayer::EstablishFeatureDefn(const char *pszGeomCol,
         rc = sqlite3_get_table(hDB, pszSQLConst, &papszResult, &nRowCount,
                                &nColCount, &pszErrMsg);
         OGRwkbGeometryType eGeomType = wkbUnknown;
-        OGRSQLiteGeomFormat eGeomFormat = OSGF_None;
+        OGRSQLiteGeomFormat eGeomFormat = OSGF_Unknown;
         if (rc == SQLITE_OK && nRowCount == 1)
         {
             char **papszRow = papszResult + nColCount;

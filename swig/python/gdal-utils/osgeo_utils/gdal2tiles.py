@@ -31,6 +31,7 @@ import stat
 import sys
 import tempfile
 import threading
+import warnings
 from functools import partial
 from typing import Any, Dict, List, NoReturn, Optional, Tuple
 from uuid import uuid4
@@ -1702,6 +1703,15 @@ def optparse_init() -> Tuple[optparse.OptionParser, Dict[Any, Any]]:
     p = optparse.OptionParser(usage, version="%prog " + __version__)
 
     profile_list, tmsMap = get_profile_list_and_tmsMap()
+
+    p.add_option(
+        "--legacy",
+        dest="legacy",
+        action="store_true",
+        help=(
+            "Whether to use legacy gdal2tiles mode. Otherwise by default 'gdal raster tile' is used underneath. If you find yourself to need legacy mode and cannot find workarounds using gdal raster tile, please file a ticket at https://github.com/OSGeo/GDAL since legacy mode will be removed in GDAL 3.15."
+        ),
+    )
 
     p.add_option(
         "-p",
@@ -4584,6 +4594,12 @@ def main(argv: List[str] = sys.argv, called_from_main=False) -> int:
             os.environ[argv[i + 1]] = argv[i + 2]
 
     if "--mpi" in argv:
+
+        if "--legacy" not in argv:
+            raise Exception(
+                "--mpi mode is not supported in 'gdal raster tile' non-legacy mode. You may specify --legacy to go on, but this legacy mode is going to be removed in GDAL 3.15."
+            )
+
         from mpi4py import MPI
         from mpi4py.futures import MPICommExecutor
 
@@ -4608,6 +4624,133 @@ def submain(argv: List[str], pool=None, pool_size=0, called_from_main=False) -> 
     input_file, output_folder, options, tmsMap = process_args(
         argv[1:], called_from_main=called_from_main
     )
+
+    if not options.legacy:
+
+        kwargs = {
+            "input": input_file,
+            "output": output_folder,
+        }
+        if not options.quiet:
+            kwargs["progress"] = gdal.TermProgress_nocb
+
+        if options.profile == "raster":
+            kwargs["tiling_scheme"] = "raster"
+        elif options.profile == "geodetic":
+            if options.tmscompatible:
+                kwargs["tiling_scheme"] = "WorldCRS84Quad"
+            else:
+                kwargs["tiling_scheme"] = "GlobalGeodeticOriginLat270"
+        else:
+            kwargs["tiling_scheme"] = options.profile
+
+        if options.resampling:
+            kwargs["resampling"] = options.resampling
+
+        if options.zoom[0] is not None:
+            kwargs["min_zoom"] = options.zoom[0]
+        if options.zoom[1] is not None:
+            kwargs["max_zoom"] = options.zoom[1]
+
+        if options.resume:
+            kwargs["resume"] = True
+
+        if options.s_srs or options.srcnodata is not None:
+            tmp_dir = tempfile.mkdtemp()
+            tmp_file = os.path.join(tmp_dir, "tmp.vrt")
+            gdal.Translate(
+                tmp_file, input_file, outputSRS=options.s_srs, noData=options.srcnodata
+            )
+            kwargs["input"] = str(tmp_file)
+
+        if not options.xyz:
+            kwargs["convention"] = "tms"
+
+        if options.processes:
+            kwargs["num_threads"] = options.processes
+
+        if options.tilesize:
+            kwargs["tile_size"] = options.tilesize
+
+        if options.tiledriver:
+            kwargs["output_format"] = options.tiledriver
+
+        if options.excluded_values:
+            kwargs["excluded_values"] = options.excluded_values
+
+            if options.excluded_values_pct_threshold:
+                kwargs["excluded_values_pct_threshold"] = (
+                    options.excluded_values_pct_threshold
+                )
+
+        if options.nodata_values_pct_threshold != 100:
+            kwargs["nodata_values_pct_threshold"] = options.nodata_values_pct_threshold
+
+        def is_4326_raster(kwargs):
+            ds = gdal.Open(kwargs["input"])
+            srs = ds.GetSpatialRef()
+            return srs is not None and srs.GetAuthorityCode(None) == "4326"
+
+        if options.kml is True or (
+            (
+                options.profile == "geodetic"
+                or (options.profile == "raster" and is_4326_raster(kwargs))
+            )
+            and options.kml is None
+        ):
+            kwargs["kml"] = True
+
+        if options.url:
+            kwargs["url"] = options.url
+
+        if options.webviewer:
+            kwargs["webviewer"] = options.webviewer
+
+        if options.title:
+            kwargs["title"] = options.title
+
+        if options.copyright:
+            kwargs["copyright"] = options.copyright
+
+        if options.mapml_template:
+            kwargs["mapml_template"] = options.mapml_template
+
+        kwargs["skip_blank"] = True
+
+        creation_options = {}
+
+        if options.tiledriver == "WEBP":
+            if options.webp_quality:
+                creation_options["QUALITY"] = options.webp_quality
+            if options.webp_lossless:
+                creation_options["LOSSLESS"] = True
+        elif options.tiledriver == "JPEG":
+            if options.jpeg_quality:
+                creation_options["QUALITY"] = options.jpeg_quality
+
+        if creation_options:
+            kwargs["creation_option"] = creation_options
+
+        if options.googlekey != "INSERT_YOUR_KEY_HERE":
+            raise Exception(
+                "--googlekey is no longer supported in new 'gdal raster tile' non-legacy mode."
+            )
+
+        if options.bingkey != "INSERT_YOUR_KEY_HERE":
+            raise Exception(
+                "--bingkey is no longer supported in new 'gdal raster tile' non-legacy mode."
+            )
+
+        if gdal.alg.raster.tile(**kwargs):
+            return 0
+        else:
+            return 1
+
+    warnings.warn(
+        "--legacy mode is deprecated and will be removed in GDAL 3.15. If you find yourself to need legacy mode and cannot find workarounds using 'gdal raster tile', please file a ticket at https://github.com/OSGeo/GDAL",
+        DeprecationWarning,
+    )
+
     if pool_size:
         options.nb_processes = pool_size
     nb_processes = options.nb_processes or 1

@@ -188,7 +188,7 @@ GDALRasterTileAlgorithm::GDALRasterTileAlgorithm(bool standaloneStep)
 
     std::vector<std::string> tilingSchemes{"raster"};
     for (const std::string &scheme :
-         gdal::TileMatrixSet::listPredefinedTileMatrixSets())
+         gdal::TileMatrixSet::listPredefinedTileMatrixSets(/* hidden = */ true))
     {
         auto poTMS = gdal::TileMatrixSet::parse(scheme.c_str());
         OGRSpatialReference oSRS_TMS;
@@ -208,7 +208,7 @@ GDALRasterTileAlgorithm::GDALRasterTileAlgorithm(bool standaloneStep)
         .SetHiddenChoices(
             "GoogleMapsCompatible",  // equivalent of WebMercatorQuad
             "mercator",              // gdal2tiles equivalent of WebMercatorQuad
-            "geodetic"  // gdal2tiles (not totally) equivalent of WorldCRS84Quad
+            "GlobalGeodeticOriginLat270"  // gdal2tiles geodetic without --tmscompatible
         );
 
     AddArg("min-zoom", 0, _("Minimum zoom level"), &m_minZoomLevel)
@@ -2239,7 +2239,7 @@ GenerateMapML(const std::string &osDirectory, const std::string &mapmlTemplate,
         else
             substs["TILING_SCHEME"] = tms.identifier();
 
-        substs["URL"] = osURL.empty() ? "./" : osURL;
+        substs["URL"] = osURL.empty() ? "./" : osURL + "/";
         substs["MINTILEX"] = CPLSPrintf("%d", nMinTileX);
         substs["MINTILEY"] = CPLSPrintf("%d", nMinTileY);
         substs["MAXTILEX"] = CPLSPrintf("%d", nMaxTileX);
@@ -4597,8 +4597,6 @@ bool GDALRasterTileAlgorithm::RunStep(GDALPipelineStepRunContext &ctxt)
 
     if (m_tilingScheme == "mercator")
         m_tilingScheme = "WebMercatorQuad";
-    else if (m_tilingScheme == "geodetic")
-        m_tilingScheme = "WorldCRS84Quad";
     else if (m_tilingScheme == "raster")
     {
         if (m_tileSize == 0)

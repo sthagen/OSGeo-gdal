@@ -843,8 +843,8 @@ bool OGRGeoJSONSeqDataSource::Open(GDALOpenInfo *poOpenInfo,
         }
         else
         {
-            CPLHTTPResult *pResult =
-                GeoJSONHTTPFetchWithContentTypeHeader(pszUnprefixedFilename);
+            CPLHTTPResult *pResult = GeoJSONHTTPFetchWithContentTypeHeader(
+                pszUnprefixedFilename, false, nullptr);
             if (!pResult)
             {
                 return FALSE;

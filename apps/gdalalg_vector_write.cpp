@@ -33,6 +33,10 @@ GDALVectorWriteAlgorithm::GDALVectorWriteAlgorithm()
 {
     AddVectorOutputArgs(/* hiddenForCLI = */ false,
                         /* shortNameOutputLayerAllowed=*/true);
+
+    AddArg(GDAL_ARG_NAME_QUIET, 'q',
+           _("Quiet mode (suppress warning messages)"), &m_quiet)
+        .SetCategory(GAAC_COMMON);
 }
 
 /************************************************************************/
@@ -258,6 +262,10 @@ bool GDALVectorWriteAlgorithm::RunStep(GDALPipelineStepRunContext &ctxt)
     if (m_skipErrors)
     {
         aosOptions.AddString("-skipfailures");
+    }
+    if (m_quiet)
+    {
+        aosOptions.AddString("-q");
     }
 
     GDALDataset *poRetDS = nullptr;
