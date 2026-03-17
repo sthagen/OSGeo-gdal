@@ -43,6 +43,8 @@ Potential steps are:
 
 .. program-output:: gdal vector pipeline --help-doc=read
 
+Details for options can be found in :ref:`gdal_vector_read`.
+
 * buffer
 
 .. program-output:: gdal vector pipeline --help-doc=buffer
@@ -174,6 +176,8 @@ Details for options can be found in :ref:`gdal_vector_partition`.
 * write
 
 .. program-output:: gdal vector pipeline --help-doc=write
+
+Details for options can be found in :ref:`gdal_vector_write`.
 
 GDALG output (on-the-fly / streamed dataset)
 --------------------------------------------
