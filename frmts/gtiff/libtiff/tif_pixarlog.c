@@ -180,7 +180,7 @@ static void horizontalAccumulateF(uint16_t *wp, int n, int stride, float *op,
             n -= stride;
             while (n > 0)
             {
-                REPEAT(stride, wp[stride] += *wp; *op = ToLinearF[*wp & mask];
+                REPEAT(stride, *wp += wp[-stride]; *op = ToLinearF[*wp & mask];
                        wp++; op++)
                 n -= stride;
             }
@@ -255,9 +255,9 @@ static void horizontalAccumulate12(uint16_t *wp, int n, int stride, int16_t *op,
             n -= stride;
             while (n > 0)
             {
-                REPEAT(stride, wp[stride] += *wp;
-                       t0 = ToLinearF[wp[stride] & mask] * SCALE12;
-                       *op = CLAMP12(t0); wp++; op++)
+                REPEAT(stride, *wp += wp[-stride];
+                       t0 = ToLinearF[*wp & mask] * SCALE12; *op = CLAMP12(t0);
+                       wp++; op++)
                 n -= stride;
             }
         }
@@ -312,7 +312,7 @@ static void horizontalAccumulate16(uint16_t *wp, int n, int stride,
             n -= stride;
             while (n > 0)
             {
-                REPEAT(stride, wp[stride] += *wp; *op = ToLinear16[*wp & mask];
+                REPEAT(stride, *wp += wp[-stride]; *op = ToLinear16[*wp & mask];
                        wp++; op++)
                 n -= stride;
             }
@@ -379,7 +379,7 @@ static void horizontalAccumulate11(uint16_t *wp, int n, int stride,
             n -= stride;
             while (n > 0)
             {
-                REPEAT(stride, wp[stride] += *wp; *op = *wp & mask; wp++; op++)
+                REPEAT(stride, *wp += wp[-stride]; *op = *wp & mask; wp++; op++)
                 n -= stride;
             }
         }
@@ -434,7 +434,7 @@ static void horizontalAccumulate8(uint16_t *wp, int n, int stride,
             n -= stride;
             while (n > 0)
             {
-                REPEAT(stride, wp[stride] += *wp; *op = ToLinear8[*wp & mask];
+                REPEAT(stride, *wp += wp[-stride]; *op = ToLinear8[*wp & mask];
                        wp++; op++)
                 n -= stride;
             }
@@ -508,7 +508,7 @@ static void horizontalAccumulate8abgr(uint16_t *wp, int n, int stride,
             n -= stride;
             while (n > 0)
             {
-                REPEAT(stride, wp[stride] += *wp; *op = ToLinear8[*wp & mask];
+                REPEAT(stride, *wp += wp[-stride]; *op = ToLinear8[*wp & mask];
                        wp++; op++)
                 n -= stride;
             }
@@ -840,7 +840,7 @@ static int PixarLogDecode(TIFF *tif, uint8_t *op, tmsize_t occ, uint16_t s)
     PixarLogState *sp = PixarLogDecoderState(tif);
     tmsize_t i;
     tmsize_t nsamples;
-    int llen;
+    tmsize_t llen;
     uint16_t *up;
 
     switch (sp->user_datafmt)
@@ -865,7 +865,7 @@ static int PixarLogDecode(TIFF *tif, uint8_t *op, tmsize_t occ, uint16_t s)
             return 0;
     }
 
-    llen = sp->stride * td->td_imagewidth;
+    llen = (tmsize_t)sp->stride * td->td_imagewidth;
 
     (void)s;
     assert(sp != NULL);
@@ -943,7 +943,8 @@ static int PixarLogDecode(TIFF *tif, uint8_t *op, tmsize_t occ, uint16_t s)
     if (nsamples % llen)
     {
         TIFFWarningExtR(tif, module,
-                        "stride %d is not a multiple of sample count, "
+                        "stride %" TIFF_SSIZE_FORMAT
+                        " is not a multiple of sample count, "
                         "%" TIFF_SSIZE_FORMAT ", data truncated.",
                         llen, nsamples);
         nsamples -= nsamples % llen;
@@ -1306,7 +1307,7 @@ static int PixarLogEncode(TIFF *tif, uint8_t *bp, tmsize_t cc, uint16_t s)
     PixarLogState *sp = PixarLogEncoderState(tif);
     tmsize_t i;
     tmsize_t n;
-    int llen;
+    tmsize_t llen;
     unsigned short *up;
 
     (void)s;
@@ -1332,7 +1333,7 @@ static int PixarLogEncode(TIFF *tif, uint8_t *bp, tmsize_t cc, uint16_t s)
             return 0;
     }
 
-    llen = sp->stride * td->td_imagewidth;
+    llen = (tmsize_t)sp->stride * td->td_imagewidth;
     /* Check against the number of elements (of size uint16_t) of sp->tbuf */
     if (n > ((tmsize_t)td->td_rowsperstrip * llen))
     {
