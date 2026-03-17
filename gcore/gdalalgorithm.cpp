@@ -5778,9 +5778,8 @@ GDALAlgorithm::AddPixelFunctionArgsArg(std::vector<std::string> *pValue,
 
 void GDALAlgorithm::AddProgressArg()
 {
-    AddArg(GDAL_ARG_NAME_QUIET, 'q', _("Quiet mode (no progress bar)"),
-           &m_quiet)
-        .SetHiddenForAPI()
+    AddArg(GDAL_ARG_NAME_QUIET, 'q',
+           _("Quiet mode (no progress bar or warning message)"), &m_quiet)
         .SetCategory(GAAC_COMMON)
         .AddAction([this]() { m_progressBarRequested = false; });
 

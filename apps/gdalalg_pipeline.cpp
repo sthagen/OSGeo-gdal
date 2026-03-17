@@ -388,6 +388,7 @@ bool GDALPipelineStepAlgorithm::RunImpl(GDALProgressFunc pfnProgress,
                 else
                 {
                     writeAlg->m_outputVRTCompatible = m_outputVRTCompatible;
+                    writeAlg->m_quiet = m_quiet;
 
                     std::vector<GDALArgDatasetValue> inputDataset(1);
                     inputDataset[0].Set(m_outputDataset.GetDatasetRef());

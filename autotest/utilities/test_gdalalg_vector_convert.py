@@ -505,3 +505,57 @@ def test_error_message_leak(tmp_vsimem):
                 out_path,
             ],
         )
+
+
+###############################################################################
+
+
+@pytest.mark.require_driver("GeoJSON")
+@pytest.mark.parametrize("quiet", [True, False])
+def test_gdalalg_vector_convert_warn_no_curve_support(tmp_vsimem, quiet):
+
+    src_ds = gdal.GetDriverByName("MEM").CreateVector("")
+    src_lyr = src_ds.CreateLayer("test")
+    f = ogr.Feature(src_lyr.GetLayerDefn())
+    f.SetGeometry(ogr.CreateGeometryFromWkt("CIRCULARSTRING(0 0,1 1,2 0)"))
+    src_lyr.CreateFeature(f)
+
+    if quiet:
+        with gdaltest.error_raised(gdal.CE_None):
+            gdal.alg.vector.convert(
+                input=src_ds, output=tmp_vsimem / "out.geojson", quiet=True
+            )
+    else:
+        with gdaltest.error_raised(
+            gdal.CE_Warning, match="Attempt to write curve geometries"
+        ):
+            gdal.alg.vector.convert(input=src_ds, output=tmp_vsimem / "out.geojson")
+
+
+###############################################################################
+
+
+@pytest.mark.require_driver("GeoJSON")
+@pytest.mark.parametrize("quiet", [True, False])
+def test_gdalalg_vector_convert_pipeline_warn_no_curve_support(tmp_vsimem, quiet):
+
+    src_ds = gdal.GetDriverByName("MEM").CreateVector("")
+    src_lyr = src_ds.CreateLayer("test")
+    f = ogr.Feature(src_lyr.GetLayerDefn())
+    f.SetGeometry(ogr.CreateGeometryFromWkt("CIRCULARSTRING(0 0,1 1,2 0)"))
+    src_lyr.CreateFeature(f)
+
+    if quiet:
+        with gdaltest.error_raised(gdal.CE_None):
+            gdal.alg.vector.pipeline(
+                input=src_ds,
+                pipeline=f'read ! write {tmp_vsimem / "out.geojson"}',
+                quiet=True,
+            )
+    else:
+        with gdaltest.error_raised(
+            gdal.CE_Warning, match="Attempt to write curve geometries"
+        ):
+            gdal.alg.vector.pipeline(
+                input=src_ds, pipeline=f'read ! write {tmp_vsimem / "out.geojson"}'
+            )
