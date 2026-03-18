@@ -477,20 +477,21 @@ CSHARP_OBJECT_ARRAYS_PINNED(GDALRasterBandShadow, Band)
 %apply (int inout[ANY]) {int *pList};
 
 /*
- * Typemap for const char *utf8_path.
+ * Typemap for const char *utf8_path and utf8_or_null.
  */
-%typemap(csin) (const char *utf8_path)  "$module.StringToUtf8Bytes($csinput)"
-%typemap(imtype, out="IntPtr") (const char *utf8_path) "byte[]"
-%typemap(out) (const char *utf8_path) %{ $result = $1; %}
-%typemap(csout, excode=SWIGEXCODE) (const char *utf8_path) {
-        /* %typemap(csout) (const char *utf8_path) */
-        IntPtr cPtr = $imcall;
-        string ret = $module.Utf8BytesToString(cPtr);
-        $excode
-        return ret;
-}
+%typemap(imtype,
+  inattributes="[MarshalAs(UnmanagedType.LPUTF8Str)]",
+  outattributes="[return: MarshalAs(UnmanagedType.LPUTF8Str)]")
+    (const char *utf8_path), (const char *utf8_or_null = NULL) "string"
 
-%apply ( const char *utf8_path ) { const char* GetFieldAsString };
+%apply ( const char *utf8_path ) {
+    const char* GetFieldAsString,
+    const char* wrapper_CPLGetConfigOption,
+    const char* wrapper_CPLGetGlobalConfigOption,
+    const char* wrapper_CPLGetThreadLocalConfigOption,
+    const char* wrapper_VSIGetCredential,
+    const char* wrapper_VSIGetPathSpecificOption
+};
 
 /*
  * Typemap for double *defaultval.
