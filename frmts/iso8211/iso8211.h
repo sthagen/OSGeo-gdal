@@ -606,7 +606,7 @@ class CPL_ODLL DDFRecord
     /** Fetch size of records raw data (GetData()) in bytes. */
     int GetDataSize() const
     {
-        return nDataSize;
+        return static_cast<int>(osData.size());
     }
 
     /**
@@ -616,7 +616,7 @@ class CPL_ODLL DDFRecord
      */
     const char *GetData() const
     {
-        return pachData;
+        return osData.c_str();
     }
 
     /**
@@ -701,8 +701,7 @@ class CPL_ODLL DDFRecord
     int _sizeFieldPos = 5;
     int _sizeFieldLength = 5;
 
-    int nDataSize = 0;  // Whole record except leader with header
-    char *pachData = nullptr;
+    std::string osData{};  // Whole record except leader with header
 
     std::vector<DDFField> aoFields{};
 
