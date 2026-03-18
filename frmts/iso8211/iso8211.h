@@ -275,8 +275,6 @@ class CPL_ODLL DDFFieldDefn
         return static_cast<int>(apoSubfields.size());
     }
 
-    const DDFSubfieldDefn *GetSubfield(int i) const;
-
     const std::vector<std::unique_ptr<DDFSubfieldDefn>> &GetSubfields() const
     {
         return apoSubfields;

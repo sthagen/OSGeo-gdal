@@ -840,32 +840,6 @@ DDFFieldDefn::FindSubfieldDefn(const char *pszMnemonic) const
 }
 
 /************************************************************************/
-/*                            GetSubfield()                             */
-/*                                                                      */
-/*      Fetch a subfield by its index.                                 */
-/************************************************************************/
-
-/**
- * Fetch a subfield by index.
- *
- * @param i The index subfield index. (Between 0 and GetSubfieldCount()-1)
- *
- * @return The subfield pointer, or NULL if the index is out of range.
- */
-
-const DDFSubfieldDefn *DDFFieldDefn::GetSubfield(int i) const
-
-{
-    if (i < 0 || static_cast<size_t>(i) >= apoSubfields.size())
-    {
-        CPLAssert(false);
-        return nullptr;
-    }
-
-    return apoSubfields[i].get();
-}
-
-/************************************************************************/
 /*                          GetDefaultValue()                           */
 /************************************************************************/
 
