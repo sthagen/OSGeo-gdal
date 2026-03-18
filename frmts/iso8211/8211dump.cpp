@@ -178,10 +178,8 @@ int main(int nArgc, char **papszArgv)
                        poFieldDefn->GetFormatControls());
             }
             printf(">\n");
-            for (int iSubField = 0; iSubField < nSubfieldCount; iSubField++)
+            for (const auto &poSubFieldDefn : poFieldDefn->GetSubfields())
             {
-                const DDFSubfieldDefn *poSubFieldDefn =
-                    poFieldDefn->GetSubfield(iSubField);
                 printf("  <DDFSubfieldDefn name=\"%s\" format=\"%s\"/>\n",
                        poSubFieldDefn->GetName(), poSubFieldDefn->GetFormat());
             }
@@ -228,12 +226,9 @@ int main(int nArgc, char **papszArgv)
                     printf(">\n");
                 for (nLoopCount = 0; nLoopCount < nRepeatCount; nLoopCount++)
                 {
-                    for (int iSubField = 0;
-                         iSubField < poDefn->GetSubfieldCount(); iSubField++)
+                    for (const auto &poSubFieldDefn : poDefn->GetSubfields())
                     {
                         int nBytesConsumed;
-                        const DDFSubfieldDefn *poSubFieldDefn =
-                            poDefn->GetSubfield(iSubField);
                         const char *pszSubFieldName = poSubFieldDefn->GetName();
                         printf("    <DDFSubfield name=\"%s\" ",
                                pszSubFieldName);

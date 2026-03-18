@@ -276,6 +276,12 @@ class CPL_ODLL DDFFieldDefn
     }
 
     const DDFSubfieldDefn *GetSubfield(int i) const;
+
+    const std::vector<std::unique_ptr<DDFSubfieldDefn>> &GetSubfields() const
+    {
+        return apoSubfields;
+    }
+
     const DDFSubfieldDefn *FindSubfieldDefn(const char *) const;
 
     /**
