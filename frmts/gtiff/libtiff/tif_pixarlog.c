@@ -1222,7 +1222,7 @@ static void horizontalDifference16(unsigned short *ip, tmsize_t n, int stride,
     }
 }
 
-static void horizontalDifference8(unsigned char *ip, int n, int stride,
+static void horizontalDifference8(unsigned char *ip, tmsize_t n, int stride,
                                   unsigned short *wp, uint16_t *From8)
 {
     int r1, g1, b1, a1, r2, g2, b2, a2, mask;
