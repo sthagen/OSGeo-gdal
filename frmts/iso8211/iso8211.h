@@ -386,13 +386,13 @@ class CPL_ODLL DDFSubfieldDefn
     /** Get pointer to subfield name. */
     const char *GetName() const
     {
-        return pszName;
+        return osName.c_str();
     }
 
     /** Get pointer to subfield format string */
     const char *GetFormat() const
     {
-        return pszFormatString;
+        return osFormatString.c_str();
     }
 
     int SetFormat(const char *pszFormat);
@@ -459,8 +459,8 @@ class CPL_ODLL DDFSubfieldDefn
     }
 
   private:
-    char *pszName = nullptr;  // a.k.a. subfield mnemonic
-    char *pszFormatString = nullptr;
+    std::string osName{};  // a.k.a. subfield mnemonic
+    std::string osFormatString{};
 
     DDFDataType eType = DDFString;
     DDFBinaryFormat eBinaryFormat = NotBinary;
@@ -478,8 +478,7 @@ class CPL_ODLL DDFSubfieldDefn
     /*      Fetched string cache.  This is where we hold the values         */
     /*      returned from ExtractStringData().                              */
     /* -------------------------------------------------------------------- */
-    mutable int nMaxBufChars = 0;
-    mutable char *pachBuffer = nullptr;
+    mutable std::string osBuffer{};
 };
 
 /************************************************************************/
