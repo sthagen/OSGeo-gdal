@@ -41,9 +41,6 @@ DDFRecord::~DDFRecord()
 
 {
     Clear();
-
-    if (bIsClone)
-        poModule->RemoveCloneRecord(this);
 }
 
 /************************************************************************/
@@ -770,7 +767,7 @@ int DDFRecord::GetIntSubfield(const char *pszField, int iFieldIndex,
 
 double DDFRecord::GetFloatSubfield(const char *pszField, int iFieldIndex,
                                    const char *pszSubfield, int iSubfieldIndex,
-                                   int *pnSuccess)
+                                   int *pnSuccess) const
 
 {
     int nDummyErr = FALSE;
@@ -842,7 +839,8 @@ double DDFRecord::GetFloatSubfield(const char *pszField, int iFieldIndex,
 
 const char *DDFRecord::GetStringSubfield(const char *pszField, int iFieldIndex,
                                          const char *pszSubfield,
-                                         int iSubfieldIndex, int *pnSuccess)
+                                         int iSubfieldIndex,
+                                         int *pnSuccess) const
 
 {
     int nDummyErr = FALSE;
@@ -893,19 +891,13 @@ const char *DDFRecord::GetStringSubfield(const char *pszField, int iFieldIndex,
  * Make a copy of a record.
  *
  * This method is used to make a copy of a record that will become (mostly)
- * the properly of application.  However, it is automatically destroyed if
- * the DDFModule it was created relative to is destroyed, as its field
- * and subfield definitions relate to that DDFModule.  However, it does
- * persist even when the record returned by DDFModule::ReadRecord() is
- * invalidated, such as when reading a new record.  This allows an application
- * to cache whole DDFRecords.
+ * the properly of application.
  *
- * @return A new copy of the DDFRecord.  This can be delete'd by the
- * application when no longer needed, otherwise it will be cleaned up when
- * the DDFModule it relates to is destroyed or closed.
+ * @return A new copy of the DDFRecord. Its lifetime must not extend the one
+ * of the DDFModule of the original record, unless TransferTo() is called.
  */
 
-DDFRecord *DDFRecord::Clone()
+std::unique_ptr<DDFRecord> DDFRecord::Clone() const
 
 {
     auto poNR = std::make_unique<DDFRecord>(poModule);
@@ -926,36 +918,29 @@ DDFRecord *DDFRecord::Clone()
                                      aoFields[i].GetDataSize());
     }
 
-    poNR->bIsClone = true;
-    poModule->AddCloneRecord(poNR.get());
-    return poNR.release();
+    return poNR;
 }
 
 /************************************************************************/
-/*                              CloneOn()                               */
+/*                             TransferTo()                             */
 /************************************************************************/
 
 /**
- * Recreate a record referencing another module.
+ * Transfer this record to another module.
  *
- * Works similarly to the DDFRecord::Clone() method, but creates the
- * new record with reference to a different DDFModule.  All DDFFieldDefn
+ * All DDFFieldDefn
  * references are transcribed onto the new module based on field names.
  * If any fields don't have a similarly named field on the target module
  * the operation will fail.  No validation of field types and properties
  * is done, but this operation is intended only to be used between
  * modules with matching definitions of all affected fields.
  *
- * The new record will be managed as a clone by the target module in
- * a manner similar to regular clones.
+ * @param poTargetModule the module to which the record should be transferred
  *
- * @param poTargetModule the module on which the record copy should be
- * created.
- *
- * @return NULL on failure or a pointer to the cloned record.
+ * @return true on success
  */
 
-DDFRecord *DDFRecord::CloneOn(DDFModule *poTargetModule)
+bool DDFRecord::TransferTo(DDFModule *poTargetModule)
 
 {
     /* -------------------------------------------------------------------- */
@@ -967,31 +952,30 @@ DDFRecord *DDFRecord::CloneOn(DDFModule *poTargetModule)
         const DDFFieldDefn *poDefn = oField.GetFieldDefn();
 
         if (poTargetModule->FindFieldDefn(poDefn->GetName()) == nullptr)
-            return nullptr;
-    }
+        {
+            CPLError(CE_Failure, CPLE_AppDefined,
+                     "Cannot find field definition %s in target module",
+                     poDefn->GetName());
+            return false;
+        }
 
-    /* -------------------------------------------------------------------- */
-    /*      Create a clone.                                                 */
-    /* -------------------------------------------------------------------- */
-    DDFRecord *poClone = Clone();
+        //TODO? check equality between source and target field definitions
+    }
 
     /* -------------------------------------------------------------------- */
     /*      Update all internal information to reference other module.      */
     /* -------------------------------------------------------------------- */
-    for (int i = 0; i < GetFieldCount(); i++)
+    for (auto &oField : aoFields)
     {
-        DDFField *poCloneField = &(poClone->aoFields[i]);
-        DDFFieldDefn *poDefn = poTargetModule->FindFieldDefn(
-            poCloneField->GetFieldDefn()->GetName());
+        DDFFieldDefn *poDefn =
+            poTargetModule->FindFieldDefn(oField.GetFieldDefn()->GetName());
 
-        poCloneField->Initialize(poDefn, poCloneField->GetData(),
-                                 poCloneField->GetDataSize());
+        oField.Initialize(poDefn, oField.GetData(), oField.GetDataSize());
     }
 
-    poModule->RemoveCloneRecord(poClone);
-    poClone->poModule = poTargetModule;
-    poTargetModule->AddCloneRecord(poClone);
-    return poClone;
+    poModule = poTargetModule;
+
+    return true;
 }
 
 /************************************************************************/

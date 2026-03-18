@@ -72,13 +72,6 @@ void DDFModule::Close()
 
     poRecord.reset();
 
-    for (auto *poClone : oSetClones)
-    {
-        poClone->RemoveIsCloneFlag();
-        delete poClone;
-    }
-    oSetClones.clear();
-
     apoFieldDefns.clear();
 }
 
@@ -587,31 +580,6 @@ DDFFieldDefn *DDFModule::GetField(int i)
         return nullptr;
     else
         return apoFieldDefns[i].get();
-}
-
-/************************************************************************/
-/*                           AddCloneRecord()                           */
-/*                                                                      */
-/*      We want to keep track of cloned records, so we can clean        */
-/*      them up when the module is destroyed.                           */
-/************************************************************************/
-
-void DDFModule::AddCloneRecord(DDFRecord *poRecordIn)
-
-{
-    oSetClones.insert(poRecordIn);
-}
-
-/************************************************************************/
-/*                         RemoveCloneRecord()                          */
-/************************************************************************/
-
-void DDFModule::RemoveCloneRecord(DDFRecord *poRecordIn)
-
-{
-    auto oIter = oSetClones.find(poRecordIn);
-    CPLAssert(oIter != oSetClones.end());
-    oSetClones.erase(oIter);
 }
 
 /************************************************************************/

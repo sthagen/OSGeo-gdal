@@ -18,7 +18,6 @@
 
 #include <array>
 #include <memory>
-#include <set>
 #include <vector>
 
 /**
@@ -114,9 +113,6 @@ class CPL_ODLL DDFModule
         return _fieldControlLength;
     }
 
-    void AddCloneRecord(DDFRecord *);
-    void RemoveCloneRecord(DDFRecord *);
-
     // This is just for DDFRecord.
     VSILFILE *GetFP()
     {
@@ -197,10 +193,6 @@ class CPL_ODLL DDFModule
     std::vector<std::unique_ptr<DDFFieldDefn>> apoFieldDefns{};
 
     std::unique_ptr<DDFRecord> poRecord{};
-
-    // Ownership of DDFRecord in this set is very particular
-    // See DDFRecord::Clone() doc
-    std::set<DDFRecord *> oSetClones{};
 };
 
 /************************************************************************/
@@ -560,8 +552,8 @@ class CPL_ODLL DDFRecord
     explicit DDFRecord(DDFModule *);
     ~DDFRecord();
 
-    DDFRecord *Clone();
-    DDFRecord *CloneOn(DDFModule *);
+    std::unique_ptr<DDFRecord> Clone() const;
+    bool TransferTo(DDFModule *poTargetModule);
 
     void Dump(FILE *) const;
 
@@ -590,9 +582,9 @@ class CPL_ODLL DDFRecord
     int GetIntSubfield(const char *, int, const char *, int,
                        int * = nullptr) const;
     double GetFloatSubfield(const char *, int, const char *, int,
-                            int * = nullptr);
+                            int * = nullptr) const;
     const char *GetStringSubfield(const char *, int, const char *, int,
-                                  int * = nullptr);
+                                  int * = nullptr) const;
 
     int SetIntSubfield(const char *pszField, int iFieldIndex,
                        const char *pszSubfield, int iSubfieldIndex, int nValue);
@@ -683,11 +675,6 @@ class CPL_ODLL DDFRecord
     void Clear();
     void ResetDirectory();
 
-    void RemoveIsCloneFlag()
-    {
-        bIsClone = FALSE;
-    }
-
   private:
     int ReadHeader();
 
@@ -704,8 +691,6 @@ class CPL_ODLL DDFRecord
     std::string osData{};  // Whole record except leader with header
 
     std::vector<DDFField> aoFields{};
-
-    bool bIsClone = false;
 };
 
 #endif /* ndef ISO8211_H_INCLUDED */
