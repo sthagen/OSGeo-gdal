@@ -2698,6 +2698,21 @@ def test_ogr_parquet_arrow_stream_fast_attribute_filter_on_decimal128():
 
 
 ###############################################################################
+
+
+def test_ogr_parquet_arrow_stream_nanoarrow():
+
+    na = pytest.importorskip("nanoarrow")
+
+    ds = ogr.Open("data/parquet/test.parquet")
+    lyr = ds.GetLayer(0)
+    lyr.SetAttributeFilter("boolean = 0")
+    na_stream = na.ArrayStream(lyr)
+    batch = next(na_stream.__iter__())
+    assert len(batch) == 1
+
+
+###############################################################################
 # Combine both spatial and attribute filters through ArrowStream API
 
 
