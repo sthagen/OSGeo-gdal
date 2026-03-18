@@ -425,9 +425,9 @@ RUN --mount=type=cache,id=ubuntu-full-libjxl,target=$HOME/.cache \
     && rm -rf libjxl
 
 # Install Arrow C++
-ARG ARROW_VERSION=21.0.0-1
+ARG ARROW_VERSION=23.0.1-1
 # ARROW_SOVERSION to be updated in the "Build final image" section too
-ARG ARROW_SOVERSION=2100
+ARG ARROW_SOVERSION=2300
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     . /buildscripts/bh-set-envvars.sh \
@@ -447,7 +447,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && rm apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
 
 # Manually build ADBC packages to have support for BigQuery
-ARG ARROW_ADBC_VERSION=20
+ARG ARROW_ADBC_VERSION=22
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     . /buildscripts/bh-set-envvars.sh \
@@ -588,7 +588,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && apt-get install -y -V libarrow-compute${ARROW_SOVERSION}
 
 # Install libduckdb
-ARG DUCKDB_VERSION=v1.4.3
+ARG DUCKDB_VERSION=v1.5.0
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     export DEBIAN_FRONTEND=noninteractive \
