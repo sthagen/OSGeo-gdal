@@ -1044,6 +1044,13 @@ man_pages = [
         1,
     ),
     (
+        "programs/gdal_vector_rename_layer",
+        "gdal-vector-rename-layer",
+        "Rename layer(s) of a vector dataset",
+        [author_evenr],
+        1,
+    ),
+    (
         "programs/gdal_vector_select",
         "gdal-vector-select",
         "Select a subset of fields from a vector dataset",

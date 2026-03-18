@@ -294,6 +294,9 @@ CPL_C_END
 extern "C++"
 {
     std::string CPL_DLL CPLRemoveSQLComments(const std::string &osInput);
+    std::string CPL_DLL CPLGetFilenameCompatible(
+        const std::string &osInput, char chReplacementChar = '_',
+        const char *pszExtraReservedCharacters = nullptr);
 }
 
 #endif

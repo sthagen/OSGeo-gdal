@@ -18,6 +18,7 @@ append
 approx-stats
 array
 array-option
+ascii
 attribute-name
 aux-xml
 auxiliary
@@ -93,6 +94,7 @@ field-strategy
 field-type
 fields
 filename
+filename-compatible
 filename-filter
 fixed-value
 flatten
@@ -148,6 +150,7 @@ location-field
 location-name
 long-listing
 low-pitch
+lower-case
 m
 mapml-template
 mapping
@@ -254,8 +257,10 @@ radius1
 radius2
 recursive
 reference
+replacement-character
 report-failures
 resampling
+reserved-characters
 resolution
 resume
 return-code
