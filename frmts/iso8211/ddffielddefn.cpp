@@ -104,8 +104,8 @@ void DDFFieldDefn::AddSubfield(std::unique_ptr<DDFSubfieldDefn> poNewSFDefn,
     if (_arrayDescr == nullptr)
         _arrayDescr = CPLStrdup("");
 
-    _arrayDescr = (char *)CPLRealloc(
-        _arrayDescr, strlen(_arrayDescr) + strlen(poNewSFDefn->GetName()) + 2);
+    _arrayDescr = static_cast<char *>(CPLRealloc(
+        _arrayDescr, strlen(_arrayDescr) + strlen(poNewSFDefn->GetName()) + 2));
     if (strlen(_arrayDescr) > 0 &&
         (_arrayDescr[0] != '*' || strlen(_arrayDescr) > 1))
         strcat(_arrayDescr, "!");

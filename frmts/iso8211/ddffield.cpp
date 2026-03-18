@@ -68,7 +68,8 @@ void DDFField::Dump(FILE *fp) const
     for (int i = 0; i < std::min(nDataSize, 40); i++)
     {
         if (pachData[i] < 32 || pachData[i] > 126)
-            fprintf(fp, "\\%02X", ((unsigned char *)pachData)[i]);
+            fprintf(fp, "\\%02X",
+                    reinterpret_cast<const unsigned char *>(pachData)[i]);
         else
             fprintf(fp, "%c", pachData[i]);
     }

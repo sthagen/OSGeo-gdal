@@ -12,6 +12,7 @@ add_library(
 set_property(TARGET gdal_iso8211 PROPERTY POSITION_INDEPENDENT_CODE ${GDAL_OBJECT_LIBRARIES_POSITION_INDEPENDENT_CODE})
 target_sources(${GDAL_LIB_TARGET_NAME} PRIVATE $<TARGET_OBJECTS:gdal_iso8211>)
 gdal_standard_includes(gdal_iso8211)
+target_compile_options(gdal_iso8211 PRIVATE ${GDAL_CXX_WARNING_FLAGS} ${WFLAG_OLD_STYLE_CAST} ${WFLAG_EFFCXX} ${WFLAG_DOUBLE_PROMOTION})
 
 # Because linking an OBJECT library
 add_executable(8211dump EXCLUDE_FROM_ALL 8211dump.cpp)

@@ -127,7 +127,8 @@ int DDFModule::Open(const char *pszFilename, int bFailQuietly)
     /* -------------------------------------------------------------------- */
     char achLeader[nLeaderSize];
 
-    if ((int)VSIFReadL(achLeader, 1, nLeaderSize, fpDDF) != nLeaderSize)
+    if (static_cast<int>(VSIFReadL(achLeader, 1, nLeaderSize, fpDDF)) !=
+        nLeaderSize)
     {
         CPL_IGNORE_RET_VAL(VSIFCloseL(fpDDF));
         fpDDF = nullptr;
@@ -207,17 +208,18 @@ int DDFModule::Open(const char *pszFilename, int bFailQuietly)
     /* -------------------------------------------------------------------- */
     /*      Read the whole record info memory.                              */
     /* -------------------------------------------------------------------- */
-    char *pachRecord = (char *)CPLMalloc(_recLength);
-    memcpy(pachRecord, achLeader, nLeaderSize);
+    std::string osRecord;
+    osRecord.assign(achLeader, nLeaderSize);
+    osRecord.resize(_recLength);
 
-    if ((int)VSIFReadL(pachRecord + nLeaderSize, 1, _recLength - nLeaderSize,
-                       fpDDF) != _recLength - nLeaderSize)
+    if (static_cast<int>(VSIFReadL(osRecord.data() + nLeaderSize, 1,
+                                   _recLength - nLeaderSize, fpDDF)) !=
+        _recLength - nLeaderSize)
     {
         if (!bFailQuietly)
             CPLError(CE_Failure, CPLE_FileIO,
                      "Header record is short on DDF file `%s'.", pszFilename);
 
-        CPLFree(pachRecord);
         return FALSE;
     }
 
@@ -231,7 +233,7 @@ int DDFModule::Open(const char *pszFilename, int bFailQuietly)
     for (i = nLeaderSize; i + nFieldEntryWidth <= _recLength;
          i += nFieldEntryWidth)
     {
-        if (pachRecord[i] == DDF_FIELD_TERMINATOR)
+        if (osRecord[i] == DDF_FIELD_TERMINATOR)
             break;
 
         nFDCount++;
@@ -246,14 +248,15 @@ int DDFModule::Open(const char *pszFilename, int bFailQuietly)
         int nEntryOffset = nLeaderSize + i * nFieldEntryWidth;
         int nFieldLength, nFieldPos;
 
-        strncpy(szTag, pachRecord + nEntryOffset, _sizeFieldTag);
+        strncpy(szTag, osRecord.c_str() + nEntryOffset, _sizeFieldTag);
         szTag[_sizeFieldTag] = '\0';
 
         nEntryOffset += _sizeFieldTag;
-        nFieldLength = DDFScanInt(pachRecord + nEntryOffset, _sizeFieldLength);
+        nFieldLength =
+            DDFScanInt(osRecord.c_str() + nEntryOffset, _sizeFieldLength);
 
         nEntryOffset += _sizeFieldLength;
-        nFieldPos = DDFScanInt(pachRecord + nEntryOffset, _sizeFieldPos);
+        nFieldPos = DDFScanInt(osRecord.c_str() + nEntryOffset, _sizeFieldPos);
 
         if (nFieldPos < 0 || nFieldPos > INT_MAX - _fieldAreaStart ||
             nFieldLength <
@@ -265,23 +268,20 @@ int DDFModule::Open(const char *pszFilename, int bFailQuietly)
                          "Header record invalid on DDF file `%s'.",
                          pszFilename);
 
-            CPLFree(pachRecord);
             return FALSE;
         }
 
         auto poFDefn = std::make_unique<DDFFieldDefn>();
         if (poFDefn->Initialize(this, szTag, nFieldLength,
-                                pachRecord + _fieldAreaStart + nFieldPos))
+                                osRecord.c_str() + _fieldAreaStart + nFieldPos))
             AddField(std::move(poFDefn));
     }
-
-    CPLFree(pachRecord);
 
     /* -------------------------------------------------------------------- */
     /*      Record the current file offset, the beginning of the first      */
     /*      data record.                                                    */
     /* -------------------------------------------------------------------- */
-    nFirstRecordOffset = (long)VSIFTellL(fpDDF);
+    nFirstRecordOffset = static_cast<long>(VSIFTellL(fpDDF));
 
     return TRUE;
 }
@@ -357,22 +357,20 @@ int DDFModule::Create(const char *pszFilename)
     /* -------------------------------------------------------------------- */
     char achLeader[25];
 
-    snprintf(achLeader + 0, sizeof(achLeader) - 0, "%05d", (int)_recLength);
+    snprintf(achLeader + 0, sizeof(achLeader) - 0, "%05d", _recLength);
     achLeader[5] = _interchangeLevel;
     achLeader[6] = _leaderIden;
     achLeader[7] = _inlineCodeExtensionIndicator;
     achLeader[8] = _versionNumber;
     achLeader[9] = _appIndicator;
     snprintf(achLeader + 10, sizeof(achLeader) - 10, "%02d",
-             (int)_fieldControlLength);
-    snprintf(achLeader + 12, sizeof(achLeader) - 12, "%05d",
-             (int)_fieldAreaStart);
+             _fieldControlLength);
+    snprintf(achLeader + 12, sizeof(achLeader) - 12, "%05d", _fieldAreaStart);
     memcpy(achLeader + 17, _extendedCharSet.data(), 3);
-    snprintf(achLeader + 20, sizeof(achLeader) - 20, "%1d",
-             (int)_sizeFieldLength);
-    snprintf(achLeader + 21, sizeof(achLeader) - 21, "%1d", (int)_sizeFieldPos);
+    snprintf(achLeader + 20, sizeof(achLeader) - 20, "%1d", _sizeFieldLength);
+    snprintf(achLeader + 21, sizeof(achLeader) - 21, "%1d", _sizeFieldPos);
     achLeader[22] = '0';
-    snprintf(achLeader + 23, sizeof(achLeader) - 23, "%1d", (int)_sizeFieldTag);
+    snprintf(achLeader + 23, sizeof(achLeader) - 23, "%1d", _sizeFieldTag);
     int bRet = VSIFWriteL(achLeader, 24, 1, fpDDF) > 0;
 
     /* -------------------------------------------------------------------- */
@@ -386,17 +384,18 @@ int DDFModule::Create(const char *pszFilename)
         int nLength;
 
         CPLAssert(_sizeFieldLength + _sizeFieldPos + _sizeFieldTag <
-                  (int)sizeof(achDirEntry));
+                  static_cast<int>(sizeof(achDirEntry)));
 
         poFieldDefn->GenerateDDREntry(this, nullptr, &nLength);
 
-        CPLAssert((int)strlen(poFieldDefn->GetName()) == _sizeFieldTag);
+        CPLAssert(static_cast<int>(strlen(poFieldDefn->GetName())) ==
+                  _sizeFieldTag);
         snprintf(achDirEntry, sizeof(achDirEntry), "%s",
                  poFieldDefn->GetName());
-        snprintf(szFormat, sizeof(szFormat), "%%0%dd", (int)_sizeFieldLength);
+        snprintf(szFormat, sizeof(szFormat), "%%0%dd", _sizeFieldLength);
         snprintf(achDirEntry + _sizeFieldTag,
                  sizeof(achDirEntry) - _sizeFieldTag, szFormat, nLength);
-        snprintf(szFormat, sizeof(szFormat), "%%0%dd", (int)_sizeFieldPos);
+        snprintf(szFormat, sizeof(szFormat), "%%0%dd", _sizeFieldPos);
         snprintf(achDirEntry + _sizeFieldTag + _sizeFieldLength,
                  sizeof(achDirEntry) - _sizeFieldTag - _sizeFieldLength,
                  szFormat, nOffset);

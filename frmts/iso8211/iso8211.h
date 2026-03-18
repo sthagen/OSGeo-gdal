@@ -121,7 +121,7 @@ class CPL_ODLL DDFModule
 
     int GetSizeFieldTag() const
     {
-        return (int)_sizeFieldTag;
+        return _sizeFieldTag;
     }
 
     // Advanced uses for 8211dump/8211createfromxml
@@ -193,6 +193,8 @@ class CPL_ODLL DDFModule
     std::vector<std::unique_ptr<DDFFieldDefn>> apoFieldDefns{};
 
     std::unique_ptr<DDFRecord> poRecord{};
+
+    CPL_DISALLOW_COPY_ASSIGN(DDFModule)
 };
 
 /************************************************************************/
@@ -691,6 +693,8 @@ class CPL_ODLL DDFRecord
     std::string osData{};  // Whole record except leader with header
 
     std::vector<DDFField> aoFields{};
+
+    CPL_DISALLOW_COPY_ASSIGN(DDFRecord)
 };
 
 #endif /* ndef ISO8211_H_INCLUDED */

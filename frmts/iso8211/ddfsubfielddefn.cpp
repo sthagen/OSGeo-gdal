@@ -137,7 +137,8 @@ int DDFSubfieldDefn::SetFormat(const char *pszFormat)
                              osFormatString[1]);
                     return FALSE;
                 }
-                eBinaryFormat = (DDFBinaryFormat)(osFormatString[1] - '0');
+                eBinaryFormat =
+                    static_cast<DDFBinaryFormat>(osFormatString[1] - '0');
                 nFormatWidth = atoi(osFormatString.c_str() + 2);
                 if (nFormatWidth < 0)
                 {
@@ -467,9 +468,9 @@ double DDFSubfieldDefn::ExtractFloatData(const char *pachSourceData,
                     if (nFormatWidth == 1)
                         return abyData[0];
                     else if (nFormatWidth == 2)
-                        return *((GUInt16 *)pabyData);
+                        return *(static_cast<GUInt16 *>(pabyData));
                     else if (nFormatWidth == 4)
-                        return *((GUInt32 *)pabyData);
+                        return *(static_cast<GUInt32 *>(pabyData));
                     else
                     {
                         // CPLAssert( false );
@@ -478,11 +479,11 @@ double DDFSubfieldDefn::ExtractFloatData(const char *pachSourceData,
 
                 case SInt:
                     if (nFormatWidth == 1)
-                        return *((signed char *)abyData);
+                        return *(static_cast<signed char *>(pabyData));
                     else if (nFormatWidth == 2)
-                        return *((GInt16 *)pabyData);
+                        return *(static_cast<GInt16 *>(pabyData));
                     else if (nFormatWidth == 4)
-                        return *((GInt32 *)pabyData);
+                        return *(static_cast<GInt32 *>(pabyData));
                     else
                     {
                         // CPLAssert( false );
@@ -491,9 +492,10 @@ double DDFSubfieldDefn::ExtractFloatData(const char *pachSourceData,
 
                 case FloatReal:
                     if (nFormatWidth == 4)
-                        return *((float *)pabyData);
+                        return static_cast<double>(
+                            *(static_cast<float *>(pabyData)));
                     else if (nFormatWidth == 8)
-                        return *((double *)pabyData);
+                        return *(static_cast<double *>(pabyData));
                     else
                     {
                         // CPLAssert( false );
@@ -567,7 +569,7 @@ int DDFSubfieldDefn::ExtractIntData(const char *pachSourceData, int nMaxBytes,
             void *pabyData = abyData;
 
             if (nFormatWidth > nMaxBytes ||
-                nFormatWidth >= (int)sizeof(abyData))
+                nFormatWidth >= static_cast<int>(sizeof(abyData)))
             {
                 CPLError(
                     CE_Warning, CPLE_AppDefined,
@@ -603,11 +605,12 @@ int DDFSubfieldDefn::ExtractIntData(const char *pachSourceData, int nMaxBytes,
             {
                 case UInt:
                     if (nFormatWidth == 4)
-                        return (int)*((GUInt32 *)pabyData);
+                        return static_cast<int>(
+                            *(static_cast<GUInt32 *>(pabyData)));
                     else if (nFormatWidth == 1)
                         return abyData[0];
                     else if (nFormatWidth == 2)
-                        return *((GUInt16 *)pabyData);
+                        return *(static_cast<GUInt16 *>(pabyData));
                     else
                     {
                         // CPLAssert( false );
@@ -616,11 +619,11 @@ int DDFSubfieldDefn::ExtractIntData(const char *pachSourceData, int nMaxBytes,
 
                 case SInt:
                     if (nFormatWidth == 4)
-                        return *((GInt32 *)pabyData);
+                        return *(static_cast<GInt32 *>(pabyData));
                     else if (nFormatWidth == 1)
-                        return *((signed char *)abyData);
+                        return *(static_cast<signed char *>(pabyData));
                     else if (nFormatWidth == 2)
-                        return *((GInt16 *)pabyData);
+                        return *(static_cast<GInt16 *>(pabyData));
                     else
                     {
                         // CPLAssert( false );
@@ -629,9 +632,11 @@ int DDFSubfieldDefn::ExtractIntData(const char *pachSourceData, int nMaxBytes,
 
                 case FloatReal:
                     if (nFormatWidth == 4)
-                        return (int)*((float *)pabyData);
+                        return static_cast<int>(
+                            *(static_cast<float *>(pabyData)));
                     else if (nFormatWidth == 8)
-                        return (int)*((double *)pabyData);
+                        return static_cast<int>(
+                            *(static_cast<double *>(pabyData)));
                     else
                     {
                         // CPLAssert( false );
@@ -690,8 +695,8 @@ void DDFSubfieldDefn::DumpData(const char *pachData, int nMaxBytes,
     else if (eType == DDFBinaryString)
     {
         int nBytes = 0;
-        GByte *pabyBString =
-            (GByte *)ExtractStringData(pachData, nMaxBytes, &nBytes);
+        const GByte *pabyBString = reinterpret_cast<const GByte *>(
+            ExtractStringData(pachData, nMaxBytes, &nBytes));
 
         fprintf(fp, "      Subfield `%s' = 0x", osName.c_str());
         for (int i = 0; i < std::min(nBytes, 24); i++)
@@ -863,7 +868,8 @@ int DDFSubfieldDefn::FormatIntValue(char *pachData, int nBytesAvailable,
     {
         nSize = nFormatWidth;
 
-        if (GetBinaryFormat() == NotBinary && (int)strlen(szWork) > nSize)
+        if (GetBinaryFormat() == NotBinary &&
+            static_cast<int>(strlen(szWork)) > nSize)
             return FALSE;
     }
 
@@ -878,13 +884,12 @@ int DDFSubfieldDefn::FormatIntValue(char *pachData, int nBytesAvailable,
 
     if (bIsVariable)
     {
-        strncpy(pachData, szWork, nSize - 1);
+        memcpy(pachData, szWork, nSize - 1);
         pachData[nSize - 1] = DDF_UNIT_TERMINATOR;
     }
     else
     {
         GUInt32 nMask = 0xff;
-        int i;
 
         switch (GetBinaryFormat())
         {
@@ -901,7 +906,7 @@ int DDFSubfieldDefn::FormatIntValue(char *pachData, int nBytesAvailable,
 
             case UInt:
             case SInt:
-                for (i = 0; i < nFormatWidth; i++)
+                for (int i = 0; i < nFormatWidth; i++)
                 {
                     int iOut;
 
@@ -911,7 +916,8 @@ int DDFSubfieldDefn::FormatIntValue(char *pachData, int nBytesAvailable,
                     else
                         iOut = i;
 
-                    pachData[iOut] = (char)((nNewValue & nMask) >> (i * 8));
+                    pachData[iOut] =
+                        static_cast<char>((nNewValue & nMask) >> (i * 8));
                     nMask <<= 8;
                 }
                 break;
@@ -957,7 +963,8 @@ int DDFSubfieldDefn::FormatFloatValue(char *pachData, int nBytesAvailable,
     {
         nSize = nFormatWidth;
 
-        if (GetBinaryFormat() == NotBinary && (int)strlen(szWork) > nSize)
+        if (GetBinaryFormat() == NotBinary &&
+            static_cast<int>(strlen(szWork)) > nSize)
             return FALSE;
     }
 
@@ -972,7 +979,7 @@ int DDFSubfieldDefn::FormatFloatValue(char *pachData, int nBytesAvailable,
 
     if (bIsVariable)
     {
-        strncpy(pachData, szWork, nSize - 1);
+        memcpy(pachData, szWork, nSize - 1);
         pachData[nSize - 1] = DDF_UNIT_TERMINATOR;
     }
     else
