@@ -76,6 +76,7 @@ jobs:
         if find . -name '*.rst' | xargs grep "\.\.note"; then echo 'Wrong annotation. Should be .. note'; false; fi
         if find . -name '*.rst' | xargs grep "\.\.warning"; then echo 'Wrong annotation. Should be .. warning'; false; fi
         if find . -name '*.rst' | xargs grep "\.\.codeblock"; then echo 'Wrong annotation. Should be .. codeblock'; false; fi
+        if find . -name '*.rst' | xargs grep -P "\r$"; then echo 'Windows line breaks detected'; false; fi
       working-directory: ./doc
 
     - name: Doxygen
