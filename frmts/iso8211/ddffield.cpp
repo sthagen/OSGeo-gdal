@@ -28,7 +28,7 @@
 /*                             Initialize()                             */
 /************************************************************************/
 
-void DDFField::Initialize(DDFFieldDefn *poDefnIn, const char *pachDataIn,
+void DDFField::Initialize(const DDFFieldDefn *poDefnIn, const char *pachDataIn,
                           int nDataSizeIn)
 
 {

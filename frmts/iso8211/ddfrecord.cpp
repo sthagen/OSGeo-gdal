@@ -1010,9 +1010,9 @@ DDFRecord *DDFRecord::CloneOn(DDFModule *poTargetModule)
     /*      Verify that all fields have a corresponding field definition    */
     /*      on the target module.                                           */
     /* -------------------------------------------------------------------- */
-    for (auto &oField : aoFields)
+    for (const auto &oField : aoFields)
     {
-        DDFFieldDefn *poDefn = oField.GetFieldDefn();
+        const DDFFieldDefn *poDefn = oField.GetFieldDefn();
 
         if (poTargetModule->FindFieldDefn(poDefn->GetName()) == nullptr)
             return nullptr;

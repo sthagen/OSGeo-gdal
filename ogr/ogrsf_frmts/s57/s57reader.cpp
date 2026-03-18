@@ -446,7 +446,7 @@ bool S57Reader::Ingest()
         DDFField *poKeyField = poRecord->GetField(1);
         if (poKeyField == nullptr)
             return false;
-        DDFFieldDefn *poKeyFieldDefn = poKeyField->GetFieldDefn();
+        const DDFFieldDefn *poKeyFieldDefn = poKeyField->GetFieldDefn();
         if (poKeyFieldDefn == nullptr)
             continue;
         const char *pszName = poKeyFieldDefn->GetName();

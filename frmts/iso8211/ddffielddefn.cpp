@@ -847,7 +847,7 @@ DDFFieldDefn::FindSubfieldDefn(const char *pszMnemonic) const
  * Return default data for field instance.
  */
 
-char *DDFFieldDefn::GetDefaultValue(int *pnSize)
+char *DDFFieldDefn::GetDefaultValue(int *pnSize) const
 
 {
     /* -------------------------------------------------------------------- */

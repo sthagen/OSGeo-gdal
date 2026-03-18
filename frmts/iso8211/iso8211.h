@@ -312,7 +312,7 @@ class CPL_ODLL DDFFieldDefn
         bRepeatingSubfields = bRepeating;
     }
 
-    char *GetDefaultValue(int *pnSize);
+    char *GetDefaultValue(int *pnSize) const;
 
     const char *GetArrayDescr() const
     {
@@ -501,7 +501,7 @@ class CPL_ODLL DDFField
   public:
     DDFField() = default;
 
-    void Initialize(DDFFieldDefn *, const char *pszData, int nSize);
+    void Initialize(const DDFFieldDefn *, const char *pszData, int nSize);
 
     void Dump(FILE *fp) const;
 
@@ -528,19 +528,13 @@ class CPL_ODLL DDFField
     int GetRepeatCount() const;
 
     /** Fetch the corresponding DDFFieldDefn. */
-    DDFFieldDefn *GetFieldDefn()
-    {
-        return poDefn;
-    }
-
-    /** Fetch the corresponding DDFFieldDefn. */
     const DDFFieldDefn *GetFieldDefn() const
     {
         return poDefn;
     }
 
   private:
-    DDFFieldDefn *poDefn = nullptr;
+    const DDFFieldDefn *poDefn = nullptr;
 
     int nDataSize = 0;
 
