@@ -2889,6 +2889,16 @@ GDALDatasetH GDALVectorTranslate(const char *pszDest, GDALDatasetH hDstDS,
             bOutputDirectory = true;
         }
 
+        if (psOptions->bInvokedFromGdalAlgorithm && !bSingleLayer &&
+            !bOutputDirectory &&
+            !poDriver->GetMetadataItem(GDAL_DCAP_MULTIPLE_VECTOR_LAYERS))
+        {
+            CPLError(CE_Failure, CPLE_AppDefined,
+                     "%s driver does not support multiple layers.",
+                     poDriver->GetDescription());
+            return nullptr;
+        }
+
         CPLStringList aosDSCO(psOptions->aosDSCO);
 
         if (!aosDSCO.FetchNameValue("SINGLE_LAYER"))
@@ -2918,18 +2928,6 @@ GDALDatasetH GDALVectorTranslate(const char *pszDest, GDALDatasetH hDstDS,
             return nullptr;
         }
         bNewDataSource = true;
-
-        if (psOptions->bInvokedFromGdalAlgorithm && !bSingleLayer &&
-            !bOutputDirectory &&
-            (!poODS->TestCapability(ODsCCreateLayer) ||
-             !poDriver->GetMetadataItem(GDAL_DCAP_MULTIPLE_VECTOR_LAYERS)))
-        {
-            poDriver->Delete(osDestFilename);
-            CPLError(CE_Failure, CPLE_AppDefined,
-                     "%s driver does not support multiple layers.",
-                     poDriver->GetDescription());
-            return nullptr;
-        }
 
         if (psOptions->bCopyMD)
         {

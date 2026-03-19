@@ -559,3 +559,22 @@ def test_gdalalg_vector_convert_pipeline_warn_no_curve_support(tmp_vsimem, quiet
             gdal.alg.vector.pipeline(
                 input=src_ds, pipeline=f'read ! write {tmp_vsimem / "out.geojson"}'
             )
+
+
+###############################################################################
+
+
+@pytest.mark.require_driver("GeoJSON")
+def test_gdalalg_vector_convert_overwrite_fails(tmp_vsimem):
+
+    gdal.alg.vector.convert(
+        input="../ogr/data/poly.shp", output=f"/vsizip/{tmp_vsimem}/out.zip/out.geojson"
+    )
+    with pytest.raises(
+        Exception, match=f"Deleting /vsizip/{tmp_vsimem}/out.zip/out.geojson failed"
+    ):
+        gdal.alg.vector.convert(
+            input="../ogr/data/poly.shp",
+            output=f"/vsizip/{tmp_vsimem}/out.zip/out.geojson",
+            overwrite=True,
+        )
