@@ -21,6 +21,8 @@
 #include "gdalalg_vector_clip.h"
 #include "gdalalg_vector_combine.h"
 #include "gdalalg_vector_concat.h"
+#include "gdalalg_vector_concave_hull.h"
+#include "gdalalg_vector_convex_hull.h"
 #include "gdalalg_vector_dissolve.h"
 #include "gdalalg_vector_edit.h"
 #include "gdalalg_vector_explode_collections.h"
@@ -161,6 +163,8 @@ void GDALVectorPipelineAlgorithm::RegisterAlgorithms(
     registry.Register<GDALVectorCheckGeometryAlgorithm>();
     registry.Register<GDALVectorCombineAlgorithm>();
     registry.Register<GDALVectorConcatAlgorithm>();
+    registry.Register<GDALVectorConcaveHullAlgorithm>();
+    registry.Register<GDALVectorConvexHullAlgorithm>();
     registry.Register<GDALVectorCleanCoverageAlgorithm>();
 
     registry.Register<GDALVectorClipAlgorithm>(

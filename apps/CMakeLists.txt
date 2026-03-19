@@ -104,7 +104,9 @@ target_sources(appslib PRIVATE
   gdalalg_vector_clean_coverage.cpp
   gdalalg_vector_combine.cpp
   gdalalg_vector_concat.cpp
+  gdalalg_vector_concave_hull.cpp
   gdalalg_vector_convert.cpp
+  gdalalg_vector_convex_hull.cpp
   gdalalg_vector_dissolve.cpp
   gdalalg_vector_edit.cpp
   gdalalg_vector_pipeline.cpp

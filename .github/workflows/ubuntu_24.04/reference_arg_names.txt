@@ -12,6 +12,7 @@ all-input-field
 all-method-field
 all-touched
 allow-bbox-outside-source
+allow-holes
 altitude
 angle
 append
@@ -255,6 +256,7 @@ quiet
 radius
 radius1
 radius2
+ratio
 recursive
 reference
 replacement-character
