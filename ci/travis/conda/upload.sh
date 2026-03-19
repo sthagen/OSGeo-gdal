@@ -12,9 +12,9 @@ ls
 pwd
 find .
 
-if [[ -n $(find . -name "*gdal*.conda") ]]; then
-  echo "Found packages to upload"
-else
+files=$(find . -name "*gdal*.conda")
+
+if [ -z "$files" ]; then
   echo "No packages matching *gdal*.conda to upload found"
   exit 1
 fi
@@ -22,5 +22,18 @@ fi
 echo "Anaconda token is available, attempting to upload"
 conda install -c conda-forge python=3.12 anaconda-client -y
 
-find . -name "*gdal*.conda" -exec anaconda -t "$ANACONDA_TOKEN" upload --force --no-progress --user gdal-master  {} \;
+for f in $files; do
+  filename=$(basename "$f")
 
+  # extract package name
+  pkg=$(echo "$filename" | sed -E 's/-[0-9].*//')
+
+  # extract version number (e.g. 3.12.99)
+  version=$(echo "$filename" | sed -E 's/^.+-([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+
+  echo "Removing gdal-master/$pkg/$version"
+  anaconda -t "$ANACONDA_TOKEN" remove -f "gdal-master/$pkg/$version" || true
+
+  echo "Uploading $filename"
+  anaconda -t "$ANACONDA_TOKEN" upload --force --no-progress --user gdal-master "$f"
+done
