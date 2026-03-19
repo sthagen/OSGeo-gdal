@@ -39,9 +39,9 @@ typedef enum
 int CPL_ODLL DDFScanInt(const char *pszString, int nMaxChars);
 int CPL_ODLL DDFScanVariable(const char *pszString, int nMaxChars,
                              int nDelimChar);
-char CPL_ODLL *DDFFetchVariable(const char *pszString, int nMaxChars,
-                                int nDelimChar1, int nDelimChar2,
-                                int *pnConsumedChars);
+std::string CPL_ODLL DDFFetchVariable(const char *pszString, int nMaxChars,
+                                      int nDelimChar1, int nDelimChar2,
+                                      int *pnConsumedChars);
 
 #define DDF_FIELD_TERMINATOR 30
 #define DDF_UNIT_TERMINATOR 31
@@ -252,7 +252,7 @@ class CPL_ODLL DDFFieldDefn
      */
     const char *GetName() const
     {
-        return pszTag;
+        return osTag.c_str();
     }
 
     /** Fetch a longer description of this field.
@@ -260,7 +260,7 @@ class CPL_ODLL DDFFieldDefn
      */
     const char *GetDescription() const
     {
-        return _fieldName;
+        return _fieldName.c_str();
     }
 
     /** Get the number of subfields. */
@@ -298,7 +298,7 @@ class CPL_ODLL DDFFieldDefn
         return bRepeatingSubfields;
     }
 
-    static char *ExpandFormat(const char *);
+    static std::string ExpandFormat(const char *);
 
     /** this is just for an S-57 hack for swedish data */
     void SetRepeatingFlag(bool bRepeating)
@@ -310,12 +310,12 @@ class CPL_ODLL DDFFieldDefn
 
     const char *GetArrayDescr() const
     {
-        return _arrayDescr;
+        return _arrayDescr.c_str();
     }
 
     const char *GetFormatControls() const
     {
-        return _formatControls;
+        return _formatControls.c_str();
     }
 
     DDF_data_struct_code GetDataStructCode() const
@@ -331,14 +331,14 @@ class CPL_ODLL DDFFieldDefn
     void SetFormatControls(const char *pszVal);
 
   private:
-    static char *ExtractSubstring(const char *);
+    static std::string ExtractSubstring(const char *);
 
     DDFModule *poModule = nullptr;
-    char *pszTag = nullptr;
+    std::string osTag{};
 
-    char *_fieldName = nullptr;
-    char *_arrayDescr = nullptr;
-    char *_formatControls = nullptr;
+    std::string _fieldName{};
+    std::string _arrayDescr{};
+    std::string _formatControls{};
 
     bool bRepeatingSubfields = false;
     int nFixedWidth = 0;  // zero if variable.

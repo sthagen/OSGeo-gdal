@@ -35,14 +35,7 @@ DDFFieldDefn::DDFFieldDefn() = default;
 /*                           ~DDFFieldDefn()                            */
 /************************************************************************/
 
-DDFFieldDefn::~DDFFieldDefn()
-
-{
-    CPLFree(pszTag);
-    CPLFree(_fieldName);
-    CPLFree(_arrayDescr);
-    CPLFree(_formatControls);
-}
+DDFFieldDefn::~DDFFieldDefn() = default;
 
 /************************************************************************/
 /*                            AddSubfield()                             */
@@ -76,40 +69,27 @@ void DDFFieldDefn::AddSubfield(std::unique_ptr<DDFSubfieldDefn> poNewSFDefn,
     /*      Add this format to the format list.  We don't bother            */
     /*      aggregating formats here.                                       */
     /* -------------------------------------------------------------------- */
-    if (_formatControls == nullptr || strlen(_formatControls) == 0)
+    if (_formatControls.empty())
     {
-        CPLFree(_formatControls);
-        _formatControls = CPLStrdup("()");
+        _formatControls = "()";
     }
 
-    const int nOldLen = static_cast<int>(strlen(_formatControls));
+    std::string osNewFormatControls = _formatControls;
+    osNewFormatControls.pop_back();
+    if (!osNewFormatControls.empty() && osNewFormatControls.back() != '(')
+        osNewFormatControls += ',';
+    osNewFormatControls += poNewSFDefn->GetFormat();
+    osNewFormatControls += ')';
 
-    char *pszNewFormatControls = static_cast<char *>(
-        CPLMalloc(nOldLen + 3 + strlen(poNewSFDefn->GetFormat())));
-
-    strcpy(pszNewFormatControls, _formatControls);
-    pszNewFormatControls[nOldLen - 1] = '\0';
-    if (pszNewFormatControls[nOldLen - 2] != '(')
-        strcat(pszNewFormatControls, ",");
-
-    strcat(pszNewFormatControls, poNewSFDefn->GetFormat());
-    strcat(pszNewFormatControls, ")");
-
-    CPLFree(_formatControls);
-    _formatControls = pszNewFormatControls;
+    _formatControls = std::move(osNewFormatControls);
 
     /* -------------------------------------------------------------------- */
     /*      Add the subfield name to the list.                              */
     /* -------------------------------------------------------------------- */
-    if (_arrayDescr == nullptr)
-        _arrayDescr = CPLStrdup("");
-
-    _arrayDescr = static_cast<char *>(CPLRealloc(
-        _arrayDescr, strlen(_arrayDescr) + strlen(poNewSFDefn->GetName()) + 2));
-    if (strlen(_arrayDescr) > 0 &&
-        (_arrayDescr[0] != '*' || strlen(_arrayDescr) > 1))
-        strcat(_arrayDescr, "!");
-    strcat(_arrayDescr, poNewSFDefn->GetName());
+    if (!_arrayDescr.empty() &&
+        (_arrayDescr[0] != '*' || _arrayDescr.size() > 1))
+        _arrayDescr += '!';
+    _arrayDescr += poNewSFDefn->GetName();
 
     apoSubfields.push_back(std::move(poNewSFDefn));
 }
@@ -128,22 +108,18 @@ int DDFFieldDefn::Create(const char *pszTagIn, const char *pszFieldName,
                          const char *pszFormat)
 
 {
-    CPLAssert(pszTag == nullptr);
+    CPLAssert(osTag.empty());
     poModule = nullptr;
-    pszTag = CPLStrdup(pszTagIn);
-    _fieldName = CPLStrdup(pszFieldName);
-    _arrayDescr = CPLStrdup(pszDescription);
+    osTag = pszTagIn;
+    _fieldName = pszFieldName;
+    _arrayDescr = pszDescription ? pszDescription : "";
 
     _data_struct_code = eDataStructCode;
     _data_type_code = eDataTypeCode;
 
-    if (pszFormat != nullptr)
-        _formatControls = CPLStrdup(pszFormat);
-    else
-        _formatControls = CPLStrdup("");
+    _formatControls = pszFormat ? pszFormat : "";
 
-    if (pszDescription != nullptr && *pszDescription == '*')
-        bRepeatingSubfields = TRUE;
+    bRepeatingSubfields = (pszDescription != nullptr && *pszDescription == '*');
 
     return TRUE;
 }
@@ -154,8 +130,7 @@ int DDFFieldDefn::Create(const char *pszTagIn, const char *pszFieldName,
 
 void DDFFieldDefn::SetFormatControls(const char *pszVal)
 {
-    CPLFree(_formatControls);
-    _formatControls = CPLStrdup(pszVal ? pszVal : "");
+    _formatControls = pszVal ? pszVal : "";
 }
 
 /************************************************************************/
@@ -169,12 +144,10 @@ int DDFFieldDefn::GenerateDDREntry(DDFModule *poModuleIn, char **ppachData,
     const int iFDOffset = poModuleIn->GetFieldControlLength();
     CPLAssert(iFDOffset >= 6 && iFDOffset <= 9);
     *pnLength =
-        static_cast<int>(iFDOffset + strlen(_fieldName) + 1 +
-                         strlen(_arrayDescr) + 1 + strlen(_formatControls) + 1);
+        static_cast<int>(iFDOffset + _fieldName.size() + 1 +
+                         _arrayDescr.size() + 1 + _formatControls.size() + 1);
 
-    if (strlen(_arrayDescr) == 0)
-        *pnLength -= 1;
-    if (strlen(_formatControls) == 0)
+    if (_arrayDescr.empty() || _formatControls.empty())
         *pnLength -= 1;
 
     if (ppachData == nullptr)
@@ -217,15 +190,15 @@ int DDFFieldDefn::GenerateDDREntry(DDFModule *poModuleIn, char **ppachData,
     if (iFDOffset > 8)
         (*ppachData)[8] = ' ';
     snprintf(*ppachData + iFDOffset, *pnLength + 1 - iFDOffset, "%s",
-             _fieldName);
-    if (strlen(_arrayDescr) > 0)
+             _fieldName.c_str());
+    if (!_arrayDescr.empty())
         snprintf(*ppachData + strlen(*ppachData),
                  *pnLength + 1 - strlen(*ppachData), "%c%s",
-                 DDF_UNIT_TERMINATOR, _arrayDescr);
-    if (strlen(_formatControls) > 0)
+                 DDF_UNIT_TERMINATOR, _arrayDescr.c_str());
+    if (!_formatControls.empty())
         snprintf(*ppachData + strlen(*ppachData),
                  *pnLength + 1 - strlen(*ppachData), "%c%s",
-                 DDF_UNIT_TERMINATOR, _formatControls);
+                 DDF_UNIT_TERMINATOR, _formatControls.c_str());
     snprintf(*ppachData + strlen(*ppachData),
              *pnLength + 1 - strlen(*ppachData), "%c", DDF_FIELD_TERMINATOR);
 
@@ -247,7 +220,7 @@ int DDFFieldDefn::Initialize(DDFModule *poModuleIn, const char *pszTagIn,
 
     poModule = poModuleIn;
 
-    pszTag = CPLStrdup(pszTagIn);
+    osTag = pszTagIn;
 
     /* -------------------------------------------------------------------- */
     /*      Set the data struct and type codes.                             */
@@ -275,7 +248,7 @@ int DDFFieldDefn::Initialize(DDFModule *poModuleIn, const char *pszTagIn,
             CPLError(CE_Failure, CPLE_AppDefined,
                      "Unrecognized data_struct_code value %c.\n"
                      "Field %s initialization incorrect.",
-                     pachFieldArea[0], pszTag);
+                     pachFieldArea[0], osTag.c_str());
             _data_struct_code = dsc_elementary;
     }
 
@@ -314,7 +287,7 @@ int DDFFieldDefn::Initialize(DDFModule *poModuleIn, const char *pszTagIn,
             CPLError(CE_Failure, CPLE_AppDefined,
                      "Unrecognized data_type_code value %c.\n"
                      "Field %s initialization incorrect.",
-                     pachFieldArea[1], pszTag);
+                     pachFieldArea[1], osTag.c_str());
             _data_type_code = dtc_char_string;
     }
 
@@ -372,10 +345,10 @@ void DDFFieldDefn::Dump(FILE *fp) const
     CPL_IGNORE_RET_VAL(pszValue);  // Make CSA happy
 
     fprintf(fp, "  DDFFieldDefn:\n");
-    fprintf(fp, "      Tag = `%s'\n", pszTag);
-    fprintf(fp, "      _fieldName = `%s'\n", _fieldName);
-    fprintf(fp, "      _arrayDescr = `%s'\n", _arrayDescr);
-    fprintf(fp, "      _formatControls = `%s'\n", _formatControls);
+    fprintf(fp, "      Tag = `%s'\n", osTag.c_str());
+    fprintf(fp, "      _fieldName = `%s'\n", _fieldName.c_str());
+    fprintf(fp, "      _arrayDescr = `%s'\n", _arrayDescr.c_str());
+    fprintf(fp, "      _formatControls = `%s'\n", _formatControls.c_str());
 
     switch (_data_struct_code)
     {
@@ -394,10 +367,6 @@ void DDFFieldDefn::Dump(FILE *fp) const
         case dsc_concatenated:
             pszValue = "concatenated";
             break;
-
-        default:
-            CPLAssert(false);
-            pszValue = "(unknown)";
     }
 
     fprintf(fp, "      _data_struct_code = %s\n", pszValue);
@@ -431,11 +400,6 @@ void DDFFieldDefn::Dump(FILE *fp) const
         case dtc_mixed_data_type:
             pszValue = "mixed_data_type";
             break;
-
-        default:
-            CPLAssert(false);
-            pszValue = "(unknown)";
-            break;
     }
 
     fprintf(fp, "      _data_type_code = %s\n", pszValue);
@@ -453,7 +417,7 @@ void DDFFieldDefn::Dump(FILE *fp) const
 void DDFFieldDefn::BuildSubfields()
 
 {
-    const char *pszSublist = _arrayDescr;
+    const char *pszSublist = _arrayDescr.c_str();
 
     /* -------------------------------------------------------------------- */
     /*      It is valid to define a field with _arrayDesc                   */
@@ -484,22 +448,19 @@ void DDFFieldDefn::BuildSubfields()
     /* -------------------------------------------------------------------- */
     /*      split list of fields .                                          */
     /* -------------------------------------------------------------------- */
-    char **papszSubfieldNames =
-        CSLTokenizeStringComplex(pszSublist, "!", FALSE, FALSE);
+    const CPLStringList aosSubfieldNames(
+        CSLTokenizeStringComplex(pszSublist, "!", FALSE, FALSE));
 
     /* -------------------------------------------------------------------- */
     /*      minimally initialize the subfields.  More will be done later.   */
     /* -------------------------------------------------------------------- */
-    const int nSFCount = CSLCount(papszSubfieldNames);
-    for (int iSF = 0; iSF < nSFCount; iSF++)
+    for (const char *pszSubfieldName : cpl::Iterate(aosSubfieldNames))
     {
         auto poSFDefn = std::make_unique<DDFSubfieldDefn>();
 
-        poSFDefn->SetName(papszSubfieldNames[iSF]);
+        poSFDefn->SetName(pszSubfieldName);
         AddSubfield(std::move(poSFDefn), true);
     }
-
-    CSLDestroy(papszSubfieldNames);
 }
 
 /************************************************************************/
@@ -513,11 +474,11 @@ void DDFFieldDefn::BuildSubfields()
 /*                                                                      */
 /*      Given a string like "(A,3(B,C),D),X,Y)" return "A,3(B,C),D".    */
 /*      Giveh a string like "3A,2C" return "3A".                        */
-/*      Giveh a string like "(3A,2C" return NULL.                       */
-/*      Giveh a string like "3A),2C" return NULL.                       */
+/*      Giveh a string like "(3A,2C" return an empty string             */
+/*      Giveh a string like "3A),2C" return an empty string             */
 /************************************************************************/
 
-char *DDFFieldDefn::ExtractSubstring(const char *pszSrc)
+std::string DDFFieldDefn::ExtractSubstring(const char *pszSrc)
 
 {
     int nBracket = 0;
@@ -530,41 +491,32 @@ char *DDFFieldDefn::ExtractSubstring(const char *pszSrc)
         {
             nBracket--;
             if (nBracket < 0)
-                return nullptr;
+                return std::string();
         }
     }
     if (nBracket > 0)
-        return nullptr;
+        return std::string();
 
-    char *pszReturn = nullptr;
     if (pszSrc[0] == '(')
     {
         CPLAssert(i >= 2);
-        pszReturn = CPLStrdup(pszSrc + 1);
-        pszReturn[i - 2] = '\0';
+        return std::string(pszSrc + 1, i - 2);
     }
     else
     {
-        pszReturn = CPLStrdup(pszSrc);
-        pszReturn[i] = '\0';
+        return std::string(pszSrc, i);
     }
-
-    return pszReturn;
 }
 
 /************************************************************************/
 /*                            ExpandFormat()                            */
 /************************************************************************/
 
-char *DDFFieldDefn::ExpandFormat(const char *pszSrc)
+std::string DDFFieldDefn::ExpandFormat(const char *pszSrc)
 
 {
-    size_t nDestMax = 32;
-    char *pszDest = static_cast<char *>(CPLMalloc(nDestMax + 1));
-
+    std::string osDest;
     size_t iSrc = 0;
-    size_t iDst = 0;
-    pszDest[0] = '\0';
 
     while (pszSrc[iSrc] != '\0')
     {
@@ -574,43 +526,26 @@ char *DDFFieldDefn::ExpandFormat(const char *pszSrc)
         // layer of brackets.
         if ((iSrc == 0 || pszSrc[iSrc - 1] == ',') && pszSrc[iSrc] == '(')
         {
-            char *pszContents = ExtractSubstring(pszSrc + iSrc);
-            if (pszContents == nullptr)
+            const std::string osContents = ExtractSubstring(pszSrc + iSrc);
+            if (osContents.empty())
             {
-                pszDest[0] = '\0';
-                return pszDest;
+                return std::string();
             }
-            char *pszExpandedContents = ExpandFormat(pszContents);
-            if (pszExpandedContents[0] == '\0')
+            const std::string osExpandedContents =
+                ExpandFormat(osContents.c_str());
+            if (osExpandedContents.empty())
             {
-                CPLFree(pszContents);
-                CPLFree(pszExpandedContents);
-                pszDest[0] = '\0';
-                return pszDest;
+                return std::string();
             }
 
-            const size_t nExpandedContentsLen = strlen(pszExpandedContents);
-            if (nExpandedContentsLen + iDst + 1 > nDestMax)
+            if (osDest.size() + osExpandedContents.size() > 1024 * 1024)
             {
-                nDestMax = 2 * (nExpandedContentsLen + iDst);
-                if (nDestMax > 1024 * 1024)
-                {
-                    CPLFree(pszContents);
-                    CPLFree(pszExpandedContents);
-                    pszDest[0] = '\0';
-                    return pszDest;
-                }
-                pszDest =
-                    static_cast<char *>(CPLRealloc(pszDest, nDestMax + 1));
+                return std::string();
             }
 
-            strcat(pszDest + iDst, pszExpandedContents);
-            iDst += nExpandedContentsLen;
+            osDest += osExpandedContents;
 
-            iSrc = iSrc + strlen(pszContents) + 2;
-
-            CPLFree(pszContents);
-            CPLFree(pszExpandedContents);
+            iSrc += osContents.size() + 2;
         }
 
         // This is a repeated subclause.
@@ -622,8 +557,9 @@ char *DDFFieldDefn::ExpandFormat(const char *pszSrc)
             // problems in the below loop
             if (nRepeat < 0 || nRepeat > 100)
             {
-                pszDest[0] = '\0';
-                return pszDest;
+                CPLError(CE_Failure, CPLE_AppDefined,
+                         "Too large repeat count: %d", nRepeat);
+                return std::string();
             }
 
             // Skip over repeat count.
@@ -631,69 +567,43 @@ char *DDFFieldDefn::ExpandFormat(const char *pszSrc)
             for (; isdigit(static_cast<unsigned char>(*pszNext)); pszNext++)
                 iSrc++;
 
-            char *pszContents = ExtractSubstring(pszNext);
-            if (pszContents == nullptr)
+            const std::string osContents = ExtractSubstring(pszNext);
+            if (osContents.empty())
             {
-                pszDest[0] = '\0';
-                return pszDest;
+                return std::string();
             }
-            char *pszExpandedContents = ExpandFormat(pszContents);
-            if (pszExpandedContents[0] == '\0')
+            const std::string osExpandedContents =
+                ExpandFormat(osContents.c_str());
+            if (osExpandedContents.empty())
             {
-                CPLFree(pszContents);
-                CPLFree(pszExpandedContents);
-                pszDest[0] = '\0';
-                return pszDest;
+                return std::string();
             }
 
-            const size_t nExpandedContentsLen = strlen(pszExpandedContents);
+            const size_t nExpandedContentsLen = osExpandedContents.size();
+            if (osDest.size() + nExpandedContentsLen * nRepeat > 1024 * 1024)
+            {
+                return std::string();
+            }
+
             for (int i = 0; i < nRepeat; i++)
             {
-                if (nExpandedContentsLen + iDst + 1 + 1 > nDestMax)
-                {
-                    nDestMax = 2 * (nExpandedContentsLen + iDst + 1);
-                    if (nDestMax > 1024 * 1024)
-                    {
-                        CPLFree(pszContents);
-                        CPLFree(pszExpandedContents);
-                        pszDest[0] = '\0';
-                        return pszDest;
-                    }
-                    pszDest =
-                        static_cast<char *>(CPLRealloc(pszDest, nDestMax + 1));
-                }
-
-                strcat(pszDest + iDst, pszExpandedContents);
-                iDst += nExpandedContentsLen;
-                if (i < nRepeat - 1)
-                {
-                    strcat(pszDest + iDst, ",");
-                    iDst++;
-                }
+                if (i > 0)
+                    osDest += ',';
+                osDest += osExpandedContents;
             }
 
             if (pszNext[0] == '(')
-                iSrc = iSrc + strlen(pszContents) + 2;
+                iSrc += osContents.size() + 2;
             else
-                iSrc = iSrc + strlen(pszContents);
-
-            CPLFree(pszContents);
-            CPLFree(pszExpandedContents);
+                iSrc += osContents.size();
         }
         else
         {
-            if (iDst + 1 >= nDestMax)
-            {
-                nDestMax = 2 * iDst;
-                pszDest = static_cast<char *>(CPLRealloc(pszDest, nDestMax));
-            }
-
-            pszDest[iDst++] = pszSrc[iSrc++];
-            pszDest[iDst] = '\0';
+            osDest += pszSrc[iSrc++];
         }
     }
 
-    return pszDest;
+    return osDest;
 }
 
 /************************************************************************/
@@ -710,12 +620,12 @@ int DDFFieldDefn::ApplyFormats()
     /* -------------------------------------------------------------------- */
     /*      Verify that the format string is contained within brackets.     */
     /* -------------------------------------------------------------------- */
-    if (strlen(_formatControls) < 2 || _formatControls[0] != '(' ||
-        _formatControls[strlen(_formatControls) - 1] != ')')
+    if (_formatControls.size() < 2 || _formatControls[0] != '(' ||
+        _formatControls.back() != ')')
     {
         CPLError(CE_Warning, static_cast<CPLErrorNum>(CPLE_DiscardedFormat),
-                 "Format controls for `%s' field missing brackets:%s", pszTag,
-                 _formatControls);
+                 "Format controls for `%s' field missing brackets:%s",
+                 osTag.c_str(), _formatControls.c_str());
 
         return FALSE;
     }
@@ -724,32 +634,29 @@ int DDFFieldDefn::ApplyFormats()
     /*      Duplicate the string, and strip off the brackets.               */
     /* -------------------------------------------------------------------- */
 
-    char *pszFormatList = ExpandFormat(_formatControls);
-    if (pszFormatList[0] == '\0')
+    const std::string osFormatList = ExpandFormat(_formatControls.c_str());
+    if (osFormatList.empty())
     {
         CPLError(CE_Warning, static_cast<CPLErrorNum>(CPLE_DiscardedFormat),
-                 "Invalid format controls for `%s': %s", pszTag,
-                 _formatControls);
-        CPLFree(pszFormatList);
+                 "Invalid format controls for `%s': %s", osTag.c_str(),
+                 _formatControls.c_str());
         return FALSE;
     }
 
     /* -------------------------------------------------------------------- */
     /*      Tokenize based on commas.                                       */
     /* -------------------------------------------------------------------- */
-    char **papszFormatItems =
-        CSLTokenizeStringComplex(pszFormatList, ",", FALSE, FALSE);
-
-    CPLFree(pszFormatList);
+    const CPLStringList aosFormatItems(
+        CSLTokenizeStringComplex(osFormatList.c_str(), ",", FALSE, FALSE));
 
     /* -------------------------------------------------------------------- */
     /*      Apply the format items to subfields.                            */
     /* -------------------------------------------------------------------- */
     int iFormatItem = 0;  // Used after for.
 
-    for (; papszFormatItems[iFormatItem] != nullptr; iFormatItem++)
+    for (; iFormatItem < aosFormatItems.size(); iFormatItem++)
     {
-        const char *pszPastPrefix = papszFormatItems[iFormatItem];
+        const char *pszPastPrefix = aosFormatItems[iFormatItem];
         while (*pszPastPrefix >= '0' && *pszPastPrefix <= '9')
             pszPastPrefix++;
 
@@ -762,13 +669,13 @@ int DDFFieldDefn::ApplyFormats()
         if (iFormatItem >= GetSubfieldCount())
         {
             CPLError(CE_Warning, static_cast<CPLErrorNum>(CPLE_DiscardedFormat),
-                     "Got more formats than subfields for field `%s'.", pszTag);
+                     "Got more formats than subfields for field `%s'.",
+                     osTag.c_str());
             break;
         }
 
         if (!apoSubfields[iFormatItem]->SetFormat(pszPastPrefix))
         {
-            CSLDestroy(papszFormatItems);
             return FALSE;
         }
     }
@@ -776,12 +683,12 @@ int DDFFieldDefn::ApplyFormats()
     /* -------------------------------------------------------------------- */
     /*      Verify that we got enough formats, cleanup and return.          */
     /* -------------------------------------------------------------------- */
-    CSLDestroy(papszFormatItems);
 
     if (iFormatItem < GetSubfieldCount())
     {
         CPLError(CE_Warning, static_cast<CPLErrorNum>(CPLE_DiscardedFormat),
-                 "Got less formats than subfields for field `%s'.", pszTag);
+                 "Got less formats than subfields for field `%s'.",
+                 osTag.c_str());
         return FALSE;
     }
 
@@ -803,8 +710,8 @@ int DDFFieldDefn::ApplyFormats()
             {
                 CPLError(CE_Warning,
                          static_cast<CPLErrorNum>(CPLE_DiscardedFormat),
-                         "Invalid format controls for `%s': %s", pszTag,
-                         _formatControls);
+                         "Invalid format controls for `%s': %s", osTag.c_str(),
+                         _formatControls.c_str());
                 return FALSE;
             }
             nFixedWidth += poSubfield->GetWidth();
