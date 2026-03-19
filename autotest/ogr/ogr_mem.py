@@ -803,6 +803,26 @@ def test_ogr_mem_consume_arrow_array_pycapsule_interface():
 ###############################################################################
 
 
+def test_ogr_mem_arrow_stream_nanoarrow():
+
+    na = pytest.importorskip("nanoarrow")
+
+    ds = ogr.GetDriverByName("MEM").CreateDataSource("")
+    lyr = ds.CreateLayer("foo")
+    lyr.CreateField(ogr.FieldDefn("foo"))
+    f = ogr.Feature(lyr.GetLayerDefn())
+    f["foo"] = "bar"
+    f.SetGeometry(ogr.CreateGeometryFromWkt("POINT (1 2)"))
+    lyr.CreateFeature(f)
+
+    na_stream = na.ArrayStream(lyr)
+    batch = next(na_stream.__iter__())
+    assert len(batch) == 1
+
+
+###############################################################################
+
+
 def test_ogr_mem_arrow_stream_numpy():
     gdaltest.importorskip_gdal_array()
     numpy = pytest.importorskip("numpy")

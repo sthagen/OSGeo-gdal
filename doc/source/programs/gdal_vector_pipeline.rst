@@ -97,6 +97,12 @@ Details for options can be found in :ref:`gdal_vector_make_valid`.
 
 Details for options can be found in :ref:`gdal_vector_materialize`.
 
+* rename-layer
+
+.. program-output:: gdal vector pipeline --help-doc=rename-layer
+
+Details for options can be found in :ref:`gdal_vector_rename_layer`.
+
 * reproject
 
 .. program-output:: gdal vector pipeline --help-doc=reproject

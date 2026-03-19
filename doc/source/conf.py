@@ -106,6 +106,7 @@ exclude_patterns = [
     "programs/options/*.rst",
     "api/python/modules.rst",
     "gdal_rtd/README.md",
+    "user/geometry_validity_examples.rst",
 ]
 
 # Prevents double hyphen (--) to be replaced by Unicode long dash character
@@ -1040,6 +1041,13 @@ man_pages = [
         "gdal-vector-rasterize",
         "Burn vector geometries into a raster",
         [author_elpaso],
+        1,
+    ),
+    (
+        "programs/gdal_vector_rename_layer",
+        "gdal-vector-rename-layer",
+        "Rename layer(s) of a vector dataset",
+        [author_evenr],
         1,
     ),
     (
