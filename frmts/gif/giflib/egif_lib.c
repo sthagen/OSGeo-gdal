@@ -1002,7 +1002,7 @@ static int EGifCompressOutput(GifFileType *GifFile, const int Code) {
 		}
 	}
 
-	/* If code cannt fit into RunningBits bits, must raise its size. Note */
+	/* If code cannot fit into RunningBits bits, must raise its size. Note */
 	/* however that codes above 4095 are used for special signaling.      */
 	if (Private->RunningCode >= Private->MaxCode1 && Code <= 4095) {
 		Private->MaxCode1 = 1 << ++Private->RunningBits;

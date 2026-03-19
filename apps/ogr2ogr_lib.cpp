@@ -2962,7 +2962,7 @@ GDALDatasetH GDALVectorTranslate(const char *pszDest, GDALDatasetH hDstDS,
             poDriver->GetMetadataItem(GDAL_DCAP_UPSERT) == nullptr)
         {
             CPLError(CE_Failure, CPLE_NotSupported,
-                     "%s driver doest not support upsert",
+                     "%s driver does not support upsert",
                      poODS->GetDriver()->GetDescription());
             return nullptr;
         }

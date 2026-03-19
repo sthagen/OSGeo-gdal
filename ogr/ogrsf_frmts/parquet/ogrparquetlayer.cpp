@@ -985,7 +985,7 @@ void OGRParquetLayer::EstablishFeatureDefn()
         oMapParquetColumnNameToIdx[parquetColumnName] = iParquetCol;
     }
 
-    // Synthetize a GeoParquet bounding box column definition when detecting
+    // Synthesize a GeoParquet bounding box column definition when detecting
     // a Overture Map dataset < 2024-04-16-beta.0
     if ((m_oMapGeometryColumns.empty() ||
          // Below is for release 2024-01-17-alpha.0

@@ -536,7 +536,7 @@ json_object *OGRGeoJSONSeqLayer::GetNextObject(bool bLooseIdentification)
         }
         else
         {
-            // No separator ? then accummulate
+            // No separator ? then accumulate
             m_osFeatureBuffer.append(m_osBuffer.data() + m_nPosInBuffer,
                                      m_nBufferValidSize - m_nPosInBuffer);
             if (m_nMaxObjectSize > 0 &&

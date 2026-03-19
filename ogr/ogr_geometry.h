@@ -1406,7 +1406,7 @@ inline OGRCurve::ConstIterator end(const OGRCurve *poCurve)
  Implementation detail of OGRSimpleCurve::Iterator.
 
  This class is a simple wrapper over OGRPoint, which shouldn't be directly
- referenced by the user other than trough auto&& in an iteator
+ referenced by the user other than through auto&& in an iterator
  over a OGRSimpleCurve.
 
  Typical usage pattern is:

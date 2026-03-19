@@ -1991,7 +1991,7 @@ GDALDataset *WMTSDataset::Open(GDALOpenInfo *poOpenInfo)
             // For
             // https://data.linz.govt.nz/services;key=XXXXXXXX/wmts/1.0.0/set/69/WMTSCapabilities.xml
             // only clip in Y since there's a warp over dateline.
-            // Update: it sems that the content of the server has changed since
+            // Update: it seems that the content of the server has changed since
             // initial coding. So do X clipping in default mode.
             if (!bExtendBeyondDateLine)
             {

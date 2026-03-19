@@ -3396,7 +3396,7 @@ bool S57Reader::FindAndApplyUpdates(const char *pszPath)
 
     for (int iUpdate = 1; bSuccess; iUpdate++)
     {
-        // Creaing file extension
+        // Creating file extension
         CPLString extension;
         CPLString dirname;
 

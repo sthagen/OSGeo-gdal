@@ -1616,7 +1616,7 @@ GDALDriver *GDALPluginDriverProxy::GetRealDriver()
             {
                 CPLError(CE_Warning, CPLE_AppDefined,
                          "Driver %s declares a %s callback whereas its proxy "
-                         "doest not declare %s",
+                         "does not declare %s",
                          GetDescription(), pszFunc, pszItemName);
             }
             else if (!pfnFunc && GetMetadataItem(pszItemName))

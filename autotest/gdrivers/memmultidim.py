@@ -1482,7 +1482,7 @@ def test_mem_md_array_transpose():
         assert not ar.Transpose([0, 1, -1])  # missing axis
         assert not ar.Transpose([0, 1, 1])  # repeated axis
 
-    # Idendity
+    # Identity
     transposed = ar.Transpose([0, 1, 2])
     assert transposed.GetDimensionCount() == 3
     dims = transposed.GetDimensions()
@@ -1515,7 +1515,7 @@ def test_mem_md_array_transpose():
     assert transposed.GetNoDataValueAsRaw() == ar.GetNoDataValueAsRaw()
     assert transposed.GetSpatialRef().IsSame(ar.GetSpatialRef())
 
-    # Idendity with one extra axis
+    # Identity with one extra axis
     transposed = ar.Transpose([0, 1, -1, 2])
     assert transposed.GetDimensionCount() == 4
     dims = transposed.GetDimensions()

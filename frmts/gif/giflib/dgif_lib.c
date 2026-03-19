@@ -877,7 +877,7 @@ static int DGifDecompressLine(GifFileType *GifFile, GifPixelType *Line,
 	}
 
 	if (StackPtr != 0) {
-		/* Let pop the stack off before continueing to read the GIF
+		/* Let pop the stack off before continuing to read the GIF
 		 * file: */
 		while (StackPtr != 0 && i < LineLen) {
 			Line[i++] = Stack[--StackPtr];
@@ -917,7 +917,7 @@ static int DGifDecompressLine(GifFileType *GifFile, GifPixelType *Line,
 				/* Its a code to needed to be traced: trace the
 				 * linked list until the prefix is a pixel,
 				 * while pushing the suffix pixels on our stack.
-				 * If we done, pop the stack in reverse (thats
+				 * If we done, pop the stack in reverse (that's
 				 * what stack is good for!) order to output.  */
 				if (Prefix[CrntCode] == NO_SUCH_CODE) {
 					CrntPrefix = LastCode;
@@ -1060,7 +1060,7 @@ int DGifGetLZCodes(GifFileType *GifFile, int *Code) {
 
 /******************************************************************************
  The LZ decompression input routine:
- This routine is responsable for the decompression of the bit stream from
+ This routine is responsible for the decompression of the bit stream from
  8 bits (bytes) packets, into the real codes.
  Returns GIF_OK if read successfully.
 ******************************************************************************/
@@ -1112,7 +1112,7 @@ static int DGifDecompressInput(GifFileType *GifFile, int *Code) {
  This routines read one GIF data block at a time and buffers it internally
  so that the decompression routine could access it.
  The routine returns the next byte from its internal buffer (or read next
- block in if buffer empty) and returns GIF_OK if succesful.
+ block in if buffer empty) and returns GIF_OK if successful.
 ******************************************************************************/
 static int DGifBufferedInput(GifFileType *GifFile, GifByteType *Buf,
                              GifByteType *NextByte) {

@@ -675,7 +675,7 @@ def test_jp2jp2kak_test_multi_rate():
     # 1.2e+04 -> 12150 (24300 * 4 * 0.125F)
 
     split = arr[4][5][1].split(",")
-    # 4 layers + 2 blocs for extra information
+    # 4 layers + 2 blocks for extra information
     assert len(split) == 6
 
     assert split[2].split("\n")[0].strip() == "4.6e+03"
@@ -710,7 +710,7 @@ def test_jp2jp2kak_test_multi_rate_dash():
 
     split = arr[4][5][1].split(",")
 
-    # 4 layers + 2 blocs for extra information
+    # 4 layers + 2 blocks for extra information
     assert len(split) == 6
 
     assert split[2].split("\n")[0].strip() == "1.2e+04"
@@ -739,7 +739,7 @@ def test_jp2jp2kak_test_single_rate():
 
     split = arr[4][5][1].split(",")
 
-    # 4 layers + 2 blocs for extra information
+    # 4 layers + 2 blocks for extra information
     assert len(split) == 6
 
     assert split[5].split("\n")[0].strip() == "4.6e+03"
@@ -768,7 +768,7 @@ def test_jp2jp2kak_test_multi_rate_quality_50():
 
     split = arr[4][5][1].split(",")
 
-    # 4 layers + 2 blocs for extra information
+    # 4 layers + 2 blocks for extra information
     assert len(split) == 6
     assert split[5].split("\n")[0].strip() == "4.6e+03"
 
@@ -795,7 +795,7 @@ def test_jp2jp2kak_test_multi_rate_quality_100():
     # 4.6e+03 -> 4556 (24300 * 1.5 * 0.125F)
     split = arr[4][5][1].split(",")
 
-    # 4 layers + 2 blocs for extra information
+    # 4 layers + 2 blocks for extra information
     assert len(split) == 6
 
     assert split[5].split("\n")[0].strip() == "4.6e+03"
@@ -825,7 +825,7 @@ def test_jp2jp2kak_test_multi_rate_quality_100_reversible():
     # 4.6e+03 -> 4556 (24300 * 1.5 * 0.125F)
     split = arr[4][5][1].split(",")
 
-    # 4 layers + 2 blocs for extra information
+    # 4 layers + 2 blocks for extra information
     assert len(split) == 6
 
     assert split[5].split("\n")[0].strip() == "4.6e+03"
@@ -855,7 +855,7 @@ def test_jp2jp2kak_test_multi_rate_quality_100_no_reversible():
     # 4.6e+03 -> 4556 (24300 * 1.5 * 0.125F)
     split = arr[4][5][1].split(",")
 
-    # 4 layers + 2 blocs for extra information
+    # 4 layers + 2 blocks for extra information
     assert len(split) == 6
 
     assert split[5].split("\n")[0].strip() == "4.6e+03"
@@ -879,7 +879,7 @@ def test_jp2jp2kak_test_quality_100_no_reversible():
 
     split = arr[4][5][1].split(",")
 
-    # 12 layers + 2 blocs for extra information
+    # 12 layers + 2 blocks for extra information
     assert len(split) == 14
 
     gdal.Unlink("/vsimem/jp2kak_22.jp2")
@@ -901,7 +901,7 @@ def test_jp2jp2kak_test_quality_100_reversible():
 
     split = arr[4][5][1].split(",")
 
-    # 12 layers + 2 blocs for extra information
+    # 12 layers + 2 blocks for extra information
     assert len(split) == 14
     gdal.Unlink("/vsimem/jp2kak_22.jp2")
 

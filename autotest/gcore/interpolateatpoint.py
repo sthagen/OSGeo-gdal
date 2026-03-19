@@ -145,7 +145,7 @@ def test_interpolateatpoint_bilinear_several_points():
     )
     assert got_bilinear == pytest.approx((1.3 + 0.5 + 3.8 - 1) / 4, 1e-6)
 
-    # compute the linear intepolation manually
+    # compute the linear interpolation manually
     got_bilinear = mem_ds.GetRasterBand(1).InterpolateAtPoint(
         2.1, 1.2, gdal.GRIORA_Bilinear
     )

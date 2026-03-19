@@ -2001,7 +2001,7 @@ def test_ogr_gpkg_srs_non_duplication_custom_crs(tmp_vsimem):
         assert f["organization"] == "NONE"
         assert f["organization_coordsys_id"] == 100000
 
-    # Test now transitionning to definition_12_063 / WKT2 database structure...
+    # Test now transitioning to definition_12_063 / WKT2 database structure...
     srs_3d = osr.SpatialReference()
     srs_3d.SetFromUserInput("""GEOGCRS["srs 3d",
     DATUM["some datum",

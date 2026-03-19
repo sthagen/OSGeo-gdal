@@ -200,7 +200,7 @@ typedef double              REAL8; /* IEEE-754 64-bit */
                             */
 #define PT_LATLON 2  /* Latitude / Longitude (= PT_YDECT2B)
                             */
-#define PT_CART        3  /* Carthesian (= PT_YDECT2B)
+#define PT_CART        3  /* Cartesian (= PT_YDECT2B)
                             */
 #define PT_RDM 4  /* Rijks Driehoek Metingen stelsel (= PT_YDECT2B)
                             */

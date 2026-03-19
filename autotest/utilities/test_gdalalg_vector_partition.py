@@ -1062,7 +1062,7 @@ def test_gdalalg_vector_partition_pattern_error(tmp_vsimem):
         alg["pattern"] = "%5"
     with pytest.raises(
         Exception,
-        match=r"Number of digits in part number specifiation should be in \[1,10\] range",
+        match=r"Number of digits in part number specification should be in \[1,10\] range",
     ):
         alg["pattern"] = "%11d"
 

@@ -4336,7 +4336,7 @@ def test_ogr_dxf_write_MEASUREMENT(tmp_vsimem):
 ###############################################################################
 # Use case of https://github.com/OSGeo/gdal/issues/11591
 # Test reading a INSERT block whose column count is zero.
-# Interpretating it as 1, as AutoCAD does
+# Interpreting it as 1, as AutoCAD does
 
 
 @gdaltest.enable_exceptions()

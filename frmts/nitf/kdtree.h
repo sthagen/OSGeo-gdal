@@ -600,7 +600,7 @@ int PNNKDTree<T>::insert(std::vector<BucketItem<T>> &&vectors, int totalCount,
     }
 
     // In some cases, the median can actually be the maximum value
-    // Then, retry but exclusing the median itself.
+    // Then, retry but excluding the median itself.
     if (vectLeft.empty() || vectRight.empty())
     {
         if (!vectLeft.empty())
@@ -809,7 +809,7 @@ int PNNKDTree<T>::cluster(int initialBucketCount, int targetCount,
 
         int expectedBucketCount = curBucketCount;
 
-        // Merge all the tuple of vectors whose increasd distortion is lower
+        // Merge all the tuple of vectors whose increased distortion is lower
         // than the median.
         for (auto oIterCollector = distCollector.begin();
              oIterCollector != median_iter; ++oIterCollector)

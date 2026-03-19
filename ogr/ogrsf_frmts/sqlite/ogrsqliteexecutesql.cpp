@@ -972,7 +972,7 @@ OGRLayer *OGRSQLiteExecuteSQL(GDALDataset *poDS, const char *pszStatement,
     sqlite3 *hDB = poSQLiteDS->GetDB();
 
     /* -------------------------------------------------------------------- */
-    /*      Analysze the statement to determine which tables will be used.  */
+    /*      Analyze the statement to determine which tables will be used.   */
     /* -------------------------------------------------------------------- */
     std::set<LayerDesc> oSetLayers;
     std::set<CPLString> oSetSpatialIndex;

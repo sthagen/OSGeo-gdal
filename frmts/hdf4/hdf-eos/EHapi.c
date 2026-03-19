@@ -76,7 +76,7 @@ static intn EHget_numfiles(void);
 |  Jun 96   Joel Gales    Original Programmer                                 |
 |  Jul 96   Joel Gales    Add file id offset EHIDOFFSET                       |
 |  Aug 96   Joel Gales    Add "END" statement to structural metadata          |
-|  Sep 96   Joel Gales    Reverse order of Hopen ane SDstart statements       |
+|  Sep 96   Joel Gales    Reverse order of Hopen and SDstart statements       |
 |                         for RDWR and READ access                            |
 |  Oct 96   Joel Gales    Trap CREATE & RDWR (no write permission)            |
 |                         access errors                                       |

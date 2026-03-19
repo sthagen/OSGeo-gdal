@@ -1444,7 +1444,7 @@ def test_vrt_pixelfn_area_projected(tmp_vsimem):
 
     # the <PixelFunctionArguments crs="3" /> tag is just to test that a user
     # cannot override a built-in argument. Since "crs" is a pointer, allowing
-    # a user to override it would permit abitrary memory access.
+    # a user to override it would permit arbitrary memory access.
     xml = """
     <VRTDataset rasterXSize="20" rasterYSize="10">
       <GeoTransform>441500, 10, 0, 216600, 0, -10</GeoTransform>
