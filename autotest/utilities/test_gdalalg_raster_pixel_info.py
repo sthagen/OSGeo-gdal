@@ -924,6 +924,13 @@ def test_gdalalg_raster_pixel_info_in_pipeline(tmp_vsimem):
         assert out_lyr.GetFeatureCount() == 1
 
     with gdal.alg.pipeline(
+        pipeline="read ../gcore/data/byte.tif ! pixel-info --position 1,2"
+    ) as alg:
+        out_ds = alg.Output()
+        out_lyr = out_ds.GetLayer(0)
+        assert out_lyr.GetFeatureCount() == 1
+
+    with gdal.alg.pipeline(
         pipeline=f"read ../gcore/data/byte.tif ! pixel-info --input _PIPE_ --position-dataset {tmp_vsimem}/coords.shp"
     ) as alg:
         out_ds = alg.Output()
@@ -939,7 +946,7 @@ def test_gdalalg_raster_pixel_info_in_pipeline(tmp_vsimem):
 
     with pytest.raises(
         Exception,
-        match="Positional arguments starting at 'POSITION-DATASET' have not been specified",
+        match="Argument 'position' or 'position-dataset' must be specified",
     ):
         gdal.alg.pipeline(pipeline="read ../gcore/data/byte.tif ! pixel-info")
 
