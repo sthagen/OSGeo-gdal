@@ -20,7 +20,7 @@ git clone  https://github.com/conda-forge/gdal-feedstock.git
 cd gdal-feedstock
 
 # Patch version = "X.Y.Z" to "X.Y.99"
-sed 's/version = "\([0-9]\+\)\.\([0-9]\+\)\.\([0-9]\+\)"/version = "\1.\2.99"/' < recipe/meta.yaml > meta.yaml
+sed -E 's/version = "([0-9]+)\.([0-9]+)\.([0-9]+)"/version = "\1.\2.99"/' < recipe/meta.yaml > meta.yaml
 mv meta.yaml recipe/meta.yaml
 
 cat > recipe/recipe_clobber.yaml <<EOL
