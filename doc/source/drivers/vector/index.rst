@@ -93,6 +93,7 @@ Vector drivers
    sosi
    sqlite
    sxf
+   tiger
    tiledb
    topojson
    vdv

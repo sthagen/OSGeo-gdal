@@ -251,7 +251,10 @@ void OGRRegisterAllInternal()
     // NOTE: frmts/drivers.ini in the same directory should be kept in same
     // order as this file
 
-/* Put AVCBIN at end since they need poOpenInfo->GetSiblingFiles() */
+/* Put TIGER and AVCBIN at end since they need poOpenInfo->GetSiblingFiles() */
+#ifdef TIGER_ENABLED
+    RegisterOGRTiger();
+#endif
 #ifdef AVC_ENABLED
     RegisterOGRAVCBin();
     RegisterOGRAVCE00();
