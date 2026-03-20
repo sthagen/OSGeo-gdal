@@ -328,7 +328,7 @@ OGRTileDBDataset::ICreateLayer(const char *pszName,
 
     if (!m_osGroupName.empty() && strchr(pszName, '/'))
     {
-        // Otherwise a layer name wit ha slash when groups are enabled causes
+        // Otherwise a layer name with a slash when groups are enabled causes
         // a "[TileDB::Array] Error: FragmentID: input URI is invalid. Provided URI does not contain a fragment name."
         // exception on re-opening starting with TileDB 2.21
         CPLError(CE_Failure, CPLE_NotSupported,

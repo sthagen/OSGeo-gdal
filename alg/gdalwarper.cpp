@@ -214,7 +214,7 @@ CPLErr CPL_STDCALL GDALReprojectImage(
 /************************************************************************/
 /*                    GDALCreateAndReprojectImage()                     */
 /*                                                                      */
-/*      This is a "quicky" reprojection API.                            */
+/*      This is a "quickie" reprojection API.                           */
 /************************************************************************/
 
 /** Reproject an image and create the target reprojected image */

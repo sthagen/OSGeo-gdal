@@ -151,7 +151,7 @@ GDALVectorPartitionAlgorithm::GDALVectorPartitionAlgorithm(bool standaloneStep)
                     {
                         ReportError(CE_Failure, CPLE_IllegalArg,
                                     "Number of digits in part number "
-                                    "specifiation should be in [1,10] range");
+                                    "specification should be in [1,10] range");
                         return false;
                     }
                     m_partDigitLeadingZeroes =

@@ -474,7 +474,7 @@ TEST_F(test_alg, GDALIsLineOfSightVisible_through_mountain)
     EXPECT_EQ(*pXIntersection, 2);
     EXPECT_EQ(*pYIntersection, 2);
 
-    // Test positive slope bresenham diagnoals across the whole raster.
+    // Test positive slope bresenham diagonals across the whole raster.
     // Both high above terrain.
     EXPECT_TRUE(GDALIsLineOfSightVisible(pBand, 0, 120, 460, 120, 0, 460,
                                          nullptr, nullptr, nullptr));

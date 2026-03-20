@@ -1871,7 +1871,7 @@ def test_ogr_libkml_write_folder(tmp_vsimem):
 
 
 ###############################################################################
-# Test writing datasource and layer container propreties
+# Test writing datasource and layer container properties
 
 
 def test_ogr_libkml_write_container_properties(tmp_vsimem):

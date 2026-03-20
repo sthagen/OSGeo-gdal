@@ -3540,7 +3540,7 @@ def test_gdalwarp_lib_epsg_4326_to_esri_53037():
     srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
     src_ds.SetSpatialRef(srs)
     src_ds.SetGeoTransform([-180, 0.033333333333330, 0, 90, 0, -0.033333333333330])
-    # Expension of ESRI:53037 (proj.db of old PROJ releases don't know it)
+    # Expansion of ESRI:53037 (proj.db of old PROJ releases don't know it)
     out_ds = gdal.Warp(
         "",
         src_ds,

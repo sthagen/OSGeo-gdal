@@ -448,7 +448,7 @@ class OGRArrowWriterLayer CPL_NON_FINAL : public OGRLayer
     // Constraint: if not empty, m_apoFieldsBBOX.size() == m_poFeatureDefn->GetGeomFieldCount()
     std::vector<std::shared_ptr<arrow::Field>> m_apoFieldsBBOX{};
 
-    //! Array builers for bounding box of geometry columns.
+    //! Array builders for bounding box of geometry columns.
     // m_apoBuildersBBOXStruct is for the top-level field of type struct.
     // m_apoBuildersBBOX{XMin|YMin|XMax|YMax} are for the floating-point values
     // Constraint: if not empty, m_apoBuildersBBOX{Struct|XMin|YMin|XMax|YMax}.size() == m_poFeatureDefn->GetGeomFieldCount()

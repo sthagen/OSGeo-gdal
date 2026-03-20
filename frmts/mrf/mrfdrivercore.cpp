@@ -72,7 +72,7 @@ static bool IsLerc2(const char *s)
 /************************************************************************/
 
 /**
- *\brief Idenfity a MRF file, lightweight
+ *\brief Identify a MRF file, lightweight
  *
  * Lightweight test, otherwise Open gets called.
  *
