@@ -73,6 +73,7 @@ Vector drivers
    nas
    netcdf
    ngw
+   ntf
    oapif
    oci
    odbc
