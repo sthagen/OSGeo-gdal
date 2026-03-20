@@ -553,14 +553,14 @@ GDALDataset *ZMapDataset::CreateCopy(const char *pszFilename,
     {
         CPLError(
             CE_Failure, CPLE_NotSupported,
-            "ZMap driver does not support source dataset with zero band.\n");
+            "ZMap driver does not support source datasets with zero bands.");
         return nullptr;
     }
 
     if (nBands != 1)
     {
         CPLError((bStrict) ? CE_Failure : CE_Warning, CPLE_NotSupported,
-                 "ZMap driver only uses the first band of the dataset.\n");
+                 "ZMap driver only uses the first band of the dataset.");
         if (bStrict)
             return nullptr;
     }
@@ -585,7 +585,7 @@ GDALDataset *ZMapDataset::CreateCopy(const char *pszFilename,
     {
         CPLError(CE_Failure, CPLE_NotSupported,
                  "ZMap driver does not support CreateCopy() from skewed or "
-                 "rotated dataset.\n");
+                 "rotated dataset.");
         return nullptr;
     }
 
