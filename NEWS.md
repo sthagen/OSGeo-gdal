@@ -4874,7 +4874,7 @@ OGCAPI driver:
 
 VRT driver:
  * VRTDerivedRasterBand: Support Int8, (U)Int64 with Python pixel functions
- * VRT/gdal_translate -of 200% 200%: make sure that the synthesized virtual
+ * VRT/gdal_translate -of 200% 200%: make sure that the synthetized virtual
    overviews match the dimension of the source ones when possible
  * VRTPansharpenedDataset: allow to specify <OpenOptions> for <PanchroBand> and
    <SpectralBand>
