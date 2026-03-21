@@ -1423,6 +1423,15 @@ bool LIBERTIFFDataset::ReadBlock(GByte *pabyBlockData, int nBlockXOff,
                          "uncompressed size");
                 return false;
             }
+            // Avoid later overflow in size + m_jpegTables.size()
+            if (m_jpegTables.size() > std::numeric_limits<size_t>::max() - size)
+            {
+                // Possibly on 32 bit builds, very unlikely on 64 bit
+                CPLError(CE_Failure, CPLE_AppDefined,
+                         "Integer overflow in compressed buffer size "
+                         "calculation");
+                return false;
+            }
             if (abyCompressedStrile.size() < size + m_jpegTables.size())
             {
                 try
