@@ -121,6 +121,14 @@ int DDFFieldDefn::Create(const char *pszTagIn, const char *pszFieldName,
 
     bRepeatingSubfields = (pszDescription != nullptr && *pszDescription == '*');
 
+    if (!_formatControls.empty() && _data_struct_code != dsc_elementary)
+    {
+        BuildSubfields();
+
+        if (!ApplyFormats())
+            return FALSE;
+    }
+
     return TRUE;
 }
 

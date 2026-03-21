@@ -174,38 +174,39 @@ int main(int nArgc, char *papszArgv[])
 
             const char *pszFormatControls =
                 CPLGetXMLValue(psIter, "formatControls", nullptr);
-            if (eStructCode != dsc_elementary)
-                pszFormatControls = nullptr;
-
             const char *pszArrayDescr =
-                CPLGetXMLValue(psIter, "arrayDescr", "");
-            if (eStructCode == dsc_vector)
-                pszArrayDescr = "";
-            else if (eStructCode == dsc_array)
-                pszArrayDescr = "*";
-
-            poFDefn->Create(CPLGetXMLValue(psIter, "tag", ""),
-                            CPLGetXMLValue(psIter, "fieldName", ""),
-                            pszArrayDescr, eStructCode, eTypeCode,
-                            pszFormatControls);
-
-            CPLXMLNode *psSubIter = psIter->psChild;
-            while (psSubIter != nullptr)
+                CPLGetXMLValue(psIter, "arrayDescr", nullptr);
+            if (!pszArrayDescr && !pszFormatControls)
             {
-                if (psSubIter->eType == CXT_Element &&
-                    strcmp(psSubIter->pszValue, "DDFSubfieldDefn") == 0)
-                {
-                    poFDefn->AddSubfield(
-                        CPLGetXMLValue(psSubIter, "name", ""),
-                        CPLGetXMLValue(psSubIter, "format", ""));
-                }
-                psSubIter = psSubIter->psNext;
+                if (eStructCode == dsc_vector)
+                    pszArrayDescr = "";
+                else if (eStructCode == dsc_array)
+                    pszArrayDescr = "*";
             }
 
-            pszFormatControls =
-                CPLGetXMLValue(psIter, "formatControls", nullptr);
-            if (pszFormatControls)
-                poFDefn->SetFormatControls(pszFormatControls);
+            if (!poFDefn->Create(CPLGetXMLValue(psIter, "tag", ""),
+                                 CPLGetXMLValue(psIter, "fieldName", ""),
+                                 pszArrayDescr, eStructCode, eTypeCode,
+                                 pszFormatControls))
+            {
+                exit(1);
+            }
+
+            if (!pszArrayDescr && !pszFormatControls)
+            {
+                CPLXMLNode *psSubIter = psIter->psChild;
+                while (psSubIter != nullptr)
+                {
+                    if (psSubIter->eType == CXT_Element &&
+                        strcmp(psSubIter->pszValue, "DDFSubfieldDefn") == 0)
+                    {
+                        poFDefn->AddSubfield(
+                            CPLGetXMLValue(psSubIter, "name", ""),
+                            CPLGetXMLValue(psSubIter, "format", ""));
+                    }
+                    psSubIter = psSubIter->psNext;
+                }
+            }
 
             oModule.AddField(std::move(poFDefn));
         }
