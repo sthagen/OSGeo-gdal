@@ -384,9 +384,10 @@ bool GDALAbstractPipelineAlgorithm::ParseCommandLineArguments(
         bool isSubAlgorithm = false;
     };
 
+    int nDatasetType = GetInputType();
     const auto SetCurStepAlg =
-        [this, bIsGenericPipeline](Step &curStep, const std::string &algName,
-                                   bool firstStep)
+        [this, bIsGenericPipeline, &nDatasetType](
+            Step &curStep, const std::string &algName, bool firstStep)
     {
         if (bIsGenericPipeline)
         {
@@ -396,9 +397,16 @@ bool GDALAbstractPipelineAlgorithm::ParseCommandLineArguments(
             }
             else
             {
-                curStep.alg = GetStepAlg(algName);
+                if (nDatasetType == GDAL_OF_RASTER)
+                    curStep.alg = GetStepAlg(algName + RASTER_SUFFIX);
+                else if (nDatasetType == GDAL_OF_VECTOR)
+                    curStep.alg = GetStepAlg(algName + VECTOR_SUFFIX);
+                if (!curStep.alg)
+                    curStep.alg = GetStepAlg(algName);
                 if (!curStep.alg)
                     curStep.alg = GetStepAlg(algName + RASTER_SUFFIX);
+                if (curStep.alg)
+                    nDatasetType = curStep.alg->GetOutputType();
             }
         }
         else
@@ -1009,7 +1017,7 @@ bool GDALAbstractPipelineAlgorithm::ParseCommandLineArguments(
         }
 
         // Parse each step, but without running the validation
-        int nDatasetType = nInitialDatasetType;
+        nDatasetType = nInitialDatasetType;
         bool firstStep = nDatasetType == 0;
 
         for (auto &step : steps)
