@@ -143,17 +143,18 @@ int DDFFieldDefn::GenerateDDREntry(DDFModule *poModuleIn, char **ppachData,
 {
     const int iFDOffset = poModuleIn->GetFieldControlLength();
     CPLAssert(iFDOffset >= 6 && iFDOffset <= 9);
-    *pnLength =
-        static_cast<int>(iFDOffset + _fieldName.size() + 1 +
-                         _arrayDescr.size() + 1 + _formatControls.size() + 1);
-
-    if (_arrayDescr.empty() || _formatControls.empty())
-        *pnLength -= 1;
+    *pnLength = static_cast<int>(iFDOffset + _fieldName.size() + 1 +
+                                 _arrayDescr.size() + 1);
+    if (!_formatControls.empty())
+    {
+        *pnLength += static_cast<int>(_formatControls.size() + 1);
+    }
 
     if (ppachData == nullptr)
         return TRUE;
 
     *ppachData = static_cast<char *>(CPLMalloc(*pnLength + 1));
+    (*ppachData)[*pnLength] = 0;
 
     if (_data_struct_code == dsc_elementary)
         (*ppachData)[0] = '0';
@@ -191,14 +192,16 @@ int DDFFieldDefn::GenerateDDREntry(DDFModule *poModuleIn, char **ppachData,
         (*ppachData)[8] = ' ';
     snprintf(*ppachData + iFDOffset, *pnLength + 1 - iFDOffset, "%s",
              _fieldName.c_str());
-    if (!_arrayDescr.empty())
-        snprintf(*ppachData + strlen(*ppachData),
-                 *pnLength + 1 - strlen(*ppachData), "%c%s",
-                 DDF_UNIT_TERMINATOR, _arrayDescr.c_str());
+    snprintf(*ppachData + strlen(*ppachData),
+             *pnLength + 1 - strlen(*ppachData), "%c%s", DDF_UNIT_TERMINATOR,
+             _arrayDescr.c_str());
     if (!_formatControls.empty())
+    {
+        // empty for '0000' of S-57 & S-111
         snprintf(*ppachData + strlen(*ppachData),
                  *pnLength + 1 - strlen(*ppachData), "%c%s",
                  DDF_UNIT_TERMINATOR, _formatControls.c_str());
+    }
     snprintf(*ppachData + strlen(*ppachData),
              *pnLength + 1 - strlen(*ppachData), "%c", DDF_FIELD_TERMINATOR);
 
