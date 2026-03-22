@@ -10454,6 +10454,12 @@ bool GDALGeoPackageDataset::AddRelationship(
         return false;
     }
 
+    for (auto &poLayer : m_apoLayers)
+    {
+        if (poLayer->SyncToDisk() != OGRERR_NONE)
+            return false;
+    }
+
     if (CreateExtensionsTableIfNecessary() != OGRERR_NONE)
     {
         return false;
