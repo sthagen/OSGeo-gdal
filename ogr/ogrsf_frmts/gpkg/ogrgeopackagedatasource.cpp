@@ -7674,9 +7674,11 @@ OGRLayer *GDALGeoPackageDataset::ExecuteSQL(const char *pszSQLCommand,
     {
         if (nErrorCount == CPLGetErrorCounter())
         {
-            CPLError(CE_Failure, CPLE_AppDefined,
-                     "In ExecuteSQL(): sqlite3_prepare_v2(%s): %s",
-                     osSQLCommandTruncated.c_str(), sqlite3_errmsg(hDB));
+            CPLError(CE_Failure, CPLE_AppDefined, "%s",
+                     SQLFormatErrorMsgFailedPrepare(
+                         GetDB(), "In ExecuteSQL(): sqlite3_prepare_v2(): ",
+                         osSQLCommand.c_str())
+                         .c_str());
         }
         return nullptr;
     }
