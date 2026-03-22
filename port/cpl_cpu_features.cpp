@@ -199,7 +199,7 @@ bool CPLHaveRuntimeAVX()
 #ifdef HAVE_AVX2_AT_COMPILE_TIME
 
 /************************************************************************/
-/*                        CPLHaveRuntimeAVX2()                          */
+/*                         CPLHaveRuntimeAVX2()                         */
 /************************************************************************/
 
 bool CPLHaveRuntimeAVX2()
