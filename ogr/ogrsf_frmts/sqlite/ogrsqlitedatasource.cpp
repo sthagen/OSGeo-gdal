@@ -886,7 +886,7 @@ sqlite3_stmt *OGRSQLiteBaseDataSource::prepareSql(sqlite3 *db, const char *zSql,
         error.append(sqlite3_errmsg(db));
         pfnQueryLoggerFunc(zSql, error.c_str(), -1, -1, poQueryLoggerArg);
     }
-    else if (pszTail && SQLHasRemainingContent(pszTail))
+    else if (strchr(zSql, ';') && pszTail && SQLHasRemainingContent(pszTail))
     {
         sqlite3_finalize(stmt);
         stmt = nullptr;

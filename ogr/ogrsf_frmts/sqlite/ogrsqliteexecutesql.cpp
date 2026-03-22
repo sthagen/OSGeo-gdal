@@ -1110,7 +1110,8 @@ OGRLayer *OGRSQLiteExecuteSQL(GDALDataset *poDS, const char *pszStatement,
             hSQLStmt = nullptr;
         }
     }
-    else if (pszTail && SQLHasRemainingContent(pszTail))
+    else if (strchr(pszStatement, ';') && pszTail &&
+             SQLHasRemainingContent(pszTail))
     {
         sqlite3_finalize(hSQLStmt);
         hSQLStmt = nullptr;
