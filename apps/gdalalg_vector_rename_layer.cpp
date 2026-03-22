@@ -268,8 +268,8 @@ bool GDALVectorRenameLayerAlgorithm::RunStep(GDALPipelineStepRunContext &)
             }
             if (m_filenameCompatible)
             {
-                osName = CPLGetFilenameCompatible(osName,
-                                                  m_replacementChar.c_str()[0]);
+                osName = CPLLaunderForFilenameSafe(
+                    osName, m_replacementChar.c_str()[0]);
             }
             if (m_ascii)
             {

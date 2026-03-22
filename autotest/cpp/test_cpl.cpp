@@ -5868,31 +5868,32 @@ TEST_F(test_cpl, CPL_SWAP)
     }
 }
 
-TEST_F(test_cpl, CPLGetFilenameCompatible)
+TEST_F(test_cpl, CPLLaunderForFilenameSafe)
 {
-    EXPECT_STREQ(CPLGetFilenameCompatible("").c_str(), "");
-    EXPECT_STREQ(CPLGetFilenameCompatible("a").c_str(), "a");
-    EXPECT_STREQ(CPLGetFilenameCompatible("a<b").c_str(), "a_b");
-    EXPECT_STREQ(CPLGetFilenameCompatible("a>b").c_str(), "a_b");
-    EXPECT_STREQ(CPLGetFilenameCompatible("a:b").c_str(), "a_b");
-    EXPECT_STREQ(CPLGetFilenameCompatible("a\"b").c_str(), "a_b");
-    EXPECT_STREQ(CPLGetFilenameCompatible("a/b").c_str(), "a_b");
-    EXPECT_STREQ(CPLGetFilenameCompatible("a\\b").c_str(), "a_b");
-    EXPECT_STREQ(CPLGetFilenameCompatible("a|b").c_str(), "a_b");
-    EXPECT_STREQ(CPLGetFilenameCompatible("a?b").c_str(), "a_b");
-    EXPECT_STREQ(CPLGetFilenameCompatible("a*b").c_str(), "a_b");
-    EXPECT_STREQ(CPLGetFilenameCompatible("a^b").c_str(), "a_b");
-    EXPECT_STREQ(CPLGetFilenameCompatible(".").c_str(), "._");
-    EXPECT_STREQ(CPLGetFilenameCompatible("..").c_str(), ".._");
-    EXPECT_STREQ(CPLGetFilenameCompatible("a.b").c_str(), "a.b");
-    EXPECT_STREQ(CPLGetFilenameCompatible(" a ").c_str(), " a _");
-    EXPECT_STREQ(CPLGetFilenameCompatible(".a.").c_str(), ".a._");
-    EXPECT_STREQ(CPLGetFilenameCompatible(" a ", ';').c_str(), " a ;");
-    EXPECT_STREQ(CPLGetFilenameCompatible("CON").c_str(), "CON_");
-    EXPECT_STREQ(CPLGetFilenameCompatible("a<b c", ';', " ").c_str(), "a;b;c");
-    EXPECT_STREQ(CPLGetFilenameCompatible("a<b c", 0, " ").c_str(), "abc");
-    EXPECT_STREQ(CPLGetFilenameCompatible("CON", 0).c_str(), "CON_");
-    EXPECT_STREQ(CPLGetFilenameCompatible("CON", ';').c_str(), "CON;");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe("").c_str(), "");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe("a").c_str(), "a");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe("a<b").c_str(), "a_b");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe("a>b").c_str(), "a_b");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe("a:b").c_str(), "a_b");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe("a\"b").c_str(), "a_b");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe("a/b").c_str(), "a_b");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe("a\\b").c_str(), "a_b");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe("a|b").c_str(), "a_b");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe("a?b").c_str(), "a_b");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe("a*b").c_str(), "a_b");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe("a^b").c_str(), "a_b");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe(".").c_str(), "._");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe("..").c_str(), ".._");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe("a.b").c_str(), "a.b");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe(" a ").c_str(), " a _");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe(".a.").c_str(), ".a._");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe(" a ", ';').c_str(), " a ;");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe("CON").c_str(), "CON_");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe("a<b c", ';', " ").c_str(), "a;b;c");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe("a<b c", '\0', " ").c_str(), "abc");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe("CON", '\0', nullptr).c_str(),
+                 "CON_");
+    EXPECT_STREQ(CPLLaunderForFilenameSafe("CON", ';').c_str(), "CON;");
 }
 
 }  // namespace
