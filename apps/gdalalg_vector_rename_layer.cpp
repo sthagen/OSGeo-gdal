@@ -292,7 +292,7 @@ bool GDALVectorRenameLayerAlgorithm::RunStep(GDALPipelineStepRunContext &)
             }
             if (++oMapCountNames[osName] > 1)
                 bNonUniqueNames = true;
-            aosNames.push_back(osName);
+            aosNames.push_back(std::move(osName));
         }
     }
 

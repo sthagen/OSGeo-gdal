@@ -2023,7 +2023,8 @@ GDALDataset *SAR_CEOSDataset::Open(GDALOpenInfo *poOpenInfo)
                                              &nStartData);
 
                 nStartData += psImageDesc->ImageDataStart;
-                nStartData += psImageDesc->BytesPerPixel * iBand;
+                nStartData +=
+                    cpl::fits_on<int>(psImageDesc->BytesPerPixel * iBand);
 
                 nPixelOffset =
                     psImageDesc->BytesPerPixel * psImageDesc->NumChannels;
