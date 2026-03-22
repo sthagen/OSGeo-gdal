@@ -111,7 +111,7 @@ bool GDALVectorLimitAlgorithm::RunStep(GDALPipelineStepRunContext &)
     CPLAssert(m_outputDataset.GetName().empty());
     CPLAssert(!m_outputDataset.GetDatasetRef());
 
-    auto outDS = std::make_unique<GDALVectorOutputDataset>();
+    auto outDS = std::make_unique<GDALVectorOutputDataset>(poSrcDS);
 
     for (auto &&poSrcLayer : poSrcDS->GetLayers())
     {

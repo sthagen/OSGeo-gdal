@@ -136,7 +136,8 @@ GDALVectorCheckCoverageOutputLayer::~GDALVectorCheckCoverageOutputLayer()
 bool GDALVectorCheckCoverageAlgorithm::RunStep(GDALPipelineStepRunContext &ctxt)
 {
     auto poSrcDS = m_inputDataset[0].GetDatasetRef();
-    auto poDstDS = std::make_unique<GDALVectorNonStreamingAlgorithmDataset>();
+    auto poDstDS =
+        std::make_unique<GDALVectorNonStreamingAlgorithmDataset>(*poSrcDS);
 
     const bool bSingleLayerOutput = m_inputLayerNames.empty()
                                         ? poSrcDS->GetLayerCount() == 1

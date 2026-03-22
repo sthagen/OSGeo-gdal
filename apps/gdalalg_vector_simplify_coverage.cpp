@@ -130,7 +130,8 @@ bool GDALVectorSimplifyCoverageAlgorithm::RunStep(
     GDALPipelineStepRunContext &ctxt)
 {
     auto poSrcDS = m_inputDataset[0].GetDatasetRef();
-    auto poDstDS = std::make_unique<GDALVectorNonStreamingAlgorithmDataset>();
+    auto poDstDS =
+        std::make_unique<GDALVectorNonStreamingAlgorithmDataset>(*poSrcDS);
 
     GDALVectorAlgorithmLayerProgressHelper progressHelper(ctxt);
 
