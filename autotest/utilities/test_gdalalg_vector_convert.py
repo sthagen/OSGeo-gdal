@@ -84,6 +84,37 @@ def test_gdalalg_vector_convert_base(tmp_vsimem):
         assert ds.GetLayerByName("layer2").GetFeatureCount() == 10
 
 
+###############################################################################
+
+
+@pytest.mark.require_driver("GPKG")
+def test_gdalalg_vector_convert_append_without_existing_file(tmp_vsimem):
+
+    out_filename = str(tmp_vsimem / "out.gpkg")
+    gdal.alg.vector.convert(
+        input="../ogr/data/poly.shp",
+        output=out_filename,
+        append=True,
+        creation_option={"ADD_GPKG_OGR_CONTENTS": "NO"},
+    )
+
+    with gdal.OpenEx(out_filename) as ds:
+        assert ds.GetLayerByName("poly").GetFeatureCount() == 10
+        with ds.ExecuteSQL(
+            "SELECT * FROM sqlite_master WHERE name = 'gpkg_ogr_contents'"
+        ) as sql_lyr:
+            assert sql_lyr.GetFeatureCount() == 0
+    gdal.alg.vector.convert(
+        input="../ogr/data/poly.shp", output=out_filename, append=True
+    )
+
+    with gdal.OpenEx(out_filename) as ds:
+        assert ds.GetLayerByName("poly").GetFeatureCount() == 20
+
+
+###############################################################################
+
+
 @pytest.mark.require_driver("GPKG")
 def test_gdalalg_vector_convert_dsco(tmp_vsimem):
 
