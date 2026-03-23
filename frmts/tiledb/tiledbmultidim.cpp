@@ -19,7 +19,7 @@
 /* static */
 std::string TileDBSharedResource::SanitizeNameForPath(const std::string &osName)
 {
-    return CPLGetFilenameCompatible(osName);
+    return CPLLaunderForFilenameSafe(osName);
 }
 
 /************************************************************************/
