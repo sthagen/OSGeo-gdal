@@ -588,7 +588,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && apt-get install -y -V libarrow-compute${ARROW_SOVERSION}
 
 # Install libduckdb
-ARG DUCKDB_VERSION=v1.5.0
+ARG DUCKDB_VERSION=v1.5.1
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     export DEBIAN_FRONTEND=noninteractive \
