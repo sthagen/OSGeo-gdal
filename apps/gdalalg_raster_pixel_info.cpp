@@ -71,7 +71,7 @@ GDALRasterPixelInfoAlgorithm::GDALRasterPixelInfoAlgorithm(bool standaloneStep)
                    GDAL_OF_VECTOR)
                 .SetMutualExclusionGroup("position-dataset-pos");
         if (!standaloneStep)
-            coordinateDatasetArg.SetPositional().SetRequired();
+            coordinateDatasetArg.SetPositional();
 
         SetAutoCompleteFunctionForFilename(coordinateDatasetArg,
                                            GDAL_OF_VECTOR);
@@ -99,12 +99,10 @@ GDALRasterPixelInfoAlgorithm::GDALRasterPixelInfoAlgorithm(bool standaloneStep)
            &m_overview)
         .SetMinValueIncluded(0);
 
-    if (standaloneStep)
-    {
+    auto &positionArg =
         AddArg("position", 'p', _("Pixel position"), &m_pos)
             .AddAlias("pos")
             .SetMetaVar("<column,line> or <X,Y>")
-            .SetPositional()
             .SetMutualExclusionGroup("position-dataset-pos")
             .AddValidationAction(
                 [this]
@@ -119,7 +117,8 @@ GDALRasterPixelInfoAlgorithm::GDALRasterPixelInfoAlgorithm(bool standaloneStep)
                     }
                     return true;
                 });
-    }
+    if (standaloneStep)
+        positionArg.SetPositional();
 
     AddArg("position-crs", 0,
            _("CRS of position (default is 'pixel' if 'position-dataset' not "
