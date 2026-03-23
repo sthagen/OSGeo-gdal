@@ -156,13 +156,71 @@ class GDALVectorPipelineAlgorithm final : public GDALAbstractPipelineAlgorithm
 };
 
 /************************************************************************/
+/*                      GDALVectorDecoratedDataset                      */
+/************************************************************************/
+
+/** Base class for GDALVectorOutputDataset, GDALVectorNonStreamingAlgorithmDataset
+ * and GDALVectorPipelineOutputDataset
+ */
+class GDALVectorDecoratedDataset /* non final */
+    : public GDALDataset
+{
+  public:
+    ~GDALVectorDecoratedDataset() override;
+
+    CSLConstList GetMetadata(const char *pszDomain) override
+    {
+        return m_srcDS.GetMetadata(pszDomain);
+    }
+
+    const char *GetMetadataItem(const char *pszName,
+                                const char *pszDomain) override
+    {
+        return m_srcDS.GetMetadataItem(pszName, pszDomain);
+    }
+
+    std::vector<std::string>
+    GetFieldDomainNames(CSLConstList papszOptions) const override
+    {
+        return m_srcDS.GetFieldDomainNames(papszOptions);
+    }
+
+    const OGRFieldDomain *GetFieldDomain(const std::string &name) const override
+    {
+        return m_srcDS.GetFieldDomain(name);
+    }
+
+    std::vector<std::string>
+    GetRelationshipNames(CSLConstList papszOptions) const override
+    {
+        return m_srcDS.GetRelationshipNames(papszOptions);
+    }
+
+    const GDALRelationship *
+    GetRelationship(const std::string &name) const override
+    {
+        return m_srcDS.GetRelationship(name);
+    }
+
+  private:
+    std::unique_ptr<GDALDataset> m_dummySrcDS{};
+
+  protected:
+    explicit GDALVectorDecoratedDataset(GDALDataset *poSrcDS);
+
+    GDALDataset &m_srcDS;
+};
+
+/************************************************************************/
 /*                       GDALVectorOutputDataset                        */
 /************************************************************************/
 
-class GDALVectorOutputDataset final : public GDALDataset
+class GDALVectorOutputDataset final : public GDALVectorDecoratedDataset
 {
 
   public:
+    explicit GDALVectorOutputDataset(GDALDataset *poSrcDS);
+
     int GetLayerCount() const override
     {
         return static_cast<int>(m_layers.size());
@@ -416,10 +474,10 @@ class GDALVectorNonStreamingAlgorithmLayer
  * processing.
  */
 class GDALVectorNonStreamingAlgorithmDataset /* non final */
-    : public GDALDataset
+    : public GDALVectorDecoratedDataset
 {
   public:
-    GDALVectorNonStreamingAlgorithmDataset();
+    explicit GDALVectorNonStreamingAlgorithmDataset(GDALDataset &oSrcDS);
     ~GDALVectorNonStreamingAlgorithmDataset() override;
 
     /** Add a layer to the dataset and perform the associated processing. */
@@ -445,9 +503,9 @@ class GDALVectorNonStreamingAlgorithmDataset /* non final */
 /** Class used by vector pipeline steps to create an output on-the-fly
  * dataset where they can store on-the-fly layers.
  */
-class GDALVectorPipelineOutputDataset final : public GDALDataset
+class GDALVectorPipelineOutputDataset /* non final */
+    : public GDALVectorDecoratedDataset
 {
-    GDALDataset &m_srcDS;
     std::map<OGRLayer *, OGRLayerWithTranslateFeature *>
         m_mapSrcLayerToNewLayer{};
     std::vector<std::unique_ptr<OGRLayerWithTranslateFeature>>

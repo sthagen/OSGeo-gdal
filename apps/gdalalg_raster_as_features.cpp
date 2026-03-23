@@ -437,7 +437,7 @@ bool GDALRasterAsFeaturesAlgorithm::RunStep(GDALPipelineStepRunContext &)
 
     auto poLayer =
         std::make_unique<GDALRasterAsFeaturesLayer>(*poSrcDS, options);
-    auto poRetDS = std::make_unique<GDALVectorOutputDataset>();
+    auto poRetDS = std::make_unique<GDALVectorOutputDataset>(nullptr);
     poRetDS->AddLayer(std::move(poLayer));
 
     m_outputDataset.Set(std::move(poRetDS));

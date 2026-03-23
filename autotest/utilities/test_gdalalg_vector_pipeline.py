@@ -899,6 +899,40 @@ def test_gdalalg_vector_pipeline_set_type():
     ogrtest.check_feature_geometry(out_f, "POINT Z (3 0 0)")
 
 
+def test_gdalalg_vector_pipeline_propagate_metadata():
+
+    src_ds = gdal.GetDriverByName("MEM").CreateVector("")
+    src_ds.SetMetadataItem("key", "value", "domain")
+    with gdal.alg.vector.pipeline(pipeline="read ! limit 1", input=src_ds) as alg:
+        ds = alg.Output()
+        assert ds.GetMetadata_Dict("domain") == {"key": "value"}
+        assert ds.GetMetadataItem("key", "domain") == "value"
+
+
+@pytest.mark.require_driver("GPKG")
+def test_gdalalg_vector_pipeline_propagate_field_domain():
+
+    src_ds = ogr.Open("../ogr/data/gpkg/domains.gpkg")
+    with gdal.alg.vector.pipeline(
+        pipeline="read ../ogr/data/gpkg/domains.gpkg ! edit"
+    ) as alg:
+        ds = alg.Output()
+        assert ds.GetFieldDomainNames() == src_ds.GetFieldDomainNames()
+        assert ds.GetFieldDomain(ds.GetFieldDomainNames()[0]) is not None
+
+
+@pytest.mark.require_driver("GPKG")
+def test_gdalalg_vector_pipeline_propagate_relationship():
+
+    src_ds = ogr.Open("../ogr/data/gpkg/relation_mapping_table.gpkg")
+    with gdal.alg.vector.pipeline(
+        pipeline="read ../ogr/data/gpkg/relation_mapping_table.gpkg ! edit"
+    ) as alg:
+        ds = alg.Output()
+        assert ds.GetRelationshipNames() == src_ds.GetRelationshipNames()
+        assert ds.GetRelationship(ds.GetRelationshipNames()[0]) is not None
+
+
 def test_gdalalg_vector_pipeline_help():
 
     import gdaltest

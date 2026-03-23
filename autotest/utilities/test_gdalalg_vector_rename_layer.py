@@ -209,6 +209,94 @@ def test_gdalalg_vector_rename_layer_unique_max_length_impossible():
             assert ds.GetLayer(1).GetName() == "sa"
 
 
+@pytest.mark.require_driver("GPKG")
+def test_gdalalg_vector_rename_layer_relationships(tmp_vsimem):
+
+    src_ds = gdal.GetDriverByName("GPKG").CreateVector(tmp_vsimem / "test.gpkg")
+    src_ds.CreateLayer("left")
+    src_ds.CreateLayer("right")
+
+    relationship = gdal.Relationship(
+        "my_relationship", "left", "right", gdal.GRC_MANY_TO_MANY
+    )
+    relationship.SetRelatedTableType("media")
+    relationship.SetLeftTableFields(["fid"])
+    relationship.SetRightTableFields(["fid"])
+    assert src_ds.AddRelationship(relationship)
+
+    src_ds.CreateLayer("another_left")
+    src_ds.CreateLayer("another_right")
+    relationship = gdal.Relationship(
+        "another_relationship", "another_left", "another_right", gdal.GRC_MANY_TO_MANY
+    )
+    relationship.SetRelatedTableType("media")
+    relationship.SetLeftTableFields(["fid"])
+    relationship.SetRightTableFields(["fid"])
+    assert src_ds.AddRelationship(relationship)
+
+    assert set(src_ds.GetRelationshipNames()) == set(
+        ["left_right_media", "another_left_another_right_media"]
+    )
+
+    with gdal.alg.vector.rename_layer(
+        input=src_ds,
+        output="",
+        output_format="stream",
+        input_layer="left",
+        output_layer="renamed",
+    ) as alg:
+        ds = alg.Output()
+        assert set(ds.GetRelationshipNames()) == set(
+            ["left_right_media", "another_left_another_right_media"]
+        )
+
+        relationship = ds.GetRelationship("left_right_media")
+        assert relationship.GetLeftTableName() == "renamed"
+        assert relationship.GetRightTableName() == "right"
+        assert relationship.GetMappingTableName() == "left_right"
+
+        # Again
+        relationship = ds.GetRelationship("left_right_media")
+        assert relationship.GetLeftTableName() == "renamed"
+        assert relationship.GetRightTableName() == "right"
+        assert relationship.GetMappingTableName() == "left_right"
+
+        relationship = ds.GetRelationship("another_left_another_right_media")
+        assert relationship.GetLeftTableName() == "another_left"
+        assert relationship.GetRightTableName() == "another_right"
+        assert relationship.GetMappingTableName() == "another_left_another_right"
+
+        assert ds.GetRelationship("non_existing") is None
+
+    with gdal.alg.vector.rename_layer(
+        input=src_ds,
+        output="",
+        output_format="stream",
+        input_layer="right",
+        output_layer="renamed",
+    ) as alg:
+        ds = alg.Output()
+
+        relationship = ds.GetRelationship("left_right_media")
+        assert relationship.GetLeftTableName() == "left"
+        assert relationship.GetRightTableName() == "renamed"
+        assert relationship.GetMappingTableName() == "left_right"
+
+    with gdal.alg.vector.rename_layer(
+        input=src_ds,
+        output="",
+        output_format="stream",
+        input_layer="left_right",
+        output_layer="renamed",
+    ) as alg:
+        ds = alg.Output()
+
+        relationship = ds.GetRelationship("left_right_media")
+        assert relationship.GetLeftTableName() == "left"
+        assert relationship.GetRightTableName() == "right"
+        assert relationship.GetMappingTableName() == "renamed"
+
+
 def test_gdalalg_vector_rename_layer_in_pipeline():
 
     src_ds = gdal.GetDriverByName("MEM").CreateVector("")

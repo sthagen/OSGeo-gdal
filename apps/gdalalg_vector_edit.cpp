@@ -69,12 +69,13 @@ GDALVectorEditAlgorithm::GDALVectorEditAlgorithm(bool standaloneStep)
            &m_unsetFID);
 }
 
+namespace
+{
+
 /************************************************************************/
 /*                     GDALVectorEditAlgorithmLayer                     */
 /************************************************************************/
 
-namespace
-{
 class GDALVectorEditAlgorithmLayer final : public GDALVectorPipelineOutputLayer
 {
   public:
@@ -195,6 +196,36 @@ class GDALVectorEditAlgorithmLayer final : public GDALVectorPipelineOutputLayer
     CPL_DISALLOW_COPY_ASSIGN(GDALVectorEditAlgorithmLayer)
 };
 
+/************************************************************************/
+/*                     GDALVectorEditOutputDataset                      */
+/************************************************************************/
+
+class GDALVectorEditOutputDataset final : public GDALVectorPipelineOutputDataset
+{
+  public:
+    explicit GDALVectorEditOutputDataset(GDALDataset &oSrcDS)
+        : GDALVectorPipelineOutputDataset(oSrcDS)
+    {
+    }
+
+    CSLConstList GetMetadata(const char *pszDomain) override;
+
+    const char *GetMetadataItem(const char *pszName,
+                                const char *pszDomain) override
+    {
+        if (!pszDomain || pszDomain[0] == 0)
+            return GDALDataset::GetMetadataItem(pszName, pszDomain);
+        return m_srcDS.GetMetadataItem(pszName, pszDomain);
+    }
+};
+
+CSLConstList GDALVectorEditOutputDataset::GetMetadata(const char *pszDomain)
+{
+    if (!pszDomain || pszDomain[0] == 0)
+        return GDALDataset::GetMetadata(pszDomain);
+    return m_srcDS.GetMetadata(pszDomain);
+}
+
 }  // namespace
 
 /************************************************************************/
@@ -219,7 +250,9 @@ bool GDALVectorEditAlgorithm::RunStep(GDALPipelineStepRunContext &)
         bChangeGeomType = true;
     }
 
-    auto outDS = std::make_unique<GDALVectorPipelineOutputDataset>(*poSrcDS);
+    auto outDS = std::make_unique<GDALVectorEditOutputDataset>(*poSrcDS);
+
+    outDS->SetMetadata(poSrcDS->GetMetadata());
 
     const CPLStringList aosMD(m_metadata);
     for (const auto &[key, value] : cpl::IterateNameValue(aosMD))
