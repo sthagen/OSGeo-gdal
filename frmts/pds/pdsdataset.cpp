@@ -35,6 +35,7 @@ constexpr double PDS_NULL3 = -3.4028226550889044521e+38;
 #include "pdsdrivercore.h"
 
 #include <array>
+#include <optional>
 
 enum PDSLayout
 {
@@ -1297,6 +1298,9 @@ int PDSDataset::ParseImage(const CPLString &osPrefix,
 class PDSWrapperRasterBand final : public GDALProxyRasterBand
 {
     GDALRasterBand *poBaseBand{};
+    double m_dfOffset = 0.0;
+    double m_dfScale = 1.0;
+    std::optional<double> m_dfNoData{};
 
     CPL_DISALLOW_COPY_ASSIGN(PDSWrapperRasterBand)
 
@@ -1305,11 +1309,34 @@ class PDSWrapperRasterBand final : public GDALProxyRasterBand
     RefUnderlyingRasterBand(bool /*bForceOpen*/) const override;
 
   public:
-    explicit PDSWrapperRasterBand(GDALRasterBand *poBaseBandIn)
+    PDSWrapperRasterBand(GDALRasterBand *poBaseBandIn, double dfOffset,
+                         double dfScale, std::optional<double> dfNoData)
+        : m_dfOffset(dfOffset), m_dfScale(dfScale), m_dfNoData(dfNoData)
     {
         this->poBaseBand = poBaseBandIn;
         eDataType = poBaseBand->GetRasterDataType();
         poBaseBand->GetBlockSize(&nBlockXSize, &nBlockYSize);
+    }
+
+    double GetScale(int *pbHasVal) override
+    {
+        if (pbHasVal)
+            *pbHasVal = m_dfScale != 1.0;
+        return m_dfScale;
+    }
+
+    double GetOffset(int *pbHasVal) override
+    {
+        if (pbHasVal)
+            *pbHasVal = m_dfOffset != 1.0;
+        return m_dfOffset;
+    }
+
+    double GetNoDataValue(int *pbHasVal) override
+    {
+        if (pbHasVal)
+            *pbHasVal = m_dfNoData.has_value();
+        return m_dfNoData.has_value() ? m_dfNoData.value() : 0.0;
     }
 };
 
@@ -1335,6 +1362,24 @@ int PDSDataset::ParseCompressedImage()
         return false;
     }
 
+    double dfOffset = 0;
+    double dfScale = 1;
+    std::optional<double> dfNoData;
+    const std::string osUncompressedFilename =
+        GetKeyword("COMPRESSED_FILE.UNCOMPRESSED_FILE_NAME", "");
+    if (!osUncompressedFilename.empty() &&
+        GetKeyword("UNCOMPRESSED_FILE.FILE_NAME", "") == osUncompressedFilename)
+
+    {
+        dfOffset = CPLAtof(GetKeyword("UNCOMPRESSED_FILE.IMAGE.OFFSET", "0.0"));
+        dfScale = CPLAtof(
+            GetKeyword("UNCOMPRESSED_FILE.IMAGE.SCALING_FACTOR", "1.0"));
+        const char *pszNull =
+            GetKeyword("UNCOMPRESSED_FILE.IMAGE.CORE_NULL", nullptr);
+        if (pszNull)
+            dfNoData = CPLAtof(pszNull);
+    }
+
     const CPLString osPath = CPLGetPathSafe(GetDescription());
     const CPLString osFullFileName =
         CPLFormFilenameSafe(osPath, osFileName, nullptr);
@@ -1351,7 +1396,8 @@ int PDSDataset::ParseCompressedImage()
     for (int iBand = 0; iBand < poCompressedDS->GetRasterCount(); iBand++)
     {
         SetBand(iBand + 1, new PDSWrapperRasterBand(
-                               poCompressedDS->GetRasterBand(iBand + 1)));
+                               poCompressedDS->GetRasterBand(iBand + 1),
+                               dfOffset, dfScale, dfNoData));
     }
 
     return TRUE;
