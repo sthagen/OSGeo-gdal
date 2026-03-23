@@ -26,6 +26,7 @@
 #include "gdalalg_vector_dissolve.h"
 #include "gdalalg_vector_edit.h"
 #include "gdalalg_vector_explode_collections.h"
+#include "gdalalg_vector_export_schema.h"
 #include "gdalalg_vector_filter.h"
 #include "gdalalg_vector_info.h"
 #include "gdalalg_vector_limit.h"
@@ -175,6 +176,7 @@ void GDALVectorPipelineAlgorithm::RegisterAlgorithms(
         addSuffixIfNeeded(GDALVectorEditAlgorithm::NAME));
 
     registry.Register<GDALVectorExplodeCollectionsAlgorithm>();
+    registry.Register<GDALVectorExportSchemaAlgorithm>();
 
     registry.Register<GDALMaterializeVectorAlgorithm>(
         addSuffixIfNeeded(GDALMaterializeVectorAlgorithm::NAME));
