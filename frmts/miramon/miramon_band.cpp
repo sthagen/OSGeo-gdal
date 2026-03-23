@@ -174,7 +174,7 @@ MMRBand::MMRBand(MMRRel &fRel, const CPLString &osBandSectionIn)
     UpdateRATInfo(m_osBandSection);
 
     // MiraMon IMG files are efficient in going to an specified row.
-    // So le'ts configurate the blocks as line blocks.
+    // So let's configure the blocks as line blocks.
     m_nBlockXSize = m_nWidth;
     m_nBlockYSize = 1;
     m_nNRowsPerBlock = 1;

@@ -4003,7 +4003,7 @@ GDgetdefaults(int32 projcode, int32 zonecode, float64 projparm[],
 |  projcode       int32               GCTP projection code                    |
 |  zonecode       int32               UTM zone code                           |
 |  projparm       float64             Projection parameters                   |
-|  spherecode     int32               GCTP spheriod code                      |
+|  spherecode     int32               GCTP spheroid code                      |
 |  xdimsize       int32               xdimsize from GDcreate                  |
 |  ydimsize       int32               ydimsize from GDcreate                  |
 |  upleftpt       float64             upper left corner coordinates           |

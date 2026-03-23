@@ -1736,7 +1736,7 @@ def test_tiff_write_46():
         # Load the working block
         data = ds.ReadRaster(0, 0, 10, 1)
 
-        # Write the working bloc
+        # Write the working block
         ds.WriteRaster(0, 0, 10, 1, ones)
 
         # This will discard the cached block for ds

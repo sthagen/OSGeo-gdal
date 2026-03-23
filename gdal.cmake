@@ -768,7 +768,7 @@ set(GDAL_USE_EXTERNAL_LIBS_OLD_CACHED
     CACHE INTERNAL "Previous value of GDAL_USE_EXTERNAL_LIBS")
 
 # Emit a warning if users do not define the build type for non-multi config and that we can't find -O in CMAKE_CXX_FLAGS
-# This is not super idiomatic to warn this way, but this will help users transitionning from autoconf where the default
+# This is not super idiomatic to warn this way, but this will help users transitioning from autoconf where the default
 # settings result in a -O2 build.
 get_property(_isMultiConfig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if (NOT GDAL_CMAKE_QUIET

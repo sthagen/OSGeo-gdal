@@ -61,7 +61,7 @@ GDALVectorConcatAlgorithm::GDALVectorConcatAlgorithm(bool bStandalone)
              "name the output vector layers (stack mode)"),
            &m_layerNameTemplate);
     AddArg("source-layer-field-name", 0,
-           _("Name of the new field to add to contain identificoncation of the "
+           _("Name of the new field to add to contain identification of the "
              "source layer, with value determined from "
              "'source-layer-field-content'"),
            &m_sourceLayerFieldName);

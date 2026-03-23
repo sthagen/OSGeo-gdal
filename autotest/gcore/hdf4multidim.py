@@ -351,7 +351,7 @@ def test_hdf4multidim_sds():
 def test_hdf4multidim_sds_unlimited_dim():
 
     # Generated with
-    # hhttps://support.hdfgroup.org/ftp/HDF/HDF_Current/src/unpacked/mfhdf/examples/SD_unlimited_sds.c
+    # https://support.hdfgroup.org/ftp/HDF/HDF_Current/src/unpacked/mfhdf/examples/SD_unlimited_sds.c
     ds = gdal.OpenEx("data/SDSUNLIMITED.hdf", gdal.OF_MULTIDIM_RASTER)
     assert ds
     rg = ds.GetRootGroup()

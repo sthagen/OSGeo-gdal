@@ -1863,7 +1863,7 @@ def test_ogr_openfilegdb_utc_datetime():
 
 
 ###############################################################################
-# Test that field alias are correctly read and mapped to OGR field alternativ
+# Test that field alias are correctly read and mapped to OGR field alternative
 # names
 
 

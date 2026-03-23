@@ -594,7 +594,7 @@ void PDSDataset::ParseSRS()
         // body name 'GCS' = Geographic/Geocentric Coordinate System
         const CPLString geog_name = "GCS_" + target_name;
 
-        // The datum and sphere names will be the same basic name aas the planet
+        // The datum and sphere names will be the same basic name as the planet
         const CPLString datum_name = "D_" + target_name;
 
         CPLString sphere_name = std::move(target_name);

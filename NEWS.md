@@ -148,7 +148,7 @@ ENVI driver:
 
 ESRIC driver:
  * Remove record count header check (#13580)
- * Ignore levels with a dimensin >= 2^31 pixel. Add IGNORE_OVERSIZED_LODS open
+ * Ignore levels with a dimension >= 2^31 pixel. Add IGNORE_OVERSIZED_LODS open
    option
 
 GIF driver:
@@ -159,7 +159,7 @@ GTI driver:
    for STAC GeoParquet
 
 GTiff driver:
- * read potential ENVI .hdr sidecar file to set band wavelengh/FWHM/bad band
+ * read potential ENVI .hdr sidecar file to set band wavelength/FWHM/bad band
    list
  * report LAYOUT=COG in IMAGE_STRUCTURE metadata item, even in the
    absence of the GDAL 'ghost area' when the file meets the basic requirements
@@ -277,7 +277,7 @@ Zarr driver:
 * gdal vector partition: also accept geometry fields, to partition on geometry
   type
 * gdal vector partition: automatically generate the '_metadata' index of
-  Parquet partitionned datasets
+  Parquet partitioned datasets
 * gdal vector rasterize: improve error message when invalid options paired with
   --update (#13771)
 * gdal vector select: expose --output-layer for pipeline mode
@@ -331,7 +331,7 @@ OAPIF driver:
 
 Parquet driver:
  * Add 'gdal driver parquet create-metadata-file' to create the '_metadata'
-   index of partitionned datasets
+   index of partitioned datasets
 
 Shapefile driver:
  * read .shp.xml to set field names >= 10 chars, and field aliases (#13472)
@@ -348,6 +348,124 @@ VFK driver:
 ## Java bindings
 
 * Expose VSICurlClearCache and VSICurlPartialClearCache
+
+# GDAL/OGR 3.12.3 Release Notes
+
+GDAL 3.12.3 is a bugfix release.
+
+## Build
+
+* PDF: add compatibility with Poppler 26.02.0 (#13857)
+* HDF5: Adding proper support for parallel HDF5
+
+## GDAL 3.12.3
+
+### Port
+
+* Add CPLLexicallyNormalize() to normalize file paths, to fix oss-fuzz#473110068
+
+### Algorithms
+
+* Homography GCP transformer: fix bad scaling factor on overviews (3.11.0
+  regression) (qgis/QGIS#65011)
+* GDALCreateAndReprojectImage(): fix memleak in error code path (#14001)
+* GDALWarpResolveWorkingDataType(): do not default to UInt8 before looking at
+  data type bands (#14063)
+* Warper: add dedicated code path for Int8 nearest neighbour resampling (#14063)
+* viewshed: allow out-of-range values outside of Byte range for DEM and GROUND
+  modes
+
+### Core
+
+* RMS overview resampling: fix error in normalization formula
+
+### Utilities
+
+* gdal raster calc: properly handle inputs with no geotransform
+* gdal raster contour/polygonize: expose --output-layer for pipeline mode
+* gdal raster edit: add missing --oo option in standalone mode (#14107)
+* gdalinfo: support again -wkt_format WKT1_ESRI (#13906)
+* gdaltindex: use GDALWarp for reprojected extents
+* gdal pipeline: fix nullptr deref on 'read -h' pipeline in non-command line
+  mode (oss-fuzz#485952614)
+* gdal dataset copy/rename: make it work with vector datasets, and directories
+  (#14097)
+* gdal2tiles: fix wrong extent computation on source raster with non-square pixels
+
+### Raster drivers
+
+GIF driver:
+ * avoid potential left shift of >=32 positions (oss-fuzz#481899239)
+ * avoid potential crash on corrupted datasets (oss-fuzz#481841770)
+
+Georaster driver:
+ * Preserve the double quote in the database connection string.
+
+GTI driver:
+ * avoid warning about 'Tile index is out of sync with actual extent' (#13944)
+ * add a WARPING_MEMORY_SIZE open option (#14063)
+ * on-the-fly reprojection: avoid creating a -dstalpha band when not needed
+   (#14063)
+
+GTIFF driver:
+ * accept Float16 with PREDICTOR=3
+ * dataset creation: do not trigger output directory listing if
+   GDAL_DISABLE_READDIR_ON_OPEN=TRUE (3.12.0 regression, #13930)
+ * avoid potential use-after-free related to querying IMAGE_STRUCTURE
+   metadata domain (oss-fuzz#478560270)
+
+LIBERTIFF driver:
+ * validate value of PlanarConfiguration to avoid later issues such as in the
+   LERC codec (oss-fuzz#484435855)
+
+netCDF driver:
+ * use stored GeoTransform attribute only if consistent with dimensio
+   variables (#13823)
+ * avoid warning when a GeoTransform attribute with gt.yscale > 0 is found
+   (qgis/QGIS#64873)
+ * Handle port numbers in GDALGetSubdatasetInfo
+
+PDS4 driver:
+ * avoid integer division by zero on corrupted file (oss-fuzz#483762324)
+
+RPFTOC driver:
+ * fix georeferencing of polar zones
+
+VRT driver:
+ * VRTDerivedRasterBand::IRasterIO(): fix output buffer zero initialization when
+   nLineSpace != nBufXSize * nPixelSpace (#13862)
+ * VRTDerivedRasterBand::IRasterIO(): refine check to decide for splitting or
+   not based on the actual number of contributing sources
+
+Zarr V2 driver:
+ * multithreaded decoding: avoid potential memory leak / race / user after free
+  (oss-fuzz#489132118 and oss-fuzz#490674996)
+
+## OGR 3.12.3
+
+### Core
+
+* OGRSQL: honor spatial filter defined through ExecuteSQL() when result set is
+  an aggregation record
+
+### Utilities
+
+* gdal vector select: expose --output-layer for pipeline mode
+* ogrmerge: fix error messages (#14013)
+* ogrmerge.py: make it work with input filenames with leading spaces (#14121)
+
+### Vector drivers
+
+ADBC driver:
+ * add compatibility with DuckDB 1.5
+
+GML driver:
+ * fix memory leak on invalid files with invalid geometry cross-linking
+   (oss-fuzz#487160964)
+
+GPKG driver:
+ * fix GetFeatureCount() result on spatial filter just after insertion under
+   transaction, in some circumstance (#13919)
 
 # GDAL/OGR 3.12.2 Release Notes
 
@@ -496,7 +614,7 @@ OSM driver:
  * fix reading complex multipolygons (3.11.5 regression) (#13610)
 
 Parquet driver:
- * fix so that Hive partitionned datasets are filtered properly
+ * fix so that Hive partitioned datasets are filtered properly
  * avoid conflicts with geoarrow.pyarrow Python module when opening GeoArrow
    encoded files that have no GeoParquet metadata
 
@@ -629,7 +747,7 @@ GML driver:
  * reader: fix reading 3D geometries with a 3D srsName but without
    srsDimension='3'
  * reader: set geometry column name when there are several geometry elements,
-   but the last one (whih is the one we read) is always the same
+   but the last one (which is the one we read) is always the same
 
 GPKG driver:
  * writer: avoid (non fatal) error message when creating a layer with a derived
@@ -651,7 +769,7 @@ Shapefile driver:
 * Increment FeatureDefn refcount on Feature.GetDefnRef
 * Python bindings: avoid warning with Python 3.14 when VSIFile constructor
   throws an exception
-* Python bindings: add compatilibity with Python 3.13+ free-standing/no-gil
+* Python bindings: add compatibility with Python 3.13+ free-standing/no-gil
   builds
 * Python bindings: add 'progress' keyword argument to gdal.alg.xxxx() methods
 * Python bindings: avoid gdal.alg.X public symbols to have non relevant
@@ -1876,7 +1994,7 @@ GDAL 3.11.1 is a bugfix release.
 * gdal-bash-completion: add compatibility for zsh
 * gdalinfo JSON output: return integer nodata value of integer bands as integer
 * gdalinfo JSON output: attach 'rat' object to 'band',
-* gdalinfo JSON outpu: do not emit wgs84Extent/extent on non-georeferenced image
+* gdalinfo JSON output: do not emit wgs84Extent/extent on non-georeferenced image
 * add missing elements in gdalinfo_output.schema.json (#12637, #12638)
 
 ### Raster drivers
@@ -2189,7 +2307,7 @@ See [MIGRATION_GUIDE.TXT](https://github.com/OSGeo/gdal/blob/release/3.11/MIGRAT
 * Block cache: Allow memory units in GDAL_CACHEMAX
 * Use sse2neon.h to provide Intel SSE optimizations to ARM Neon CPUs in gcore,
   PNG, GTI, overview, warp code paths
-* Raster API: error out on GDT_Unknown/GDT_TypeCount in a nmber of places (#11257)
+* Raster API: error out on GDT_Unknown/GDT_TypeCount in a number of places (#11257)
 * create class gdal::VectorX to do easy vector operations
 * gdaldrivermanager.cpp: Do not look for plugins in GetRealDriver when
   GDAL_NO_AUTOLOAD set (#11332)
@@ -2835,7 +2953,7 @@ GDAL 3.10.1 is a bugfix release.
   but has a non-empty NextMarker
 * /vsis3/ / AWS: implement support for AWS Single-Sign On (AWS IAM Identity
   Center) (#11203)
-* /vsicurl/: fix to allow to read Parquet partitionned datasets from public
+* /vsicurl/: fix to allow to read Parquet partitioned datasets from public
   Azure container using /vsicurl/ (#11309)
 * CPLGetPath()/CPLGetDirname(): make them work with /vsicurl? and URL encoded
   (#11467)
@@ -7102,7 +7220,7 @@ GDAL 3.6.3 is a bugfix release.
 * CPLGetPhysicalRAM(): take into account MemTotal limit from /proc/meminfo
 * /vsicurl/: fix CPL_VSIL_CURL_USE_HEAD=NO mode (#7150)
 * Avoid use of deprecated ZSTD_getDecompressedSize() function with libzstd 1.3+
-* cpl_vsil_crypt.cpp: fix build isse on Windows (#7304)
+* cpl_vsil_crypt.cpp: fix build issue on Windows (#7304)
 
 ### Algorithms
 
@@ -7384,7 +7502,7 @@ cf https://github.com/qgis/QGIS/issues/51188 and
 https://github.com/OSGeo/gdal/pull/6911. GDAL 3.6.1 fixes that issue. Setting
 OGR_GPKG_ALLOW_THREADED_RTREE=NO environment variable (at generation time)
 also works around the issue with GDAL 3.6.0. Users who have generated corrupted
-GeoPackage files with 3.6.0 can regnerate them with 3.6.1 with, for example,
+GeoPackage files with 3.6.0 can regenerate them with 3.6.1 with, for example,
 "ogr2ogr out_ok.gpkg in_corrupted.gpkg" (assuming a GeoPackage file with vector
 content only)
 
@@ -7599,7 +7717,7 @@ Those notes include changes since GDAL 3.5.0, but not already included in a GDAL
 * Add read/write raster [JPEGXL driver](https://gdal.org/drivers/raster/jpegxl.html) for standalone JPEG-XL files. Requires libjxl
 * Add KTX2 and BASISU read/write raster drivers for texture formats. Require (forked) basisu library
 * Vector layer API: table relationship discovery & creation, Upsert() operation
-* GeoTIFF: add multi-threaded read capabilities (reqiures NUM_THREADS open option or GDAL_NUM_THREADS configuration option to be set)
+* GeoTIFF: add multi-threaded read capabilities (requires NUM_THREADS open option or GDAL_NUM_THREADS configuration option to be set)
 * Multiple performance improvements in GPKG driver
 * ogr_layer_algebra.py: promoted to official script (#1581)
 * Code linting and security fixes
@@ -7736,7 +7854,7 @@ New features:
  * gdal_translate: add a -ovr <level|AUTO|AUTO-n|NONE> flag (#1923)
  * gdal2tiles.py: add WEBP support with --tiledriver option
  * gdalmdiminfo & gdalmdimtranslate: add -if (input format) flag (#6295)
- * gdal_grid: add 'radius' parameter to invdist, nearest, averge and metrics algorithm, to set radius1 and radius2 at the same time
+ * gdal_grid: add 'radius' parameter to invdist, nearest, average and metrics algorithm, to set radius1 and radius2 at the same time
  * gdal_grid: add per-quadrant search capabilities for invdistnn, average, and metrics algorithms
  * ogr_layer_algebra.py: promoted to official script (#1581)
 
@@ -7761,7 +7879,7 @@ Bugfixes:
 
 ### gdal_utils package
 
-* standardized return codes (#5561). Return 2 when utilities called without argumen
+* standardized return codes (#5561). Return 2 when utilities called without argument
 
 ### Raster drivers
 
@@ -7793,7 +7911,7 @@ GPKG driver:
  * writer: write fully set tiles as soon as possible to decrease pressure on block cache
 
 GTiff driver:
- * add multi-threaded read capabilities (reqiures NUM_THREADS open option or GDAL_NUM_THREADS configuration option to be set)
+ * add multi-threaded read capabilities (requires NUM_THREADS open option or GDAL_NUM_THREADS configuration option to be set)
  * JXL codec: support more than 4 bands in INTERLEAVE=PIXEL mode (#5704)
  * JXL codec: preserve Alpha color interpretation when the Alpha band does not immediately follow color bands (e.g. R,G,B,undefined,Alpha), and fix decoding of such files
  * add a WEBP_LOSSLESS_OVERVIEW=YES/NO configuration option (#6439)
@@ -8027,7 +8145,7 @@ OpenFileGDB driver:
  * Report relationships
 
 Parquet driver:
- * add basic support for reading partitionned datasets
+ * add basic support for reading partitioned datasets
  * add CREATOR option
  * do not write statistics for WKB geometry columns
  * make sure 'geo' metadata is embedded in ARROW:schema so that partitioned reading works fine
@@ -8202,7 +8320,7 @@ GDAL 3.6.3 is a bugfix release.
 * CPLGetPhysicalRAM(): take into account MemTotal limit from /proc/meminfo
 * /vsicurl/: fix CPL_VSIL_CURL_USE_HEAD=NO mode (#7150)
 * Avoid use of deprecated ZSTD_getDecompressedSize() function with libzstd 1.3+
-* cpl_vsil_crypt.cpp: fix build isse on Windows (#7304)
+* cpl_vsil_crypt.cpp: fix build issue on Windows (#7304)
 
 ### Algorithms
 
@@ -8484,7 +8602,7 @@ cf https://github.com/qgis/QGIS/issues/51188 and
 https://github.com/OSGeo/gdal/pull/6911. GDAL 3.6.1 fixes that issue. Setting
 OGR_GPKG_ALLOW_THREADED_RTREE=NO environment variable (at generation time)
 also works around the issue with GDAL 3.6.0. Users who have generated corrupted
-GeoPackage files with 3.6.0 can regnerate them with 3.6.1 with, for example,
+GeoPackage files with 3.6.0 can regenerate them with 3.6.1 with, for example,
 "ogr2ogr out_ok.gpkg in_corrupted.gpkg" (assuming a GeoPackage file with vector
 content only)
 
@@ -11849,7 +11967,7 @@ CPL_UNSTABLE_API macro (#1925)
 * importFromWkt(): emit a CPLError() in case of import failure (#1623)
 * Add OSRGetAxesCount() to C API and SWIG bindings
 * Add OSRPromoteTo3D() and map it to SWIG (PROJ >= 7) (#1852)
-* importFromESRI(): acept COMPD_CS (#1881)
+* importFromESRI(): accept COMPD_CS (#1881)
 * add an internal cache for importFromEPSG() and importFromWkt(). Helps performance for MapServer PROJ6 migration
 * Add support for Vertical Perspective projection (#1856)
 * Add a OSRGetPROJSearchPaths() function and a SWIG osr.GetPROJVersionMicro()
@@ -12303,7 +12421,7 @@ XYZ driver:
 
 Core:
  * Add OGR_G_MakeValid() (requires GEOS 3.8)
- * change prototye of OGRFeature::SetField( int iField, int nBytes, GByte *pabyData ) to ( ... , const void* pabyData), and same for OGR_F_SetFieldBinary().
+ * change prototype of OGRFeature::SetField( int iField, int nBytes, GByte *pabyData ) to ( ... , const void* pabyData), and same for OGR_F_SetFieldBinary().
  * Polyhedral surface: fix importFromWKT to properly fix Z/M flag
  * OGRBuildPolygonFromLines: avoid generating effectively duplicate points
  * OGRBuildPolygonFromEdges(): improve performance. https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=13798

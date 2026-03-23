@@ -455,7 +455,7 @@ def test_gdalalg_vector_convert_upsert(tmp_vsimem, output_format):
         return srcDS
 
     if output_format == "SQLite":
-        with pytest.raises(Exception, match="SQLite driver doest not support upsert"):
+        with pytest.raises(Exception, match="SQLite driver does not support upsert"):
             gdal.Run(
                 "vector",
                 "convert",

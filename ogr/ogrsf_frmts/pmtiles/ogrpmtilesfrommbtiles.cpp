@@ -513,7 +513,7 @@ bool OGRPMTilesConvertFromMBTiles(const char *pszDestName,
         sHeader.leaf_dirs_offset + sHeader.leaf_dirs_bytes;
     sHeader.tile_data_bytes = nFileOffset;
 
-    // Nomber of tiles that are addressable in the PMTiles archive, that is
+    // Number of tiles that are addressable in the PMTiles archive, that is
     // the number of tiles we would have if not deduplicating them
     sHeader.addressed_tiles_count = asTileEntries.size();
 

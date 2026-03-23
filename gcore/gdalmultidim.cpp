@@ -15238,8 +15238,8 @@ GDALPamMultiDim::GenerateOverviewFilename(const std::string &osArrayFullName,
 {
     Load();
 
-    constexpr int ARBIRARY_ITERATION_COUNT = 1000;
-    for (int i = 0; i < ARBIRARY_ITERATION_COUNT; ++i)
+    constexpr int ARBITRARY_ITERATION_COUNT = 1000;
+    for (int i = 0; i < ARBITRARY_ITERATION_COUNT; ++i)
     {
         std::string osOvrFilename(d->m_osFilename);
         osOvrFilename += '.';

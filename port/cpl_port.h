@@ -809,16 +809,24 @@ extern "C++"
 #include <cstddef>
 #include <cstdint>
 
+    /*! @cond Doxygen_Suppress */
+    // workaround before CWG2518/P2593R1
+    template <class T> struct CPL_T_IsAlwaysFalse
+    {
+        static const bool value = false;
+    };
+
+    /*! @endcond */
+
     /** Return the provided value as a LSB ordered one.
      *
      * Only available for primitive types: [u]int[8|16|32|64], float and double.
      */
-    template <class T>
-    T CPL_AS_LSB(T)
-#ifndef DOXYGEN_SKIP
-        = delete
-#endif
-        ;
+    template <class T> T CPL_AS_LSB(T)
+    {
+        // See https://youtu.be/b6j6SZiXmoo?t=1659 for rationale for CPL_T_IsAlwaysFalse
+        static_assert(CPL_T_IsAlwaysFalse<T>::value, "Unsupported value for T");
+    }
 
     /*! @cond Doxygen_Suppress */
     template <> inline int8_t CPL_AS_LSB<int8_t>(int8_t x)
@@ -897,12 +905,11 @@ extern "C++"
      *
      * Only available for primitive types: [u]int[8|16|32|64], float and double.
      */
-    template <class T>
-    T CPL_SWAP(T)
-#ifndef DOXYGEN_SKIP
-        = delete
-#endif
-        ;
+    template <class T> T CPL_SWAP(T)
+    {
+        // See https://youtu.be/b6j6SZiXmoo?t=1659 for rationale for CPL_T_IsAlwaysFalse
+        static_assert(CPL_T_IsAlwaysFalse<T>::value, "Unsupported value for T");
+    }
 
     /*! @cond Doxygen_Suppress */
     template <> inline int8_t CPL_SWAP<int8_t>(int8_t x)

@@ -886,7 +886,7 @@ sqlite3_stmt *OGRSQLiteBaseDataSource::prepareSql(sqlite3 *db, const char *zSql,
         error.append(sqlite3_errmsg(db));
         pfnQueryLoggerFunc(zSql, error.c_str(), -1, -1, poQueryLoggerArg);
     }
-    else if (pszTail && SQLHasRemainingContent(pszTail))
+    else if (strchr(zSql, ';') && pszTail && SQLHasRemainingContent(pszTail))
     {
         sqlite3_finalize(stmt);
         stmt = nullptr;
@@ -1855,7 +1855,7 @@ bool OGRSQLiteDataSource::Create(const char *pszNameIn,
         CPLError(
             CE_Failure, CPLE_NotSupported,
             "OGR was built without libspatialite support\n"
-            "... sorry, creating/writing any SpatiaLite DB is unsupported\n");
+            "... sorry, creating/writing any SpatiaLite DB is unsupported");
 
         return false;
 #endif
