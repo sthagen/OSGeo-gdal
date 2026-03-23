@@ -1104,6 +1104,30 @@ bool SQLHasRemainingContent(const char *pszTail)
 }
 
 /************************************************************************/
+/*                   SQLFormatErrorMsgFailedPrepare()                   */
+/************************************************************************/
+
+std::string SQLFormatErrorMsgFailedPrepare(sqlite3 *hDB,
+                                           const char *pszErrMsgIntro,
+                                           const char *pszSQL)
+{
+    std::string osErrorMsg(pszErrMsgIntro);
+    osErrorMsg += sqlite3_errmsg(hDB);
+    osErrorMsg += "\n  ";
+    osErrorMsg += pszSQL;
+#if SQLITE_VERSION_NUMBER >= 3038000L
+    const int nOffset = sqlite3_error_offset(hDB);
+    if (nOffset >= 0 && static_cast<size_t>(nOffset) <= strlen(pszSQL))
+    {
+        osErrorMsg += "\n  ";
+        osErrorMsg.append(nOffset, ' ');
+        osErrorMsg += "^--- error here";
+    }
+#endif
+    return osErrorMsg;
+}
+
+/************************************************************************/
 /*                       SQLGetSQLite3DataType()                        */
 /************************************************************************/
 

@@ -882,9 +882,11 @@ sqlite3_stmt *OGRSQLiteBaseDataSource::prepareSql(sqlite3 *db, const char *zSql,
     const int rc = sqlite3_prepare_v2(db, zSql, nByte, &stmt, &pszTail);
     if (rc != SQLITE_OK && pfnQueryLoggerFunc)
     {
-        std::string error{"Error preparing query: "};
-        error.append(sqlite3_errmsg(db));
-        pfnQueryLoggerFunc(zSql, error.c_str(), -1, -1, poQueryLoggerArg);
+        pfnQueryLoggerFunc(
+            zSql,
+            SQLFormatErrorMsgFailedPrepare(db, "Error preparing query: ", zSql)
+                .c_str(),
+            -1, -1, poQueryLoggerArg);
     }
     else if (strchr(zSql, ';') && pszTail && SQLHasRemainingContent(pszTail))
     {
@@ -3338,9 +3340,11 @@ OGRLayer *OGRSQLiteDataSource::ExecuteSQL(const char *pszSQLCommand,
     {
         if (nErrorCount == CPLGetErrorCounter())
         {
-            CPLError(CE_Failure, CPLE_AppDefined,
-                     "In ExecuteSQL(): sqlite3_prepare_v2(%s):\n  %s",
-                     osSQLCommand.c_str(), sqlite3_errmsg(GetDB()));
+            CPLError(CE_Failure, CPLE_AppDefined, "%s",
+                     SQLFormatErrorMsgFailedPrepare(
+                         GetDB(), "In ExecuteSQL(): sqlite3_prepare_v2(): ",
+                         osSQLCommand.c_str())
+                         .c_str());
         }
         return nullptr;
     }
