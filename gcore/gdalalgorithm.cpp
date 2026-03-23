@@ -2891,7 +2891,14 @@ bool GDALAlgorithm::ProcessDatasetArg(GDALAlgorithmArg *arg,
                     }
                     else if (EQUAL(pszType, "File"))
                     {
-                        VSIUnlink(val.GetName().c_str());
+                        if (VSIUnlink(val.GetName().c_str()) != 0)
+                        {
+                            ReportError(CE_Failure, CPLE_AppDefined,
+                                        "Deleting %s failed: %s",
+                                        val.GetName().c_str(),
+                                        VSIStrerror(errno));
+                            return false;
+                        }
                     }
                     else if (EQUAL(pszType, "Directory"))
                     {
@@ -2905,11 +2912,37 @@ bool GDALAlgorithm::ProcessDatasetArg(GDALAlgorithmArg *arg,
                     }
                     else if (poDriver)
                     {
-                        CPLStringList aosDrivers;
-                        aosDrivers.AddString(poDriver->GetDescription());
-                        CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
-                        GDALDriver::QuietDelete(val.GetName().c_str(),
-                                                aosDrivers.List());
+                        bool bDeleteOK;
+                        {
+                            CPLErrorStateBackuper oBackuper(
+                                CPLQuietErrorHandler);
+                            bDeleteOK = (poDriver->Delete(
+                                             val.GetName().c_str()) == CE_None);
+                        }
+                        VSIStatBufL sStat;
+                        if (!bDeleteOK &&
+                            VSIStatL(val.GetName().c_str(), &sStat) == 0)
+                        {
+                            if (VSI_ISDIR(sStat.st_mode))
+                            {
+                                // We don't want the user to accidentally erase a non-GDAL dataset
+                                ReportError(
+                                    CE_Failure, CPLE_AppDefined,
+                                    "Directory '%s' already exists, but is not "
+                                    "recognized as a valid GDAL dataset. "
+                                    "Please manually delete it before retrying",
+                                    val.GetName().c_str());
+                                return false;
+                            }
+                            else if (VSIUnlink(val.GetName().c_str()) != 0)
+                            {
+                                ReportError(CE_Failure, CPLE_AppDefined,
+                                            "Deleting %s failed: %s",
+                                            val.GetName().c_str(),
+                                            VSIStrerror(errno));
+                                return false;
+                            }
+                        }
                     }
                 }
             }
@@ -3806,11 +3839,12 @@ GDALInConstructionAlgorithmArg &GDALAlgorithm::AddOutputDatasetArg(
 GDALInConstructionAlgorithmArg &
 GDALAlgorithm::AddOverwriteArg(bool *pValue, const char *helpMessage)
 {
-    return AddArg(GDAL_ARG_NAME_OVERWRITE, 0,
-                  MsgOrDefault(
-                      helpMessage,
-                      _("Whether overwriting existing output is allowed")),
-                  pValue)
+    return AddArg(
+               GDAL_ARG_NAME_OVERWRITE, 0,
+               MsgOrDefault(
+                   helpMessage,
+                   _("Whether overwriting existing output dataset is allowed")),
+               pValue)
         .SetDefault(false);
 }
 
@@ -3834,11 +3868,12 @@ GDALAlgorithm::AddOverwriteLayerArg(bool *pValue, const char *helpMessage)
             }
             return true;
         });
-    return AddArg(GDAL_ARG_NAME_OVERWRITE_LAYER, 0,
-                  MsgOrDefault(
-                      helpMessage,
-                      _("Whether overwriting existing output is allowed")),
-                  pValue)
+    return AddArg(
+               GDAL_ARG_NAME_OVERWRITE_LAYER, 0,
+               MsgOrDefault(
+                   helpMessage,
+                   _("Whether overwriting existing output layer is allowed")),
+               pValue)
         .SetDefault(false)
         .AddAction(
             [this]

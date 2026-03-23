@@ -14,6 +14,7 @@ Supported Formats: (ro:read-only, rw:read-write, +:write from scratch, u:update,
   GDALG -raster,vector- (rov): GDAL Streamed Algorithm driver (*.gdalg.json)
   ESRI Shapefile -vector- (rw+uv): ESRI Shapefile (*.shp, *.dbf, *.shz, *.shp.zip)
   MapInfo File -vector- (rw+uv): MapInfo File (*.tab, *.mif, *.mid)
+  UK .NTF -vector- (rov): UK .NTF
   LVBAG -vector- (rov): Kadaster LV BAG Extract 2.0 (*.xml)
   S57 -vector- (rw+v): IHO S-57 (ENC) (*.000)
   DGN -vector- (rw+v): Microstation DGN (*.dgn)
@@ -81,6 +82,7 @@ Supported Formats: (ro:read-only, rw:read-write, +:write from scratch, u:update,
   MiraMonVector -vector- (rw+v): MiraMon Vectors (.pol, .arc, .pnt) (*.pol, *.arc, *.pnt)
   XODR -vector- (ro): OpenDRIVE - Open Dynamic Road Information for Vehicle Environment (*.xodr)
   ADBC -vector- (rou): Arrow Database Connectivity
+  TIGER -vector- (rov): U.S. Census TIGER/Line
   AVCBin -vector- (rov): Arc/Info Binary Coverage
   AVCE00 -vector- (rov): Arc/Info E00 (ASCII) Coverage (*.e00)
   AIVector -vector- (ro): Artificial Intelligence powered vector driver

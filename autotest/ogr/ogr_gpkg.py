@@ -7579,6 +7579,8 @@ def test_ogr_gpkg_alter_relations(tmp_vsimem, tmp_path):
     assert retrieved_rel.GetLeftMappingTableFields() == ["base_id"]
     assert retrieved_rel.GetRightMappingTableFields() == ["related_id"]
 
+    assert ds.GetLayerByName("origin_table_dest_table") is not None
+
     # try again, should fail because relationship already exists
     assert not ds.AddRelationship(relationship)
 

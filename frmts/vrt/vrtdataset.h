@@ -216,6 +216,9 @@ class CPL_DLL VRTSource
     }
 
   protected:
+    VRTSource() = default;
+    VRTSource(const VRTSource &) = default;
+
     std::string m_osName{};
 };
 
@@ -899,7 +902,7 @@ class CPL_DLL VRTRasterBand CPL_NON_FINAL : public GDALRasterBand
     virtual CPLErr SetDefaultHistogram(double dfMin, double dfMax, int nBuckets,
                                        GUIntBig *panHistogram) override;
 
-    CPLErr CopyCommonInfoFrom(GDALRasterBand *);
+    CPLErr CopyCommonInfoFrom(const GDALRasterBand *);
 
     virtual void GetFileList(char ***ppapszFileList, int *pnSize,
                              int *pnMaxSize, CPLHashSet *hSetFiles);
@@ -970,6 +973,12 @@ class CPL_DLL VRTSourcedRasterBand CPL_NON_FINAL : public VRTRasterBand
                          int nXSize, int nYSize, int nBlockXSizeIn,
                          int nBlockYSizeIn);
     ~VRTSourcedRasterBand() override;
+
+    void CopyForCloneWithoutSources(const VRTSourcedRasterBand *poSrcBand);
+
+    virtual std::unique_ptr<VRTSourcedRasterBand>
+    CloneWithoutSources(GDALDataset *poNewDS, int nNewXSize,
+                        int nNewYSize) const;
 
     CPLErr IRasterIO(GDALRWFlag, int, int, int, int, void *, int, int,
                      GDALDataType, GSpacing nPixelSpace, GSpacing nLineSpace,
@@ -1221,6 +1230,12 @@ class CPL_DLL VRTDerivedRasterBand CPL_NON_FINAL : public VRTSourcedRasterBand
                          int nXSize, int nYSize, int nBlockXSizeIn = 0,
                          int nBlockYSizeIn = 0);
     ~VRTDerivedRasterBand() override;
+
+    void CopyForCloneWithoutSources(const VRTDerivedRasterBand *poSrcBand);
+
+    std::unique_ptr<VRTSourcedRasterBand>
+    CloneWithoutSources(GDALDataset *poNewDS, int nNewXSize,
+                        int nNewYSize) const override;
 
     CPLErr IRasterIO(GDALRWFlag, int, int, int, int, void *, int, int,
                      GDALDataType, GSpacing nPixelSpace, GSpacing nLineSpace,
@@ -1545,6 +1560,10 @@ class CPL_DLL VRTSimpleSource CPL_NON_FINAL : public VRTSource
     {
         m_nMaxValue = nVal;
     }
+
+    static std::pair<std::string, bool>
+    ComputeSourceNameAndRelativeFlag(const char *pszVRTPath,
+                                     const std::string &osSourceNameIn);
 };
 
 /************************************************************************/

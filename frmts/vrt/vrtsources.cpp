@@ -80,7 +80,8 @@ VRTSimpleSource::VRTSimpleSource() = default;
 
 VRTSimpleSource::VRTSimpleSource(const VRTSimpleSource *poSrcSource,
                                  double dfXDstRatio, double dfYDstRatio)
-    : m_poMapSharedSources(poSrcSource->m_poMapSharedSources),
+    : VRTSource(*poSrcSource),
+      m_poMapSharedSources(poSrcSource->m_poMapSharedSources),
       m_poRasterBand(poSrcSource->m_poRasterBand),
       m_poMaskBandMainBand(poSrcSource->m_poMaskBandMainBand),
       m_aosOpenOptionsOri(poSrcSource->m_aosOpenOptionsOri),
@@ -353,36 +354,21 @@ static bool IsSlowSource(const char *pszSrcName)
 /*                       AddSourceFilenameNode()                        */
 /************************************************************************/
 
-void VRTSimpleSource::AddSourceFilenameNode(const char *pszVRTPath,
-                                            CPLXMLNode *psSrc)
+/* static */
+std::pair<std::string, bool> VRTSimpleSource::ComputeSourceNameAndRelativeFlag(
+    const char *pszVRTPath, const std::string &osSourceNameIn)
 {
+    std::string osSourceFilename = osSourceNameIn;
+    int bRelativeToVRT = false;
 
-    VSIStatBufL sStat;
-    int bRelativeToVRT = FALSE;  // TODO(schwehr): Make this a bool?
-    std::string osSourceFilename;
-
-    if (m_bRelativeToVRTOri >= 0)
-    {
-        osSourceFilename = m_osSourceFileNameOri;
-        bRelativeToVRT = m_bRelativeToVRTOri;
-    }
-    else if (IsSlowSource(m_osSrcDSName))
-    {
-        // Testing the existence of remote resources can be excruciating
-        // slow, so let's just suppose they exist.
-        osSourceFilename = m_osSrcDSName;
-        bRelativeToVRT = FALSE;
-    }
     // If this isn't actually a file, don't even try to know if it is a
     // relative path. It can't be !, and unfortunately CPLIsFilenameRelative()
     // can only work with strings that are filenames To be clear
     // NITF_TOC_ENTRY:CADRG_JOG-A_250K_1_0:some_path isn't a relative file
     // path.
-    else if (VSIStatExL(m_osSrcDSName, &sStat, VSI_STAT_EXISTS_FLAG) != 0)
+    VSIStatBufL sStat;
+    if (VSIStatExL(osSourceFilename.c_str(), &sStat, VSI_STAT_EXISTS_FLAG) != 0)
     {
-        osSourceFilename = m_osSrcDSName;
-        bRelativeToVRT = FALSE;
-
         // Try subdatasetinfo API first
         // Note: this will become the only branch when subdatasetinfo will become
         //       available for NITF_IM, RASTERLITE and TILEDB
@@ -452,7 +438,8 @@ void VRTSimpleSource::AddSourceFilenameNode(const char *pszVRTPath,
     else
     {
         std::string osVRTFilename = pszVRTPath;
-        std::string osSourceDataset = m_osSrcDSName;
+        std::string osSourceDataset = osSourceNameIn;
+        ;
         char *pszCurDir = CPLGetCurrentDir();
         if (CPLIsFilenameRelative(osSourceDataset.c_str()) &&
             !CPLIsFilenameRelative(osVRTFilename.c_str()) &&
@@ -471,6 +458,38 @@ void VRTSimpleSource::AddSourceFilenameNode(const char *pszVRTPath,
         CPLFree(pszCurDir);
         osSourceFilename = CPLExtractRelativePath(
             osVRTFilename.c_str(), osSourceDataset.c_str(), &bRelativeToVRT);
+    }
+
+    return {osSourceFilename, static_cast<bool>(bRelativeToVRT)};
+}
+
+/************************************************************************/
+/*                       AddSourceFilenameNode()                        */
+/************************************************************************/
+
+void VRTSimpleSource::AddSourceFilenameNode(const char *pszVRTPath,
+                                            CPLXMLNode *psSrc)
+{
+
+    bool bRelativeToVRT = false;
+    std::string osSourceFilename;
+
+    if (m_bRelativeToVRTOri >= 0)
+    {
+        osSourceFilename = m_osSourceFileNameOri;
+        bRelativeToVRT = m_bRelativeToVRTOri;
+    }
+    else if (IsSlowSource(m_osSrcDSName))
+    {
+        // Testing the existence of remote resources can be excruciating
+        // slow, so let's just suppose they exist.
+        osSourceFilename = m_osSrcDSName;
+        bRelativeToVRT = false;
+    }
+    else
+    {
+        std::tie(osSourceFilename, bRelativeToVRT) =
+            ComputeSourceNameAndRelativeFlag(pszVRTPath, m_osSrcDSName);
     }
 
     CPLSetXMLValue(psSrc, "SourceFilename", osSourceFilename.c_str());

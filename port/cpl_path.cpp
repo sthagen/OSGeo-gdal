@@ -1599,17 +1599,87 @@ const char *CPLGetHomeDir()
 std::string CPLLaunderForFilenameSafe(const char *pszName,
                                       CPL_UNUSED const char *pszOutputPath)
 {
-    std::string osRet(pszName);
-    for (char &ch : osRet)
+    return CPLLaunderForFilenameSafe(pszName, '_', nullptr);
+}
+
+/************************************************************************/
+/*                     CPLLaunderForFilenameSafe()                      */
+/************************************************************************/
+
+/** Return a string that is compatible with a filename on Linux, Windows and
+ * MacOS.
+ *
+ * Reserved characters '<', '>', ':', '"', '/', '\\', '|', '?', '*', '^', and
+ * ASCII control characters are replaced by the replacement character, or
+ * removed if it is NUL.
+ *
+ * Reserved names (".", "..", "CON", "PRN", etc.) are suffixed with the
+ * replacement character (or underscore).
+ *
+ * If the string ends with a final space or dot, the replacement character
+ * (or underscore) will be appended.
+ *
+ * @param osInput Input string.
+ * @param chReplacementChar Character to substitute to characters that are not
+ *                          compatible of a file name, or NUL character to
+ *                          remove them.
+ * @param pszExtraReservedCharacters String with extra reserved characters that
+ *                                   are replaced by the replacement character,
+ *                                   or removed if it is NUL. Or nullptr.
+ * @since GDAL 3.13
+ */
+std::string CPLLaunderForFilenameSafe(const std::string &osInput,
+                                      char chReplacementChar,
+                                      const char *pszExtraReservedCharacters)
+{
+    // Cf https://stackoverflow.com/questions/1976007/what-characters-are-forbidden-in-windows-and-linux-directory-names
+    std::string ret;
+    ret.reserve(osInput.size());
+    for (char c : osInput)
     {
-        // https://docs.microsoft.com/en-us/windows/desktop/fileio/naming-a-file
-        if (ch == '<' || ch == '>' || ch == ':' || ch == '"' || ch == '/' ||
-            ch == '\\' || ch == '?' || ch == '*')
+        if (static_cast<unsigned>(c) < 32 || c == 127 || c == '<' || c == '>' ||
+            c == ':' || c == '"' || c == '/' || c == '\\' || c == '|' ||
+            c == '?' ||
+            c == '*'
+            // '^' invalid on FAT
+            || c == '^')
         {
-            ch = '_';
+            if (chReplacementChar)
+                ret += chReplacementChar;
+        }
+        else if (pszExtraReservedCharacters &&
+                 strchr(pszExtraReservedCharacters, c))
+        {
+            if (chReplacementChar)
+                ret += chReplacementChar;
+        }
+        else
+        {
+            ret += c;
         }
     }
-    return osRet;
+
+    // Windows reserved filenames (case-insensitive)
+    const char *const apszReservedNames[] = {
+        "CON",  "PRN",  "AUX",  "NUL",  "COM1", "COM2", "COM3",   "COM4",
+        "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2",   "LPT3",
+        "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9", "CONIN$", "CONOUT$",
+    };
+    for (const char *pszReservedName : apszReservedNames)
+    {
+        if (EQUAL(ret.c_str(), pszReservedName))
+        {
+            ret += chReplacementChar ? chReplacementChar : '_';
+            break;
+        }
+    }
+
+    // Windows rule: no filename ending with space or dot
+    // This also prevents "." and ".." which are invalid on POSIX
+    if (!ret.empty() && (ret.back() == ' ' || ret.back() == '.'))
+        ret += chReplacementChar ? chReplacementChar : '_';
+
+    return ret;
 }
 
 /************************************************************************/

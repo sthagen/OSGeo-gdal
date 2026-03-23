@@ -193,6 +193,76 @@ class GDALVectorRenameLayerAlgorithmLayer final
     }
 };
 
+/************************************************************************/
+/*                GDALVectorRenameLayerAlgorithmDataset                 */
+/************************************************************************/
+
+class GDALVectorRenameLayerAlgorithmDataset final
+    : public GDALVectorPipelineOutputDataset
+{
+  public:
+    GDALVectorRenameLayerAlgorithmDataset(
+        GDALDataset &oSrcDS, const std::vector<std::string> &aosNewLayerNames)
+        : GDALVectorPipelineOutputDataset(oSrcDS)
+    {
+        const int nLayerCount = oSrcDS.GetLayerCount();
+        CPLAssert(aosNewLayerNames.size() == static_cast<size_t>(nLayerCount));
+        for (int i = 0; i < nLayerCount; ++i)
+        {
+            m_mapOldLayerNameToNew[oSrcDS.GetLayer(i)->GetName()] =
+                aosNewLayerNames[i];
+        }
+    }
+
+    const GDALRelationship *
+    GetRelationship(const std::string &name) const override;
+
+  private:
+    std::map<std::string, std::string> m_mapOldLayerNameToNew{};
+    mutable std::map<std::string, std::unique_ptr<GDALRelationship>>
+        m_relationships{};
+};
+
+/************************************************************************/
+/*                          GetRelationship()                           */
+/************************************************************************/
+
+const GDALRelationship *GDALVectorRenameLayerAlgorithmDataset::GetRelationship(
+    const std::string &name) const
+{
+    const auto oIterRelationships = m_relationships.find(name);
+    if (oIterRelationships != m_relationships.end())
+        return oIterRelationships->second.get();
+
+    const GDALRelationship *poSrcRelationShip = m_srcDS.GetRelationship(name);
+    if (!poSrcRelationShip)
+        return nullptr;
+    const auto oIterLeftTableName =
+        m_mapOldLayerNameToNew.find(poSrcRelationShip->GetLeftTableName());
+    const auto oIterRightTableName =
+        m_mapOldLayerNameToNew.find(poSrcRelationShip->GetRightTableName());
+    const auto oIterMappingTableName =
+        m_mapOldLayerNameToNew.find(poSrcRelationShip->GetMappingTableName());
+    if (oIterLeftTableName == m_mapOldLayerNameToNew.end() &&
+        oIterRightTableName == m_mapOldLayerNameToNew.end() &&
+        oIterMappingTableName == m_mapOldLayerNameToNew.end())
+    {
+        return poSrcRelationShip;
+    }
+
+    auto poNewRelationship =
+        std::make_unique<GDALRelationship>(*poSrcRelationShip);
+    if (oIterLeftTableName != m_mapOldLayerNameToNew.end())
+        poNewRelationship->SetLeftTableName(oIterLeftTableName->second);
+    if (oIterRightTableName != m_mapOldLayerNameToNew.end())
+        poNewRelationship->SetRightTableName(oIterRightTableName->second);
+    if (oIterMappingTableName != m_mapOldLayerNameToNew.end())
+        poNewRelationship->SetMappingTableName(oIterMappingTableName->second);
+
+    return m_relationships.insert({name, std::move(poNewRelationship)})
+        .first->second.get();
+}
+
 }  // namespace
 
 /************************************************************************/
@@ -228,8 +298,6 @@ bool GDALVectorRenameLayerAlgorithm::RunStep(GDALPipelineStepRunContext &)
 
     CPLAssert(m_outputDataset.GetName().empty());
     CPLAssert(!m_outputDataset.GetDatasetRef());
-
-    auto outDS = std::make_unique<GDALVectorPipelineOutputDataset>(*poSrcDS);
 
     // First pass over layer names to create new layer names matching specified
     // constraints
@@ -268,8 +336,8 @@ bool GDALVectorRenameLayerAlgorithm::RunStep(GDALPipelineStepRunContext &)
             }
             if (m_filenameCompatible)
             {
-                osName = CPLGetFilenameCompatible(osName,
-                                                  m_replacementChar.c_str()[0]);
+                osName = CPLLaunderForFilenameSafe(
+                    osName, m_replacementChar.c_str()[0]);
             }
             if (m_ascii)
             {
@@ -340,6 +408,9 @@ bool GDALVectorRenameLayerAlgorithm::RunStep(GDALPipelineStepRunContext &)
             }
         }
     }
+
+    auto outDS = std::make_unique<GDALVectorRenameLayerAlgorithmDataset>(
+        *poSrcDS, aosNames);
 
     // Final pass to create output layers
     for (int i = 0; i < nLayerCount; ++i)

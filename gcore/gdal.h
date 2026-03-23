@@ -794,15 +794,28 @@ typedef enum
  */
 #define GDAL_DCAP_COORDINATE_EPOCH "DCAP_COORDINATE_EPOCH"
 
-/** Capability set by drivers for formats which support multiple vector layers.
+/** Capability set by drivers for formats which natively support multiple vector layers.
+ *
+ * GDAL_DCAP_MULTIPLE_VECTOR_LAYERS is only set for drivers of formats
+ * which have a native concept of multiple vector layers (such as GeoPackage).
  *
  * Note: some GDAL drivers expose "virtual" layer support while the underlying
- * formats themselves do not. This capability is only set for drivers of formats
- * which have a native concept of multiple vector layers (such as GeoPackage).
+ * formats themselves do not (see GDAL_DCAP_MULTIPLE_VECTOR_LAYERS_IN_DIRECTORY).
  *
  * @since GDAL 3.4
  */
 #define GDAL_DCAP_MULTIPLE_VECTOR_LAYERS "DCAP_MULTIPLE_VECTOR_LAYERS"
+
+/** Capability set by drivers for formats which support multiple vector layers,
+ * as individual files in a directory.
+ *
+ * For example "ESRI Shapefile", "MapInfo File", "CSV", "FlatGeoBuf" or
+ * "MiraMonVector"
+ *
+ * @since GDAL 3.13
+ */
+#define GDAL_DCAP_MULTIPLE_VECTOR_LAYERS_IN_DIRECTORY                          \
+    "GDAL_DCAP_MULTIPLE_VECTOR_LAYERS_IN_DIRECTORY"
 
 /** Capability set by drivers for formats which support reading field domains.
  *

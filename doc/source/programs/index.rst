@@ -213,6 +213,7 @@ Vector commands
    gdal_vector_edit
    gdal_vector_filter
    gdal_vector_info
+   gdal_vector_export_schema
    gdal_vector_explode_collections
    gdal_vector_grid
    gdal_vector_index
@@ -255,6 +256,7 @@ Vector commands
     - :ref:`gdal_vector_convex_hull`: Compute the convex hull of geometries of a vector dataset
     - :ref:`gdal_vector_edit`: Edit metadata of a vector dataset
     - :ref:`gdal_vector_explode_collections`: Explode geometries of type collection of a vector dataset
+    - :ref:`gdal_vector_export_schema`: Export the OGR_SCHEMA from a vector dataset
     - :ref:`gdal_vector_filter`: Filter a vector dataset
     - :ref:`gdal_vector_grid`: Create a regular grid from scattered points
     - :ref:`gdal_vector_info`: Get information on a vector dataset

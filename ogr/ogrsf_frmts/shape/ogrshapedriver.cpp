@@ -318,6 +318,8 @@ void RegisterOGRShape()
     poDriver->SetMetadataItem(GDAL_DMD_GEOMETRY_FLAGS,
                               "EquatesMultiAndSingleLineStringDuringWrite "
                               "EquatesMultiAndSinglePolygonDuringWrite");
+    poDriver->SetMetadataItem(GDAL_DCAP_MULTIPLE_VECTOR_LAYERS_IN_DIRECTORY,
+                              "YES");
 
     poDriver->SetMetadataItem(GDAL_DMD_LONGNAME, "ESRI Shapefile");
     poDriver->SetMetadataItem(GDAL_DMD_EXTENSION, "shp");

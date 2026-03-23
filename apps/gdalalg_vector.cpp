@@ -28,6 +28,7 @@
 #include "gdalalg_vector_dissolve.h"
 #include "gdalalg_vector_edit.h"
 #include "gdalalg_vector_explode_collections.h"
+#include "gdalalg_vector_export_schema.h"
 #include "gdalalg_vector_grid.h"
 #include "gdalalg_vector_index.h"
 #include "gdalalg_vector_layer_algebra.h"
@@ -82,6 +83,7 @@ GDALVectorAlgorithm::GDALVectorAlgorithm()
     RegisterSubAlgorithm<GDALVectorConvexHullAlgorithmStandalone>();
     RegisterSubAlgorithm<GDALVectorDissolveAlgorithmStandalone>();
     RegisterSubAlgorithm<GDALVectorEditAlgorithmStandalone>();
+    RegisterSubAlgorithm<GDALVectorExportSchemaAlgorithmStandalone>();
     RegisterSubAlgorithm<GDALVectorExplodeCollectionsAlgorithmStandalone>();
     RegisterSubAlgorithm<GDALVectorGridAlgorithmStandalone>();
     RegisterSubAlgorithm<GDALVectorRasterizeAlgorithmStandalone>();

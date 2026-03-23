@@ -2854,14 +2854,10 @@ GDALDatasetH GDALVectorTranslate(const char *pszDest, GDALDatasetH hDstDS,
              psOptions->aosLayers.size() == 1 ||
              (psOptions->aosLayers.empty() && poDS->GetLayerCount() == 1));
 
-        bool bOutputDirectory = false;
-        if (!bSingleLayer && CPLGetExtensionSafe(osDestFilename).empty() &&
-            (EQUAL(poDriver->GetDescription(), "CSV") ||
-             EQUAL(poDriver->GetDescription(), "ESRI Shapefile") ||
-             EQUAL(poDriver->GetDescription(), "MapInfo File")))
-        {
-            bOutputDirectory = true;
-        }
+        bool bOutputDirectory =
+            !bSingleLayer && CPLGetExtensionSafe(osDestFilename).empty() &&
+            poDriver->GetMetadataItem(
+                GDAL_DCAP_MULTIPLE_VECTOR_LAYERS_IN_DIRECTORY);
 
         /* ------------------------------------------------------------------ */
         /*   Special case to improve user experience when translating         */
@@ -2887,6 +2883,16 @@ GDALDatasetH GDALVectorTranslate(const char *pszDest, GDALDatasetH hDstDS,
                 return nullptr;
             }
             bOutputDirectory = true;
+        }
+
+        if (psOptions->bInvokedFromGdalAlgorithm && !bSingleLayer &&
+            !bOutputDirectory &&
+            !poDriver->GetMetadataItem(GDAL_DCAP_MULTIPLE_VECTOR_LAYERS))
+        {
+            CPLError(CE_Failure, CPLE_AppDefined,
+                     "%s driver does not support multiple layers.",
+                     poDriver->GetDescription());
+            return nullptr;
         }
 
         CPLStringList aosDSCO(psOptions->aosDSCO);
@@ -2918,18 +2924,6 @@ GDALDatasetH GDALVectorTranslate(const char *pszDest, GDALDatasetH hDstDS,
             return nullptr;
         }
         bNewDataSource = true;
-
-        if (psOptions->bInvokedFromGdalAlgorithm && !bSingleLayer &&
-            !bOutputDirectory &&
-            (!poODS->TestCapability(ODsCCreateLayer) ||
-             !poDriver->GetMetadataItem(GDAL_DCAP_MULTIPLE_VECTOR_LAYERS)))
-        {
-            poDriver->Delete(osDestFilename);
-            CPLError(CE_Failure, CPLE_AppDefined,
-                     "%s driver does not support multiple layers.",
-                     poDriver->GetDescription());
-            return nullptr;
-        }
 
         if (psOptions->bCopyMD)
         {

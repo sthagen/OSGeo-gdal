@@ -26,6 +26,7 @@
 #include "gdalalg_vector_dissolve.h"
 #include "gdalalg_vector_edit.h"
 #include "gdalalg_vector_explode_collections.h"
+#include "gdalalg_vector_export_schema.h"
 #include "gdalalg_vector_filter.h"
 #include "gdalalg_vector_info.h"
 #include "gdalalg_vector_limit.h"
@@ -175,6 +176,7 @@ void GDALVectorPipelineAlgorithm::RegisterAlgorithms(
         addSuffixIfNeeded(GDALVectorEditAlgorithm::NAME));
 
     registry.Register<GDALVectorExplodeCollectionsAlgorithm>();
+    registry.Register<GDALVectorExportSchemaAlgorithm>();
 
     registry.Register<GDALMaterializeVectorAlgorithm>(
         addSuffixIfNeeded(GDALMaterializeVectorAlgorithm::NAME));
@@ -327,6 +329,36 @@ std::string GDALVectorPipelineAlgorithm::GetUsageForCLI(
 }
 
 /************************************************************************/
+/*                      GDALVectorDecoratedDataset                      */
+/************************************************************************/
+
+namespace
+{
+class DummyDataset final : public GDALDataset
+{
+  public:
+    DummyDataset() = default;
+};
+}  // namespace
+
+/************************************************************************/
+/*                     GDALVectorDecoratedDataset()                     */
+/************************************************************************/
+
+GDALVectorDecoratedDataset::GDALVectorDecoratedDataset(GDALDataset *poSrcDS)
+    : m_dummySrcDS(poSrcDS ? nullptr : std::make_unique<DummyDataset>()),
+      m_srcDS(poSrcDS ? *poSrcDS : *(m_dummySrcDS.get()))
+{
+    SetDescription(m_srcDS.GetDescription());
+}
+
+/************************************************************************/
+/*                    ~GDALVectorDecoratedDataset()                     */
+/************************************************************************/
+
+GDALVectorDecoratedDataset::~GDALVectorDecoratedDataset() = default;
+
+/************************************************************************/
 /*                    GDALVectorPipelineOutputLayer                     */
 /************************************************************************/
 
@@ -394,6 +426,19 @@ OGRFeature *GDALVectorPipelineOutputLayer::GetNextRawFeature()
 /*                       GDALVectorOutputDataset                        */
 /************************************************************************/
 
+/************************************************************************/
+/*                      GDALVectorOutputDataset()                       */
+/************************************************************************/
+
+GDALVectorOutputDataset::GDALVectorOutputDataset(GDALDataset *poSrcDS)
+    : GDALVectorDecoratedDataset(poSrcDS)
+{
+}
+
+/************************************************************************/
+/*                           TestCapability()                           */
+/************************************************************************/
+
 int GDALVectorOutputDataset::TestCapability(const char *) const
 {
     return 0;
@@ -409,10 +454,8 @@ int GDALVectorOutputDataset::TestCapability(const char *) const
 
 GDALVectorPipelineOutputDataset::GDALVectorPipelineOutputDataset(
     GDALDataset &srcDS)
-    : m_srcDS(srcDS)
+    : GDALVectorDecoratedDataset(&srcDS)
 {
-    SetDescription(m_srcDS.GetDescription());
-    SetMetadata(m_srcDS.GetMetadata());
 }
 
 /************************************************************************/
@@ -532,7 +575,9 @@ const OGRFeatureDefn *GDALVectorPipelinePassthroughLayer::GetLayerDefn() const
 /*               GDALVectorNonStreamingAlgorithmDataset()               */
 /************************************************************************/
 
-GDALVectorNonStreamingAlgorithmDataset::GDALVectorNonStreamingAlgorithmDataset()
+GDALVectorNonStreamingAlgorithmDataset::GDALVectorNonStreamingAlgorithmDataset(
+    GDALDataset &oSrcDS)
+    : GDALVectorDecoratedDataset(&oSrcDS)
 {
 }
 

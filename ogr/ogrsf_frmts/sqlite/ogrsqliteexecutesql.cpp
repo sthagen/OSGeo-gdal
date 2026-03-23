@@ -1100,10 +1100,11 @@ OGRLayer *OGRSQLiteExecuteSQL(GDALDataset *poDS, const char *pszStatement,
 
     if (rc != SQLITE_OK)
     {
-        CPLError(CE_Failure, CPLE_AppDefined,
-                 "In ExecuteSQL(): sqlite3_prepare_v2(%s):\n  %s", pszStatement,
-                 sqlite3_errmsg(hDB));
-
+        CPLError(
+            CE_Failure, CPLE_AppDefined, "%s",
+            SQLFormatErrorMsgFailedPrepare(
+                hDB, "In ExecuteSQL(): sqlite3_prepare_v2(): ", pszStatement)
+                .c_str());
         if (hSQLStmt != nullptr)
         {
             sqlite3_finalize(hSQLStmt);

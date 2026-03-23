@@ -1203,14 +1203,14 @@ def test_ogr_sqlite_24(tmp_path):
 
 
 def get_sqlite_version():
-    ds = ogr.Open(":memory:")
-    sql_lyr = ds.ExecuteSQL("SELECT sqlite_version()")
-    feat = sql_lyr.GetNextFeature()
-    sqlite_version = feat.GetFieldAsString(0)
-    print("SQLite version : %s" % sqlite_version)
-    feat = None
-    ds.ReleaseResultSet(sql_lyr)
-    return sqlite_version
+    with gdaltest.disable_exceptions():
+        ds = ogr.Open(":memory:")
+    if ds is None:
+        return (0, 0, 0)
+    with ds.ExecuteSQL("SELECT sqlite_version()") as sql_lyr:
+        f = sql_lyr.GetNextFeature()
+        version = f.GetField(0)
+    return tuple([int(x) for x in version.split(".")[0:3]])
 
 
 ###############################################################################
@@ -3107,14 +3107,6 @@ def test_ogr_sqlite_42(sqlite_test_db):
 
 def test_ogr_sqlite_43():
 
-    # Only available since sqlite 3.8.0
-    version = get_sqlite_version().split(".")
-    if not (
-        len(version) >= 3
-        and int(version[0]) * 10000 + int(version[1]) * 100 + int(version[2]) >= 30800
-    ):
-        pytest.skip()
-
     ds = ogr.Open("file:foo?mode=memory&cache=shared")
     assert ds is not None
 
@@ -3172,14 +3164,6 @@ def test_ogr_sqlite_44(tmp_vsimem):
 
 
 def test_ogr_sqlite_45(tmp_path):
-
-    # Only available since sqlite 3.7.0
-    version = get_sqlite_version().split(".")
-    if not (
-        len(version) >= 3
-        and int(version[0]) * 10000 + int(version[1]) * 100 + int(version[2]) >= 30700
-    ):
-        pytest.skip()
 
     ds = ogr.GetDriverByName("SQLite").CreateDataSource(tmp_path / "ogr_sqlite_45.db")
     sql_lyr = ds.ExecuteSQL("PRAGMA journal_mode = WAL")
@@ -4791,3 +4775,28 @@ def test_ogr_sqlite_detect_multiple_statements(sql, error_expected):
     else:
         with ds.ExecuteSQL(sql):
             pass
+
+
+###############################################################################
+
+
+def test_ogr_sqlite_error_msg():
+
+    ds = ogr.Open(":memory:")
+
+    version_3_38_or_later = get_sqlite_version() >= (3, 38, 0)
+    with gdal.quiet_errors():
+        ds.ExecuteSQL("SELECT (1 FROM x)")
+    if version_3_38_or_later:
+        assert (
+            gdal.GetLastErrorMsg()
+            == """In ExecuteSQL(): sqlite3_prepare_v2(): near "FROM": syntax error
+  SELECT (1 FROM x)
+            ^--- error here"""
+        )
+    else:
+        assert (
+            gdal.GetLastErrorMsg()
+            == """In ExecuteSQL(): sqlite3_prepare_v2(): near "FROM": syntax error
+  SELECT (1 FROM x)"""
+        )

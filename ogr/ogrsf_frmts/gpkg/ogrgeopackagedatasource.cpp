@@ -7674,9 +7674,11 @@ OGRLayer *GDALGeoPackageDataset::ExecuteSQL(const char *pszSQLCommand,
     {
         if (nErrorCount == CPLGetErrorCounter())
         {
-            CPLError(CE_Failure, CPLE_AppDefined,
-                     "In ExecuteSQL(): sqlite3_prepare_v2(%s): %s",
-                     osSQLCommandTruncated.c_str(), sqlite3_errmsg(hDB));
+            CPLError(CE_Failure, CPLE_AppDefined, "%s",
+                     SQLFormatErrorMsgFailedPrepare(
+                         GetDB(), "In ExecuteSQL(): sqlite3_prepare_v2(): ",
+                         osSQLCommand.c_str())
+                         .c_str());
         }
         return nullptr;
     }
@@ -10454,6 +10456,12 @@ bool GDALGeoPackageDataset::AddRelationship(
         return false;
     }
 
+    for (auto &poLayer : m_apoLayers)
+    {
+        if (poLayer->SyncToDisk() != OGRERR_NONE)
+            return false;
+    }
+
     if (CreateExtensionsTableIfNecessary() != OGRERR_NONE)
     {
         return false;
@@ -10631,6 +10639,16 @@ bool GDALGeoPackageDataset::AddRelationship(
                                 .c_str();
             return false;
         }
+
+        auto poLayer = std::make_unique<OGRGeoPackageTableLayer>(
+            this, osMappingTableName.c_str());
+        poLayer->SetOpeningParameters(osMappingTableName.c_str(), "table",
+                                      /* bIsInGpkgContents = */ true,
+                                      /* bIsSpatial = */ false,
+                                      /* pszGeomColName =*/nullptr,
+                                      /* pszGeomType =*/nullptr,
+                                      /* bHasZ = */ false, /* bHasM = */ false);
+        m_apoLayers.push_back(std::move(poLayer));
     }
     else
     {

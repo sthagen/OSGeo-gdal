@@ -108,4 +108,8 @@ bool SQLCheckLineIsSafe(const char *pszLine);
 
 bool SQLHasRemainingContent(const char *pszTail);
 
+std::string SQLFormatErrorMsgFailedPrepare(sqlite3 *hDB,
+                                           const char *pszErrMsgIntro,
+                                           const char *pszSQL);
+
 #endif  // OGR_SQLITEUTILITY_H_INCLUDED

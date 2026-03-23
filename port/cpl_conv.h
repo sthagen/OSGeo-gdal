@@ -245,6 +245,10 @@ extern "C++"
         CPL_WARN_UNUSED_RESULT;
     std::string CPL_DLL CPLLaunderForFilenameSafe(
         const char *pszName, const char *pszOutputPath) CPL_WARN_UNUSED_RESULT;
+    std::string CPL_DLL CPLLaunderForFilenameSafe(
+        const std::string &osName, char chReplacementChar = '_',
+        const char *pszExtraReservedCharacters = nullptr)
+        CPL_WARN_UNUSED_RESULT;
 
 #if defined(GDAL_COMPILATION) || __cplusplus >= 201703L
     std::string
