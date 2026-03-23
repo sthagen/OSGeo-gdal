@@ -3806,11 +3806,12 @@ GDALInConstructionAlgorithmArg &GDALAlgorithm::AddOutputDatasetArg(
 GDALInConstructionAlgorithmArg &
 GDALAlgorithm::AddOverwriteArg(bool *pValue, const char *helpMessage)
 {
-    return AddArg(GDAL_ARG_NAME_OVERWRITE, 0,
-                  MsgOrDefault(
-                      helpMessage,
-                      _("Whether overwriting existing output is allowed")),
-                  pValue)
+    return AddArg(
+               GDAL_ARG_NAME_OVERWRITE, 0,
+               MsgOrDefault(
+                   helpMessage,
+                   _("Whether overwriting existing output dataset is allowed")),
+               pValue)
         .SetDefault(false);
 }
 
@@ -3834,11 +3835,12 @@ GDALAlgorithm::AddOverwriteLayerArg(bool *pValue, const char *helpMessage)
             }
             return true;
         });
-    return AddArg(GDAL_ARG_NAME_OVERWRITE_LAYER, 0,
-                  MsgOrDefault(
-                      helpMessage,
-                      _("Whether overwriting existing output is allowed")),
-                  pValue)
+    return AddArg(
+               GDAL_ARG_NAME_OVERWRITE_LAYER, 0,
+               MsgOrDefault(
+                   helpMessage,
+                   _("Whether overwriting existing output layer is allowed")),
+               pValue)
         .SetDefault(false)
         .AddAction(
             [this]
