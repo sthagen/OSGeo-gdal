@@ -2854,14 +2854,10 @@ GDALDatasetH GDALVectorTranslate(const char *pszDest, GDALDatasetH hDstDS,
              psOptions->aosLayers.size() == 1 ||
              (psOptions->aosLayers.empty() && poDS->GetLayerCount() == 1));
 
-        bool bOutputDirectory = false;
-        if (!bSingleLayer && CPLGetExtensionSafe(osDestFilename).empty() &&
-            (EQUAL(poDriver->GetDescription(), "CSV") ||
-             EQUAL(poDriver->GetDescription(), "ESRI Shapefile") ||
-             EQUAL(poDriver->GetDescription(), "MapInfo File")))
-        {
-            bOutputDirectory = true;
-        }
+        bool bOutputDirectory =
+            !bSingleLayer && CPLGetExtensionSafe(osDestFilename).empty() &&
+            poDriver->GetMetadataItem(
+                GDAL_DCAP_MULTIPLE_VECTOR_LAYERS_IN_DIRECTORY);
 
         /* ------------------------------------------------------------------ */
         /*   Special case to improve user experience when translating         */
