@@ -3235,3 +3235,43 @@ def test_ogr_mem_arrow_string_view():
     ] == expected_sv_fixed_size_list_values
     assert [f["map_sv_field"] for f in lyr] == expected_map_sv_values
     assert [f["map_sv_list_field"] for f in lyr] == expected_map_sv_list_values
+
+
+###############################################################################
+
+
+@gdaltest.enable_exceptions()
+def test_ogr_mem_relationships():
+
+    ds = gdal.GetDriverByName("MEM").CreateVector("")
+    assert ds.TestCapability(ogr.ODsCAddRelationship)
+    assert ds.TestCapability(ogr.ODsCUpdateRelationship)
+    assert ds.TestCapability(ogr.ODsCDeleteRelationship)
+
+    assert ds.GetRelationshipNames() is None
+    assert ds.GetRelationship("non_existing") is None
+    assert (
+        ds.UpdateRelationship(
+            gdal.Relationship(
+                "my_relationship", "origin_table", "dest_table", gdal.GRC_MANY_TO_MANY
+            )
+        )
+        is False
+    )
+    assert ds.DeleteRelationship("non_existing") is False
+
+    assert ds.AddRelationship(
+        gdal.Relationship(
+            "my_relationship", "origin_table", "dest_table", gdal.GRC_MANY_TO_MANY
+        )
+    )
+    assert ds.GetRelationshipNames() == ["my_relationship"]
+    assert ds.GetRelationship("my_relationship") is not None
+    assert ds.UpdateRelationship(
+        gdal.Relationship(
+            "my_relationship", "origin_table", "dest_table2", gdal.GRC_MANY_TO_MANY
+        )
+    )
+    assert ds.GetRelationship("my_relationship").GetRightTableName() == "dest_table2"
+    assert ds.DeleteRelationship("my_relationship")
+    assert ds.GetRelationship("my_relationship") is None

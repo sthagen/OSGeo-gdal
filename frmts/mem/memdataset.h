@@ -165,6 +165,21 @@ class CPL_DLL MEMDataset CPL_NON_FINAL : public GDALDataset
 
     bool UpdateFieldDomain(std::unique_ptr<OGRFieldDomain> &&domain,
                            std::string &failureReason) override;
+
+    std::vector<std::string>
+    GetRelationshipNames(CSLConstList papszOptions = nullptr) const override;
+
+    const GDALRelationship *
+    GetRelationship(const std::string &name) const override;
+
+    bool AddRelationship(std::unique_ptr<GDALRelationship> &&relationship,
+                         std::string &failureReason) override;
+
+    bool DeleteRelationship(const std::string &name,
+                            std::string &failureReason) override;
+
+    bool UpdateRelationship(std::unique_ptr<GDALRelationship> &&relationship,
+                            std::string &failureReason) override;
 };
 
 /************************************************************************/
