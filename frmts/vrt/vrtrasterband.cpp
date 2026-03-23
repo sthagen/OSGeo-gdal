@@ -84,34 +84,35 @@ VRTRasterBand::~VRTRasterBand() = default;
 /*      interpretation from the provided source band.                   */
 /************************************************************************/
 
-CPLErr VRTRasterBand::CopyCommonInfoFrom(GDALRasterBand *poSrcBand)
+CPLErr VRTRasterBand::CopyCommonInfoFrom(const GDALRasterBand *poSrcBand)
 
 {
-    SetMetadata(poSrcBand->GetMetadata());
+    auto poSrcBandNonConst = const_cast<GDALRasterBand *>(poSrcBand);
+    SetMetadata(poSrcBandNonConst->GetMetadata());
     const char *pszNBits =
-        poSrcBand->GetMetadataItem("NBITS", "IMAGE_STRUCTURE");
+        poSrcBandNonConst->GetMetadataItem("NBITS", "IMAGE_STRUCTURE");
     SetMetadataItem("NBITS", pszNBits, "IMAGE_STRUCTURE");
     if (poSrcBand->GetRasterDataType() == GDT_UInt8)
     {
-        poSrcBand->EnablePixelTypeSignedByteWarning(false);
+        poSrcBandNonConst->EnablePixelTypeSignedByteWarning(false);
         const char *pszPixelType =
-            poSrcBand->GetMetadataItem("PIXELTYPE", "IMAGE_STRUCTURE");
-        poSrcBand->EnablePixelTypeSignedByteWarning(true);
+            poSrcBandNonConst->GetMetadataItem("PIXELTYPE", "IMAGE_STRUCTURE");
+        poSrcBandNonConst->EnablePixelTypeSignedByteWarning(true);
         SetMetadataItem("PIXELTYPE", pszPixelType, "IMAGE_STRUCTURE");
     }
-    SetColorTable(poSrcBand->GetColorTable());
-    SetColorInterpretation(poSrcBand->GetColorInterpretation());
+    SetColorTable(poSrcBandNonConst->GetColorTable());
+    SetColorInterpretation(poSrcBandNonConst->GetColorInterpretation());
     if (strlen(poSrcBand->GetDescription()) > 0)
         SetDescription(poSrcBand->GetDescription());
 
-    GDALCopyNoDataValue(this, poSrcBand);
-    SetOffset(poSrcBand->GetOffset());
-    SetScale(poSrcBand->GetScale());
-    SetCategoryNames(poSrcBand->GetCategoryNames());
-    if (!EQUAL(poSrcBand->GetUnitType(), ""))
-        SetUnitType(poSrcBand->GetUnitType());
+    GDALCopyNoDataValue(this, poSrcBandNonConst);
+    SetOffset(poSrcBandNonConst->GetOffset());
+    SetScale(poSrcBandNonConst->GetScale());
+    SetCategoryNames(poSrcBandNonConst->GetCategoryNames());
+    if (!EQUAL(poSrcBandNonConst->GetUnitType(), ""))
+        SetUnitType(poSrcBandNonConst->GetUnitType());
 
-    GDALRasterAttributeTable *poRAT = poSrcBand->GetDefaultRAT();
+    GDALRasterAttributeTable *poRAT = poSrcBandNonConst->GetDefaultRAT();
     if (poRAT != nullptr &&
         static_cast<GIntBig>(poRAT->GetColumnCount()) * poRAT->GetRowCount() <
             1024 * 1024)
