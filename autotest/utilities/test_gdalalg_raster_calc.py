@@ -1077,3 +1077,18 @@ def test_gdalalg_raster_calc_two_inputs_one_no_geotransform(
 
     out_ds = calc["output"].GetDataset()
     assert out_ds.GetGeoTransform(True) is None
+
+
+def test_gdalalg_raster_calc_relative_to_vrt(calc, tmp_vsimem):
+
+    gdal.CopyFile("../gcore/data/byte.tif", tmp_vsimem / "in.tif")
+
+    calc["input"] = [tmp_vsimem / "in.tif"]
+    calc["output"] = tmp_vsimem / "out.vrt"
+    calc["calc"] = "X"
+
+    assert calc.Run()
+
+    with gdal.VSIFile(tmp_vsimem / "out.vrt", "rb") as f:
+        vrt = f.read()
+        assert b'<SourceFilename relativeToVRT="1">in.tif</SourceFilename>' in vrt

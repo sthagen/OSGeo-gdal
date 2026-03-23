@@ -1545,6 +1545,10 @@ class CPL_DLL VRTSimpleSource CPL_NON_FINAL : public VRTSource
     {
         m_nMaxValue = nVal;
     }
+
+    static std::pair<std::string, bool>
+    ComputeSourceNameAndRelativeFlag(const char *pszVRTPath,
+                                     const std::string &osSourceNameIn);
 };
 
 /************************************************************************/

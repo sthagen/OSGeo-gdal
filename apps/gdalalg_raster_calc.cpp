@@ -342,6 +342,7 @@ UpdateSourceProperties(SourceProperties &out, const std::string &dsn,
 /** Create XML nodes for one or more derived bands resulting from the evaluation
  *  of a single expression
  *
+ * @param pszVRTFilename VRT filename
  * @param root VRTDataset node to which the band nodes should be added
  * @param bandType the type of the band(s) to create
  * @param nXOut Number of columns in VRT dataset
@@ -358,10 +359,10 @@ UpdateSourceProperties(SourceProperties &out, const std::string &dsn,
  * @return true if the band(s) were added, false otherwise
  */
 static bool
-CreateDerivedBandXML(CPLXMLNode *root, int nXOut, int nYOut,
-                     GDALDataType bandType, const std::string &expression,
-                     const std::string &dialect, bool flatten,
-                     const std::string &noDataText,
+CreateDerivedBandXML(const char *pszVRTFilename, CPLXMLNode *root, int nXOut,
+                     int nYOut, GDALDataType bandType,
+                     const std::string &expression, const std::string &dialect,
+                     bool flatten, const std::string &noDataText,
                      const std::vector<std::string> &pixelFunctionArguments,
                      const std::map<std::string, std::string> &sources,
                      const std::map<std::string, SourceProperties> &sourceProps,
@@ -487,9 +488,18 @@ CreateDerivedBandXML(CPLXMLNode *root, int nXOut, int nYOut,
                     CPLCreateXMLNode(source, CXT_Element, "SourceFilename");
                 if (fakeSourceFilename.empty())
                 {
+                    std::string osSourceFilename = dsn;
+                    bool bRelativeToVRT = false;
+                    if (pszVRTFilename[0])
+                    {
+                        std::tie(osSourceFilename, bRelativeToVRT) =
+                            VRTSimpleSource::ComputeSourceNameAndRelativeFlag(
+                                CPLGetPathSafe(pszVRTFilename).c_str(), dsn);
+                    }
                     CPLAddXMLAttributeAndValue(sourceFilename, "relativeToVRT",
-                                               "0");
-                    CPLCreateXMLNode(sourceFilename, CXT_Text, dsn.c_str());
+                                               bRelativeToVRT ? "1" : "0");
+                    CPLCreateXMLNode(sourceFilename, CXT_Text,
+                                     osSourceFilename.c_str());
                 }
                 else
                 {
@@ -723,6 +733,7 @@ static bool ReadFileLists(const std::vector<GDALArgDatasetValue> &inputDS,
  * expression engine is concerned, the variables "X[1]" and "X[2]" have nothing
  * to do with each other.
  *
+ * @param pszVRTFilename VRT filename
  * @param inputs A list of sources, expressed as NAME=DSN
  * @param expressions A list of expressions to be evaluated
  * @param dialect Expression dialect
@@ -737,7 +748,7 @@ static bool ReadFileLists(const std::vector<GDALArgDatasetValue> &inputDS,
  * @return a newly created VRTDataset, or nullptr on error
  */
 static std::unique_ptr<GDALDataset> GDALCalcCreateVRTDerived(
-    const std::vector<std::string> &inputs,
+    const char *pszVRTFilename, const std::vector<std::string> &inputs,
     const std::vector<std::string> &expressions, const std::string &dialect,
     bool flatten, const std::string &noData,
     const std::vector<std::vector<std::string>> &pixelFunctionArguments,
@@ -832,22 +843,24 @@ static std::unique_ptr<GDALDataset> GDALCalcCreateVRTDerived(
             }
         }
 
-        if (!CreateDerivedBandXML(root.get(), out.nX, out.nY, bandType,
-                                  origExpression, dialect, flatten, noData,
-                                  pixelFunctionArguments[iExpr], sources,
-                                  sourceProps, fakeSourceFilename))
+        if (!CreateDerivedBandXML(pszVRTFilename, root.get(), out.nX, out.nY,
+                                  bandType, origExpression, dialect, flatten,
+                                  noData, pixelFunctionArguments[iExpr],
+                                  sources, sourceProps, fakeSourceFilename))
         {
             return nullptr;
         }
         ++iExpr;
     }
 
-    //CPLDebug("VRT", "%s", CPLSerializeXMLTree(root.get()));
+    // CPLDebug("VRT", "%s", CPLSerializeXMLTree(root.get()));
 
     auto ds = fakeSourceFilename.empty()
                   ? std::make_unique<VRTDataset>(out.nX, out.nY)
                   : std::make_unique<VRTDataset>(1, 1);
-    if (ds->XMLInit(root.get(), "") != CE_None)
+    if (ds->XMLInit(root.get(), pszVRTFilename[0]
+                                    ? CPLGetPathSafe(pszVRTFilename).c_str()
+                                    : "") != CE_None)
     {
         return nullptr;
     };
@@ -1074,9 +1087,16 @@ bool GDALRasterCalcAlgorithm::RunStep(GDALPipelineStepRunContext &ctxt)
     }
 
     int maxSourceBands = 0;
-    auto vrt = GDALCalcCreateVRTDerived(inputFilenames, m_expr, m_dialect,
-                                        m_flatten, m_nodata, pixelFunctionArgs,
-                                        options, maxSourceBands);
+    const bool bIsVRT =
+        m_format == "VRT" ||
+        (m_format.empty() &&
+         EQUAL(CPLGetExtensionSafe(m_outputDataset.GetName().c_str()).c_str(),
+               "VRT"));
+
+    auto vrt = GDALCalcCreateVRTDerived(
+        bIsVRT ? m_outputDataset.GetName().c_str() : "", inputFilenames, m_expr,
+        m_dialect, m_flatten, m_nodata, pixelFunctionArgs, options,
+        maxSourceBands);
     if (vrt == nullptr)
     {
         return false;
@@ -1084,12 +1104,6 @@ bool GDALRasterCalcAlgorithm::RunStep(GDALPipelineStepRunContext &ctxt)
 
     if (!m_noCheckExpression)
     {
-        const bool bIsVRT =
-            m_format == "VRT" ||
-            (m_format.empty() &&
-             EQUAL(
-                 CPLGetExtensionSafe(m_outputDataset.GetName().c_str()).c_str(),
-                 "VRT"));
         const bool bIsGDALG =
             m_format == "GDALG" ||
             (m_format.empty() &&
@@ -1114,7 +1128,7 @@ bool GDALRasterCalcAlgorithm::RunStep(GDALPipelineStepRunContext &ctxt)
             if (!osTmpFilename.empty())
             {
                 auto fakeVRT = GDALCalcCreateVRTDerived(
-                    inputFilenames, m_expr, m_dialect, m_flatten, m_nodata,
+                    "", inputFilenames, m_expr, m_dialect, m_flatten, m_nodata,
                     pixelFunctionArgs, options, maxSourceBands, osTmpFilename);
                 if (fakeVRT &&
                     fakeVRT->RasterIO(GF_Read, 0, 0, 1, 1, dummyData.data(), 1,
