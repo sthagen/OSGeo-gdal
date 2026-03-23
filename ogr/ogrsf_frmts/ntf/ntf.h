@@ -100,11 +100,8 @@ constexpr int MAX_LINK = 5000;
 
 class NTFRecord
 {
-    int nType;
-    int nLength;
-    char *pszData;
-
-    static int ReadPhysicalLine(VSILFILE *fp, char *pszLine);
+    int nType = 99;
+    std::string osData{};
 
     CPL_DISALLOW_COPY_ASSIGN(NTFRecord)
 
@@ -112,22 +109,22 @@ class NTFRecord
     explicit NTFRecord(VSILFILE *);
     ~NTFRecord();
 
-    int GetType()
+    int GetType() const
     {
         return nType;
     }
 
-    int GetLength()
+    int GetLength() const
     {
-        return nLength;
+        return static_cast<int>(osData.size());
     }
 
-    const char *GetData()
+    const char *GetData() const
     {
-        return pszData;
+        return osData.c_str();
     }
 
-    const char *GetField(int, int);
+    const char *GetField(int, int) const;
 };
 
 /************************************************************************/
