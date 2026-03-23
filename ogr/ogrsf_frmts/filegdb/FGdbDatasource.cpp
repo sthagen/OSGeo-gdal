@@ -486,7 +486,7 @@ class OGRFGdbSingleFeatureLayer final : public OGRLayer
 
   public:
     OGRFGdbSingleFeatureLayer(const char *pszLayerName, const char *pszVal);
-    virtual ~OGRFGdbSingleFeatureLayer();
+    ~OGRFGdbSingleFeatureLayer() override;
 
     void ResetReading() override
     {
