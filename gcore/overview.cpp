@@ -2197,8 +2197,8 @@ static CPLErr GDALResampleChunk_Gauss(const GDALOverviewResampleArgs &args,
                     panGaussMatrix + nYShiftGaussMatrix * nGaussMatrixDim +
                     nXShiftGaussMatrix;
 
-                for (int j = 0, iY = nSrcYOff; iY < nSrcYOff2;
-                     ++iY, ++j, panLineWeight += nGaussMatrixDim)
+                for (int iY = nSrcYOff; iY < nSrcYOff2;
+                     ++iY, panLineWeight += nGaussMatrixDim)
                 {
                     for (int i = 0, iX = nSrcXOff; iX < nSrcXOff2; ++iX, ++i)
                     {
@@ -2239,8 +2239,8 @@ static CPLErr GDALResampleChunk_Gauss(const GDALOverviewResampleArgs &args,
                     panGaussMatrix + nYShiftGaussMatrix * nGaussMatrixDim +
                     nXShiftGaussMatrix;
 
-                for (int j = 0, iY = nSrcYOff; iY < nSrcYOff2;
-                     ++iY, ++j, panLineWeight += nGaussMatrixDim)
+                for (int iY = nSrcYOff; iY < nSrcYOff2;
+                     ++iY, panLineWeight += nGaussMatrixDim)
                 {
                     for (int i = 0, iX = nSrcXOff; iX < nSrcXOff2; ++iX, ++i)
                     {

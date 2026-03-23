@@ -13,6 +13,7 @@
 #include "cpl_port.h"
 #include "gdal_priv.h"
 
+#include <cassert>
 #include <cstring>
 
 #include "cpl_conv.h"
@@ -551,19 +552,28 @@ GDALOverviewBand::GDALOverviewBand(GDALOverviewDataset *poDSIn, int nBandIn)
     nBand = nBandIn;
     nRasterXSize = poDSIn->nRasterXSize;
     nRasterYSize = poDSIn->nRasterYSize;
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wnull-dereference"
+#endif
     if (nBandIn == 0)
     {
-        poUnderlyingBand =
-            GetOverviewEx(poDSIn->poMainDS->GetRasterBand(1), poDSIn->nOvrLevel)
-                ->GetMaskBand();
+        poUnderlyingBand = GetOverviewEx(poDSIn->poMainDS->GetRasterBand(1),
+                                         poDSIn->nOvrLevel);
+        assert(poUnderlyingBand);
+        poUnderlyingBand = poUnderlyingBand->GetMaskBand();
     }
     else
     {
         poUnderlyingBand = GetOverviewEx(
             poDSIn->poMainDS->GetRasterBand(nBandIn), poDSIn->nOvrLevel);
     }
+    assert(poUnderlyingBand);
     eDataType = poUnderlyingBand->GetRasterDataType();
     poUnderlyingBand->GetBlockSize(&nBlockXSize, &nBlockYSize);
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 }
 
 /************************************************************************/

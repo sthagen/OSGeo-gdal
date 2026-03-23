@@ -3218,10 +3218,9 @@ static CPLErr AreaPixelFunc(void ** /*papoSources*/, int nSources, void *pData,
     std::array<double, 5> adfLon{};
     std::array<double, 5> adfLat{};
 
-    size_t ii = 0;
     for (int iLine = 0; iLine < nYSize; ++iLine)
     {
-        for (int iCol = 0; iCol < nXSize; ++iCol, ++ii)
+        for (int iCol = 0; iCol < nXSize; ++iCol)
         {
             gt.Apply(static_cast<double>(iCol + nXOff),
                      static_cast<double>(iLine + nYOff), &adfLon[0],

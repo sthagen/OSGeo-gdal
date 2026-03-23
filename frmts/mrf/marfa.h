@@ -208,9 +208,10 @@ void ppmWrite(const char *fname, const char *data, const ILSize &sz);
  *
  */
 
-typedef struct ILImage
+struct ILImage
 {
     ILImage();
+
     GIntBig dataoffset;
     GIntBig idxoffset;
     GInt32 quality;
@@ -227,7 +228,7 @@ typedef struct ILImage
     CPLString idxfname;
     GDALDataType dt;
     GDALColorInterp ci;
-} ILImage;
+};
 
 // Declarations of utility functions
 

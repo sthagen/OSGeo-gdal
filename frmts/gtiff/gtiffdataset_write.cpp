@@ -7049,19 +7049,17 @@ CPLErr GTiffDataset::CopyImageryAndMask(GTiffDataset *poDstDS,
                             (l_nBands + (poDstDS->m_poMaskDS ? 1 : 0));
         for (int i = 0; eErr == CE_None && i < l_nBands; i++)
         {
-            for (int iY = 0, nYBlock = 0; iY < nYSize && eErr == CE_None;
+            for (int iY = 0; iY < nYSize && eErr == CE_None;
                  iY = ((nYSize - iY < poDstDS->m_nBlockYSize)
                            ? nYSize
-                           : iY + poDstDS->m_nBlockYSize),
-                     nYBlock++)
+                           : iY + poDstDS->m_nBlockYSize))
             {
                 const int nReqYSize =
                     std::min(nYSize - iY, poDstDS->m_nBlockYSize);
-                for (int iX = 0, nXBlock = 0; iX < nXSize && eErr == CE_None;
+                for (int iX = 0; iX < nXSize && eErr == CE_None;
                      iX = ((nXSize - iX < poDstDS->m_nBlockXSize)
                                ? nXSize
-                               : iX + poDstDS->m_nBlockXSize),
-                         nXBlock++)
+                               : iX + poDstDS->m_nBlockXSize))
                 {
                     const int nReqXSize =
                         std::min(nXSize - iX, poDstDS->m_nBlockXSize);

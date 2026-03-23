@@ -94,12 +94,19 @@ class GDALMDArrayGridded final : public GDALPamMDArray
            double dfNoDataValue, double dfMinX, double dfResX, double dfMinY,
            double dfResY, double dfRadius)
     {
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
+#endif
         auto newAr(std::shared_ptr<GDALMDArrayGridded>(new GDALMDArrayGridded(
             poParent, apoDims, poVarX, poVarY, std::move(poVectorDS), eAlg,
             std::move(poGridOptions), dfNoDataValue, dfMinX, dfResX, dfMinY,
             dfResY, dfRadius)));
         newAr->SetSelf(newAr);
         return newAr;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
     }
 
     bool IsWritable() const override
