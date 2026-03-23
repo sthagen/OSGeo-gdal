@@ -596,22 +596,6 @@ static GDALDataset *OGRGeoJSONDriverCreate(const char *pszName,
 }
 
 /************************************************************************/
-/*                               Delete()                               */
-/************************************************************************/
-
-static CPLErr OGRGeoJSONDriverDelete(const char *pszFilename)
-{
-    if (VSIUnlink(pszFilename) == 0)
-    {
-        return CE_None;
-    }
-
-    CPLDebug("GeoJSON", "Failed to delete \'%s\'", pszFilename);
-
-    return CE_Failure;
-}
-
-/************************************************************************/
 /*                    OGRGeoJSONDriverStoreContent()                    */
 /************************************************************************/
 
@@ -795,7 +779,6 @@ void RegisterOGRGeoJSON()
     poDriver->pfnOpen = OGRGeoJSONDriverOpen;
     poDriver->pfnIdentify = OGRGeoJSONDriverIdentify;
     poDriver->pfnCreate = OGRGeoJSONDriverCreate;
-    poDriver->pfnDelete = OGRGeoJSONDriverDelete;
     poDriver->pfnUnloadDriver = OGRGeoJSONDriverUnload;
 
     GetGDALDriverManager()->RegisterDriver(poDriver);
