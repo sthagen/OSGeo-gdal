@@ -11,7 +11,9 @@
 # SPDX-License-Identifier: MIT
 ###############################################################################
 
+import gdaltest
 import pytest
+import test_cli_utilities
 
 from osgeo import gdal, ogr
 
@@ -559,3 +561,121 @@ def test_gdalalg_raster_edit_cog(tmp_vsimem):
             crs="EPSG:32611",
             open_option={"IGNORE_COG_LAYOUT_BREAK": "YES"},
         )
+
+
+def test_gdalalg_raster_edit_color_interpretation_single_band():
+
+    ds = gdal.GetDriverByName("MEM").Create("", 1, 1)
+
+    gdal.alg.raster.edit(dataset=ds, color_interpretation="Red")
+    assert ds.GetRasterBand(1).GetColorInterpretation() == gdal.GCI_RedBand
+
+    gdal.alg.raster.edit(dataset=ds, color_interpretation="all=Green")
+    assert ds.GetRasterBand(1).GetColorInterpretation() == gdal.GCI_GreenBand
+
+    gdal.alg.raster.edit(dataset=ds, color_interpretation="1=Blue")
+    assert ds.GetRasterBand(1).GetColorInterpretation() == gdal.GCI_BlueBand
+
+    with pytest.raises(Exception, match="Unsupported color interpretation: invalid"):
+        gdal.alg.raster.edit(dataset=ds, color_interpretation="invalid")
+
+    with pytest.raises(Exception, match="Unsupported color interpretation: invalid"):
+        gdal.alg.raster.edit(dataset=ds, color_interpretation="all=invalid")
+
+    with pytest.raises(Exception, match="Unsupported color interpretation: invalid"):
+        gdal.alg.raster.edit(dataset=ds, color_interpretation="1=invalid")
+
+    with pytest.raises(Exception, match="Invalid band number '0' in '0=Red'"):
+        gdal.alg.raster.edit(dataset=ds, color_interpretation="0=Red")
+
+    with pytest.raises(Exception, match="Invalid band number '2' in '2=Red'"):
+        gdal.alg.raster.edit(dataset=ds, color_interpretation="2=Red")
+
+    with pytest.raises(
+        Exception,
+        match="More color interpretation values specified than bands in the dataset",
+    ):
+        gdal.alg.raster.edit(dataset=ds, color_interpretation=["Red", "Green"])
+
+
+def test_gdalalg_raster_edit_color_interpretation_multi_band():
+
+    ds = gdal.GetDriverByName("MEM").Create("", 1, 1, 3)
+
+    gdal.alg.raster.edit(dataset=ds, color_interpretation="all=Green")
+    assert ds.GetRasterBand(1).GetColorInterpretation() == gdal.GCI_GreenBand
+    assert ds.GetRasterBand(2).GetColorInterpretation() == gdal.GCI_GreenBand
+    assert ds.GetRasterBand(3).GetColorInterpretation() == gdal.GCI_GreenBand
+
+    gdal.alg.raster.edit(dataset=ds, color_interpretation=["Red", "Green", "Blue"])
+    assert ds.GetRasterBand(1).GetColorInterpretation() == gdal.GCI_RedBand
+    assert ds.GetRasterBand(2).GetColorInterpretation() == gdal.GCI_GreenBand
+    assert ds.GetRasterBand(3).GetColorInterpretation() == gdal.GCI_BlueBand
+
+    gdal.alg.raster.edit(
+        dataset=ds, color_interpretation=["3=Red", "1=Green", "2=Blue"]
+    )
+    assert ds.GetRasterBand(1).GetColorInterpretation() == gdal.GCI_GreenBand
+    assert ds.GetRasterBand(2).GetColorInterpretation() == gdal.GCI_BlueBand
+    assert ds.GetRasterBand(3).GetColorInterpretation() == gdal.GCI_RedBand
+
+    with pytest.raises(
+        Exception,
+        match="With several bands, specify as many color interpretation as bands, one or many values of the form <band_number>=<color> or a single value all=<color>",
+    ):
+        gdal.alg.raster.edit(dataset=ds, color_interpretation="Red")
+
+    with pytest.raises(
+        Exception,
+        match="More color interpretation values specified than bands in the dataset",
+    ):
+        gdal.alg.raster.edit(
+            dataset=ds, color_interpretation=["Red", "Green", "Blue", "Alpha"]
+        )
+
+    with pytest.raises(
+        Exception,
+        match="Less color interpretation values specified than bands in the dataset",
+    ):
+        gdal.alg.raster.edit(dataset=ds, color_interpretation=["Red", "Green"])
+
+    with pytest.raises(
+        Exception, match="Mix of different syntaxes to specify color interpretation"
+    ):
+        gdal.alg.raster.edit(dataset=ds, color_interpretation=["Red", "all=Green"])
+
+    with pytest.raises(
+        Exception, match="Mix of different syntaxes to specify color interpretation"
+    ):
+        gdal.alg.raster.edit(dataset=ds, color_interpretation=["2=Red", "Green"])
+
+    with pytest.raises(
+        Exception, match="Mix of different syntaxes to specify color interpretation"
+    ):
+        gdal.alg.raster.edit(dataset=ds, color_interpretation=["Red", "2=Green"])
+
+
+def test_gdalalg_raster_edit_color_interpretation_autocomplete():
+
+    gdal_path = test_cli_utilities.get_gdal_path()
+    if gdal_path is None:
+        pytest.skip("gdal binary not available")
+
+    out = gdaltest.runexternal(
+        f"{gdal_path} completion gdal raster edit --color-interpretation last_word_is_complete=true"
+    ).split(" ")
+    assert "all=" in out
+    assert "Red" in out
+
+    out = gdaltest.runexternal(
+        f"{gdal_path} completion gdal raster edit ../gcore/data/byte.tif --color-interpretation last_word_is_complete=true"
+    ).split(" ")
+    assert "all=" in out
+    assert "1=" in out
+    assert "Red" in out
+
+    out = gdaltest.runexternal(
+        f"{gdal_path} completion gdal raster edit --color-interpretation all= last_word_is_complete=false"
+    ).split(" ")
+    assert "all=" not in out
+    assert "Red" in out

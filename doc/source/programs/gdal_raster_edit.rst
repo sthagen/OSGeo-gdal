@@ -83,6 +83,24 @@ Program-Specific Options
 
     .. note:: This option is not available when the command is part of a pipeline.
 
+.. option:: --color-interpretation [all|<BAND>=]<COLOR-INTERPRETATION>
+
+    .. versionadded:: 3.13
+
+    Set band color interpretation. May be repeated.
+
+    ``<COLOR-INTERPRETATION>`` is one of ``red``, ``green``, ``blue``, ``alpha``,
+    ``gray``, ``undefined``, ``pan``, ``coastal``, ``rededge``, ``nir``, ``swir``, ``mwir`` or ``lwir``.
+
+    Several syntaxes are supported:
+
+    - specifying ``all=<COLOR-INTERPRETATION>``: set the color interpretation on all bands.
+
+    - specifying as many ``<COLOR-INTERPRETATION>`` as there are bands, starting from band 1 to the last band.
+
+    - specifying the color interpretation on a subset of bands with ``<BAND>=<COLOR-INTERPRETATION>``
+      where band is the band number starting at 1.
+
 .. option:: --metadata <KEY>=<VALUE>
 
     Add/update metadata item, at the dataset level. May be repeated.
@@ -164,3 +182,10 @@ Examples
    .. code-block:: bash
 
         $ gdal raster edit --gcp @gcps.csv my.tif
+
+.. example::
+   :title: Set red, green, blue, NIR color interpretation to a 4-band dataset
+
+   .. code-block:: bash
+
+        $ gdal raster edit --color-interpretation red,green,blue,nir 4band.tif

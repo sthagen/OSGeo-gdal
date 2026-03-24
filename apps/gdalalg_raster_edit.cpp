@@ -16,6 +16,8 @@
 #include "gdal_utils.h"
 #include "ogrsf_frmts.h"
 
+#include <optional>
+
 //! @cond Doxygen_Suppress
 
 #ifndef _
@@ -73,6 +75,35 @@ GDALRasterEditAlgorithm::GDALRasterEditAlgorithm(bool standaloneStep)
     AddBBOXArg(&m_bbox);
 
     AddNodataArg(&m_nodata, /* noneAllowed = */ true);
+
+    AddArg("color-interpretation", 0, _("Set band color interpretation"),
+           &m_colorInterpretation)
+        .SetAutoCompleteFunction(
+            [this](const std::string &s)
+            {
+                std::vector<std::string> ret;
+                int nValues = 0;
+                const auto paeVals = GDALGetColorInterpretationList(&nValues);
+                if (s.find('=') == std::string::npos)
+                {
+                    ret.push_back("all=");
+                    if (auto poDS = m_dataset.GetDatasetRef())
+                    {
+                        for (int i = 0; i < poDS->GetRasterCount(); ++i)
+                            ret.push_back(std::to_string(i + 1).append("="));
+                    }
+                    for (int i = 0; i < nValues; ++i)
+                        ret.push_back(
+                            GDALGetColorInterpretationName(paeVals[i]));
+                }
+                else
+                {
+                    for (int i = 0; i < nValues; ++i)
+                        ret.push_back(
+                            GDALGetColorInterpretationName(paeVals[i]));
+                }
+                return ret;
+            });
 
     {
         auto &arg = AddArg("metadata", 0, _("Add/update dataset metadata item"),
@@ -326,6 +357,128 @@ bool GDALRasterEditAlgorithm::RunStep(GDALPipelineStepRunContext &ctxt)
                 else
                     poDS->GetRasterBand(i + 1)->SetNoDataValue(
                         CPLAtof(m_nodata.c_str()));
+            }
+        }
+
+        if (!m_colorInterpretation.empty())
+        {
+            const auto GetColorInterp =
+                [this](const char *pszStr) -> std::optional<GDALColorInterp>
+            {
+                if (EQUAL(pszStr, "undefined"))
+                    return GCI_Undefined;
+                const GDALColorInterp eInterp =
+                    GDALGetColorInterpretationByName(pszStr);
+                if (eInterp != GCI_Undefined)
+                    return eInterp;
+                ReportError(CE_Failure, CPLE_NotSupported,
+                            "Unsupported color interpretation: %s", pszStr);
+                return {};
+            };
+
+            if (m_colorInterpretation.size() == 1 &&
+                poDS->GetRasterCount() > 1 &&
+                !cpl::starts_with(m_colorInterpretation[0], "all="))
+            {
+                ReportError(
+                    CE_Failure, CPLE_NotSupported,
+                    "With several bands, specify as many color interpretation "
+                    "as bands, one or many values of the form "
+                    "<band_number>=<color> or a single value all=<color>");
+                return false;
+            }
+            else
+            {
+                int nBandIter = 0;
+                bool bSyntaxAll = false;
+                bool bSyntaxExplicitBand = false;
+                bool bSyntaxImplicitBand = false;
+                for (const std::string &token : m_colorInterpretation)
+                {
+                    const CPLStringList aosTokens(
+                        CSLTokenizeString2(token.c_str(), "=", 0));
+                    if (aosTokens.size() == 2 && EQUAL(aosTokens[0], "all"))
+                    {
+                        bSyntaxAll = true;
+                        const auto eColorInterp = GetColorInterp(aosTokens[1]);
+                        if (!eColorInterp)
+                        {
+                            return false;
+                        }
+                        else
+                        {
+                            for (int i = 0; i < poDS->GetRasterCount(); ++i)
+                            {
+                                if (poDS->GetRasterBand(i + 1)
+                                        ->SetColorInterpretation(
+                                            *eColorInterp) != CE_None)
+                                    return false;
+                            }
+                        }
+                    }
+                    else if (aosTokens.size() == 2)
+                    {
+                        bSyntaxExplicitBand = true;
+                        const int nBand = atoi(aosTokens[0]);
+                        if (nBand <= 0 || nBand > poDS->GetRasterCount())
+                        {
+                            ReportError(CE_Failure, CPLE_NotSupported,
+                                        "Invalid band number '%s' in '%s'",
+                                        aosTokens[0], token.c_str());
+                            return false;
+                        }
+                        const auto eColorInterp = GetColorInterp(aosTokens[1]);
+                        if (!eColorInterp)
+                        {
+                            return false;
+                        }
+                        else if (poDS->GetRasterBand(nBand)
+                                     ->SetColorInterpretation(*eColorInterp) !=
+                                 CE_None)
+                        {
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        bSyntaxImplicitBand = true;
+                        ++nBandIter;
+                        if (nBandIter > poDS->GetRasterCount())
+                        {
+                            ReportError(CE_Failure, CPLE_IllegalArg,
+                                        "More color interpretation values "
+                                        "specified than bands in the dataset");
+                            return false;
+                        }
+                        const auto eColorInterp = GetColorInterp(token.c_str());
+                        if (!eColorInterp)
+                        {
+                            return false;
+                        }
+                        else if (poDS->GetRasterBand(nBandIter)
+                                     ->SetColorInterpretation(*eColorInterp) !=
+                                 CE_None)
+                        {
+                            return false;
+                        }
+                    }
+                }
+                if ((bSyntaxAll ? 1 : 0) + (bSyntaxExplicitBand ? 1 : 0) +
+                        (bSyntaxImplicitBand ? 1 : 0) !=
+                    1)
+                {
+                    ReportError(CE_Failure, CPLE_IllegalArg,
+                                "Mix of different syntaxes to specify color "
+                                "interpretation");
+                    return false;
+                }
+                if (bSyntaxImplicitBand && nBandIter != poDS->GetRasterCount())
+                {
+                    ReportError(CE_Failure, CPLE_IllegalArg,
+                                "Less color interpretation values specified "
+                                "than bands in the dataset");
+                    return false;
+                }
             }
         }
 
