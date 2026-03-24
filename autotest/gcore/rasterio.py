@@ -12,6 +12,7 @@
 # SPDX-License-Identifier: MIT
 ###############################################################################
 
+import array
 import math
 import struct
 import sys
@@ -3898,3 +3899,50 @@ def test_rasterio_gdt_unknown():
         # Caught at the SWIG level
         with pytest.raises(Exception, match="Illegal value for data type"):
             ds.GetRasterBand(1).ReadRaster(buf_type=gdal.GDT_Unknown)
+
+
+###############################################################################
+
+
+def test_rasterio_resampling_output_type_not_native_type():
+
+    ds = gdal.GetDriverByName("MEM").Create("", 4, 4, eType=gdal.GDT_UInt8, bands=2)
+    ds.GetRasterBand(1).WriteRaster(
+        0, 0, 4, 4, array.array("B", [i for i in range(16)])
+    )
+    ds.GetRasterBand(2).WriteRaster(
+        0, 0, 4, 4, array.array("B", [i + 16 for i in range(16)])
+    )
+
+    got = struct.unpack(
+        "d" * 8,
+        ds.ReadRaster(
+            buf_xsize=2,
+            buf_ysize=2,
+            buf_type=gdal.GDT_Float64,
+            resample_alg=gdal.GRIORA_CubicSpline,
+        ),
+    )
+    assert got == (5.0, 6.0, 9.0, 10.0, 21.0, 22.0, 25.0, 26.0)
+
+    got = struct.unpack(
+        "d" * 4,
+        ds.GetRasterBand(1).ReadRaster(
+            buf_xsize=2,
+            buf_ysize=2,
+            buf_type=gdal.GDT_Float64,
+            resample_alg=gdal.GRIORA_CubicSpline,
+        ),
+    )
+    assert got == (5.0, 6.0, 9.0, 10.0)
+
+    got = struct.unpack(
+        "d" * 4,
+        ds.GetRasterBand(2).ReadRaster(
+            buf_xsize=2,
+            buf_ysize=2,
+            buf_type=gdal.GDT_Float64,
+            resample_alg=gdal.GRIORA_CubicSpline,
+        ),
+    )
+    assert got == (21.0, 22.0, 25.0, 26.0)

@@ -2949,6 +2949,11 @@ CPLErr GDALDataset::ValidateRasterIOOrAdviseReadParameters(
     int nYOff, int nXSize, int nYSize, int nBufXSize, int nBufYSize,
     int nBandCount, const int *panBandMap)
 {
+    if (nBands == 0)
+    {
+        *pbStopProcessingOnCENone = TRUE;
+        return CE_None;
+    }
 
     /* -------------------------------------------------------------------- */
     /*      Some size values are "noop".  Lets just return to avoid         */
