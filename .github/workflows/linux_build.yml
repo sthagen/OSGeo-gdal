@@ -92,6 +92,14 @@ jobs:
             test_script: test.sh
             os: ubuntu-24.04
 
+          - name: Ubuntu 26.04, clang ASAN
+            id: asan
+            travis_branch: sanitize
+            container: ubuntu_26.04
+            build_script: build.sh
+            test_script: test.sh
+            os: ubuntu-24.04
+
           - name: Ubuntu 22.04, gcc
             id: ubuntu_22.04
             travis_branch: ubuntu_2204
@@ -100,14 +108,6 @@ jobs:
             build_script: build.sh
             test_script: test.sh
             os: ubuntu-22.04
-
-          - name: Ubuntu 24.04, clang ASAN
-            id: asan
-            travis_branch: sanitize
-            container: ubuntu_24.04
-            build_script: build.sh
-            test_script: test.sh
-            os: ubuntu-24.04
 
           - name: Ubuntu 20.04, gcc
             id: ubuntu_20.04
