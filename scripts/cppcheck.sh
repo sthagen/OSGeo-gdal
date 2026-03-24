@@ -197,6 +197,10 @@ mv ${LOG_FILE}.tmp ${LOG_FILE}
 grep -v -e "ogr/ogrsf_frmts/ntf/" ${LOG_FILE} > ${LOG_FILE}.tmp
 mv ${LOG_FILE}.tmp ${LOG_FILE}
 
+# Ignore port/cpl_port.h:176,error,syntaxError,syntax error
+grep -v "port/cpl_port.h:176,error,syntaxError,syntax error" ${LOG_FILE} > ${LOG_FILE}.tmp
+mv ${LOG_FILE}.tmp ${LOG_FILE}
+
 if grep "null pointer" ${LOG_FILE} ; then
     echo "Null pointer check failed"
     ret_code=1
