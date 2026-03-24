@@ -5,6 +5,7 @@ Supported Formats: (ro:read-only, rw:read-write, +:write from scratch, u:update,
   netCDF -raster,multidimensional raster,vector- (rw+uvs): Network Common Data Format (*.nc)
   PDS4 -raster,vector- (rw+uvs): NASA Planetary Data System 4 (*.xml)
   VICAR -raster,vector- (rw+v): MIPL VICAR file
+  JP2Grok -raster,vector- (rwv): JPEG-2000 driver based on Grok library (*.jp2, *.j2k)
   JP2OpenJPEG -raster,vector- (rwv): JPEG-2000 driver based on JP2OpenJPEG library (*.jp2, *.j2k)
   PDF -raster,vector- (rw+uvs): Geospatial PDF (*.pdf)
   MBTiles -raster,vector- (rw+v): MBTiles (*.mbtiles)
