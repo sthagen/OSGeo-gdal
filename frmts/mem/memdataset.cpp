@@ -36,6 +36,8 @@
 struct MEMDataset::Private
 {
     std::shared_ptr<GDALGroup> m_poRootGroup{};
+    std::map<std::string, std::unique_ptr<GDALRelationship>>
+        m_oMapRelationships{};
 };
 
 /************************************************************************/
@@ -3388,26 +3390,20 @@ OGRErr MEMDataset::DeleteLayer(int iLayer)
 int MEMDataset::TestCapability(const char *pszCap) const
 
 {
-    if (EQUAL(pszCap, ODsCCreateLayer))
-        return TRUE;
-    else if (EQUAL(pszCap, ODsCDeleteLayer))
-        return TRUE;
-    else if (EQUAL(pszCap, ODsCCreateGeomFieldAfterCreateLayer))
-        return TRUE;
-    else if (EQUAL(pszCap, ODsCCurveGeometries))
-        return TRUE;
-    else if (EQUAL(pszCap, ODsCMeasuredGeometries))
-        return TRUE;
-    else if (EQUAL(pszCap, ODsCZGeometries))
-        return TRUE;
-    else if (EQUAL(pszCap, ODsCRandomLayerWrite))
-        return TRUE;
-    else if (EQUAL(pszCap, ODsCAddFieldDomain))
-        return TRUE;
-    else if (EQUAL(pszCap, ODsCDeleteFieldDomain))
-        return TRUE;
-    else if (EQUAL(pszCap, ODsCUpdateFieldDomain))
-        return TRUE;
+    if (EQUAL(pszCap, ODsCCreateLayer) || EQUAL(pszCap, ODsCDeleteLayer) ||
+        EQUAL(pszCap, ODsCCreateGeomFieldAfterCreateLayer) ||
+        EQUAL(pszCap, ODsCCurveGeometries) ||
+        EQUAL(pszCap, ODsCMeasuredGeometries) ||
+        EQUAL(pszCap, ODsCZGeometries) || EQUAL(pszCap, ODsCRandomLayerWrite) ||
+        EQUAL(pszCap, ODsCAddFieldDomain) ||
+        EQUAL(pszCap, ODsCDeleteFieldDomain) ||
+        EQUAL(pszCap, ODsCUpdateFieldDomain) ||
+        EQUAL(pszCap, GDsCAddRelationship) ||
+        EQUAL(pszCap, GDsCDeleteRelationship) ||
+        EQUAL(pszCap, GDsCUpdateRelationship))
+    {
+        return true;
+    }
 
     return GDALDataset::TestCapability(pszCap);
 }
@@ -3494,6 +3490,86 @@ bool MEMDataset::UpdateFieldDomain(std::unique_ptr<OGRFieldDomain> &&domain,
 }
 
 /************************************************************************/
+/*                        GetRelationshipNames()                        */
+/************************************************************************/
+
+std::vector<std::string> MEMDataset::GetRelationshipNames(CSLConstList) const
+{
+    std::vector<std::string> ret;
+    for (const auto &kv : m_poPrivate->m_oMapRelationships)
+        ret.push_back(kv.first);
+    return ret;
+}
+
+/************************************************************************/
+/*                          GetRelationship()                           */
+/************************************************************************/
+
+const GDALRelationship *
+MEMDataset::GetRelationship(const std::string &name) const
+{
+    const auto iter = m_poPrivate->m_oMapRelationships.find(name);
+    if (iter != m_poPrivate->m_oMapRelationships.end())
+        return iter->second.get();
+    return nullptr;
+}
+
+/************************************************************************/
+/*                          AddRelationship()                           */
+/************************************************************************/
+
+bool MEMDataset::AddRelationship(
+    std::unique_ptr<GDALRelationship> &&relationship,
+    std::string &failureReason)
+{
+    const std::string osName(relationship->GetName());
+    const auto iter = m_poPrivate->m_oMapRelationships.find(osName);
+    if (iter != m_poPrivate->m_oMapRelationships.end())
+    {
+        failureReason = "A relationship of identical name already exists";
+        return false;
+    }
+    m_poPrivate->m_oMapRelationships[osName] = std::move(relationship);
+    return true;
+}
+
+/************************************************************************/
+/*                         DeleteRelationship()                         */
+/************************************************************************/
+
+bool MEMDataset::DeleteRelationship(const std::string &name,
+                                    std::string &failureReason)
+{
+    const auto iter = m_poPrivate->m_oMapRelationships.find(name);
+    if (iter == m_poPrivate->m_oMapRelationships.end())
+    {
+        failureReason = "No matching relationship found";
+        return false;
+    }
+    m_poPrivate->m_oMapRelationships.erase(iter);
+    return true;
+}
+
+/************************************************************************/
+/*                         UpdateRelationship()                         */
+/************************************************************************/
+
+bool MEMDataset::UpdateRelationship(
+    std::unique_ptr<GDALRelationship> &&relationship,
+    std::string &failureReason)
+{
+    const std::string osName(relationship->GetName());
+    const auto iter = m_poPrivate->m_oMapRelationships.find(osName);
+    if (iter == m_poPrivate->m_oMapRelationships.end())
+    {
+        failureReason = "No matching relationship found";
+        return false;
+    }
+    iter->second = std::move(relationship);
+    return true;
+}
+
+/************************************************************************/
 /*                             ExecuteSQL()                             */
 /************************************************************************/
 
@@ -3554,6 +3630,15 @@ void GDALRegister_MEM()
     poDriver->SetMetadataItem(GDAL_DCAP_MEASURED_GEOMETRIES, "YES");
     poDriver->SetMetadataItem(GDAL_DCAP_Z_GEOMETRIES, "YES");
     poDriver->SetMetadataItem(GDAL_DMD_SUPPORTED_SQL_DIALECTS, "OGRSQL SQLITE");
+
+    poDriver->SetMetadataItem(GDAL_DCAP_RELATIONSHIPS, "YES");
+    poDriver->SetMetadataItem(GDAL_DCAP_CREATE_RELATIONSHIP, "YES");
+    poDriver->SetMetadataItem(GDAL_DCAP_DELETE_RELATIONSHIP, "YES");
+    poDriver->SetMetadataItem(GDAL_DCAP_UPDATE_RELATIONSHIP, "YES");
+    poDriver->SetMetadataItem(
+        GDAL_DMD_RELATIONSHIP_FLAGS,
+        "OneToOne OneToMany ManyToOne ManyToMany Composite Association "
+        "Aggregation ForwardPathLabel MultipleFieldKeys BackwardPathLabel");
 
     poDriver->SetMetadataItem(
         GDAL_DMD_CREATIONFIELDDATATYPES,
