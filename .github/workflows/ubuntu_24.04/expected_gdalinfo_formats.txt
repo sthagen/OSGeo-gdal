@@ -50,6 +50,7 @@ Supported Formats: (ro:read-only, rw:read-write, +:write from scratch, u:update,
   VICAR -raster,vector- (rw+v): MIPL VICAR file
   TIL -raster- (rov): EarthWatch .TIL
   ERS -raster- (rw+v): ERMapper .ers Labelled (*.ers)
+  JP2Grok -raster,vector- (rwv): JPEG-2000 driver based on Grok library (*.jp2, *.j2k)
   JP2OpenJPEG -raster,vector- (rwv): JPEG-2000 driver based on JP2OpenJPEG library (*.jp2, *.j2k)
   L1B -raster- (rovs): NOAA Polar Orbiter Level 1b Data Set
   GRIB -raster,multidimensional raster- (rwv): GRIdded Binary (.grb, .grb2) (*.grb, *.grb2, *.grib2)

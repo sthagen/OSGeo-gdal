@@ -2792,9 +2792,8 @@ GDALDataset *OGRMVTDataset::OpenDirectory(GDALOpenInfo *poOpenInfo)
                                          poDS->m_bClip);
                     }
 
-                    for (int k = 0; k < poTileDS->GetLayerCount(); k++)
+                    for (auto *poTileLayer : poTileDS->GetLayers())
                     {
-                        OGRLayer *poTileLayer = poTileDS->GetLayer(k);
                         OGRFeatureDefn *poTileLDefn =
                             poTileLayer->GetLayerDefn();
                         OGRwkbGeometryType eTileGeomType =

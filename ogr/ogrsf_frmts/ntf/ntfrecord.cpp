@@ -26,7 +26,7 @@ constexpr int MAX_RECORD_LEN = 160;
 /*      transparent merging of continuation lines.                      */
 /************************************************************************/
 
-NTFRecord::NTFRecord(VSILFILE *fp) : nType(99), nLength(0), pszData(nullptr)
+NTFRecord::NTFRecord(VSILFILE *fp)
 {
     if (fp == nullptr)
         return;
@@ -34,75 +34,57 @@ NTFRecord::NTFRecord(VSILFILE *fp) : nType(99), nLength(0), pszData(nullptr)
     /* ==================================================================== */
     /*      Read lines until we get to one without a continuation mark.     */
     /* ==================================================================== */
-    char szLine[MAX_RECORD_LEN + 3] = {};
-    int nNewLength = 0;
-
-    do
+    const char *pszLine;
+    while ((pszLine = CPLReadLine2L(fp, MAX_RECORD_LEN + 2, nullptr)) !=
+           nullptr)
     {
-        nNewLength = ReadPhysicalLine(fp, szLine);
-        if (nNewLength == -1 || nNewLength == -2)
-            break;
+        int nNewLength = static_cast<int>(strlen(pszLine));
+        while (nNewLength > 0 && pszLine[nNewLength - 1] == ' ')
+            --nNewLength;
 
-        while (nNewLength > 0 && szLine[nNewLength - 1] == ' ')
-            szLine[--nNewLength] = '\0';
-
-        if (nNewLength < 2 || szLine[nNewLength - 1] != '%')
+        if (nNewLength < 2 || pszLine[nNewLength - 1] != '%')
         {
             CPLError(CE_Failure, CPLE_AppDefined,
                      "Corrupt NTF record, missing end '%%'.");
-            CPLFree(pszData);
-            pszData = nullptr;
+            osData.clear();
             break;
         }
 
-        if (pszData == nullptr)
+        if (osData.empty())
         {
-            nLength = nNewLength - 2;
-            // coverity[overflow_sink]
-            pszData = static_cast<char *>(VSI_MALLOC_VERBOSE(nLength + 1));
-            if (pszData == nullptr)
-            {
-                return;
-            }
-            memcpy(pszData, szLine, nLength);
-            pszData[nLength] = '\0';
+            osData.assign(pszLine, nNewLength - 2);
         }
         else
         {
-            if (!STARTS_WITH_CI(szLine, "00") || nNewLength < 4)
+            if (!STARTS_WITH_CI(pszLine, "00") || nNewLength < 4)
             {
                 CPLError(CE_Failure, CPLE_AppDefined, "Invalid line");
-                VSIFree(pszData);
-                pszData = nullptr;
+                osData.clear();
                 return;
             }
 
-            char *pszNewData = static_cast<char *>(
-                VSI_REALLOC_VERBOSE(pszData, nLength + (nNewLength - 4) + 1));
-            if (pszNewData == nullptr)
+            try
             {
-                VSIFree(pszData);
-                pszData = nullptr;
+                osData.append(pszLine + 2, nNewLength - 4);
+            }
+            catch (const std::exception &)
+            {
+                CPLError(CE_Failure, CPLE_OutOfMemory, "Too large file");
+                osData.clear();
                 return;
             }
-
-            pszData = pszNewData;
-            memcpy(pszData + nLength, szLine + 2, nNewLength - 4);
-            nLength += nNewLength - 4;
-            pszData[nLength] = '\0';
         }
-    } while (szLine[nNewLength - 2] == '1');
+
+        if (pszLine[nNewLength - 2] != '1')
+            break;
+    }
 
     /* -------------------------------------------------------------------- */
     /*      Figure out the record type.                                     */
     /* -------------------------------------------------------------------- */
-    if (pszData != nullptr)
+    if (osData.size() >= 2)
     {
-        char szType[3];
-
-        strncpy(szType, pszData, 2);
-        szType[2] = '\0';
-
+        char szType[3] = {osData[0], osData[1], 0};
         nType = atoi(szType);
     }
 }
@@ -114,83 +96,12 @@ NTFRecord::NTFRecord(VSILFILE *fp) : nType(99), nLength(0), pszData(nullptr)
 NTFRecord::~NTFRecord()
 
 {
-    CPLFree(pszData);
-
     if (pszFieldBuf != nullptr)
     {
         CPLFree(pszFieldBuf);
         pszFieldBuf = nullptr;
         nFieldBufSize = 0;
     }
-}
-
-/************************************************************************/
-/*                          ReadPhysicalLine()                          */
-/************************************************************************/
-
-int NTFRecord::ReadPhysicalLine(VSILFILE *fp, char *pszLine)
-
-{
-    /* -------------------------------------------------------------------- */
-    /*      Read enough data that we are sure we have a whole record.       */
-    /* -------------------------------------------------------------------- */
-    int nRecordStart = static_cast<int>(VSIFTellL(fp));
-    const int nBytesRead =
-        static_cast<int>(VSIFReadL(pszLine, 1, MAX_RECORD_LEN + 2, fp));
-
-    if (nBytesRead == 0)
-    {
-        if (VSIFEofL(fp))
-            return -1;
-        else /* if (VSIFErrorL(fp)) */
-        {
-            CPLError(CE_Failure, CPLE_AppDefined,
-                     "Low level read error occurred while reading NTF file.");
-            return -2;
-        }
-    }
-
-    /* -------------------------------------------------------------------- */
-    /*      Search for CR or LF.                                            */
-    /* -------------------------------------------------------------------- */
-    int i = 0;  // Used after for.
-    for (; i < nBytesRead; i++)
-    {
-        if (pszLine[i] == 10 || pszLine[i] == 13)
-            break;
-    }
-
-    /* -------------------------------------------------------------------- */
-    /*      If we don't find EOL within 80 characters something has gone    */
-    /*      badly wrong!                                                    */
-    /* -------------------------------------------------------------------- */
-    if (i == MAX_RECORD_LEN + 2)
-    {
-        CPLError(CE_Failure, CPLE_AppDefined,
-                 "%d byte record too long for NTF format.  "
-                 "No line may be longer than 80 characters though up "
-                 "to %d tolerated.",
-                 nBytesRead, MAX_RECORD_LEN);
-        return -2;
-    }
-
-    /* -------------------------------------------------------------------- */
-    /*      Trim CR/LF.                                                     */
-    /* -------------------------------------------------------------------- */
-    const int l_nLength = i;
-    const int nRecordEnd =
-        nRecordStart + i +
-        (pszLine[i + 1] == 10 || pszLine[i + 1] == 13 ? 2 : 1);
-
-    pszLine[l_nLength] = '\0';
-
-    /* -------------------------------------------------------------------- */
-    /*      Restore read pointer to beginning of next record.               */
-    /* -------------------------------------------------------------------- */
-    if (VSIFSeekL(fp, static_cast<vsi_l_offset>(nRecordEnd), SEEK_SET) != 0)
-        return -1;
-
-    return l_nLength;
 }
 
 /************************************************************************/
@@ -201,12 +112,12 @@ int NTFRecord::ReadPhysicalLine(VSILFILE *fp, char *pszLine)
 /*      internal buffer, but is zero terminated.                        */
 /************************************************************************/
 
-const char *NTFRecord::GetField(int nStart, int nEnd)
+const char *NTFRecord::GetField(int nStart, int nEnd) const
 
 {
     const int nSize = nEnd - nStart + 1;
 
-    if (pszData == nullptr)
+    if (osData.empty())
         return "";
 
     /* -------------------------------------------------------------------- */
@@ -222,18 +133,18 @@ const char *NTFRecord::GetField(int nStart, int nEnd)
     /* -------------------------------------------------------------------- */
     /*      Copy out desired data.                                          */
     /* -------------------------------------------------------------------- */
-    if (nStart + nSize > nLength + 1)
+    if (nStart + nSize > GetLength() + 1)
     {
         CPLError(CE_Failure, CPLE_AppDefined,
                  "Attempt to read %d to %d, beyond the end of %d byte long\n"
                  "type `%2.2s' record.\n",
-                 nStart, nEnd, nLength, pszData);
+                 nStart, nEnd, GetLength(), osData.c_str());
         memset(pszFieldBuf, ' ', nSize);
         pszFieldBuf[nSize] = '\0';
     }
     else
     {
-        strncpy(pszFieldBuf, pszData + nStart - 1, nSize);
+        strncpy(pszFieldBuf, osData.c_str() + nStart - 1, nSize);
         pszFieldBuf[nSize] = '\0';
     }
 

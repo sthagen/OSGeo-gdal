@@ -821,6 +821,26 @@ The `GTA <https://marlam.de/gta/>`_ library is required for the :ref:`raster.gta
     Control whether to use GTA. Defaults to ON when GTA is found.
 
 
+Grok
+****
+
+The `Grok <https://github.com/GrokImageCompression/grok>`_ (>= 20.2) library is an
+open-source JPEG-2000 codec. It is required for the :ref:`raster.jp2grok` driver.
+It can be detected with pkg-config.
+
+.. option:: GROK_INCLUDE_DIR
+
+    Path to an include directory with the ``grk_config.h`` header file.
+
+.. option:: GROK_LIBRARY
+
+    Path to a shared or static library file.
+
+.. option:: GDAL_USE_GROK=ON/OFF
+
+    Control whether to use Grok. Defaults to ON when Grok is found.
+
+
 HEIF
 ****
 

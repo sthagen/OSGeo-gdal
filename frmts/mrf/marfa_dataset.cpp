@@ -728,12 +728,12 @@ CPLErr MRFDataset::SetVersion(int version)
     for (int bcount = 1; bcount <= nBands; bcount++)
     {
         MRFRasterBand *srcband =
-            reinterpret_cast<MRFRasterBand *>(GetRasterBand(bcount));
+            cpl::down_cast<MRFRasterBand *>(GetRasterBand(bcount));
         srcband->img.idxoffset += idxSize * verCount;
         for (int l = 0; l < srcband->GetOverviewCount(); l++)
         {
             MRFRasterBand *band =
-                reinterpret_cast<MRFRasterBand *>(srcband->GetOverview(l));
+                cpl::down_cast<MRFRasterBand *>(srcband->GetOverview(l));
             if (band != nullptr)
                 band->img.idxoffset += idxSize * verCount;
         }
@@ -752,8 +752,10 @@ CPLErr MRFDataset::LevelInit(const int l)
         return CE_Failure;
     }
 
-    MRFRasterBand *srcband = reinterpret_cast<MRFRasterBand *>(
-        cds->GetRasterBand(1)->GetOverview(l));
+    MRFRasterBand *srcband =
+        cpl::down_cast<MRFRasterBand *>(cds->GetRasterBand(1)->GetOverview(l));
+    if (!srcband)
+        return CE_Failure;
 
     // Copy the sizes from this level
     full = srcband->img;

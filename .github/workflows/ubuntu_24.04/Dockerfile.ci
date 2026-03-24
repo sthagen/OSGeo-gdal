@@ -47,6 +47,7 @@ RUN apt-get update && \
     libpng-dev \
     libpq-dev \
     libproj-dev \
+    libpsl-dev \
     librasterlite2-dev \
     libspatialite-dev \
     libssl-dev \
@@ -78,7 +79,7 @@ RUN git clone --depth 1 https://gitlab.freedesktop.org/poppler/poppler.git poppl
     cd poppler && \
     mkdir build && \
     cd build && \
-    cmake -DENABLE_UNSTABLE_API_ABI_HEADER=ON -DENABLE_NSS3=OFF -DENABLE_GPGME=OFF -DENABLE_QT5=OFF -DENABLE_QT6=OFF .. && \
+    cmake -DENABLE_UNSTABLE_API_ABI_HEADERS=ON -DENABLE_NSS3=OFF -DENABLE_GPGME=OFF -DENABLE_QT5=OFF -DENABLE_QT6=OFF .. && \
     make -j$(nproc) && \
     make install
 
@@ -218,6 +219,18 @@ RUN curl -LO -fsS https://github.com/apache/arrow/archive/refs/heads/main.zip \
     && make install \
     && cd ../../.. \
     && rm -rf arrow-main
+
+# Build Grok JPEG 2000 library
+RUN git clone --recursive --depth 1 https://github.com/GrokImageCompression/grok.git grok-git && \
+    cd grok-git && \
+    mkdir build && \
+    cd build && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DGRK_BUILD_LIBTIFF=OFF -DGRK_BUILD_LIBPNG=OFF -DGRK_BUILD_JPEG=OFF .. && \
+    make -j$(nproc) && \
+    make install && \
+    cd ../.. && \
+    rm -rf grok-git && \
+    ldconfig
 
 # Install pdfium
 RUN wget -q https://github.com/rouault/pdfium_build_gdal_3_13/releases/download/pdfium_7724_v1/install-ubuntu2404-rev7724.tar.gz \
