@@ -83,6 +83,15 @@ jobs:
             test_script: test.sh
             os: ubuntu-22.04
 
+          - name: Ubuntu 26.04, gcc
+            id: ubuntu_26.04
+            travis_branch: ubuntu_2604
+            container: ubuntu_26.04
+            before_test_script: services.sh
+            build_script: build.sh
+            test_script: test.sh
+            os: ubuntu-24.04
+
           - name: Ubuntu 24.04, gcc
             id: ubuntu_24.04
             travis_branch: ubuntu_2404
