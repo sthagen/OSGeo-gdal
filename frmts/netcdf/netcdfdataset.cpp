@@ -3006,12 +3006,12 @@ CPLErr netCDFDataset::SetMetadataItem(const char *pszName, const char *pszValue,
         std::string osName(pszName);
 
         // Same logic as in CopyMetadata()
-        if (STARTS_WITH(osName.c_str(), "NC_GLOBAL#"))
+        if (cpl::starts_with(osName, "NC_GLOBAL#"))
             osName = osName.substr(strlen("NC_GLOBAL#"));
         else if (strchr(osName.c_str(), '#') == nullptr)
             osName = "GDAL_" + osName;
 
-        if (STARTS_WITH(osName.c_str(), "NETCDF_DIM_") ||
+        if (cpl::starts_with(osName, "NETCDF_DIM_") ||
             strchr(osName.c_str(), '#') != nullptr)
         {
             // do nothing

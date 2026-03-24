@@ -6647,19 +6647,15 @@ OGRLayer *GDALDataset::GetLayerByName(const char *pszName)
         return nullptr;
 
     // First a case sensitive check.
-    for (int i = 0; i < GetLayerCount(); ++i)
+    for (auto *poLayer : GetLayers())
     {
-        OGRLayer *poLayer = GetLayer(i);
-
         if (strcmp(pszName, poLayer->GetName()) == 0)
             return poLayer;
     }
 
     // Then case insensitive.
-    for (int i = 0; i < GetLayerCount(); ++i)
+    for (auto *poLayer : GetLayers())
     {
-        OGRLayer *poLayer = GetLayer(i);
-
         if (EQUAL(pszName, poLayer->GetName()))
             return poLayer;
     }

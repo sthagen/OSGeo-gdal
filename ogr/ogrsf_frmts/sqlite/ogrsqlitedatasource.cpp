@@ -4003,9 +4003,8 @@ OGRErr OGRSQLiteBaseDataSource::SoftStartTransaction()
     OGRErr eErr = OGRERR_NONE;
     if (m_nSoftTransactionLevel == 1)
     {
-        for (int i = 0; i < GetLayerCount(); i++)
+        for (auto *poLayer : GetLayers())
         {
-            OGRLayer *poLayer = GetLayer(i);
             poLayer->PrepareStartTransaction();
         }
 
@@ -4082,9 +4081,8 @@ OGRErr OGRSQLiteBaseDataSource::SoftRollbackTransaction()
         eErr = DoTransactionCommand("ROLLBACK");
         if (eErr == OGRERR_NONE)
         {
-            for (int i = 0; i < GetLayerCount(); i++)
+            for (auto *poLayer : GetLayers())
             {
-                OGRLayer *poLayer = GetLayer(i);
                 poLayer->FinishRollbackTransaction("");
             }
         }
@@ -4101,9 +4099,8 @@ OGRErr OGRSQLiteBaseDataSource::StartSavepoint(const std::string &osName)
     {
         m_bImplicitTransactionOpened = true;
         m_nSoftTransactionLevel++;
-        for (int i = 0; i < GetLayerCount(); i++)
+        for (auto *poLayer : GetLayers())
         {
-            OGRLayer *poLayer = GetLayer(i);
             poLayer->PrepareStartTransaction();
         }
     }

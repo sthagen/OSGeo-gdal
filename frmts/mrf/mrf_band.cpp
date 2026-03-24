@@ -1356,8 +1356,10 @@ CPLErr MRFRasterBand::IWriteBlock(int xblk, int yblk, void *buffer)
             // Pick the right overview
             if (m_l)
                 band = band->GetOverview(m_l - 1);
-            poBlock = (reinterpret_cast<MRFRasterBand *>(band))
-                          ->TryGetLockedBlockRef(xblk, yblk);
+            auto poMRFBand = cpl::down_cast<MRFRasterBand *>(band);
+            if (!poMRFBand)
+                continue;
+            poBlock = poMRFBand->TryGetLockedBlockRef(xblk, yblk);
             if (nullptr == poBlock)
                 continue;
             // This is where the image data is for this band
