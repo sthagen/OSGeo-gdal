@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Name:     gdalmultidim_gridded.cpp
+ * Name:     gdalmultidim_array_gridded.cpp
  * Project:  GDAL Core
  * Purpose:  GDALMDArray::GetGridded() implementation
  * Author:   Even Rouault <even.rouault at spatialys.com>
@@ -22,6 +22,8 @@
 #include <cassert>
 #include <limits>
 #include <new>
+
+//! @cond Doxygen_Suppress
 
 /************************************************************************/
 /*                          GDALMDArrayGridded                          */
@@ -368,6 +370,8 @@ bool GDALMDArrayGridded::IRead(const GUInt64 *arrayStartIdx,
 
     return true;
 }
+
+//! @endcond
 
 /************************************************************************/
 /*                             GetGridded()                             */

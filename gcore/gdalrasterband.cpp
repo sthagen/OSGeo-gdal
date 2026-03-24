@@ -10783,6 +10783,36 @@ const char *GDALRasterBand::GetMetadataItem(const char *pszName,
 }
 
 /************************************************************************/
+/*                      GDALRasterBandAsMDArray()                       */
+/************************************************************************/
+
+/** Return a view of this raster band as a 2D multidimensional GDALMDArray.
+ *
+ * The band must be linked to a GDALDataset. If this dataset is not already
+ * marked as shared, it will be, so that the returned array holds a reference
+ * to it.
+ *
+ * If the dataset has a geotransform attached, the X and Y dimensions of the
+ * returned array will have an associated indexing variable.
+ *
+ * The returned pointer must be released with GDALMDArrayRelease().
+ *
+ * This is the same as the C++ method GDALRasterBand::AsMDArray().
+ *
+ * @return a new array, or NULL.
+ *
+ * @since GDAL 3.1
+ */
+GDALMDArrayH GDALRasterBandAsMDArray(GDALRasterBandH hBand)
+{
+    VALIDATE_POINTER1(hBand, __func__, nullptr);
+    auto poArray(GDALRasterBand::FromHandle(hBand)->AsMDArray());
+    if (!poArray)
+        return nullptr;
+    return new GDALMDArrayHS(poArray);
+}
+
+/************************************************************************/
 /*                            WindowIterator                            */
 /************************************************************************/
 

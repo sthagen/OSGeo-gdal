@@ -1,5 +1,5 @@
 /******************************************************************************
- * Name:     gdalmultidim_gltorthorectification.cpp
+ * Name:     gdalmultidim_array_gltorthorectification.cpp
  * Project:  GDAL Core
  * Purpose:  GLT orthorectification implementation
  * Author:   Even Rouault <even.rouault at spatialys.com>
