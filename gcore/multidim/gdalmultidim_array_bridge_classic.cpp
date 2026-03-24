@@ -97,8 +97,19 @@ class GDALDatasetFromArray final : public GDALPamDataset
     GDALMultiDomainMetadata m_oMDD{};
     std::string m_osOvrFilename{};
     bool m_bOverviewsDiscovered = false;
+    bool m_bPixelInterleaved = false;
     std::vector<std::unique_ptr<GDALDataset, GDALDatasetUniquePtrReleaser>>
         m_apoOverviews{};
+    std::vector<GUInt64> m_anOffset{};
+    std::vector<size_t> m_anCount{};
+    std::vector<GPtrDiff_t> m_anStride{};
+
+    CPLErr IRasterIO(GDALRWFlag eRWFlag, int nXOff, int nYOff, int nXSize,
+                     int nYSize, void *pData, int nBufXSize, int nBufYSize,
+                     GDALDataType eBufType, int nBandCount,
+                     BANDMAP_TYPE panBandMap, GSpacing nPixelSpace,
+                     GSpacing nLineSpace, GSpacing nBandSpace,
+                     GDALRasterIOExtraArg *psExtraArg) override;
 
   public:
     GDALDatasetFromArray(const std::shared_ptr<GDALMDArray> &array,
@@ -107,6 +118,10 @@ class GDALDatasetFromArray final : public GDALPamDataset
         : m_poArray(array), m_iXDim(iXDim), m_iYDim(iYDim),
           m_aosOptions(aosOptions)
     {
+        const auto nDimCount = m_poArray->GetDimensionCount();
+        m_anOffset.resize(nDimCount);
+        m_anCount.resize(nDimCount, 1);
+        m_anStride.resize(nDimCount);
     }
 
     static std::unique_ptr<GDALDatasetFromArray>
@@ -807,6 +822,100 @@ CPLErr GDALRasterBandFromArray::IRasterIO(GDALRWFlag eRWFlag, int nXOff,
     return GDALRasterBand::IRasterIO(eRWFlag, nXOff, nYOff, nXSize, nYSize,
                                      pData, nBufXSize, nBufYSize, eBufType,
                                      nPixelSpaceBuf, nLineSpaceBuf, psExtraArg);
+}
+
+/************************************************************************/
+/*                        IsContiguousSequence()                        */
+/************************************************************************/
+
+static bool IsContiguousSequence(int nBandCount, const int *panBandMap)
+{
+    for (int i = 1; i < nBandCount; ++i)
+    {
+        if (panBandMap[i] != panBandMap[i - 1] + 1)
+            return false;
+    }
+    return true;
+}
+
+/************************************************************************/
+/*                             IRasterIO()                              */
+/************************************************************************/
+
+CPLErr GDALDatasetFromArray::IRasterIO(
+    GDALRWFlag eRWFlag, int nXOff, int nYOff, int nXSize, int nYSize,
+    void *pData, int nBufXSize, int nBufYSize, GDALDataType eBufType,
+    int nBandCount, BANDMAP_TYPE panBandMap, GSpacing nPixelSpaceBuf,
+    GSpacing nLineSpaceBuf, GSpacing nBandSpaceBuf,
+    GDALRasterIOExtraArg *psExtraArg)
+{
+    const int nBufferDTSize(GDALGetDataTypeSizeBytes(eBufType));
+    int nBlockXSize, nBlockYSize;
+    papoBands[0]->GetBlockSize(&nBlockXSize, &nBlockYSize);
+
+    // If reading/writing at full resolution and with proper stride, go
+    // directly to the array, but, for performance reasons,
+    // only if exactly on chunk boundaries, or with a pixel interleaved dataset,
+    // otherwise go through the block cache.
+    if (m_poArray->GetDimensionCount() == 3 && nXSize == nBufXSize &&
+        nYSize == nBufYSize && nBufferDTSize > 0 && nBandCount == nBands &&
+        (nPixelSpaceBuf % nBufferDTSize) == 0 &&
+        (nLineSpaceBuf % nBufferDTSize) == 0 &&
+        (m_bPixelInterleaved ||
+         ((nXOff % nBlockXSize) == 0 && (nYOff % nBlockYSize) == 0 &&
+          ((nXSize % nBlockXSize) == 0 || nXOff + nXSize == nRasterXSize) &&
+          ((nYSize % nBlockYSize) == 0 || nYOff + nYSize == nRasterYSize))) &&
+        IsContiguousSequence(nBandCount, panBandMap))
+    {
+        m_anOffset[m_iXDim] = static_cast<GUInt64>(nXOff);
+        m_anCount[m_iXDim] = static_cast<size_t>(nXSize);
+        m_anStride[m_iXDim] =
+            static_cast<GPtrDiff_t>(nPixelSpaceBuf / nBufferDTSize);
+
+        m_anOffset[m_iYDim] = static_cast<GUInt64>(nYOff);
+        m_anCount[m_iYDim] = static_cast<size_t>(nYSize);
+        m_anStride[m_iYDim] =
+            static_cast<GPtrDiff_t>(nLineSpaceBuf / nBufferDTSize);
+
+        size_t iBandDim = 0;
+        for (size_t i = 0; i < 3; ++i)
+        {
+            if (i != m_iXDim && i != m_iYDim)
+            {
+                iBandDim = i;
+                break;
+            }
+        }
+
+        m_anOffset[iBandDim] = panBandMap[0] - 1;
+        m_anCount[iBandDim] = nBandCount;
+        m_anStride[iBandDim] =
+            static_cast<GPtrDiff_t>(nBandSpaceBuf / nBufferDTSize);
+
+        if (eRWFlag == GF_Read)
+        {
+            return m_poArray->Read(m_anOffset.data(), m_anCount.data(), nullptr,
+                                   m_anStride.data(),
+                                   GDALExtendedDataType::Create(eBufType),
+                                   pData)
+                       ? CE_None
+                       : CE_Failure;
+        }
+        else
+        {
+            return m_poArray->Write(m_anOffset.data(), m_anCount.data(),
+                                    nullptr, m_anStride.data(),
+                                    GDALExtendedDataType::Create(eBufType),
+                                    pData)
+                       ? CE_None
+                       : CE_Failure;
+        }
+    }
+
+    return GDALDataset::IRasterIO(eRWFlag, nXOff, nYOff, nXSize, nYSize, pData,
+                                  nBufXSize, nBufYSize, eBufType, nBandCount,
+                                  panBandMap, nPixelSpaceBuf, nLineSpaceBuf,
+                                  nBandSpaceBuf, psExtraArg);
 }
 
 /************************************************************************/
@@ -1641,6 +1750,13 @@ lbl_next_depth:
     }
     if (iDim > 0)
         goto lbl_return_to_caller;
+
+    if (nDimCount == 3 && iXDim <= 1 && iYDim <= 1 &&
+        poDS->GetRasterCount() > 1)
+    {
+        poDS->m_bPixelInterleaved = true;
+        poDS->m_oMDD.SetMetadataItem("INTERLEAVE", "PIXEL", "IMAGE_STRUCTURE");
+    }
 
     if (!array->GetFilename().empty() &&
         CPLTestBool(CSLFetchNameValueDef(papszOptions, "LOAD_PAM", "YES")))
