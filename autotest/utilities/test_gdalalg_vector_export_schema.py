@@ -12,8 +12,9 @@
 ###############################################################################
 
 import json
-import pytest
+
 import gdaltest
+import pytest
 
 from osgeo import gdal, ogr
 
@@ -51,6 +52,7 @@ def test_gdalalg_vector_info_features_json():
     assert geom_fields[0]["type"] == "LineString"
     assert geom_fields[0]["nullable"] is True
     assert geom_fields[0]["coordinateSystem"]["projjson"]["id"]["code"] == 4326
+
 
 @pytest.mark.require_driver("GPKG")
 def test_export_field_with_alias_comment_domain_default(tmp_vsimem):
