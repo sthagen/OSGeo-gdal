@@ -1085,7 +1085,7 @@ CPLErr GDALRasterBand::RasterIOResampled(
     GSpacing nLSMem = nLineSpace;
     void *pDataMem = pData;
     GDALDataType eDTMem = eBufType;
-    if (eBufType != eDataType)
+    if (eBufType != eDataType && !GDAL_GET_OPERATE_IN_BUF_TYPE(*psExtraArg))
     {
         nPSMem = GDALGetDataTypeSizeBytes(eDataType);
         nLSMem = nPSMem * nBufXSize;
@@ -1497,7 +1497,7 @@ CPLErr GDALRasterBand::RasterIOResampled(
         CPLFree(pabyChunkNoDataMask);
     }
 
-    if (eBufType != eDataType)
+    if (pTempBuffer)
     {
         CPL_IGNORE_RET_VAL(poMEMDS->GetRasterBand(1)->RasterIO(
             GF_Read, nDestXOffVirtual, nDestYOffVirtual, nBufXSize, nBufYSize,
@@ -1576,7 +1576,7 @@ CPLErr GDALDataset::RasterIOResampled(
     GDALDataType eDTMem = eBufType;
     GDALRasterBand *poFirstSrcBand = GetRasterBand(panBandMap[0]);
     const GDALDataType eDataType = poFirstSrcBand->GetRasterDataType();
-    if (eBufType != eDataType)
+    if (eBufType != eDataType && !GDAL_GET_OPERATE_IN_BUF_TYPE(*psExtraArg))
     {
         nPSMem = GDALGetDataTypeSizeBytes(eDataType);
         nLSMem = nPSMem * nBufXSize;
@@ -2007,7 +2007,7 @@ CPLErr GDALDataset::RasterIOResampled(
         CPLFree(pabyChunkNoDataMask);
     }
 
-    if (eBufType != eDataType)
+    if (pTempBuffer)
     {
         CPL_IGNORE_RET_VAL(poMEMDS->RasterIO(
             GF_Read, nDestXOffVirtual, nDestYOffVirtual, nBufXSize, nBufYSize,
@@ -5970,7 +5970,7 @@ CPLErr CPL_STDCALL GDALRasterBandCopyWholeRaster(
 /************************************************************************/
 
 void GDALCopyRasterIOExtraArg(GDALRasterIOExtraArg *psDestArg,
-                              GDALRasterIOExtraArg *psSrcArg)
+                              const GDALRasterIOExtraArg *psSrcArg)
 {
     INIT_RASTERIO_EXTRA_ARG(*psDestArg);
     if (psSrcArg)
@@ -5990,6 +5990,10 @@ void GDALCopyRasterIOExtraArg(GDALRasterIOExtraArg *psDestArg,
         if (psSrcArg->nVersion >= 2)
         {
             psDestArg->bUseOnlyThisScale = psSrcArg->bUseOnlyThisScale;
+        }
+        if (psSrcArg->nVersion >= 3)
+        {
+            psDestArg->bOperateInBufType = psSrcArg->bOperateInBufType;
         }
     }
 }

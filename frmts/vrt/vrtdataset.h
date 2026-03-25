@@ -1706,7 +1706,7 @@ class CPL_DLL VRTComplexSource CPL_NON_FINAL : public VRTSimpleSource
                      GSpacing nLineSpace, GDALRasterIOExtraArg *psExtraArg,
                      GDALDataType eWrkDataType, WorkingState &oWorkingState);
 
-    template <class SourceDT, GDALDataType eSourceType>
+    template <class WorkingDT, GDALDataType eWorkDT>
     CPLErr RasterIOProcessNoData(GDALRasterBand *poSourceBand,
                                  GDALDataType eVRTBandDataType, int nReqXOff,
                                  int nReqYOff, int nReqXSize, int nReqYSize,

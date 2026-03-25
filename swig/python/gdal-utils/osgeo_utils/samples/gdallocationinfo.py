@@ -192,6 +192,7 @@ def gdallocationinfo(
                     buf_obj,
                     buf_type,
                     resample_alg,
+                    True,
                     None,
                     None,
                 )

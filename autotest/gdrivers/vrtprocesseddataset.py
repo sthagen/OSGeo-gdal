@@ -664,7 +664,7 @@ def test_vrtprocesseddataset_dehazing_different_resolution(tmp_vsimem):
         """)
     np.testing.assert_equal(
         ds.GetRasterBand(1).ReadAsArray(),
-        np.array([[1, 2, 6, 8, 15, 15], [1, 2, 6, 8, 15, 15]]),
+        np.array([[1, 1, 5, 7, 14, 15], [1, 1, 5, 7, 14, 15]]),
     )
     np.testing.assert_equal(
         ds.GetRasterBand(1).GetOverview(0).ReadAsArray(),
