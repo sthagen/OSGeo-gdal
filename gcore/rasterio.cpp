@@ -1602,7 +1602,7 @@ CPLErr GDALDataset::RasterIOResampled(
                                  nPSMem * nDestXOffVirtual -
                                  nLSMem * nDestYOffVirtual + nBandSpaceMEM * i;
         auto poMEMBand = GDALRasterBand::FromHandle(MEMCreateRasterBandEx(
-            poMEMDS.get(), 1, pBandData, eDTMem, nPSMem, nLSMem, false));
+            poMEMDS.get(), i + 1, pBandData, eDTMem, nPSMem, nLSMem, false));
         poMEMDS->SetBand(i + 1, poMEMBand);
 
         GDALRasterBand *poSrcBand = GetRasterBand(panBandMap[i]);
