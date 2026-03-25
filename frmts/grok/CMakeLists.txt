@@ -30,3 +30,7 @@ endif()
 gdal_standard_includes(gdal_JP2Grok)
 target_include_directories(gdal_JP2Grok PRIVATE ../opjlike)
 gdal_target_link_libraries(gdal_JP2Grok PRIVATE GROK::Grok)
+
+if (GDAL_USE_CURL)
+    target_compile_definitions(gdal_JP2Grok PRIVATE -DHAVE_CURL)
+endif()
