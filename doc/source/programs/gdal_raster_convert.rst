@@ -52,6 +52,7 @@ Examples
 
 .. example::
    :title: Converting file :file:`utm.tif` to a cloud-optimized GeoTIFF using JPEG compression
+   :id: gdal-raster-convert-cog
 
    .. code-block:: console
 

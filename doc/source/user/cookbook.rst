@@ -19,13 +19,21 @@ General How do I...
 -------------------
 
 ... get the GDAL version?
-   :example:`gdal-version`.
+   :example:`gdal-version`
 
 Raster How do I...
 ------------------
 
 ... resize a raster?
    :example:`gdal-raster-resize-cubic`.
+
+... create a Cloud Optimized GeoTIFF (COG)?
+
+- :example:`gdal-raster-convert-cog`
+- :example:`raster.cog-gdalwarp`
+
+... check if a GeoTIFF is a Cloud Optimized GeoTIFF (COG)?
+   :example:`raster.cog-validate`
 
 Vector How do I...
 ------------------
@@ -41,6 +49,9 @@ Vector How do I...
 
 ... list all layers in a GeoPackage with their geometry fields and types?
     :example:`gdal-vector-info-geom-name`
+
+... validate a GeoPackage?
+    :example:`vector.gpkg-validate`
 
 Raster and Vector How do I...
 -----------------------------

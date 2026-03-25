@@ -852,6 +852,16 @@ Examples
         -sql "SELECT poly.id, other.foo FROM poly JOIN other_schema.other USING (id)" \
         -oo PRELUDE_STATEMENTS="ATTACH DATABASE 'other.gpkg' AS other_schema"
 
+.. example::
+   :title: Validate a GeoPackage
+   :id: vector.gpkg-validate
+
+   This example requires the :ref:`gdal_python_utilities` and uses one of the :ref:`python_samples`.
+
+   .. code-block:: bash
+
+        $ python -m osgeo_utils.samples.validate_gpkg natural_earth_vector.gpkg
+
 Secure deletion
 ---------------
 

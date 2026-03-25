@@ -734,13 +734,31 @@ TileOffsets[i] + TileByteCounts[i].
 Examples
 --------
 
-::
+.. example::
+   :title: Create a COG with ``gdalwarp``
+   :id: raster.cog-gdalwarp
 
-    gdalwarp src1.tif src2.tif out.tif -of COG
+   .. code-block:: bash
 
-::
+        $ gdalwarp src1.tif src2.tif out.tif -of COG
 
-    gdal_translate world.tif world_webmerc_cog.tif -of COG -co TILING_SCHEME=GoogleMapsCompatible -co COMPRESS=JPEG
+.. example::
+   :title: Create a Web Mercator COG with Google Maps–Compatible Tiling and JPEG Compression
+
+   .. code-block:: bash
+
+        $ gdal_translate world.tif world_webmerc_cog.tif -of COG -co TILING_SCHEME=GoogleMapsCompatible -co COMPRESS=JPEG
+
+.. example::
+   :title: Validate a Remote Sentinel-2 COG
+   :id: raster.cog-validate
+
+   This example requires the :ref:`gdal_python_utilities` and uses one of the :ref:`python_samples`.
+
+   .. code-block:: bash
+
+        $ python -m osgeo_utils.samples.validate_cloud_optimized_geotiff --full-check=yes \
+            https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/36/Q/WD/2020/7/S2A_36QWD_20200701_0_L2A/TCI.tif
 
 See Also
 --------
