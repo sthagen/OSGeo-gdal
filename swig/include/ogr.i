@@ -512,6 +512,9 @@ typedef void retGetPoints;
 %constant char *ODsCAddFieldDomain     = "AddFieldDomain";
 %constant char *ODsCDeleteFieldDomain  = "DeleteFieldDomain";
 %constant char *ODsCUpdateFieldDomain  = "UpdateFieldDomain";
+%constant char *ODsCAddRelationship    = "AddRelationship";
+%constant char *ODsCDeleteRelationship = "DeleteRelationship";
+%constant char *ODsCUpdateRelationship = "UpdateRelationship";
 
 %constant char *ODrCCreateDataSource   = "CreateDataSource";
 %constant char *ODrCDeleteDataSource   = "DeleteDataSource";
@@ -568,7 +571,12 @@ typedef int CPLErr;
 #define ODsCRandomLayerRead    "RandomLayerRead"
 /* Note the unfortunate trailing space at the end of the string */
 #define ODsCRandomLayerWrite   "RandomLayerWrite "
-
+#define ODsCAddFieldDomain     "AddFieldDomain";
+#define ODsCDeleteFieldDomain  "DeleteFieldDomain"
+#define ODsCUpdateFieldDomain  "UpdateFieldDomain"
+#define ODsCAddRelationship    "AddRelationship"
+#define ODsCDeleteRelationship "DeleteRelationship"
+#define ODsCUpdateRelationship "UpdateRelationship"
 #define ODrCCreateDataSource   "CreateDataSource"
 #define ODrCDeleteDataSource   "DeleteDataSource"
 

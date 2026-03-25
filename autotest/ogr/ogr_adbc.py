@@ -42,6 +42,11 @@ def _has_sqlite_driver():
 
 
 def _has_duckdb_driver():
+
+    if gdaltest.is_travis_branch("sanitize"):
+        print("heap-use-after-free in duckdb")
+        return False
+
     import ctypes
 
     for libname in ["libduckdb.so", "libduckdb.dylib", "duckdb.dll"]:

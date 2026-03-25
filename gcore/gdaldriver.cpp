@@ -1011,6 +1011,8 @@ CPLErr GDALDriver::QuietDeleteForCreateCopy(const char *pszFilename,
     // This is somewhat messy. Ideally there should be a way for the
     // driver to overload the default behavior
     if (!EQUAL(GetDescription(), "MEM") && !EQUAL(GetDescription(), "Memory") &&
+        // VRT with empty name is a un-materialized dataset
+        !(EQUAL(GetDescription(), "VRT") && pszFilename[0] == 0) &&
         // Also exclude database formats for which there's no file list
         // and whose opening might be slow (GeoRaster in particular)
         !EQUAL(GetDescription(), "GeoRaster") &&

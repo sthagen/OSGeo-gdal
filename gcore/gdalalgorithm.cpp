@@ -2584,10 +2584,16 @@ bool GDALAlgorithm::ProcessDatasetArg(GDALAlgorithmArg *arg,
     const auto updateArg = algForOutput->GetArg(GDAL_ARG_NAME_UPDATE);
     const bool hasUpdateArg = updateArg && updateArg->GetType() == GAAT_BOOLEAN;
     const bool update = hasUpdateArg && updateArg->Get<bool>();
+
+    const auto appendArg = algForOutput->GetArg(GDAL_ARG_NAME_APPEND);
+    const bool hasAppendArg = appendArg && appendArg->GetType() == GAAT_BOOLEAN;
+    const bool append = hasAppendArg && appendArg->Get<bool>();
+
     const auto overwriteArg = algForOutput->GetArg(GDAL_ARG_NAME_OVERWRITE);
     const bool overwrite =
         (arg->IsOutput() && overwriteArg &&
          overwriteArg->GetType() == GAAT_BOOLEAN && overwriteArg->Get<bool>());
+
     auto outputArg = algForOutput->GetArg(GDAL_ARG_NAME_OUTPUT);
     auto &val = [arg]() -> GDALArgDatasetValue &
     {
@@ -2646,7 +2652,11 @@ bool GDALAlgorithm::ProcessDatasetArg(GDALAlgorithmArg *arg,
         if (!arg->IsOutput() || arg->GetDatasetInputFlags() == GADV_NAME)
             flags |= GDAL_OF_VERBOSE_ERROR;
         if ((arg == outputArg || !outputArg) && update)
-            flags |= GDAL_OF_UPDATE | GDAL_OF_VERBOSE_ERROR;
+        {
+            flags |= GDAL_OF_UPDATE;
+            if (!append)
+                flags |= GDAL_OF_VERBOSE_ERROR;
+        }
 
         const auto readOnlyArg = GetArg(GDAL_ARG_NAME_READ_ONLY);
         const bool readOnly =
@@ -2792,7 +2802,7 @@ bool GDALAlgorithm::ProcessDatasetArg(GDALAlgorithmArg *arg,
             val.Set(poDS);
             poDS->ReleaseRef();
         }
-        else
+        else if (!append)
         {
             ret = false;
         }
@@ -2801,10 +2811,6 @@ bool GDALAlgorithm::ProcessDatasetArg(GDALAlgorithmArg *arg,
     // Deal with overwriting the output dataset
     if (ret && arg == outputArg && val.GetDatasetRef() == nullptr)
     {
-        const auto appendArg = algForOutput->GetArg(GDAL_ARG_NAME_APPEND);
-        const bool hasAppendArg =
-            appendArg && appendArg->GetType() == GAAT_BOOLEAN;
-        const bool append = (hasAppendArg && appendArg->Get<bool>());
         if (!append)
         {
             // If outputting to MEM, do not try to erase a real file of the same name!

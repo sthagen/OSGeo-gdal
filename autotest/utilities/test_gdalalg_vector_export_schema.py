@@ -14,8 +14,9 @@
 import json
 
 import gdaltest
+import pytest
 
-from osgeo import gdal
+from osgeo import gdal, ogr
 
 
 def get_alg():
@@ -51,3 +52,36 @@ def test_gdalalg_vector_info_features_json():
     assert geom_fields[0]["type"] == "LineString"
     assert geom_fields[0]["nullable"] is True
     assert geom_fields[0]["coordinateSystem"]["projjson"]["id"]["code"] == 4326
+
+
+@pytest.mark.require_driver("GPKG")
+def test_export_field_with_alias_comment_domain_default(tmp_vsimem):
+
+    path = str(tmp_vsimem / "test.gpkg")
+    ds = ogr.GetDriverByName("GPKG").CreateDataSource(path)
+    layer = ds.CreateLayer("test_layer")
+    field_defn = ogr.FieldDefn("field1", ogr.OFTReal)
+    field_defn.SetNullable(True)
+    field_defn.SetUnique(True)
+    field_defn.SetComment("This is a comment")
+    field_defn.SetAlternativeName("alias1")
+    field_defn.SetDefault("1234")
+    field_defn.SetDomainName("domain1")
+    layer.CreateField(field_defn)
+    ds = None
+
+    # Export the schema using the algorithm
+    info = get_alg()
+    assert info.ParseRunAndFinalize([path])
+    output_string = info["output-string"]
+    j = json.loads(output_string)
+
+    # Validate the exported schema
+    assert j["layers"][0]["fields"][0]["name"] == "field1"
+    assert j["layers"][0]["fields"][0]["type"] == "Real"
+    assert j["layers"][0]["fields"][0]["nullable"] is True
+    assert j["layers"][0]["fields"][0]["uniqueConstraint"] is True
+    assert j["layers"][0]["fields"][0]["comment"] == "This is a comment"
+    assert j["layers"][0]["fields"][0]["alias"] == "alias1"
+    assert j["layers"][0]["fields"][0]["defaultValue"] == "1234"
+    assert j["layers"][0]["fields"][0]["domainName"] == "domain1"

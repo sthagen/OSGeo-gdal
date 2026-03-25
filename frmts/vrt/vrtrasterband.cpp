@@ -1337,7 +1337,9 @@ int VRTRasterBand::GetOverviewCount()
         return static_cast<int>(m_aoOverviewInfos.size());
 
     // If not found, external .ovr overviews
-    const int nOverviewCount = GDALRasterBand::GetOverviewCount();
+    const int nOverviewCount = poVRTDS->GetDescription()[0] == '\0'
+                                   ? 0
+                                   : GDALRasterBand::GetOverviewCount();
     if (nOverviewCount)
         return nOverviewCount;
 

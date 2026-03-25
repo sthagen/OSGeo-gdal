@@ -83,6 +83,10 @@
 
 #include "gdal_thread_pool.h"
 
+#ifdef HAVE_CURL
+#include "cpl_aws.h"
+#endif
+
 /**
  * @brief Bounded string copy that always null-terminates.
  *
@@ -122,11 +126,13 @@ static bool GrokCanRead(const char *filename)
     if (filename == nullptr)
         return false;
 
-    // TODO: re-enable once GDAL can pass resolved AWS credentials to Grok
-    // via grk_stream_params (username/password/bearer_token/region).
-    // Cloud storage: Grok has native support for S3
-    // if (strncmp(filename, "/vsis3/", 7) == 0)
-    //     return true;
+#if defined(HAVE_CURL) && defined(GRK_HAS_LIBCURL)
+    // Cloud storage: Grok handles S3 fetching natively via libcurl.
+    // GDAL resolves AWS credentials and passes them to Grok via
+    // grk_stream_params (username/password/bearer_token/region).
+    if (strncmp(filename, "/vsis3/", 7) == 0)
+        return true;
+#endif
 
     // Any other GDAL virtual filesystem must go through VSILFILE callbacks
     if (strncmp(filename, "/vsi", 4) == 0)
@@ -527,11 +533,60 @@ struct GRKCodecWrapper
         streamParams.stream_len = nCodeStreamLength;
         if (GrokCanRead(pszFilename))
         {
+            CPLDebug("GROK", "Native I/O for: %s", pszFilename);
             safe_strcpy(streamParams.file, pszFilename);
             streamParams.initial_offset = psJP2File->nBaseOffset;
+#if defined(HAVE_CURL) && defined(GRK_HAS_LIBCURL)
+            // For /vsis3/ paths, resolve AWS credentials through GDAL's
+            // full authentication chain and pass them to Grok so it can
+            // handle S3 fetching natively via libcurl.
+            if (strncmp(pszFilename, "/vsis3/", 7) == 0)
+            {
+                auto poHelper = std::unique_ptr<VSIS3HandleHelper>(
+                    VSIS3HandleHelper::BuildFromURI(pszFilename + 7, "/vsis3/",
+                                                    true));
+                if (poHelper)
+                {
+                    const auto &osAccessKeyId = poHelper->GetAccessKeyId();
+                    const auto &osSecretAccessKey =
+                        poHelper->GetSecretAccessKey();
+                    const auto &osSessionToken = poHelper->GetSessionToken();
+                    const auto &osRegion = poHelper->GetRegion();
+                    const auto &osEndpoint = poHelper->GetEndpoint();
+
+                    if (!osAccessKeyId.empty())
+                        safe_strcpy(streamParams.username, osAccessKeyId);
+                    if (!osSecretAccessKey.empty())
+                        safe_strcpy(streamParams.password, osSecretAccessKey);
+                    if (!osSessionToken.empty())
+                        safe_strcpy(streamParams.bearer_token, osSessionToken);
+                    if (!osRegion.empty())
+                        safe_strcpy(streamParams.region, osRegion);
+                    if (!osEndpoint.empty())
+                        safe_strcpy(streamParams.s3_endpoint, osEndpoint);
+                    streamParams.s3_use_https =
+                        poHelper->GetUseHTTPS() ? 1 : -1;
+                    streamParams.s3_use_virtual_hosting =
+                        poHelper->GetVirtualHosting() ? 1 : -1;
+                    streamParams.s3_no_sign_request =
+                        poHelper->GetCredentialsSource() ==
+                        AWSCredentialsSource::NO_SIGN_REQUEST;
+                    streamParams.s3_allow_insecure = CPLTestBool(
+                        CPLGetConfigOption("GDAL_HTTP_UNSAFESSL", "NO"));
+                }
+                else
+                {
+                    CPLError(CE_Warning, CPLE_AppDefined,
+                             "Could not resolve AWS credentials "
+                             "for %s",
+                             pszFilename);
+                }
+            }
+#endif
         }
         else
         {
+            CPLDebug("GROK", "VSILFILE callback I/O for: %s", pszFilename);
             streamParams.read_fn = JP2Dataset_Read;
             streamParams.seek_fn = JP2Dataset_Seek;
             streamParams.user_data = psJP2File;
@@ -1853,6 +1908,10 @@ struct JP2GRKDatasetBase : public JP2DatasetBase
         if (hasCachedPostPreload_)
         {
             PostPreload cached = cachedPostPreload_;
+            // rowCopyDone_ was set during the initial row-by-row wait
+            // loop.  Subsequent calls use the cached path (no row-by-row
+            // loop), so the caller must call CopyTiles itself.
+            cached.rowCopyDone_ = false;
             cached.x0 = swath_x0;
             cached.y0 = swath_y0;
             cached.x1 = swath_x0 + swath_width;
@@ -1880,8 +1939,6 @@ struct JP2GRKDatasetBase : public JP2DatasetBase
             sw.y0 = cached.y0;
             sw.x1 = cached.x1;
             sw.y1 = cached.y1;
-            // fprintf(stderr, "[GDAL] cached wait: y0=%d y1=%d tileY0=%d tileY1=%d\n",
-            //         sw.y0, sw.y1, cached.tile_y0, cached.tile_y1);
             grk_decompress_wait(m_codec->pCodec, &sw);
 
             return cached;

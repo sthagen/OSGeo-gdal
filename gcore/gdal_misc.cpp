@@ -1370,8 +1370,47 @@ const char *GDALGetColorInterpretationName(GDALColorInterp eInterp)
 
         case GCI_SAR_Reserved_2:
             return "SAR_Reserved_2";
+
+            // If adding any (non-reserved) value, also update GDALGetColorInterpretationList()
     }
     return "Undefined";
+}
+
+/************************************************************************/
+/*                  GDALGetColorInterpretationByName()                  */
+/************************************************************************/
+
+/**
+ * \brief Get the list of valid color interpretations.
+ *
+ * Reserved values of the GDALColorInterp enumeration are not listed.
+ *
+ * @param[out] pnCount Pointer to an integer that will be set to the number of
+ *                     values of the returned array. It must not be null.
+ *
+ * @return array of *pnCount values
+ *
+ */
+const GDALColorInterp *GDALGetColorInterpretationList(int *pnCount)
+{
+    VALIDATE_POINTER1(pnCount, "GDALGetColorInterpretationList", nullptr);
+
+    static constexpr GDALColorInterp list[] = {
+        GCI_Undefined,     GCI_GrayIndex,    GCI_PaletteIndex,
+        GCI_RedBand,       GCI_GreenBand,    GCI_BlueBand,
+        GCI_AlphaBand,     GCI_HueBand,      GCI_SaturationBand,
+        GCI_LightnessBand, GCI_CyanBand,     GCI_MagentaBand,
+        GCI_YellowBand,    GCI_BlackBand,    GCI_YCbCr_YBand,
+        GCI_YCbCr_CbBand,  GCI_YCbCr_CrBand, GCI_PanBand,
+        GCI_CoastalBand,   GCI_RedEdgeBand,  GCI_NIRBand,
+        GCI_SWIRBand,      GCI_MWIRBand,     GCI_LWIRBand,
+        GCI_TIRBand,       GCI_OtherIRBand,  GCI_SAR_Ka_Band,
+        GCI_SAR_K_Band,    GCI_SAR_Ku_Band,  GCI_SAR_X_Band,
+        GCI_SAR_C_Band,    GCI_SAR_S_Band,   GCI_SAR_L_Band,
+        GCI_SAR_P_Band,
+    };
+    *pnCount = static_cast<int>(CPL_ARRAYSIZE(list));
+    return list;
 }
 
 /************************************************************************/
