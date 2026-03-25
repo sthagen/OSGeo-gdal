@@ -103,7 +103,7 @@
             "string"
           ]
         },
-        "aliases": {
+        "alias": {
           "description": "Alias for the field",
           "type": "string"
         },
