@@ -32,6 +32,9 @@ CURVEPOLYGON, MULTICURVE and MULTISURFACE
 GeoPackage raster/tiles are supported. See the
 :ref:`GeoPackage raster <raster.gpkg>` documentation page.
 
+Validation whether a GeoPackage file conforms to the GeoPackage specification
+can be done with :ref:`gdal_driver_gpkg_validate`.
+
 Driver capabilities
 -------------------
 
@@ -797,8 +800,8 @@ Examples
 --------
 
 .. example::
-   :title: Simple translation of a single shapefile into GeoPackage 
-   
+   :title: Simple translation of a single shapefile into GeoPackage
+
    The table
    'abc' will be created with the features from abc.shp and attributes
    from abc.dbf. The file ``filename.gpkg`` must **not** already exist,
@@ -809,7 +812,7 @@ Examples
 
       ogr2ogr -f GPKG filename.gpkg abc.shp
 
-.. example:: 
+.. example::
    :title: Updating an existing GeoPackage file
 
    Updates an existing file – e.g. a GeoPackage template –
@@ -821,7 +824,7 @@ Examples
 
       ogr2ogr -append output.gpkg input.gpkg
 
-.. example:: 
+.. example::
    :title: Converting a directory of shapefiles into a GeoPackage
 
    Each file
@@ -832,7 +835,7 @@ Examples
 
       ogr2ogr -f GPKG filename.gpkg ./path/to/dir
 
-.. example:: 
+.. example::
    :title: Converting  a PostGIS database into a GeoPackage
 
    Each table in
@@ -843,7 +846,7 @@ Examples
 
       ogr2ogr -f GPKG filename.gpkg PG:'dbname=mydatabase host=localhost'
 
-.. example:: 
+.. example::
    :title: Performing a join between two GeoPackage databases
 
     .. code-block:: bash
