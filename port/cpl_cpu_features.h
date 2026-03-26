@@ -83,7 +83,24 @@ bool CPLHaveRuntimeAVX();
 #endif
 
 #ifdef HAVE_AVX2_AT_COMPILE_TIME
+#if __AVX2__
+#define HAVE_INLINE_AVX2
+
+static bool inline CPLHaveRuntimeAVX2()
+{
+    return true;
+}
+#elif defined(__GNUC__)
+extern bool bCPLHasAVX2;
+
+static bool inline CPLHaveRuntimeAVX2()
+{
+    return bCPLHasAVX2;
+}
+#else
 bool CPLHaveRuntimeAVX2();
+#endif
+
 #endif
 
 //! @endcond
