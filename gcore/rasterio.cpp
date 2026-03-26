@@ -3008,8 +3008,6 @@ static void GDALCopyWordsInt32ToUInt8_AVX2(const int32_t *CPL_RESTRICT pSrc,
                                            uint8_t *CPL_RESTRICT pDst,
                                            GPtrDiff_t nWordCount)
 {
-    const __m256i ymm_zero = _mm256_setzero_si256();
-    const __m256i ymm_255 = _mm256_set1_epi32(255);
     const __m256i permuteIdx = _mm256_setr_epi32(0, 4, 1, 5, 2, 6, 3, 7);
     GPtrDiff_t n = 0;
     for (; n < nWordCount - 31; n += 32)
@@ -3023,15 +3021,7 @@ static void GDALCopyWordsInt32ToUInt8_AVX2(const int32_t *CPL_RESTRICT pSrc,
         __m256i v3 = _mm256_loadu_si256(
             reinterpret_cast<const __m256i *>(pSrc + n + 24));
         // Clamp to [0, 255]
-        v0 = _mm256_max_epi32(v0, ymm_zero);
-        v1 = _mm256_max_epi32(v1, ymm_zero);
-        v2 = _mm256_max_epi32(v2, ymm_zero);
-        v3 = _mm256_max_epi32(v3, ymm_zero);
-        v0 = _mm256_min_epi32(v0, ymm_255);
-        v1 = _mm256_min_epi32(v1, ymm_255);
-        v2 = _mm256_min_epi32(v2, ymm_255);
-        v3 = _mm256_min_epi32(v3, ymm_255);
-        // Pack int32→int16→uint8, then fix cross-lane ordering
+        // Pack int32 -> int16 -> uint8, then fix cross-lane ordering
         __m256i ab16 = _mm256_packs_epi32(v0, v1);
         __m256i cd16 = _mm256_packs_epi32(v2, v3);
         __m256i bytes = _mm256_packus_epi16(ab16, cd16);
@@ -3045,9 +3035,7 @@ static void GDALCopyWordsInt32ToUInt8_AVX2(const int32_t *CPL_RESTRICT pSrc,
                                    : static_cast<uint8_t>(pSrc[n]);
     }
 }
-#endif  // HAVE_AVX2_DISPATCH
 
-#if defined(HAVE_AVX2_DISPATCH)
 #if !defined(_MSC_VER)
 __attribute__((target("avx2")))
 #endif
@@ -3055,7 +3043,6 @@ static void GDALCopyWordsInt32ToUInt16_AVX2(const int32_t *CPL_RESTRICT pSrc,
                                             uint16_t *CPL_RESTRICT pDst,
                                             GPtrDiff_t nWordCount)
 {
-    const __m256i ymm_zero = _mm256_setzero_si256();
     // _mm256_packus_epi32(v0, v1) produces per-lane interleaved result:
     //   [v0_lo4, v1_lo4, v0_hi4, v1_hi4] (in uint16 pairs per 32-bit lane)
     // Permute to deinterleave: all v0 values first, then all v1 values
@@ -3068,8 +3055,6 @@ static void GDALCopyWordsInt32ToUInt16_AVX2(const int32_t *CPL_RESTRICT pSrc,
         __m256i v1 =
             _mm256_loadu_si256(reinterpret_cast<const __m256i *>(pSrc + n + 8));
         // Clamp to [0, 65535]: _mm256_packus_epi32 saturates uint
-        v0 = _mm256_max_epi32(v0, ymm_zero);
-        v1 = _mm256_max_epi32(v1, ymm_zero);
         __m256i packed = _mm256_packus_epi32(v0, v1);
         // Fix cross-lane interleave from packus
         packed = _mm256_permutevar8x32_epi32(packed, permuteIdx);
@@ -3134,7 +3119,7 @@ CPL_NOINLINE void GDALCopyWordsT(const int32_t *const CPL_RESTRICT pSrcData,
                               _mm_and_si128(gt2, xmm_255));
             v3 = _mm_or_si128(_mm_andnot_si128(gt3, v3),
                               _mm_and_si128(gt3, xmm_255));
-            // Values in [0, 255]: pack int32→int16→uint8
+            // Values in [0, 255]: pack int32->int16->uint8
             __m128i lo16 = _mm_packs_epi32(v0, v1);
             __m128i hi16 = _mm_packs_epi32(v2, v3);
             __m128i bytes = _mm_packus_epi16(lo16, hi16);
@@ -3184,8 +3169,6 @@ CPL_NOINLINE void GDALCopyWordsT(const int32_t *const CPL_RESTRICT pSrcData,
                 reinterpret_cast<const __m128i *>(pSrcData + n));
             __m128i v1 = _mm_loadu_si128(
                 reinterpret_cast<const __m128i *>(pSrcData + n + 4));
-            v0 = _mm_max_epi32(v0, _mm_setzero_si128());
-            v1 = _mm_max_epi32(v1, _mm_setzero_si128());
             __m128i packed = _mm_packus_epi32(v0, v1);
             _mm_storeu_si128(reinterpret_cast<__m128i *>(pDstData + n), packed);
         }
@@ -3210,7 +3193,7 @@ CPL_NOINLINE void GDALCopyWordsT(const int32_t *const CPL_RESTRICT pSrcData,
                               _mm_and_si128(gt0, xmm_65535));
             v1 = _mm_or_si128(_mm_andnot_si128(gt1, v1),
                               _mm_and_si128(gt1, xmm_65535));
-            // Shift [0, 65535] → [-32768, 32767] for _mm_packs_epi32
+            // Shift [0, 65535] -> [-32768, 32767] for _mm_packs_epi32
             v0 = _mm_sub_epi32(v0, xmm_bias32);
             v1 = _mm_sub_epi32(v1, xmm_bias32);
             __m128i packed = _mm_packs_epi32(v0, v1);
