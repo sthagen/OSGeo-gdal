@@ -1229,24 +1229,16 @@ def test_vrt_read_30():
 # Check that we take into account intermediate data type demotion
 
 
-@pytest.mark.require_driver("AAIGRID")
 def test_vrt_read_31(tmp_vsimem):
 
-    gdal.FileFromMemBuffer(
-        tmp_vsimem / "in.asc",
-        """ncols        2
-nrows        2
-xllcorner    0
-yllcorner    0
-dx           1
-dy           1
--255         1
-254          256""",
+    src_ds = gdal.GetDriverByName("MEM").Create("", 2, 2, 2, gdal.GDT_Int16)
+    src_ds.GetRasterBand(1).WriteRaster(
+        0, 0, 2, 2, struct.pack("h" * 4, -255, 1, 254, 256)
     )
-
-    ds = gdal.Translate(
-        "", tmp_vsimem / "in.asc", outputType=gdal.GDT_UInt8, format="VRT"
+    src_ds.GetRasterBand(2).WriteRaster(
+        0, 0, 2, 2, struct.pack("h" * 4, -255, 1, 254, 256)
     )
+    ds = gdal.Translate("", src_ds, outputType=gdal.GDT_UInt8, format="VRT")
 
     data = ds.GetRasterBand(1).ReadRaster(
         0, 0, 2, 2, buf_type=gdal.GDT_Float32, operate_in_buf_type=False
@@ -1263,14 +1255,14 @@ dy           1
     data = ds.ReadRaster(
         0, 0, 2, 2, buf_type=gdal.GDT_Float32, operate_in_buf_type=False
     )
-    got = struct.unpack("f" * 2 * 2, data)
-    assert got == (0, 1, 254, 255)
+    got = struct.unpack("f" * 2 * 2 * 2, data)
+    assert got == (0, 1, 254, 255, 0, 1, 254, 255)
 
     data = ds.ReadRaster(
         0, 0, 2, 2, buf_type=gdal.GDT_Float32, operate_in_buf_type=True
     )
-    got = struct.unpack("f" * 2 * 2, data)
-    assert got == (0, 1, 254, 255)
+    got = struct.unpack("f" * 2 * 2 * 2, data)
+    assert got == (0, 1, 254, 255, 0, 1, 254, 255)
 
     ds = None
 

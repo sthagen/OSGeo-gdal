@@ -157,6 +157,21 @@ inline bool GDALClampDoubleValue(double &tValue, const T2 tMin, const T3 tMax)
 }
 
 /************************************************************************/
+/*                        GDALClampValueToType()                        */
+/************************************************************************/
+/**
+ * Clamp a value of type T to the limits of type TClamped.
+ *
+ * @param tValue the value
+ */
+template <class T, class TClamped> inline T GDALClampValueToType(T tValue)
+{
+    T tMaxValue, tMinValue;
+    GDALGetDataLimits<T, TClamped>(tMaxValue, tMinValue);
+    return std::clamp(tValue, tMinValue, tMaxValue);
+}
+
+/************************************************************************/
 /*                         GDALIsValueInRange()                         */
 /************************************************************************/
 /**

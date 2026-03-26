@@ -1380,66 +1380,6 @@ int VRTSimpleSource::NeedMaxValAdjustment() const
 }
 
 /************************************************************************/
-/*                         GetDataTypeMinMax()                          */
-/************************************************************************/
-
-static std::pair<double, double> GetDataTypeMinMax(GDALDataType eDT)
-{
-    double dfMinVal = -std::numeric_limits<double>::infinity();
-    double dfMaxVal = std::numeric_limits<double>::infinity();
-    switch (eDT)
-    {
-        case GDT_UInt8:
-            dfMinVal = std::numeric_limits<uint8_t>::lowest();
-            dfMaxVal = std::numeric_limits<uint8_t>::max();
-            break;
-        case GDT_Int8:
-            dfMinVal = std::numeric_limits<int8_t>::lowest();
-            dfMaxVal = std::numeric_limits<int8_t>::max();
-            break;
-        case GDT_UInt16:
-            dfMinVal = std::numeric_limits<uint16_t>::lowest();
-            dfMaxVal = std::numeric_limits<uint16_t>::max();
-            break;
-        case GDT_Int16:
-            dfMinVal = std::numeric_limits<int16_t>::lowest();
-            dfMaxVal = std::numeric_limits<int16_t>::max();
-            break;
-        case GDT_UInt32:
-            dfMinVal = std::numeric_limits<uint32_t>::lowest();
-            dfMaxVal = std::numeric_limits<uint32_t>::max();
-            break;
-        case GDT_Int32:
-            dfMinVal = std::numeric_limits<int32_t>::lowest();
-            dfMaxVal = std::numeric_limits<int32_t>::max();
-            break;
-        case GDT_UInt64:
-            dfMinVal =
-                static_cast<double>(std::numeric_limits<uint64_t>::lowest());
-            dfMaxVal =
-                static_cast<double>(std::numeric_limits<uint64_t>::max());
-            break;
-        case GDT_Int64:
-            dfMinVal =
-                static_cast<double>(std::numeric_limits<int64_t>::lowest());
-            dfMaxVal = static_cast<double>(std::numeric_limits<int64_t>::max());
-            break;
-        case GDT_Float16:
-        case GDT_Float32:
-        case GDT_Float64:
-        case GDT_CFloat16:
-        case GDT_CFloat32:
-        case GDT_CFloat64:
-        case GDT_CInt16:
-        case GDT_CInt32:
-        case GDT_Unknown:
-        case GDT_TypeCount:
-            break;
-    }
-    return {dfMinVal, dfMaxVal};
-}
-
-/************************************************************************/
 /*                             CopyWordIn()                             */
 /************************************************************************/
 
@@ -1548,6 +1488,143 @@ static void CopyWordOut(const SrcType *pSrcVal, GDALDataType eSrcType,
         case GDT_Unknown:
         case GDT_TypeCount:
             CPLAssert(false);
+    }
+}
+
+/************************************************************************/
+/*                        GDALClampValueToType()                        */
+/************************************************************************/
+
+template <class T>
+inline void GDALClampValueToType(T *pValue, GDALDataType eClampingType)
+{
+    switch (eClampingType)
+    {
+        case GDT_UInt8:
+            *pValue = GDALClampValueToType<T, uint8_t>(*pValue);
+            break;
+        case GDT_Int8:
+            *pValue = GDALClampValueToType<T, int8_t>(*pValue);
+            break;
+        case GDT_UInt16:
+            *pValue = GDALClampValueToType<T, uint16_t>(*pValue);
+            break;
+        case GDT_Int16:
+        case GDT_CInt16:
+            *pValue = GDALClampValueToType<T, int16_t>(*pValue);
+            break;
+        case GDT_UInt32:
+            *pValue = GDALClampValueToType<T, uint32_t>(*pValue);
+            break;
+        case GDT_Int32:
+        case GDT_CInt32:
+            *pValue = GDALClampValueToType<T, int32_t>(*pValue);
+            break;
+        case GDT_UInt64:
+            *pValue = GDALClampValueToType<T, uint64_t>(*pValue);
+            break;
+        case GDT_Int64:
+            *pValue = GDALClampValueToType<T, int64_t>(*pValue);
+            break;
+        case GDT_Float16:
+        case GDT_CFloat16:
+            *pValue = GDALClampValueToType<T, GFloat16>(*pValue);
+            break;
+        case GDT_Float32:
+        case GDT_CFloat32:
+            *pValue = GDALClampValueToType<T, float>(*pValue);
+            break;
+        case GDT_Float64:
+        case GDT_CFloat64:
+            *pValue = GDALClampValueToType<T, double>(*pValue);
+            break;
+        case GDT_Unknown:
+        case GDT_TypeCount:
+            CPLAssert(false);
+            break;
+    }
+}
+
+/************************************************************************/
+/*                        GDALClampValueToType()                        */
+/************************************************************************/
+
+inline void GDALClampValueToType(void *pValue, GDALDataType eValueType,
+                                 GDALDataType eClampingType)
+{
+    switch (eValueType)
+    {
+        case GDT_UInt8:
+            GDALClampValueToType(static_cast<uint8_t *>(pValue), eClampingType);
+            break;
+        case GDT_Int8:
+            GDALClampValueToType(static_cast<int8_t *>(pValue), eClampingType);
+            break;
+        case GDT_UInt16:
+            GDALClampValueToType(static_cast<uint16_t *>(pValue),
+                                 eClampingType);
+            break;
+        case GDT_Int16:
+            GDALClampValueToType(static_cast<int16_t *>(pValue), eClampingType);
+            break;
+        case GDT_UInt32:
+            GDALClampValueToType(static_cast<uint32_t *>(pValue),
+                                 eClampingType);
+            break;
+        case GDT_Int32:
+            GDALClampValueToType(static_cast<int32_t *>(pValue), eClampingType);
+            break;
+        case GDT_UInt64:
+            GDALClampValueToType(static_cast<uint64_t *>(pValue),
+                                 eClampingType);
+            break;
+        case GDT_Int64:
+            GDALClampValueToType(static_cast<int64_t *>(pValue), eClampingType);
+            break;
+        case GDT_Float16:
+            GDALClampValueToType(static_cast<GFloat16 *>(pValue),
+                                 eClampingType);
+            break;
+        case GDT_Float32:
+            GDALClampValueToType(static_cast<float *>(pValue), eClampingType);
+            break;
+        case GDT_Float64:
+            GDALClampValueToType(static_cast<double *>(pValue), eClampingType);
+            break;
+        case GDT_CInt16:
+            GDALClampValueToType(static_cast<int16_t *>(pValue) + 0,
+                                 eClampingType);
+            GDALClampValueToType(static_cast<int16_t *>(pValue) + 1,
+                                 eClampingType);
+            break;
+        case GDT_CInt32:
+            GDALClampValueToType(static_cast<int32_t *>(pValue) + 0,
+                                 eClampingType);
+            GDALClampValueToType(static_cast<int32_t *>(pValue) + 1,
+                                 eClampingType);
+            break;
+        case GDT_CFloat16:
+            GDALClampValueToType(static_cast<GFloat16 *>(pValue) + 0,
+                                 eClampingType);
+            GDALClampValueToType(static_cast<GFloat16 *>(pValue) + 1,
+                                 eClampingType);
+            break;
+        case GDT_CFloat32:
+            GDALClampValueToType(static_cast<float *>(pValue) + 0,
+                                 eClampingType);
+            GDALClampValueToType(static_cast<float *>(pValue) + 1,
+                                 eClampingType);
+            break;
+        case GDT_CFloat64:
+            GDALClampValueToType(static_cast<double *>(pValue) + 0,
+                                 eClampingType);
+            GDALClampValueToType(static_cast<double *>(pValue) + 1,
+                                 eClampingType);
+            break;
+        case GDT_Unknown:
+        case GDT_TypeCount:
+            CPLAssert(false);
+            break;
     }
 }
 
@@ -1692,21 +1769,12 @@ CPLErr VRTSimpleSource::RasterIO(GDALDataType eVRTBandDataType, int nXOff,
                                  eBufType, nPixelSpace, nLineSpace, psExtraArg);
             if (eErr == CE_None)
             {
-                const auto [dfMinVal, dfMaxVal] =
-                    GetDataTypeMinMax(eVRTBandDataType);
-                if (dfMinVal != -std::numeric_limits<double>::infinity())
+                for (int j = 0; j < nOutYSize; j++)
                 {
-                    for (int j = 0; j < nOutYSize; j++)
+                    for (int i = 0; i < nOutXSize; i++)
                     {
-                        for (int i = 0; i < nOutXSize; i++)
-                        {
-                            GByte *pDst =
-                                pabyOut + j * nLineSpace + i * nPixelSpace;
-                            double dfVal;
-                            CopyWordIn(pDst, eBufType, &dfVal, GDT_Float64);
-                            dfVal = std::clamp(dfVal, dfMinVal, dfMaxVal);
-                            CopyWordOut(&dfVal, GDT_Float64, pDst, eBufType);
-                        }
+                        void *pDst = pabyOut + j * nLineSpace + i * nPixelSpace;
+                        GDALClampValueToType(pDst, eBufType, eVRTBandDataType);
                     }
                 }
             }
@@ -2020,9 +2088,7 @@ CPLErr VRTSimpleSource::DatasetRasterIO(
                                   nReqYSize, pabyOut, nOutXSize, nOutYSize,
                                   eBufType, nBandCount, panBandMap, nPixelSpace,
                                   nLineSpace, nBandSpace, psExtraArg);
-            const auto [dfMinVal, dfMaxVal] =
-                GetDataTypeMinMax(eVRTBandDataType);
-            if (dfMinVal != -std::numeric_limits<double>::infinity())
+            if (eErr == CE_None)
             {
                 for (int k = 0; k < nBandCount; k++)
                 {
@@ -2030,12 +2096,10 @@ CPLErr VRTSimpleSource::DatasetRasterIO(
                     {
                         for (int i = 0; i < nOutXSize; i++)
                         {
-                            GByte *pDst = pabyOut + k * nBandSpace +
-                                          j * nLineSpace + i * nPixelSpace;
-                            double dfVal;
-                            CopyWordIn(pDst, eBufType, &dfVal, GDT_Float64);
-                            dfVal = std::clamp(dfVal, dfMinVal, dfMaxVal);
-                            CopyWordOut(&dfVal, GDT_Float64, pDst, eBufType);
+                            void *pDst = pabyOut + k * nBandSpace +
+                                         j * nLineSpace + i * nPixelSpace;
+                            GDALClampValueToType(pDst, eBufType,
+                                                 eVRTBandDataType);
                         }
                     }
                 }
@@ -2058,8 +2122,8 @@ CPLErr VRTSimpleSource::DatasetRasterIO(
             {
                 for (int i = 0; i < nOutXSize; i++)
                 {
-                    GByte *pDst = pabyOut + k * nBandSpace + j * nLineSpace +
-                                  i * nPixelSpace;
+                    void *pDst = pabyOut + k * nBandSpace + j * nLineSpace +
+                                 i * nPixelSpace;
                     int nVal = 0;
                     CopyWordIn(pDst, eBufType, &nVal, GDT_Int32);
 
@@ -3565,8 +3629,8 @@ CPLErr VRTComplexSource::RasterIOProcessNoData(
         CPLError(CE_Failure, CPLE_OutOfMemory, "%s", e.what());
         return CE_Failure;
     }
-    const auto paSrcData = reinterpret_cast<const WorkingDT *>(
-        oWorkingState.m_abyWrkBuffer.data());
+    auto paSrcData =
+        reinterpret_cast<WorkingDT *>(oWorkingState.m_abyWrkBuffer.data());
 
     GDALRasterIOExtraArg sExtraArg;
     GDALCopyRasterIOExtraArg(&sExtraArg, psExtraArg);
@@ -3700,10 +3764,8 @@ CPLErr VRTComplexSource::RasterIOProcessNoData(
     }
     else
     {
-        const auto [dfMinVal, dfMaxVal] = GetDataTypeMinMax(eVRTBandDataType);
         const bool bClampToVRTBandType =
-            (dfMinVal != -std::numeric_limits<double>::infinity() &&
-             GDAL_GET_OPERATE_IN_BUF_TYPE(*psExtraArg));
+            GDAL_GET_OPERATE_IN_BUF_TYPE(*psExtraArg);
 
         GByte abyTemp[2 * sizeof(double)];
         for (int iY = 0; iY < nOutYSize; iY++)
@@ -3726,12 +3788,10 @@ CPLErr VRTComplexSource::RasterIOProcessNoData(
                 {
                     if (bClampToVRTBandType)
                     {
-                        double dfVal;
-                        CopyWordIn(&paSrcData[idxBuffer], eWorkingDT, &dfVal,
-                                   GDT_Float64);
-                        dfVal = std::clamp(dfVal, dfMinVal, dfMaxVal);
-                        CopyWordOut(&dfVal, GDT_Float64, pDstLocation,
-                                    eBufType);
+                        GDALClampValueToType(&paSrcData[idxBuffer],
+                                             eVRTBandDataType);
+                        CopyWordOut(&paSrcData[idxBuffer], eWorkingDT,
+                                    pDstLocation, eBufType);
                     }
                     else
                     {
