@@ -52,9 +52,6 @@
 #elif defined(_MSC_VER)
 #include <intrin.h>
 #define HAVE_AVX2_DISPATCH
-#define HAVE_AVX2_DISPATCH_MSVC
-#elif defined(__AVX2__)
-#define HAVE_AVX2_NATIVELY
 #endif
 #elif defined(USE_NEON_OPTIMIZATIONS)
 #include "include_sse2neon.h"
@@ -3003,8 +3000,8 @@ CPL_NOINLINE void GDALCopyWordsT(const int16_t *const CPL_RESTRICT pSrcData,
 
 // ---- AVX2 helpers for int32 narrowing (runtime dispatch) ----
 
-#if defined(HAVE_AVX2_DISPATCH) || defined(HAVE_AVX2_NATIVELY)
-#if defined(HAVE_AVX2_DISPATCH) && !defined(HAVE_AVX2_DISPATCH_MSVC)
+#if defined(HAVE_AVX2_DISPATCH)
+#if !defined(_MSC_VER)
 __attribute__((target("avx2")))
 #endif
 static void GDALCopyWordsInt32ToUInt8_AVX2(const int32_t *CPL_RESTRICT pSrc,
@@ -3048,10 +3045,10 @@ static void GDALCopyWordsInt32ToUInt8_AVX2(const int32_t *CPL_RESTRICT pSrc,
                                    : static_cast<uint8_t>(pSrc[n]);
     }
 }
-#endif  // HAVE_AVX2_DISPATCH || HAVE_AVX2_NATIVELY
+#endif  // HAVE_AVX2_DISPATCH
 
-#if defined(HAVE_AVX2_DISPATCH) || defined(HAVE_AVX2_NATIVELY)
-#if defined(HAVE_AVX2_DISPATCH) && !defined(HAVE_AVX2_DISPATCH_MSVC)
+#if defined(HAVE_AVX2_DISPATCH)
+#if !defined(_MSC_VER)
 __attribute__((target("avx2")))
 #endif
 static void GDALCopyWordsInt32ToUInt16_AVX2(const int32_t *CPL_RESTRICT pSrc,
@@ -3085,7 +3082,7 @@ static void GDALCopyWordsInt32ToUInt16_AVX2(const int32_t *CPL_RESTRICT pSrc,
                                      : static_cast<uint16_t>(pSrc[n]);
     }
 }
-#endif  // HAVE_AVX2_DISPATCH || HAVE_AVX2_NATIVELY
+#endif  // HAVE_AVX2_DISPATCH
 
 // ---- int32 -> uint8 with clamping to [0, 255] ----
 template <>
@@ -3103,9 +3100,6 @@ CPL_NOINLINE void GDALCopyWordsT(const int32_t *const CPL_RESTRICT pSrcData,
             GDALCopyWordsInt32ToUInt8_AVX2(pSrcData, pDstData, nWordCount);
             return;
         }
-#elif defined(HAVE_AVX2_NATIVELY)
-        GDALCopyWordsInt32ToUInt8_AVX2(pSrcData, pDstData, nWordCount);
-        return;
 #endif
 #ifdef HAVE_SSE2
         // SSE2 path: 16 pixels per iteration
@@ -3180,9 +3174,6 @@ CPL_NOINLINE void GDALCopyWordsT(const int32_t *const CPL_RESTRICT pSrcData,
             GDALCopyWordsInt32ToUInt16_AVX2(pSrcData, pDstData, nWordCount);
             return;
         }
-#elif defined(HAVE_AVX2_NATIVELY)
-        GDALCopyWordsInt32ToUInt16_AVX2(pSrcData, pDstData, nWordCount);
-        return;
 #endif
         decltype(nWordCount) n = 0;
 #if defined(__SSE4_1__) || defined(USE_NEON_OPTIMIZATIONS)
