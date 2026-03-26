@@ -3089,7 +3089,6 @@ CPL_NOINLINE void GDALCopyWordsT(const int32_t *const CPL_RESTRICT pSrcData,
 #ifdef HAVE_SSE2
         // SSE2 path: 16 pixels per iteration
         decltype(nWordCount) n = 0;
-        const __m128i xmm_255 = _mm_set1_epi32(255);
         for (; n < nWordCount - 15; n += 16)
         {
             __m128i v0 = _mm_loadu_si128(
@@ -3100,25 +3099,6 @@ CPL_NOINLINE void GDALCopyWordsT(const int32_t *const CPL_RESTRICT pSrcData,
                 reinterpret_cast<const __m128i *>(pSrcData + n + 8));
             __m128i v3 = _mm_loadu_si128(
                 reinterpret_cast<const __m128i *>(pSrcData + n + 12));
-            // Clamp to [0, 255] using SSE2 arithmetic:
-            // max(v, 0): zero out negatives via sign bit mask
-            v0 = _mm_andnot_si128(_mm_srai_epi32(v0, 31), v0);
-            v1 = _mm_andnot_si128(_mm_srai_epi32(v1, 31), v1);
-            v2 = _mm_andnot_si128(_mm_srai_epi32(v2, 31), v2);
-            v3 = _mm_andnot_si128(_mm_srai_epi32(v3, 31), v3);
-            // min(v, 255): blend 255 where v > 255
-            __m128i gt0 = _mm_cmpgt_epi32(v0, xmm_255);
-            __m128i gt1 = _mm_cmpgt_epi32(v1, xmm_255);
-            __m128i gt2 = _mm_cmpgt_epi32(v2, xmm_255);
-            __m128i gt3 = _mm_cmpgt_epi32(v3, xmm_255);
-            v0 = _mm_or_si128(_mm_andnot_si128(gt0, v0),
-                              _mm_and_si128(gt0, xmm_255));
-            v1 = _mm_or_si128(_mm_andnot_si128(gt1, v1),
-                              _mm_and_si128(gt1, xmm_255));
-            v2 = _mm_or_si128(_mm_andnot_si128(gt2, v2),
-                              _mm_and_si128(gt2, xmm_255));
-            v3 = _mm_or_si128(_mm_andnot_si128(gt3, v3),
-                              _mm_and_si128(gt3, xmm_255));
             // Values in [0, 255]: pack int32->int16->uint8
             __m128i lo16 = _mm_packs_epi32(v0, v1);
             __m128i hi16 = _mm_packs_epi32(v2, v3);
