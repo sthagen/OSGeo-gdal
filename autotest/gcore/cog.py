@@ -2317,3 +2317,28 @@ def test_cog_create(tmp_vsimem):
 
     with pytest.raises(Exception, match="Attempt to create 0x0 dataset is illegal"):
         gdal.GetDriverByName("COG").Create(tmp_vsimem / "out.tif", 0, 0)
+
+
+###############################################################################
+
+
+@gdaltest.enable_exceptions()
+def test_cog_algorithm_driver_cog_validate():
+
+    with gdal.alg.driver.cog.validate(
+        dataset="data/cog/byte_little_endian_golden.tif"
+    ) as alg:
+        assert (
+            alg.Output()
+            == """data/cog/byte_little_endian_golden.tif is a valid cloud optimized GeoTIFF\n\nThe size of all IFD headers is 570 bytes\n"""
+        )
+
+    with gdal.alg.driver.cog.validate(
+        dataset="data/cog/byte_little_endian_golden.tif", quiet=True
+    ) as alg:
+        assert alg.Output() == ""
+
+    with pytest.raises(
+        Exception, match="data/byte.tif is NOT a valid cloud optimized GeoTIFF"
+    ):
+        gdal.alg.driver.cog.validate(dataset="data/byte.tif")
