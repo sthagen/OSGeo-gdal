@@ -33,7 +33,9 @@ Raster How do I...
 - :example:`raster.cog-gdalwarp`
 
 ... check if a GeoTIFF is a Cloud Optimized GeoTIFF (COG)?
-   :example:`gdal-raster-info-cog`
+
+- :example:`gdal-dataset-identify-cog`
+- :example:`gdal-raster-info-cog`
 
 Vector How do I...
 ------------------
