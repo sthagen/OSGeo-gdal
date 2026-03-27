@@ -87,10 +87,15 @@ Running the Sample Scripts
 --------------------------
 
 If you install GDAL using :ref:`conda`, the :ref:`gdal_python_utilities` are also installed, and the sample scripts above are available.
-Examples of using these scripts are provided below:
+The scripts can be executed using Python. For example:
 
-- :example:`raster.cog-validate` using :source_file:`swig/python/gdal-utils/osgeo_utils/samples/validate_cloud_optimized_geotiff.py`
-- :example:`vector.gpkg-validate` using :source_file:`swig/python/gdal-utils/osgeo_utils/samples/validate_gpkg.py`
+.. example::
+   :title: Make a graticule Shapefile
+   :id: python-samples-graticule
+
+   .. code-block:: bash
+
+        $ python -m osgeo_utils.samples.mkgraticule -t_srs EPSG:4326 grid4326.shp
 
 You can also inspect the available Python utilities and sample scripts using Python:
 

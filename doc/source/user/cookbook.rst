@@ -33,7 +33,7 @@ Raster How do I...
 - :example:`raster.cog-gdalwarp`
 
 ... check if a GeoTIFF is a Cloud Optimized GeoTIFF (COG)?
-   :example:`raster.cog-validate`
+   :example:`gdal-raster-info-cog`
 
 Vector How do I...
 ------------------
@@ -49,9 +49,6 @@ Vector How do I...
 
 ... list all layers in a GeoPackage with their geometry fields and types?
     :example:`gdal-vector-info-geom-name`
-
-... validate a GeoPackage?
-    :example:`vector.gpkg-validate`
 
 Raster and Vector How do I...
 -----------------------------
