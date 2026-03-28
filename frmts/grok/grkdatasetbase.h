@@ -1284,10 +1284,10 @@ struct JP2GRKDatasetBase : public JP2DatasetBase
      */
     void init(void)
     {
-        // Initialize Grok's global thread pool exactly once per
-        // process using std::call_once.  The thread count is
-        // resolved from GDAL_NUM_THREADS on the very first call
-        // and never changed afterwards.  This avoids the
+        // Initialize Grok's global thread pool and message handlers
+        // exactly once per process using std::call_once.  The thread
+        // count is resolved from GDAL_NUM_THREADS on the very first
+        // call and never changed afterwards.  This avoids the
         // create-destroy-recreate cycle that caused stale executor
         // state (orphaned task graphs, corrupted wavelet buffers).
         static std::once_flag grokInitFlag;
@@ -1299,29 +1299,29 @@ struct JP2GRKDatasetBase : public JP2DatasetBase
                     nullptr,
                     GDALGetNumThreads(GDAL_DEFAULT_MAX_THREAD_COUNT, true),
                     nullptr);
-            });
 
-        grk_msg_handlers handlers = {};
-        const char *debug_env = std::getenv("GRK_DEBUG");
-        if (debug_env)
-        {
-            int level = std::atoi(debug_env);
-            if (level >= 1)
-                handlers.error_callback = JP2_ErrorCallback;
-            if (level >= 2)
-                handlers.warn_callback = JP2_WarningCallback;
-            if (level >= 3)
-                handlers.info_callback = JP2_InfoCallback;
-            if (level >= 4)
-                handlers.debug_callback = JP2_DebugCallback;
-        }
-        else
-        {
-            handlers.info_callback = JP2_InfoCallback;
-            handlers.warn_callback = JP2_WarningCallback;
-            handlers.error_callback = JP2_ErrorCallback;
-        }
-        grk_set_msg_handlers(handlers);
+                grk_msg_handlers handlers = {};
+                const char *debug_env = std::getenv("GRK_DEBUG");
+                if (debug_env)
+                {
+                    int level = std::atoi(debug_env);
+                    if (level >= 1)
+                        handlers.error_callback = JP2_ErrorCallback;
+                    if (level >= 2)
+                        handlers.warn_callback = JP2_WarningCallback;
+                    if (level >= 3)
+                        handlers.info_callback = JP2_InfoCallback;
+                    if (level >= 4)
+                        handlers.debug_callback = JP2_DebugCallback;
+                }
+                else
+                {
+                    handlers.info_callback = JP2_InfoCallback;
+                    handlers.warn_callback = JP2_WarningCallback;
+                    handlers.error_callback = JP2_ErrorCallback;
+                }
+                grk_set_msg_handlers(handlers);
+            });
     }
 
     /**
@@ -1429,11 +1429,11 @@ struct JP2GRKDatasetBase : public JP2DatasetBase
     };
 
     /**
-     * @brief Copies decoded tile data to the GDAL output buffer.
+     * @brief Scalar fallback: copies decoded tile data for subsampled components.
      *
-     * Handles tile-to-window overlap calculation, per-band data type
-     * conversion, and 1-bit alpha promotion. Called from CopyTiles
-     * (potentially from multiple threads for multi-tile images).
+     * Only called when one or more components have dx/dy != 1 (e.g. YCBCR420).
+     * For non-subsampled components, CopyTiles delegates to
+     * grk_decompress_schedule_swath_copy() for SIMD-accelerated copying.
      */
     static CPLErr CopyTileData(grk_image *img, int nXOff, int nYOff, int nXSize,
                                int nYSize, void *pData, int /*nBufXSize*/,
@@ -1457,75 +1457,8 @@ struct JP2GRKDatasetBase : public JP2DatasetBase
         if (xStart >= xEnd || yStart >= yEnd)
             return CE_None;
 
-        const int cols = xEnd - xStart;
-        const int tileXStart = xStart - tileXOff;
-        const int bufXStart = xStart - nXOff;
-
-        // ---- Fast path: no subsampling, no alpha promotion ----
-        // Hoists type dispatch and band loop outside the pixel loops
-        // so the inner loop is a simple narrowing copy per row.
-        bool canUseFastPath = (nPromoteAlphaBandIdx < 0);
-        for (int i = 0; i < nBandCount && canUseFastPath; ++i)
-        {
-            const int b = panBandMap[i] - 1;
-            if (b < 0 || b >= img->numcomps || !img->comps[b].data ||
-                img->comps[b].dx != 1 || img->comps[b].dy != 1)
-                canUseFastPath = false;
-        }
-
-        if (canUseFastPath)
-        {
-            const int nRows = yEnd - yStart;
-            const int nSrcStride = static_cast<int>(sizeof(int32_t));
-            const int nDstStride = static_cast<int>(nPixelSpace);
-
-            for (int i = 0; i < nBandCount; ++i)
-            {
-                const auto &comp = img->comps[panBandMap[i] - 1];
-                const int srcStride = static_cast<int>(comp.stride);
-                const int32_t *srcBase =
-                    static_cast<const int32_t *>(comp.data) +
-                    static_cast<GPtrDiff_t>(yStart - tileYOff) * srcStride +
-                    tileXStart;
-
-                GByte *dstBase =
-                    static_cast<GByte *>(pData) + i * nBandSpace +
-                    static_cast<GPtrDiff_t>(bufXStart) * nPixelSpace;
-
-                // When source and destination rows are contiguous, batch
-                // all rows into a single GDALCopyWords64 call to avoid
-                // per-row dispatch overhead (type switch + AVX2 check).
-                const GPtrDiff_t totalPixels =
-                    static_cast<GPtrDiff_t>(nRows) * cols;
-                if (srcStride == cols &&
-                    nLineSpace == static_cast<GSpacing>(cols) * nPixelSpace)
-                {
-                    GDALCopyWords64(srcBase, GDT_Int32, nSrcStride, dstBase,
-                                    eBufType, nDstStride, totalPixels);
-                }
-                else
-                {
-                    // First row: goes through GDALCopyWords64 dispatch.
-                    // Subsequent rows: call GDALCopyWords64 per row.
-                    // The per-row overhead is acceptable when rows aren't
-                    // contiguous since we can't batch them.
-                    for (int iY = 0; iY < nRows; ++iY)
-                    {
-                        const int32_t *srcRow =
-                            srcBase + static_cast<GPtrDiff_t>(iY) * srcStride;
-                        GByte *dstRow = dstBase + static_cast<GPtrDiff_t>(
-                                                      yStart - nYOff + iY) *
-                                                      nLineSpace;
-
-                        GDALCopyWords64(srcRow, GDT_Int32, nSrcStride, dstRow,
-                                        eBufType, nDstStride, cols);
-                    }
-                }
-            }
-            return CE_None;
-        }
-
-        // ---- Slow path: subsampled components or alpha promotion ----
+        // Scalar per-pixel loop that handles dx/dy subsampling, alpha promotion,
+        // and all five output types.
         CPLErr eErr = CE_None;
         for (int iY = yStart; iY < yEnd; ++iY)
         {
@@ -1593,18 +1526,18 @@ struct JP2GRKDatasetBase : public JP2DatasetBase
     }
 
     /**
-     * @brief Dispatches tile processing across a thread pool.
+     * @brief Dispatches tile copy to the output buffer.
      *
-     * After decompressAsynch() returns the tile grid range, this method
-     * processes each tile's decoded data via CopyTileData().
+     * Fast path (non-subsampled components): delegates to
+     * grk_decompress_schedule_swath_copy() which uses Grok's existing
+     * Taskflow executor to copy tiles in parallel — no extra thread pool.
      *
-     * For single-tile images (the common case), the tile is processed
-     * directly on the calling thread to avoid thread pool overhead.
-     * For multi-tile images, a thread pool is created and tiles are
-     * processed in parallel.
+     * Slow path (any component with dx/dy != 1, e.g. YCBCR420): creates
+     * a GDAL ThreadPool and calls CopyTileData() per tile (scalar loop
+     * that handles chroma upsampling).
      *
-     * NOTE: grk_decompress_get_tile_image is serialized with codecMutex
-     * as it may not be thread-safe, but CopyTileData runs in parallel.
+     * NOTE: grk_decompress_get_tile_image is serialized in the slow path
+     * only — the fast path uses Grok's internal tile cache directly.
      */
     CPLErr CopyTiles(PostPreload &postPreload, int nXOff, int nYOff, int nXSize,
                      int nYSize, void *pData, int nBufXSize, int nBufYSize,
@@ -1613,26 +1546,99 @@ struct JP2GRKDatasetBase : public JP2DatasetBase
                      GSpacing nLineSpace, GSpacing nBandSpace,
                      int nPromoteAlphaBandIdx)
     {
-        CPLErr eErr = CE_None;
-
+        // ---- Upfront subsampling check ----
+        // If any requested component has dx/dy != 1, fall back to the
+        // scalar slow path; otherwise use the Taskflow-based fast path.
+        // The fast path is only used for multi-tile images because
+        // single-tile images require grk_decompress_get_image() to
+        // trigger post-processing (wait(nullptr) -> postMulti_).
         const int nTotalTiles = (postPreload.tile_x1 - postPreload.tile_x0) *
                                 (postPreload.tile_y1 - postPreload.tile_y0);
+        bool canUseFastPath = (nTotalTiles > 1 && m_codec && m_codec->psImage);
+        if (canUseFastPath)
+        {
+            for (int i = 0; i < nBandCount && canUseFastPath; ++i)
+            {
+                const int b = panBandMap[i] - 1;
+                if (b < 0 ||
+                    b >= static_cast<int>(m_codec->psImage->numcomps) ||
+                    m_codec->psImage->comps[b].dx != 1 ||
+                    m_codec->psImage->comps[b].dy != 1)
+                    canUseFastPath = false;
+            }
+        }
+
+        if (canUseFastPath)
+        {
+            // ---- Fast path: delegate to Grok Taskflow executor ----
+            // grk_decompress_schedule_swath_copy enqueues one Taskflow task
+            // per tile and grk_decompress_wait_swath_copy waits for them.
+            // No extra thread pool is created.
+            uint8_t prec = 8;
+            bool sgnd = false;
+            if (eBufType == GDT_Int16)
+            {
+                prec = 16;
+                sgnd = true;
+            }
+            else if (eBufType == GDT_UInt16)
+            {
+                prec = 16;
+            }
+            else if (eBufType == GDT_Int32)
+            {
+                prec = 32;
+                sgnd = true;
+            }
+            else if (eBufType == GDT_UInt32)
+            {
+                prec = 32;
+            }
+
+            grk_wait_swath waitSwath = {};
+            waitSwath.tile_x0 = postPreload.tile_x0;
+            waitSwath.tile_y0 = postPreload.tile_y0;
+            waitSwath.tile_x1 = postPreload.tile_x1;
+            waitSwath.tile_y1 = postPreload.tile_y1;
+            waitSwath.num_tile_cols = postPreload.num_tile_cols;
+
+            grk_swath_buffer buf = {};
+            buf.data = pData;
+            buf.prec = prec;
+            buf.sgnd = sgnd;
+            buf.numcomps = static_cast<uint16_t>(nBandCount);
+            buf.band_map = const_cast<int *>(panBandMap);
+            buf.pixel_space = static_cast<int64_t>(nPixelSpace);
+            buf.line_space = static_cast<int64_t>(nLineSpace);
+            buf.band_space = static_cast<int64_t>(nBandSpace);
+            buf.promote_alpha = nPromoteAlphaBandIdx;
+            buf.x0 = static_cast<uint32_t>(nXOff);
+            buf.y0 = static_cast<uint32_t>(nYOff);
+            buf.x1 = static_cast<uint32_t>(nXOff + nXSize);
+            buf.y1 = static_cast<uint32_t>(nYOff + nYSize);
+
+            grk_decompress_schedule_swath_copy(m_codec->pCodec, &waitSwath,
+                                               &buf);
+            grk_decompress_wait_swath_copy(m_codec->pCodec);
+            return CE_None;
+        }
+
+        // ---- Slow path: subsampled components or single tile ----
+        CPLErr eErr = CE_None;
 
         // Helper lambda: get tile image, handling single-tile fallback
         auto getTileImage = [&](uint16_t tileno) -> grk_image *
         {
             grk_image *img =
                 grk_decompress_get_tile_image(m_codec->pCodec, tileno, true);
-            // For single-tile images, Grok puts data in the
-            // composite image rather than the per-tile image
             if (!img)
                 img = grk_decompress_get_image(m_codec->pCodec);
             return img;
         };
 
-        // Single-tile fast path: process directly, no thread pool overhead
         if (nTotalTiles <= 1)
         {
+            // Single tile: no thread pool overhead
             uint16_t tileno = postPreload.tile_y0 * postPreload.num_tile_cols +
                               postPreload.tile_x0;
             grk_image *img = getTileImage(tileno);
@@ -1650,17 +1656,14 @@ struct JP2GRKDatasetBase : public JP2DatasetBase
                                 nPromoteAlphaBandIdx);
         }
 
-        // Multi-tile path: use thread pool for parallel processing
+        // Multi-tile: use thread pool for parallel processing
         std::atomic<bool> errorOccurred(false);
         size_t numThreads = static_cast<size_t>(
             GDALGetNumThreads(/* nMaxVal = */ -1,
                               /* bDefaultAllCPUs = */ true));
         ThreadPool pool(numThreads);
-
-        // Mutex for protecting grk_decompress_get_tile_image
         std::mutex codecMutex;
 
-        // Enqueue tasks for each tile
         for (uint16_t ty = postPreload.tile_y0; ty < postPreload.tile_y1; ++ty)
         {
             for (uint16_t tx = postPreload.tile_x0; tx < postPreload.tile_x1;
@@ -1670,19 +1673,14 @@ struct JP2GRKDatasetBase : public JP2DatasetBase
                 pool.enqueue(
                     [&, tileno]
                     {
-                        // If an error has already occurred, skip processing
                         if (errorOccurred)
                             return;
 
-                        // Get tile image (protect with mutex if not thread-safe)
                         grk_image *img = nullptr;
                         {
                             std::lock_guard<std::mutex> lock(codecMutex);
                             img = grk_decompress_get_tile_image(m_codec->pCodec,
                                                                 tileno, true);
-
-                            // For single-tile images, Grok puts data in the
-                            // composite image rather than the per-tile image
                             if (!img)
                                 img = grk_decompress_get_image(m_codec->pCodec);
                         }
@@ -1695,23 +1693,18 @@ struct JP2GRKDatasetBase : public JP2DatasetBase
                             errorOccurred = true;
                             return;
                         }
-                        // Process tile data
                         CPLErr tileErr = CopyTileData(
                             img, nXOff, nYOff, nXSize, nYSize, pData, nBufXSize,
                             nBufYSize, eBufType, nBandCount, panBandMap,
                             nPixelSpace, nLineSpace, nBandSpace,
                             nPromoteAlphaBandIdx);
-
                         if (tileErr != CE_None)
-                        {
                             errorOccurred = true;
-                        }
                     });
             }
         }
 
-        // Thread pool destructor waits for all tasks to complete
-        // If an error occurred, set return value
+        // ThreadPool destructor waits for all tasks to complete.
         if (errorOccurred)
             eErr = CE_Failure;
 
