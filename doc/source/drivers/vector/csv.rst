@@ -448,7 +448,7 @@ The following layer creation options are supported:
       value of **CRLF** (DOS format) or **LF** (Unix format).
 
 -  .. lco:: GEOMETRY
-      :choices: AS_WKT, AS_XYZ, AS_XY, AS_YZ
+      :choices: AS_WKT, AS_XYZ, AS_XY, AS_YX
 
       By default, the geometry of
       a feature written to a .csv file is discarded. It is possible to
@@ -538,14 +538,14 @@ Examples
 
    .. code-block:: bash
 
-      ogr2ogr -f CSV output.csv input.shp -lco GEOMETRY=AS_XYZ
+      ogr2ogr output.csv input.shp -lco GEOMETRY=AS_XYZ
 
 .. example::
    :title: Converting a shapefile to `.csv` with file with geometry field formatted as GeoJSON
 
    .. code-block:: bash
 
-      ogr2ogr -f CSV output.csv input.shp -dialect sqlite -sql \
+      ogr2ogr output.csv input.shp -dialect sqlite -sql \
           "select AsGeoJSON(geometry) AS geom, * from input"
 
 .. example::
@@ -556,7 +556,7 @@ Examples
    .. code-block:: bash
 
      ogr2ogr \
-       -f GPKG output.gpkg \
+       output.gpkg \
        input.csv \
        -oo X_POSSIBLE_NAMES=longitude \
        -oo Y_POSSIBLE_NAMES=latitude \
