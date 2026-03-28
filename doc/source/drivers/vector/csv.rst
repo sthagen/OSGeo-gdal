@@ -247,6 +247,14 @@ AS float))) FROM test GROUP BY way_id"* will return :
      way_id (String) = 2
      LINESTRING (-2 49,-3 50)
 
+In fact we can get the same output with simply:
+
+::
+
+    ogrinfo -sql "SELECT MakeLine(geometry) FROM test GROUP BY way_id" \
+    -oo X_POSSIBLE_NAMES=x -oo Y_POSSIBLE_NAMES=y -dialect SQLite test.csv	
+
+
 VSI Virtual File System API support
 -----------------------------------
 
