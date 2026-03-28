@@ -1939,7 +1939,7 @@ class S102Checker:
         values_type = values.id.get_type()
         if not self._is_uint32(values_type):
             self._critical_error(
-                f"/BathymetryCoverage/BathymetryCoverage.01/Group_001/values type is not uint32 but {values_type}"
+                f"/QualityOfBathymetryCoverage/QualityOfBathymetryCoverage.01/Group_001/values type is not uint32 but {values_type}"
             )
             if (
                 isinstance(values_type, h5py.h5t.TypeCompoundID)
