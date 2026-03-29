@@ -36,6 +36,8 @@ final size of the file of storage capacity is required. Note that as the
 temporary dataset uses lossless compression, if the final COG file uses lossy
 compression, more temporary storage may be needed.
 
+Validation whether a TIFF file is a valid COG file can be done with :ref:`gdal_driver_cog_validate`.
+
 Driver capabilities
 -------------------
 

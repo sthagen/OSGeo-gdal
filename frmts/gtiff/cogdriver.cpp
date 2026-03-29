@@ -12,9 +12,11 @@
 
 #include "cpl_port.h"
 
+#include "gdalalgorithm.h"
 #include "gdal_proxy.h"
 #include "gdal_priv.h"
 #include "gdal_frmts.h"
+#include "gdalpython.h"
 #include "gtiff.h"
 #include "gtiffdataset.h"
 #include "gt_overview.h"
@@ -31,6 +33,8 @@
 #include <vector>
 
 static bool gbHasLZW = false;
+
+using namespace GDALPy;
 
 /************************************************************************/
 /*                         HasZSTDCompression()                         */
@@ -1801,6 +1805,155 @@ void GDALCOGDriver::InitializeCreationOptionList()
     SetMetadataItem(GDAL_DMD_CREATIONOPTIONLIST, osOptions.c_str());
 }
 
+/************************************************************************/
+/*                         COGValidateAlgorithm                         */
+/************************************************************************/
+
+#ifndef _
+#define _(x) x
+#endif
+
+class COGValidateAlgorithm final : public GDALAlgorithm
+{
+  public:
+    COGValidateAlgorithm()
+        : GDALAlgorithm("validate",
+                        "Validate if a TIFF file is a Cloud Optimized GeoTIFF",
+                        "/programs/gdal_driver_cog_validate.html")
+    {
+        constexpr int type = GDAL_OF_RASTER;
+        auto &arg = AddArg("dataset", 0, _("COG dataset"), &m_dataset, type)
+                        .AddAlias("input")
+                        .SetPositional()
+                        .SetRequired();
+        SetAutoCompleteFunctionForFilename(arg, type);
+
+        AddArg("full-check", 0, _("Whether to perform full check"),
+               &m_fullCheck)
+            .SetChoices("auto", "yes", "no")
+            .SetDefault(m_fullCheck);
+
+        AddOutputStringArg(&m_output);
+        AddProgressArg();
+    }
+
+  protected:
+    bool RunImpl(GDALProgressFunc, void *) override;
+
+  private:
+    GDALArgDatasetValue m_dataset{};
+    std::string m_output{};
+    std::string m_fullCheck{"auto"};
+};
+
+/************************************************************************/
+/*                              RunImpl()                               */
+/************************************************************************/
+
+bool COGValidateAlgorithm::RunImpl(GDALProgressFunc, void *)
+{
+    auto poDS = m_dataset.GetDatasetRef();
+    CPLAssert(poDS);
+    auto poDriver = poDS->GetDriver();
+    if (!poDriver || !EQUAL(poDriver->GetDescription(), "GTIFF"))
+    {
+        ReportError(CE_Failure, CPLE_AppDefined, "%s is not a TIFF file",
+                    m_dataset.GetName().c_str());
+        return false;
+    }
+
+    if (!GDALPythonInitialize())
+        return false;
+
+    GIL_Holder oHolder(false);
+
+    const CPLString osModuleName(CPLSPrintf("cog_validate_module_%p", this));
+    PyObject *poCompiledString = Py_CompileString(
+        "from osgeo_utils.samples.validate_cloud_optimized_geotiff import "
+        "main, get_output_string\n",
+        osModuleName, Py_file_input);
+    if (poCompiledString == nullptr || PyErr_Occurred())
+    {
+        CPLError(CE_Failure, CPLE_AppDefined, "Couldn't compile code:\n%s",
+                 GetPyExceptionString().c_str());
+        return false;
+    }
+    PyObject *poModule =
+        PyImport_ExecCodeModule(osModuleName, poCompiledString);
+    Py_DecRef(poCompiledString);
+
+    if (poModule == nullptr || PyErr_Occurred())
+    {
+        CPLError(CE_Failure, CPLE_AppDefined, "%s",
+                 GetPyExceptionString().c_str());
+        return false;
+    }
+
+    PyObject *poMain = PyObject_GetAttrString(poModule, "main");
+    CPLAssert(poMain);
+    PyObject *poGetOutput =
+        PyObject_GetAttrString(poModule, "get_output_string");
+    CPLAssert(poGetOutput);
+
+    Py_DecRef(poModule);
+
+    PyObject *pyArgv = PyTuple_New(3);
+    PyTuple_SetItem(pyArgv, 0, PyUnicode_FromString("dummy"));
+    PyTuple_SetItem(pyArgv, 1,
+                    PyUnicode_FromString(m_dataset.GetName().c_str()));
+    PyTuple_SetItem(
+        pyArgv, 2,
+        PyUnicode_FromString(("--full-check=" + m_fullCheck).c_str()));
+    PyObject *pyKwargs = PyDict_New();
+    PyDict_SetItemString(pyKwargs, "argv", pyArgv);
+    PyDict_SetItemString(pyKwargs, "output_in_string", PyBool_FromLong(true));
+    PyObject *pyArgs = PyTuple_New(0);
+    PyObject *pRetValue = PyObject_Call(poMain, pyArgs, pyKwargs);
+    const auto nRetValue = pRetValue ? PyLong_AsLong(pRetValue) : -1;
+    Py_DecRef(pyArgs);
+    Py_DecRef(pyKwargs);
+    Py_DecRef(pRetValue);
+
+    if (!m_quiet || nRetValue)
+    {
+        pyArgs = PyTuple_New(0);
+        pyKwargs = PyDict_New();
+        PyObject *poMsg = PyObject_Call(poGetOutput, pyArgs, pyKwargs);
+        Py_DecRef(pyArgs);
+        Py_DecRef(pyKwargs);
+        if (poMsg)
+            m_output = GetString(poMsg);
+        Py_DecRef(poMsg);
+    }
+
+    Py_DecRef(poMain);
+    Py_DecRef(poGetOutput);
+
+    if (nRetValue && !IsCalledFromCommandLine())
+    {
+        ReportError(CE_Failure, CPLE_AppDefined, "%s", m_output.c_str());
+    }
+
+    return nRetValue == 0;
+}
+
+/************************************************************************/
+/*                   COGDriverInstantiateAlgorithm()                    */
+/************************************************************************/
+
+static GDALAlgorithm *
+COGDriverInstantiateAlgorithm(const std::vector<std::string> &aosPath)
+{
+    if (aosPath.size() == 1 && aosPath[0] == "validate")
+    {
+        return std::make_unique<COGValidateAlgorithm>().release();
+    }
+    else
+    {
+        return nullptr;
+    }
+}
+
 void GDALRegister_COG()
 
 {
@@ -1832,6 +1985,9 @@ void GDALRegister_COG()
 
     poDriver->pfnCreateCopy = COGCreateCopy;
     poDriver->pfnCreate = COGCreate;
+
+    poDriver->pfnInstantiateAlgorithm = COGDriverInstantiateAlgorithm;
+    poDriver->DeclareAlgorithm({"validate"});
 
     GetGDALDriverManager()->RegisterDriver(poDriver);
 }

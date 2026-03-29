@@ -360,6 +360,7 @@ Driver specific commands
    :maxdepth: 1
    :hidden:
 
+   gdal_driver_cog_validate
    gdal_driver_gpkg_repack
    gdal_driver_gti_create
    gdal_driver_openfilegdb_repack
@@ -368,6 +369,7 @@ Driver specific commands
 
 .. only:: html
 
+    - :ref:`gdal_driver_cog_validate`: Validate if a TIFF file is a Cloud Optimized GeoTIFF
     - :ref:`gdal_driver_gpkg_repack`: Repack/vacuum in-place a GeoPackage dataset
     - :ref:`gdal_driver_gti_create`: Create an index of raster datasets compatible of the GDAL Tile Index (GTI) driver
     - :ref:`gdal_driver_openfilegdb_repack`: Repack in-place a FileGeodatabase dataset
