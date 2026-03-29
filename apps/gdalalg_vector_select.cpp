@@ -40,9 +40,11 @@ GDALVectorSelectAlgorithm::GDALVectorSelectAlgorithm(bool standaloneStep)
     AddActiveLayerArg(&m_activeLayer);
     AddArg("fields", 0, _("Fields to select (or exclude if --exclude)"),
            &m_fields)
+        .SetDuplicateValuesAllowed(false)
         .SetPositional()
         .SetRequired();
     AddArg("exclude", 0, _("Exclude specified fields"), &m_exclude)
+        .SetDuplicateValuesAllowed(false)
         .SetMutualExclusionGroup("exclude-ignore");
     AddArg("ignore-missing-fields", 0, _("Ignore missing fields"),
            &m_ignoreMissingFields)
