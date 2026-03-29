@@ -1,5 +1,5 @@
 /******************************************************************************
- * Name:     gdalmultiDim_meshgrid.cpp
+ * Name:     gdalmultidim_array_meshgrid.cpp
  * Project:  GDAL Core
  * Purpose:  Return a vector of coordinate matrices from coordinate vectors.
  * Author:   Even Rouault <even.rouault at spatialys.com>
@@ -14,6 +14,8 @@
 
 #include <algorithm>
 #include <limits>
+
+//! @cond Doxygen_Suppress
 
 /************************************************************************/
 /*                        GetConcatenatedNames()                        */
@@ -243,6 +245,8 @@ lbl_next_depth:
 
     return true;
 }
+
+//! @endcond
 
 /************************************************************************/
 /*                       GDALMDArrayGetMeshGrid()                       */

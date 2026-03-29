@@ -80,6 +80,7 @@ if test "${CIFUZZ:-}" = "True"; then
   $CXX $CXXFLAGS \
             -I$SRC_DIR/port -I$SRC_DIR/build/port \
             -I$SRC_DIR/gcore -I$SRC_DIR/build/gcore \
+            -I$SRC_DIR/gcore/multidim \
             -I$SRC_DIR/alg -I$SRC_DIR/apps -I$SRC_DIR/ogr \
             -I$SRC_DIR/ogr/ogrsf_frmts \
             -I$SRC_DIR/ogr/ogrsf_frmts/sqlite  \
@@ -94,6 +95,7 @@ if test "${CIFUZZ:-}" = "True"; then
   $CXX $CXXFLAGS \
             -I$SRC_DIR/port -I$SRC_DIR/build/port \
             -I$SRC_DIR/gcore -I$SRC_DIR/build/gcore \
+            -I$SRC_DIR/gcore/multidim \
             -I$SRC_DIR/alg -I$SRC_DIR/apps -I$SRC_DIR/ogr \
             -I$SRC_DIR/ogr/ogrsf_frmts \
             -I$SRC_DIR/ogr/ogrsf_frmts/sqlite  \
