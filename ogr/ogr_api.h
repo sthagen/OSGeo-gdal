@@ -208,6 +208,9 @@ OGRGeometryH CPL_DLL OGR_G_Boundary(OGRGeometryH) CPL_WARN_UNUSED_RESULT;
 OGRGeometryH CPL_DLL OGR_G_ConvexHull(OGRGeometryH) CPL_WARN_UNUSED_RESULT;
 OGRGeometryH CPL_DLL OGR_G_ConcaveHull(OGRGeometryH, double dfRatio,
                                        bool bAllowHoles) CPL_WARN_UNUSED_RESULT;
+OGRGeometryH CPL_DLL
+OGR_G_ConcaveHullOfPolygons(OGRGeometryH, double dfLengthRatio, bool bIsTight,
+                            bool bAllowHoles) CPL_WARN_UNUSED_RESULT;
 OGRGeometryH CPL_DLL OGR_G_Buffer(OGRGeometryH, double dfDist,
                                   int nQuadSegs) CPL_WARN_UNUSED_RESULT;
 OGRGeometryH CPL_DLL OGR_G_BufferEx(OGRGeometryH, double dfDist,
