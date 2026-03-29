@@ -10981,16 +10981,16 @@ def test_gpkg_secure_delete(tmp_vsimem):
 @pytest.mark.parametrize(
     "src_filename,options",
     [
-        # Generated with: ogr2ogr autotest/ogr/data/gpkg/poly_golden.gpkg autotest/ogr/data/poly.shp --config OGR_CURRENT_DATE="2000-01-01T:00:00:00.000Z" -nomd -dsco VERSION=1.2
+        # Generated with: ogr2ogr autotest/ogr/data/gpkg/poly_golden.gpkg autotest/ogr/data/poly.shp --config OGR_CURRENT_DATE="2000-01-01T00:00:00.000Z" -nomd -dsco VERSION=1.2
         ("data/gpkg/poly_golden.gpkg", ["VERSION=1.2"]),
-        # Generated with: ogr2ogr autotest/ogr/data/gpkg/poly_golden_gpkg_1_4.gpkg autotest/ogr/data/poly.shp --config OGR_CURRENT_DATE="2000-01-01T:00:00:00.000Z" -nomd -dsco VERSION=1.4
+        # Generated with: ogr2ogr autotest/ogr/data/gpkg/poly_golden_gpkg_1_4.gpkg autotest/ogr/data/poly.shp --config OGR_CURRENT_DATE="2000-01-01T00:00:00.000Z" -nomd -dsco VERSION=1.4
         ("data/gpkg/poly_golden_gpkg_1_4.gpkg", ["VERSION=1.4"]),
     ],
 )
 def test_ogr_gpkg_write_check_golden_file(tmp_path, src_filename, options):
 
     out_filename = str(tmp_path / "test.gpkg")
-    with gdal.config_option("OGR_CURRENT_DATE", "2000-01-01T:00:00:00.000Z"):
+    with gdal.config_option("OGR_CURRENT_DATE", "2000-01-01T00:00:00.000Z"):
         gdal.VectorTranslate(out_filename, src_filename, datasetCreationOptions=options)
 
     # Compare first sqlite3 dump if sqlite3 binary available
@@ -11475,3 +11475,29 @@ def test_ogr_gpkg_detect_multiple_statements(sql, error_expected):
     else:
         with ds.ExecuteSQL(sql):
             pass
+
+
+###############################################################################
+
+
+@gdaltest.enable_exceptions()
+def test_ogr_gpkg_algorithm_driver_gpkg_validate():
+
+    with gdal.alg.driver.gpkg.validate(
+        dataset="data/gpkg/poly_golden_gpkg_1_4.gpkg"
+    ) as alg:
+        assert alg.Output() == "Validation succeeded"
+
+    with gdal.alg.driver.gpkg.validate(
+        dataset="data/gpkg/poly_golden_gpkg_1_4.gpkg", full_check=True
+    ) as alg:
+        assert alg.Output() == "Validation succeeded"
+
+    with gdal.alg.driver.gpkg.validate(
+        dataset="data/gpkg/poly_golden_gpkg_1_4.gpkg", full_check=True, verbose=True
+    ) as alg:
+        assert alg.Output().startswith("Checking gpkg_spatial_ref_sys")
+        assert alg.Output().endswith("\nValidation succeeded")
+
+    with pytest.raises(Exception, match="Validation failed"):
+        gdal.alg.driver.gpkg.validate(dataset="data/gpkg/poly_non_conformant.gpkg")

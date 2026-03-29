@@ -342,6 +342,7 @@ url
 use-source-timestamp
 use-tempfile
 variant
+verbose
 visible-value
 warp-option
 webviewer
