@@ -699,7 +699,11 @@ CPLErr GDALRasterBand::ReadRaster(T *pData, size_t nArrayEltCount,
     }
 
     GDALRasterIOExtraArg sExtraArg;
-    sExtraArg.nVersion = 1;
+    INIT_RASTERIO_EXTRA_ARG(sExtraArg);
+    CPL_IGNORE_RET_VAL(sExtraArg.eResampleAlg);
+    CPL_IGNORE_RET_VAL(sExtraArg.pfnProgress);
+    CPL_IGNORE_RET_VAL(sExtraArg.pProgressData);
+    CPL_IGNORE_RET_VAL(sExtraArg.bFloatingPointWindowValidity);
     sExtraArg.eResampleAlg = eResampleAlg;
     sExtraArg.pfnProgress = pfnProgress;
     sExtraArg.pProgressData = pProgressData;
@@ -708,6 +712,7 @@ CPLErr GDALRasterBand::ReadRaster(T *pData, size_t nArrayEltCount,
     sExtraArg.dfYOff = dfYOff;
     sExtraArg.dfXSize = dfXSize;
     sExtraArg.dfYSize = dfYSize;
+
     const int nXOff = static_cast<int>(dfXOff);
     const int nYOff = static_cast<int>(dfYOff);
     const int nXSize = std::max(1, static_cast<int>(dfXSize + 0.5));
@@ -899,7 +904,11 @@ CPLErr GDALRasterBand::ReadRaster(std::vector<T> &vData, double dfXOff,
     }
 
     GDALRasterIOExtraArg sExtraArg;
-    sExtraArg.nVersion = 1;
+    INIT_RASTERIO_EXTRA_ARG(sExtraArg);
+    CPL_IGNORE_RET_VAL(sExtraArg.eResampleAlg);
+    CPL_IGNORE_RET_VAL(sExtraArg.pfnProgress);
+    CPL_IGNORE_RET_VAL(sExtraArg.pProgressData);
+    CPL_IGNORE_RET_VAL(sExtraArg.bFloatingPointWindowValidity);
     sExtraArg.eResampleAlg = eResampleAlg;
     sExtraArg.pfnProgress = pfnProgress;
     sExtraArg.pProgressData = pProgressData;
@@ -908,6 +917,7 @@ CPLErr GDALRasterBand::ReadRaster(std::vector<T> &vData, double dfXOff,
     sExtraArg.dfYOff = dfYOff;
     sExtraArg.dfXSize = dfXSize;
     sExtraArg.dfYSize = dfYSize;
+
     const int nXOff = static_cast<int>(dfXOff);
     const int nYOff = static_cast<int>(dfYOff);
     const int nXSize = std::max(1, static_cast<int>(dfXSize + 0.5));

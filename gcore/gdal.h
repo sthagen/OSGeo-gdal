@@ -161,8 +161,12 @@ typedef enum
 } GDALRIOResampleAlg;
 
 /* NOTE to developers: if required, only add members at the end of the
- * structure, and when doing so increase RASTERIO_EXTRA_ARG_CURRENT_VERSION
+ * structure, and when doing so increase RASTERIO_EXTRA_ARG_CURRENT_VERSION.
+ *
+ * Also make sure to use GDALCopyRasterIOExtraArg() when creating a copy
+ * from user input.
  */
+
 /** Structure to pass extra arguments to RasterIO() method,
  * must be initialized with INIT_RASTERIO_EXTRA_ARG
  */
@@ -203,10 +207,20 @@ typedef struct
         Only available if RASTERIO_EXTRA_ARG_CURRENT_VERSION >= 2
     */
     int bUseOnlyThisScale;
+
+    /** Indicate if operations (typically non-nearest resampling)
+     * should be done in the eBufType data type of the RasterIO() request
+     * rather than the band data type.
+     * Only available if RASTERIO_EXTRA_ARG_CURRENT_VERSION >= 3 (GDAL >= 3.13)
+     * Defaults to TRUE in GDAL >= 3.13 (behavior in previous version was
+     * mostly, but not always corresponding to setting it to FALSE)
+    */
+    int bOperateInBufType;
+
 } GDALRasterIOExtraArg;
 
 #ifndef DOXYGEN_SKIP
-#define RASTERIO_EXTRA_ARG_CURRENT_VERSION 2
+#define RASTERIO_EXTRA_ARG_CURRENT_VERSION 3
 #endif
 
 /** Macro to initialize an instance of GDALRasterIOExtraArg structure.
@@ -220,7 +234,15 @@ typedef struct
         (s).pProgressData = CPL_NULLPTR;                                       \
         (s).bFloatingPointWindowValidity = FALSE;                              \
         (s).bUseOnlyThisScale = FALSE;                                         \
+        (s).bOperateInBufType = TRUE;                                          \
     } while (0)
+
+/** Macro to return whether GDALRasterIOExtraArg::bOperateInBufType is set.
+ *
+ * @since 3.13
+ */
+#define GDAL_GET_OPERATE_IN_BUF_TYPE(s)                                        \
+    ((s).nVersion < 3 || (s).bOperateInBufType)
 
 /** Value indicating the start of the range for color interpretations belonging
  * to the InfraRed (IR) domain. All constants of the GDALColorInterp enumeration

@@ -715,6 +715,7 @@ void wrapper_VSIGetMemFileBuffer(const char *utf8_string, GByte **out, vsi_l_off
                      GIntBig *buf_pixel_space = 0,
                      GIntBig *buf_line_space = 0,
                      GDALRIOResampleAlg resample_alg = GRIORA_NearestNeighbour,
+                     bool operate_in_buf_type = TRUE,
                      GDALProgressFunc callback = NULL,
                      void* callback_data=NULL,
                      void* inputOutputBuf = NULL) {
@@ -755,6 +756,7 @@ void wrapper_VSIGetMemFileBuffer(const char *utf8_string, GByte **out, vsi_l_off
     GDALRasterIOExtraArg sExtraArg;
     INIT_RASTERIO_EXTRA_ARG(sExtraArg);
     sExtraArg.eResampleAlg = resample_alg;
+    sExtraArg.bOperateInBufType = operate_in_buf_type;
     sExtraArg.pfnProgress = callback;
     sExtraArg.pProgressData = callback_data;
     int nXOff = (int)(xoff + 0.5);
@@ -1020,6 +1022,7 @@ void wrapper_VSIGetMemFileBuffer(const char *utf8_string, GByte **out, vsi_l_off
                  buf_xsize=None, buf_ysize=None, buf_type=None,
                  buf_pixel_space=None, buf_line_space=None,
                  resample_alg=gdalconst.GRIORA_NearestNeighbour,
+                 operate_in_buf_type=True,
                  callback=None,
                  callback_data=None,
                  buf_obj=None):
@@ -1032,7 +1035,8 @@ void wrapper_VSIGetMemFileBuffer(const char *utf8_string, GByte **out, vsi_l_off
       return _gdal.Band_ReadRaster1(self, xoff, yoff, xsize, ysize,
                                     buf_xsize, buf_ysize, buf_type,
                                     buf_pixel_space, buf_line_space,
-                                    resample_alg, callback, callback_data,
+                                    resample_alg, operate_in_buf_type,
+                                    callback, callback_data,
                                     buf_obj)
 
   def WriteRaster(self, xoff, yoff, xsize, ysize,
@@ -1067,6 +1071,7 @@ void wrapper_VSIGetMemFileBuffer(const char *utf8_string, GByte **out, vsi_l_off
   def ReadAsMaskedArray(self, xoff=0, yoff=0, win_xsize=None, win_ysize=None,
                   buf_xsize=None, buf_ysize=None, buf_type=None,
                   resample_alg=gdalconst.GRIORA_NearestNeighbour,
+                  operate_in_buf_type=True,
                   mask_resample_alg=gdalconst.GRIORA_NearestNeighbour,
                   callback=None,
                   callback_data=None):
@@ -1086,6 +1091,7 @@ void wrapper_VSIGetMemFileBuffer(const char *utf8_string, GByte **out, vsi_l_off
                                buf_xsize=buf_xsize, buf_ysize=buf_ysize,
                                buf_type=buf_type,
                                resample_alg=resample_alg,
+                               operate_in_buf_type=operate_in_buf_type,
                                callback=callback, callback_data=callback_data)
 
       if self.GetMaskFlags() != GMF_ALL_VALID:
@@ -1105,6 +1111,7 @@ void wrapper_VSIGetMemFileBuffer(const char *utf8_string, GByte **out, vsi_l_off
   def ReadAsArray(self, xoff=0, yoff=0, win_xsize=None, win_ysize=None,
                   buf_xsize=None, buf_ysize=None, buf_type=None, buf_obj=None,
                   resample_alg=gdalconst.GRIORA_NearestNeighbour,
+                  operate_in_buf_type=True,
                   callback=None,
                   callback_data=None):
       """
@@ -1141,6 +1148,10 @@ void wrapper_VSIGetMemFileBuffer(const char *utf8_string, GByte **out, vsi_l_off
       resample_alg : int, default = :py:const:`gdal.GRIORA_NearestNeighbour`.
            Specifies the resampling algorithm to use when the size of
            the read window and the buffer are not equal.
+      operate_in_buf_type : bool, default = True
+           Whether the data type used for the operations (typically non-nearest-neighbour
+           resampling) should be buf_type (operate_in_buf_type=True) or the
+           data type of the band (operate_in_buf_type=False)
       callback : callable, optional
           A progress callback function
       callback_data : any, optional
@@ -1189,6 +1200,7 @@ void wrapper_VSIGetMemFileBuffer(const char *utf8_string, GByte **out, vsi_l_off
                                          win_xsize, win_ysize,
                                          buf_xsize, buf_ysize, buf_type, buf_obj,
                                          resample_alg=resample_alg,
+                                         operate_in_buf_type=operate_in_buf_type,
                                          callback=callback,
                                          callback_data=callback_data)
 
@@ -1510,6 +1522,7 @@ CPLErr ReadRaster1( double xoff, double yoff, double xsize, double ysize,
                     int band_list = 0, int *pband_list = 0,
                     GIntBig* buf_pixel_space = 0, GIntBig* buf_line_space = 0, GIntBig* buf_band_space = 0,
                     GDALRIOResampleAlg resample_alg = GRIORA_NearestNeighbour,
+                    bool operate_in_buf_type = TRUE,
                     GDALProgressFunc callback = NULL,
                     void* callback_data=NULL,
                     void* inputOutputBuf = NULL )
@@ -1576,6 +1589,7 @@ CPLErr ReadRaster1( double xoff, double yoff, double xsize, double ysize,
     GDALRasterIOExtraArg sExtraArg;
     INIT_RASTERIO_EXTRA_ARG(sExtraArg);
     sExtraArg.eResampleAlg = resample_alg;
+    sExtraArg.bOperateInBufType = operate_in_buf_type;
     sExtraArg.pfnProgress = callback;
     sExtraArg.pProgressData = callback_data;
 
@@ -1657,6 +1671,7 @@ CPLErr ReadRaster1( double xoff, double yoff, double xsize, double ysize,
     def ReadAsArray(self, xoff=0, yoff=0, xsize=None, ysize=None, buf_obj=None,
                     buf_xsize=None, buf_ysize=None, buf_type=None,
                     resample_alg=gdalconst.GRIORA_NearestNeighbour,
+                    operate_in_buf_type=True,
                     callback=None,
                     callback_data=None,
                     interleave='band',
@@ -1695,6 +1710,10 @@ CPLErr ReadRaster1( double xoff, double yoff, double xsize, double ysize,
         resample_alg : int, default = :py:const:`gdal.GRIORA_NearestNeighbour`.
              Specifies the resampling algorithm to use when the size of
              the read window and the buffer are not equal.
+        operate_in_buf_type : bool, default = True
+             Whether the data type used for the operations (typically non-nearest-neighbour
+             resampling) should be buf_type (operate_in_buf_type=True) or the
+             data type of the band (operate_in_buf_type=False)
         callback : callable, optional
             A progress callback function
         callback_data : any, optional
@@ -1752,6 +1771,7 @@ CPLErr ReadRaster1( double xoff, double yoff, double xsize, double ysize,
         return gdal_array.DatasetReadAsArray(self, xoff, yoff, xsize, ysize, buf_obj,
                                               buf_xsize, buf_ysize, buf_type,
                                               resample_alg=resample_alg,
+                                              operate_in_buf_type=operate_in_buf_type,
                                               callback=callback,
                                               callback_data=callback_data,
                                               interleave=interleave,
@@ -1873,6 +1893,7 @@ CPLErr ReadRaster1( double xoff, double yoff, double xsize, double ysize,
                    band_list=None,
                    buf_pixel_space=None, buf_line_space=None, buf_band_space=None,
                    resample_alg=gdalconst.GRIORA_NearestNeighbour,
+                   operate_in_buf_type=True,
                    callback=None,
                    callback_data=None,
                    buf_obj=None):
@@ -1894,7 +1915,7 @@ CPLErr ReadRaster1( double xoff, double yoff, double xsize, double ysize,
         return _gdal.Dataset_ReadRaster1(self, xoff, yoff, xsize, ysize,
                                             buf_xsize, buf_ysize, buf_type,
                                             band_list, buf_pixel_space, buf_line_space, buf_band_space,
-                                          resample_alg, callback, callback_data, buf_obj )
+                                          resample_alg, operate_in_buf_type, callback, callback_data, buf_obj )
 
     def GetVirtualMemArray(self, eAccess=gdalconst.GF_Read, xoff=0, yoff=0,
                            xsize=None, ysize=None, bufxsize=None, bufysize=None,
