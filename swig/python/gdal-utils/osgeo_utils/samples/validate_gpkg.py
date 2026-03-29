@@ -94,6 +94,7 @@ class GPKGChecker:
         log_msg=False,
         warning_msg=True,
         warning_as_error=False,
+        myprint=print,
     ):
         self.filename = filename
         self.conn = None
@@ -106,10 +107,11 @@ class GPKGChecker:
         self.warning_as_error = warning_as_error
         self.errors = []
         self.warnings = []
+        self.myprint = myprint
 
     def _log(self, msg):
         if self.log_msg:
-            print(msg)
+            self.myprint(msg)
 
     def _assert(self, cond, req, msg):
         # self._log('Verified requirement %s' % req)
@@ -128,7 +130,7 @@ class GPKGChecker:
         else:
             self.warnings += [msg]
             if self.warning_msg:
-                print(msg)
+                self.myprint(msg)
 
     def _check_structure(self, columns, expected_columns, req, table_name):
         self._assert(
@@ -175,6 +177,7 @@ class GPKGChecker:
                 if (
                     default != expected_default
                     and expected_default == "strftime('%Y-%m-%dT%H:%M:%fZ','now')"
+                    and default is not None
                     and default.lower().replace(" ", "")
                     in (
                         "strftime('%Y-%m-%dT%H:%M:%fZ','now')".lower(),
@@ -2942,6 +2945,7 @@ def check(
     log_msg=False,
     warning_msg=True,
     warning_as_error=False,
+    myprint=print,
 ):
 
     if verbose is not None:
@@ -2959,6 +2963,7 @@ def check(
         log_msg=log_msg,
         warning_msg=warning_msg,
         warning_as_error=warning_as_error,
+        myprint=myprint,
     )
     checker.check()
     return checker.errors
@@ -2979,7 +2984,25 @@ def Usage():
     return 2
 
 
-def main(argv=sys.argv):
+_acc_print = ""
+
+
+def get_output_string():
+    return _acc_print
+
+
+def main(argv=sys.argv, output_in_string=False):
+
+    global _acc_print
+    _acc_print = ""
+
+    def acc_print(msg):
+        global _acc_print
+        _acc_print += msg
+        _acc_print += "\n"
+
+    myprint = acc_print if output_in_string else print
+
     filename = None
     log_msg = False
     warning_msg = True
@@ -3012,6 +3035,7 @@ def main(argv=sys.argv):
         log_msg=log_msg,
         warning_msg=warning_msg,
         warning_as_error=warning_as_error,
+        myprint=myprint,
     )
     if not abort_at_first_error:
         if not ret:
@@ -3019,9 +3043,9 @@ def main(argv=sys.argv):
         else:
             for req, msg in ret:
                 if req:
-                    print("Req %s: %s" % (str(req), msg))
+                    myprint("Req %s: %s" % (str(req), msg))
                 else:
-                    print(msg)
+                    myprint(msg)
             return 1
     return 0
 

@@ -5087,10 +5087,12 @@ GDALRIOResampleAlg GDALRasterIOGetResampleAlg(const char *pszResampling)
 
 const char *GDALRasterIOGetResampleAlg(GDALRIOResampleAlg eResampleAlg)
 {
+    const char *pszRet = "Unknown";
     switch (eResampleAlg)
     {
         case GRIORA_NearestNeighbour:
-            return "NearestNeighbour";
+            pszRet = "NearestNeighbour";
+            break;
         case GRIORA_Bilinear:
             return "Bilinear";
         case GRIORA_Cubic:
@@ -5107,10 +5109,11 @@ const char *GDALRasterIOGetResampleAlg(GDALRIOResampleAlg eResampleAlg)
             return "Mode";
         case GRIORA_Gauss:
             return "Gauss";
-        default:
-            CPLAssert(false);
-            return "Unknown";
+        case GRIORA_RESERVED_START:
+        case GRIORA_RESERVED_END:
+            break;
     }
+    return pszRet;
 }
 
 /************************************************************************/

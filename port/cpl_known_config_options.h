@@ -334,7 +334,7 @@ constexpr static const char* const apszKnownConfigOptions[] =
    "GDAL_JPEG2000_STRUCTURE_MAX_LINES", // from gdaljp2structure.cpp
    "GDAL_JPEG_TO_RGB", // from jpgdataset.cpp
    "GDAL_JPEGXL_MAX_BOX_BUFFER_SIZE", // from jpegxl.cpp
-   "GDAL_LOAD_EXTRA_DIM_METADATA_DELAY", // from gdalmultidim.cpp
+   "GDAL_LOAD_EXTRA_DIM_METADATA_DELAY", // from gdalmultidim_array_bridge_classic.cpp
    "GDAL_LOCALE", // from gdaldllmain.cpp
    "GDAL_MAX_BAND_COUNT", // from gdal_misc.cpp, netcdfdataset.cpp, pcidskdataset2.cpp
    "GDAL_MAX_CONNECTIONS", // from gdalogcapidataset.cpp, gdalwmsdataset.cpp
@@ -410,7 +410,7 @@ constexpr static const char* const apszKnownConfigOptions[] =
    "GDAL_STATS_USE_FLOAT32_OPTIM", // from gdalrasterband.cpp
    "GDAL_STATS_USE_FLOAT64_OPTIM", // from gdalrasterband.cpp
    "GDAL_STATS_USE_INTEGER_STATS", // from gdalrasterband.cpp
-   "GDAL_SWATH_SIZE", // from gdalmultidim.cpp, rasterio.cpp
+   "GDAL_SWATH_SIZE", // from gdalmultidim_array.cpp, rasterio.cpp
    "GDAL_TEMP_DRIVER_NAME", // from nearblack_lib_floodfill.cpp
    "GDAL_TERM_PROGRESS_OSC_9_4", // from cpl_progress.cpp
    "GDAL_THRESHOLD_MIN_THREADS_FOR_SPAWN", // from gdalalg_raster_tile.cpp

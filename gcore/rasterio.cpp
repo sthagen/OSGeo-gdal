@@ -1082,7 +1082,7 @@ CPLErr GDALRasterBand::RasterIOResampled(
     GSpacing nLSMem = nLineSpace;
     void *pDataMem = pData;
     GDALDataType eDTMem = eBufType;
-    if (eBufType != eDataType)
+    if (eBufType != eDataType && !GDAL_GET_OPERATE_IN_BUF_TYPE(*psExtraArg))
     {
         nPSMem = GDALGetDataTypeSizeBytes(eDataType);
         nLSMem = nPSMem * nBufXSize;
@@ -1229,16 +1229,7 @@ CPLErr GDALRasterBand::RasterIOResampled(
     else
     {
         const char *pszResampling =
-            (psExtraArg->eResampleAlg == GRIORA_Bilinear)      ? "BILINEAR"
-            : (psExtraArg->eResampleAlg == GRIORA_Cubic)       ? "CUBIC"
-            : (psExtraArg->eResampleAlg == GRIORA_CubicSpline) ? "CUBICSPLINE"
-            : (psExtraArg->eResampleAlg == GRIORA_Lanczos)     ? "LANCZOS"
-            : (psExtraArg->eResampleAlg == GRIORA_Average)     ? "AVERAGE"
-            : (psExtraArg->eResampleAlg == GRIORA_RMS)         ? "RMS"
-            : (psExtraArg->eResampleAlg == GRIORA_Mode)        ? "MODE"
-            : (psExtraArg->eResampleAlg == GRIORA_Gauss)       ? "GAUSS"
-                                                               : "UNKNOWN";
-
+            GDALRasterIOGetResampleAlg(psExtraArg->eResampleAlg);
         int nKernelRadius = 0;
         GDALResampleFunction pfnResampleFunc =
             GDALGetResampleFunction(pszResampling, &nKernelRadius);
@@ -1503,7 +1494,7 @@ CPLErr GDALRasterBand::RasterIOResampled(
         CPLFree(pabyChunkNoDataMask);
     }
 
-    if (eBufType != eDataType)
+    if (pTempBuffer)
     {
         CPL_IGNORE_RET_VAL(poMEMDS->GetRasterBand(1)->RasterIO(
             GF_Read, nDestXOffVirtual, nDestYOffVirtual, nBufXSize, nBufYSize,
@@ -1574,39 +1565,47 @@ CPLErr GDALDataset::RasterIOResampled(
     }
 
     // Create a MEM dataset that wraps the output buffer.
-    GDALDataset *poMEMDS =
+    std::unique_ptr<void, VSIFreeReleaser> pTempBuffer;
+    GSpacing nPSMem = nPixelSpace;
+    GSpacing nLSMem = nLineSpace;
+    GSpacing nBandSpaceMEM = nBandSpace;
+    void *pDataMem = pData;
+    GDALDataType eDTMem = eBufType;
+    GDALRasterBand *poFirstSrcBand = GetRasterBand(panBandMap[0]);
+    const GDALDataType eDataType = poFirstSrcBand->GetRasterDataType();
+    if (eBufType != eDataType && !GDAL_GET_OPERATE_IN_BUF_TYPE(*psExtraArg))
+    {
+        nPSMem = GDALGetDataTypeSizeBytes(eDataType);
+        nLSMem = nPSMem * nBufXSize;
+        nBandSpaceMEM = nLSMem * nBandCount;
+        pTempBuffer.reset(VSI_MALLOC3_VERBOSE(nBandCount, nBufYSize,
+                                              static_cast<size_t>(nLSMem)));
+        if (pTempBuffer == nullptr)
+            return CE_Failure;
+        pDataMem = pTempBuffer.get();
+        eDTMem = eDataType;
+    }
+
+    auto poMEMDS = std::unique_ptr<GDALDataset>(
         MEMDataset::Create("", nDestXOffVirtual + nBufXSize,
-                           nDestYOffVirtual + nBufYSize, 0, eBufType, nullptr);
-    GDALRasterBand **papoDstBands = static_cast<GDALRasterBand **>(
-        CPLMalloc(nBandCount * sizeof(GDALRasterBand *)));
+                           nDestYOffVirtual + nBufYSize, 0, eDTMem, nullptr));
+#ifdef GDAL_ENABLE_RESAMPLING_MULTIBAND
+    std::vector<GDALRasterBand *> apoDstBands(nBandCount);
+#endif
     int nNBITS = 0;
     for (int i = 0; i < nBandCount; i++)
     {
-        char szBuffer[32] = {'\0'};
-        int nRet = CPLPrintPointer(
-            szBuffer,
-            static_cast<GByte *>(pData) - nPixelSpace * nDestXOffVirtual -
-                nLineSpace * nDestYOffVirtual + nBandSpace * i,
-            sizeof(szBuffer));
-        szBuffer[nRet] = 0;
-
-        char szBuffer0[64] = {'\0'};
-        snprintf(szBuffer0, sizeof(szBuffer0), "DATAPOINTER=%s", szBuffer);
-
-        char szBuffer1[64] = {'\0'};
-        snprintf(szBuffer1, sizeof(szBuffer1), "PIXELOFFSET=" CPL_FRMT_GIB,
-                 static_cast<GIntBig>(nPixelSpace));
-
-        char szBuffer2[64] = {'\0'};
-        snprintf(szBuffer2, sizeof(szBuffer2), "LINEOFFSET=" CPL_FRMT_GIB,
-                 static_cast<GIntBig>(nLineSpace));
-
-        char *apszOptions[4] = {szBuffer0, szBuffer1, szBuffer2, nullptr};
-
-        poMEMDS->AddBand(eBufType, apszOptions);
+        GByte *const pBandData = static_cast<GByte *>(pDataMem) -
+                                 nPSMem * nDestXOffVirtual -
+                                 nLSMem * nDestYOffVirtual + nBandSpaceMEM * i;
+        auto poMEMBand = GDALRasterBand::FromHandle(MEMCreateRasterBandEx(
+            poMEMDS.get(), i + 1, pBandData, eDTMem, nPSMem, nLSMem, false));
+        poMEMDS->SetBand(i + 1, poMEMBand);
 
         GDALRasterBand *poSrcBand = GetRasterBand(panBandMap[i]);
-        papoDstBands[i] = poMEMDS->GetRasterBand(i + 1);
+#ifdef GDAL_ENABLE_RESAMPLING_MULTIBAND
+        apoDstBands[i] = poMEMBand;
+#endif
         const char *pszNBITS =
             poSrcBand->GetMetadataItem("NBITS", "IMAGE_STRUCTURE");
         if (pszNBITS)
@@ -1695,18 +1694,8 @@ CPLErr GDALDataset::RasterIOResampled(
 #endif
     {
         const char *pszResampling =
-            (psExtraArg->eResampleAlg == GRIORA_Bilinear)      ? "BILINEAR"
-            : (psExtraArg->eResampleAlg == GRIORA_Cubic)       ? "CUBIC"
-            : (psExtraArg->eResampleAlg == GRIORA_CubicSpline) ? "CUBICSPLINE"
-            : (psExtraArg->eResampleAlg == GRIORA_Lanczos)     ? "LANCZOS"
-            : (psExtraArg->eResampleAlg == GRIORA_Average)     ? "AVERAGE"
-            : (psExtraArg->eResampleAlg == GRIORA_RMS)         ? "RMS"
-            : (psExtraArg->eResampleAlg == GRIORA_Mode)        ? "MODE"
-            : (psExtraArg->eResampleAlg == GRIORA_Gauss)       ? "GAUSS"
-                                                               : "UNKNOWN";
+            GDALRasterIOGetResampleAlg(psExtraArg->eResampleAlg);
 
-        GDALRasterBand *poFirstSrcBand = GetRasterBand(panBandMap[0]);
-        GDALDataType eDataType = poFirstSrcBand->GetRasterDataType();
         int nBlockXSize, nBlockYSize;
         poFirstSrcBand->GetBlockSize(&nBlockXSize, &nBlockYSize);
 
@@ -1783,10 +1772,8 @@ CPLErr GDALDataset::RasterIOResampled(
         if (pChunk == nullptr ||
             (bUseNoDataMask && pabyChunkNoDataMask == nullptr))
         {
-            GDALClose(poMEMDS);
             CPLFree(pChunk);
             CPLFree(pabyChunkNoDataMask);
-            CPLFree(papoDstBands);
             return CE_Failure;
         }
 
@@ -1888,11 +1875,11 @@ CPLErr GDALDataset::RasterIOResampled(
                                 {
                                     GDALCopyWords64(
                                         abyZero, GDT_UInt8, 0,
-                                        static_cast<GByte *>(pData) +
-                                            iBand * nBandSpace +
-                                            nLineSpace * (j + nDstYOff) +
-                                            nDstXOff * nPixelSpace,
-                                        eBufType, static_cast<int>(nPixelSpace),
+                                        static_cast<GByte *>(pDataMem) +
+                                            iBand * nBandSpaceMEM +
+                                            nLSMem * (j + nDstYOff) +
+                                            nDstXOff * nPSMem,
+                                        eBufType, static_cast<int>(nPSMem),
                                         nDstXCount);
                                 }
                             }
@@ -1931,8 +1918,8 @@ CPLErr GDALDataset::RasterIOResampled(
                         nChunkYSizeQueried, nDstXOff + nDestXOffVirtual,
                         nDstXOff + nDestXOffVirtual + nDstXCount,
                         nDstYOff + nDestYOffVirtual,
-                        nDstYOff + nDestYOffVirtual + nDstYCount, papoDstBands,
-                        pszResampling, FALSE /*bHasNoData*/,
+                        nDstYOff + nDestYOffVirtual + nDstYCount,
+                        apoDstBands.data(), pszResampling, FALSE /*bHasNoData*/,
                         0.0 /* dfNoDataValue */, nullptr /* color table*/,
                         eDataType);
                 }
@@ -2017,8 +2004,13 @@ CPLErr GDALDataset::RasterIOResampled(
         CPLFree(pabyChunkNoDataMask);
     }
 
-    CPLFree(papoDstBands);
-    GDALClose(poMEMDS);
+    if (pTempBuffer)
+    {
+        CPL_IGNORE_RET_VAL(poMEMDS->RasterIO(
+            GF_Read, nDestXOffVirtual, nDestYOffVirtual, nBufXSize, nBufYSize,
+            pData, nBufXSize, nBufYSize, eBufType, nBandCount, nullptr,
+            nPixelSpace, nLineSpace, nBandSpace, nullptr));
+    }
 
     return eErr;
 }
@@ -5932,7 +5924,7 @@ CPLErr CPL_STDCALL GDALRasterBandCopyWholeRaster(
 /************************************************************************/
 
 void GDALCopyRasterIOExtraArg(GDALRasterIOExtraArg *psDestArg,
-                              GDALRasterIOExtraArg *psSrcArg)
+                              const GDALRasterIOExtraArg *psSrcArg)
 {
     INIT_RASTERIO_EXTRA_ARG(*psDestArg);
     if (psSrcArg)
@@ -5952,6 +5944,10 @@ void GDALCopyRasterIOExtraArg(GDALRasterIOExtraArg *psDestArg,
         if (psSrcArg->nVersion >= 2)
         {
             psDestArg->bUseOnlyThisScale = psSrcArg->bUseOnlyThisScale;
+        }
+        if (psSrcArg->nVersion >= 3)
+        {
+            psDestArg->bOperateInBufType = psSrcArg->bOperateInBufType;
         }
     }
 }

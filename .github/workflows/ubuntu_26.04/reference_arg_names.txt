@@ -101,6 +101,7 @@ fixed-value
 flatten
 force-recursive
 format
+full-check
 gcp
 geometry
 geometry-crs
@@ -341,6 +342,7 @@ url
 use-source-timestamp
 use-tempfile
 variant
+verbose
 visible-value
 warp-option
 webviewer

@@ -1,5 +1,5 @@
 /******************************************************************************
- * Name:     gdalmultidim_gltorthorectification.cpp
+ * Name:     gdalmultidim_array_gltorthorectification.cpp
  * Project:  GDAL Core
  * Purpose:  GLT orthorectification implementation
  * Author:   Even Rouault <even.rouault at spatialys.com>
@@ -231,24 +231,39 @@ bool GLTOrthoRectifiedArray::IRead(const GUInt64 *arrayStartIdx,
         m_apoDims.size() == 3
             ? static_cast<int>(bufferStride[2] * nBufferDTSize)
             : 0;
-    const int nCopyWordsCount =
+    const int nOutBandCount =
         m_apoDims.size() == 3 ? static_cast<int>(count[2]) : 1;
 
     const auto FillBufferWithNodata =
         [count, bufferStride, pDstBuffer, nBufferDTSize, &eBufferDT,
-         nCopyWordsDstStride, nCopyWordsCount, &abyNoData]()
+         nCopyWordsDstStride, nOutBandCount, &abyNoData]()
     {
         for (size_t iY = 0; iY < count[0]; ++iY)
         {
-            for (size_t iX = 0; iX < count[1]; ++iX)
+            if (nOutBandCount == 1 && bufferStride[1] > 0 &&
+                static_cast<int>(nBufferDTSize) <
+                    std::numeric_limits<int>::max() / bufferStride[1])
             {
-                GByte *pabyDstBuffer =
+                GDALCopyWords64(
+                    abyNoData.data(), eBufferDT, 0,
                     static_cast<GByte *>(pDstBuffer) +
-                    (iY * bufferStride[0] + iX * bufferStride[1]) *
-                        static_cast<int>(nBufferDTSize);
-                GDALCopyWords64(abyNoData.data(), eBufferDT, 0, pabyDstBuffer,
-                                eBufferDT, nCopyWordsDstStride,
-                                nCopyWordsCount);
+                        iY * bufferStride[0] * static_cast<int>(nBufferDTSize),
+                    eBufferDT,
+                    static_cast<int>(bufferStride[1] * nBufferDTSize),
+                    count[1]);
+            }
+            else
+            {
+                for (size_t iX = 0; iX < count[1]; ++iX)
+                {
+                    GByte *pabyDstBuffer =
+                        static_cast<GByte *>(pDstBuffer) +
+                        (iY * bufferStride[0] + iX * bufferStride[1]) *
+                            static_cast<int>(nBufferDTSize);
+                    GDALCopyWords64(abyNoData.data(), eBufferDT, 0,
+                                    pabyDstBuffer, eBufferDT,
+                                    nCopyWordsDstStride, nOutBandCount);
+                }
             }
         }
     };
@@ -404,8 +419,7 @@ bool GLTOrthoRectifiedArray::IRead(const GUInt64 *arrayStartIdx,
                     (iSrcY * nXCount + iSrcX) * nBandCount * nBufferDTSize;
                 GDALCopyWords64(pabySrcBuffer, eBufferDT,
                                 static_cast<int>(nBufferDTSize), pabyDstBuffer,
-                                eBufferDT, nCopyWordsDstStride,
-                                nCopyWordsCount);
+                                eBufferDT, nCopyWordsDstStride, nOutBandCount);
                 if (bSomeBandInvalids)
                 {
                     for (size_t i = 0; i < count[2]; ++i)
@@ -425,8 +439,7 @@ bool GLTOrthoRectifiedArray::IRead(const GUInt64 *arrayStartIdx,
             else
             {
                 GDALCopyWords64(abyNoData.data(), eBufferDT, 0, pabyDstBuffer,
-                                eBufferDT, nCopyWordsDstStride,
-                                nCopyWordsCount);
+                                eBufferDT, nCopyWordsDstStride, nOutBandCount);
             }
         }
     }

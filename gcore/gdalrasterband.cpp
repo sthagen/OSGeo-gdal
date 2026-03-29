@@ -699,7 +699,11 @@ CPLErr GDALRasterBand::ReadRaster(T *pData, size_t nArrayEltCount,
     }
 
     GDALRasterIOExtraArg sExtraArg;
-    sExtraArg.nVersion = 1;
+    INIT_RASTERIO_EXTRA_ARG(sExtraArg);
+    CPL_IGNORE_RET_VAL(sExtraArg.eResampleAlg);
+    CPL_IGNORE_RET_VAL(sExtraArg.pfnProgress);
+    CPL_IGNORE_RET_VAL(sExtraArg.pProgressData);
+    CPL_IGNORE_RET_VAL(sExtraArg.bFloatingPointWindowValidity);
     sExtraArg.eResampleAlg = eResampleAlg;
     sExtraArg.pfnProgress = pfnProgress;
     sExtraArg.pProgressData = pProgressData;
@@ -708,6 +712,7 @@ CPLErr GDALRasterBand::ReadRaster(T *pData, size_t nArrayEltCount,
     sExtraArg.dfYOff = dfYOff;
     sExtraArg.dfXSize = dfXSize;
     sExtraArg.dfYSize = dfYSize;
+
     const int nXOff = static_cast<int>(dfXOff);
     const int nYOff = static_cast<int>(dfYOff);
     const int nXSize = std::max(1, static_cast<int>(dfXSize + 0.5));
@@ -899,7 +904,11 @@ CPLErr GDALRasterBand::ReadRaster(std::vector<T> &vData, double dfXOff,
     }
 
     GDALRasterIOExtraArg sExtraArg;
-    sExtraArg.nVersion = 1;
+    INIT_RASTERIO_EXTRA_ARG(sExtraArg);
+    CPL_IGNORE_RET_VAL(sExtraArg.eResampleAlg);
+    CPL_IGNORE_RET_VAL(sExtraArg.pfnProgress);
+    CPL_IGNORE_RET_VAL(sExtraArg.pProgressData);
+    CPL_IGNORE_RET_VAL(sExtraArg.bFloatingPointWindowValidity);
     sExtraArg.eResampleAlg = eResampleAlg;
     sExtraArg.pfnProgress = pfnProgress;
     sExtraArg.pProgressData = pProgressData;
@@ -908,6 +917,7 @@ CPLErr GDALRasterBand::ReadRaster(std::vector<T> &vData, double dfXOff,
     sExtraArg.dfYOff = dfYOff;
     sExtraArg.dfXSize = dfXSize;
     sExtraArg.dfYSize = dfYSize;
+
     const int nXOff = static_cast<int>(dfXOff);
     const int nYOff = static_cast<int>(dfYOff);
     const int nXSize = std::max(1, static_cast<int>(dfXSize + 0.5));
@@ -10780,6 +10790,36 @@ const char *GDALRasterBand::GetMetadataItem(const char *pszName,
                  "test for the new GDT_Int8 data type instead.");
     }
     return GDALMajorObject::GetMetadataItem(pszName, pszDomain);
+}
+
+/************************************************************************/
+/*                      GDALRasterBandAsMDArray()                       */
+/************************************************************************/
+
+/** Return a view of this raster band as a 2D multidimensional GDALMDArray.
+ *
+ * The band must be linked to a GDALDataset. If this dataset is not already
+ * marked as shared, it will be, so that the returned array holds a reference
+ * to it.
+ *
+ * If the dataset has a geotransform attached, the X and Y dimensions of the
+ * returned array will have an associated indexing variable.
+ *
+ * The returned pointer must be released with GDALMDArrayRelease().
+ *
+ * This is the same as the C++ method GDALRasterBand::AsMDArray().
+ *
+ * @return a new array, or NULL.
+ *
+ * @since GDAL 3.1
+ */
+GDALMDArrayH GDALRasterBandAsMDArray(GDALRasterBandH hBand)
+{
+    VALIDATE_POINTER1(hBand, __func__, nullptr);
+    auto poArray(GDALRasterBand::FromHandle(hBand)->AsMDArray());
+    if (!poArray)
+        return nullptr;
+    return new GDALMDArrayHS(poArray);
 }
 
 /************************************************************************/

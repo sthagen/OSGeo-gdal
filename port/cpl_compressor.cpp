@@ -28,7 +28,7 @@
 #ifdef HAVE_LIBDEFLATE
 #include "libdeflate.h"
 #else
-#include "zlib.h"
+#include "cpl_zlib_header.h"  // to avoid warnings when including zlib.h
 #endif
 
 #ifdef HAVE_LZMA

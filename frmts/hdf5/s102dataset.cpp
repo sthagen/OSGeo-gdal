@@ -658,7 +658,9 @@ bool S102Dataset::OpenQuality(GDALOpenInfo *poOpenInfo,
     {
         const auto &oType = poValuesArray->GetDataType();
         if (oType.GetClass() == GEDTC_NUMERIC &&
-            oType.GetNumericDataType() == GDT_UInt32)
+            (oType.GetNumericDataType() == GDT_UInt32 ||
+             // Also accept Int32 as in /vsizip//vsicurl/https://services.data.shom.fr/static/jeux_test/S-102_FR.zip/S100_ROOT/S-102/DATASET_FILES/102FR0014581G013000/102FR0014581G013000.H5
+             oType.GetNumericDataType() == GDT_Int32))
         {
             // ok
         }
