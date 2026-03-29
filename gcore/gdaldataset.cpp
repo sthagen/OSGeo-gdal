@@ -1826,7 +1826,7 @@ void *CPL_STDCALL GDALGetInternalHandle(GDALDatasetH hDS,
  * GDALCreate().
  */
 
-GDALDriver *GDALDataset::GetDriver()
+GDALDriver *GDALDataset::GetDriver() const
 {
     return poDriver;
 }

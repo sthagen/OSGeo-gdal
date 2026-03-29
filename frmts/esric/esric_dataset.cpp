@@ -628,7 +628,7 @@ class ESRICProxyDataset final : public GDALProxyDataset
         m_aosFileList.AddString(pszDescription);
     }
 
-    GDALDriver *GetDriver() override
+    GDALDriver *GetDriver() const override
     {
         return GDALDriver::FromHandle(GDALGetDriverByName("ESRIC"));
     }

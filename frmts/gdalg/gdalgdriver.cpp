@@ -54,7 +54,7 @@ class GDALGDataset final : public GDALProxyDataset
 
     CPL_DISALLOW_COPY_ASSIGN(GDALGDataset)
 
-    GDALDriver *GetDriver() override
+    GDALDriver *GetDriver() const override
     {
         return poDriver;
     }

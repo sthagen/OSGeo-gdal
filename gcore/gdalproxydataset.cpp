@@ -188,7 +188,7 @@ D_PROXY_METHOD_WITH_RET(CPLErr, CE_Failure, SetGeoTransform,
 
 D_PROXY_METHOD_WITH_RET(void *, nullptr, GetInternalHandle, (const char *arg1),
                         (arg1))
-D_PROXY_METHOD_WITH_RET(GDALDriver *, nullptr, GetDriver, (), ())
+D_PROXY_METHOD_WITH_RET(GDALDriver *, nullptr, GetDriver, () const, ())
 D_PROXY_METHOD_WITH_RET(char **, nullptr, GetFileList, (), ())
 D_PROXY_METHOD_WITH_RET(int, 0, GetGCPCount, (), ())
 D_PROXY_METHOD_WITH_RET(const OGRSpatialReference *, nullptr, GetGCPSpatialRef,
