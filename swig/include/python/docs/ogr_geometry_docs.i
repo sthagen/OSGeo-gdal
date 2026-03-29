@@ -1148,7 +1148,7 @@ Parameters
 ratio : float
     Ratio of the area of the convex hull and the concave hull.
 allowHoles : bool
-    Whether the concave hull is allowed to contain holes
+    Whether the concave hull is allowed to contain holes.
 
 Returns
 -------
@@ -1175,7 +1175,7 @@ lengthRatio : float
 isTight : bool
     Whether the hull must follow the outer boundaries of the input polygons.
 allowHoles : bool
-    Whether the concave hull is allowed to contain holes
+    Whether the concave hull is allowed to contain holes.
 
 Returns
 -------

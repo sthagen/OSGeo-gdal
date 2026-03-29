@@ -241,6 +241,7 @@ pixel-distance
 pixel-function
 pixel-function-arg
 pixels
+polygon-mode
 polygonize
 position
 position-crs
@@ -323,6 +324,7 @@ target-aligned-pixels
 target-height
 target-values
 tee-pipeline
+tight
 tile-size
 tiling-scheme
 title

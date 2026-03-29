@@ -108,3 +108,92 @@ def test_gdalalg_vector_convex_hull_invalid_ratio(alg, ratio):
 
     with pytest.raises(Exception, match="Value of argument 'ratio"):
         alg["ratio"] = ratio
+
+
+@pytest.mark.parametrize("allow_holes", (True, False))
+def test_gdalalg_vector_convex_hull_polygon_mode_allow_holes(alg, allow_holes):
+
+    # Two Pacman's facing each other
+    src_ds = gdaltest.wkt_ds(
+        [
+            "MULTIPOLYGON(((0 0,0 1,1 1,1 0.9,0.1 0.9,0.1 0.1,1 0.1,1 0,0 0)),((1.1 1,2 1,2 0,1.1 0,1.1 0.1,1.9 0.1,1.9 0.9, 1.1 0.9,1.1 1)))"
+        ]
+    )
+
+    alg["input"] = src_ds
+    alg["output"] = ""
+    alg["output-format"] = "stream"
+    alg["polygon-mode"] = True
+    alg["ratio"] = 0.5
+    alg["allow-holes"] = allow_holes
+
+    assert alg.Run()
+
+    out_ds = alg["output"].GetDataset()
+    out_lyr = out_ds.GetLayer(0)
+    assert out_lyr.GetGeomType() == ogr.wkbMultiPolygon
+    out_f = out_lyr.GetNextFeature()
+    g = out_f.GetGeometryRef()
+
+    assert g.GetGeometryType() == ogr.wkbMultiPolygon
+    assert g.GetGeometryCount() == 1
+
+    if allow_holes:
+        assert (
+            g.GetGeometryRef(0).GetGeometryCount() == 2
+        )  # exterior ring and interior ring
+    else:
+        assert g.GetGeometryRef(0).GetGeometryCount() == 1  # exterior ring only
+
+
+@pytest.mark.parametrize("tight", (True, False))
+def test_gdalalg_vector_convex_hull_polygon_mode_tight(alg, tight):
+
+    # Hourglass
+    src_ds = gdaltest.wkt_ds(["POLYGON((0 0,0.4 0.5,0 1,1 1,0.6 0.5,1 0,0 0))"])
+
+    alg["input"] = src_ds
+    alg["output"] = ""
+    alg["output-format"] = "stream"
+    alg["polygon-mode"] = True
+    alg["ratio"] = 1
+    alg["tight"] = tight
+
+    assert alg.Run()
+
+    out_ds = alg["output"].GetDataset()
+    out_lyr = out_ds.GetLayer(0)
+    assert out_lyr.GetGeomType() == ogr.wkbMultiPolygon
+    out_f = out_lyr.GetNextFeature()
+    g = out_f.GetGeometryRef()
+
+    assert g.GetGeometryType() == ogr.wkbMultiPolygon
+    assert g.GetGeometryCount() == 1
+
+    if tight:
+        assert g.GetGeometryRef(0).Equals(
+            src_ds.GetLayer(0).GetFeature(1).GetGeometryRef()
+        )
+    else:
+        assert g.Area() == 1.0
+
+
+def test_gdalalg_vector_convex_hull_invalid_tight_without_polygon_mode(alg):
+
+    # Two Pacman's facing each other
+    src_ds = gdaltest.wkt_ds(
+        [
+            "MULTIPOLYGON(((0 0,0 1,1 1,1 0.9,0.1 0.9,0.1 0.1,1 0.1,1 0,0 0)),((1.1 1,2 1,2 0,1.1 0,1.1 0.1,1.9 0.1,1.9 0.9, 1.1 0.9,1.1 1)))"
+        ]
+    )
+
+    alg["input"] = src_ds
+    alg["output"] = ""
+    alg["output-format"] = "stream"
+    alg["tight"] = True
+    alg["ratio"] = 0.5
+
+    with pytest.raises(
+        Exception, match="--tight can only be used if --polygon-mode is specified"
+    ):
+        alg.Run()
