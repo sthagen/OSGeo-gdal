@@ -49,6 +49,9 @@ Program-Specific Options
     of any band can be specified with ``mask:<band>``. A mask band selected
     with ``--band`` will become an ordinary band in the output dataset.
 
+    Starting with GDAL 3.13, <BAND> can also be a color interpretation such
+    as "red", "green", "blue", "alpha", "nir", etc.
+
 .. option:: --mask <BAND>
 
     Select one input band to create output dataset mask band.. Bands are numbered from 1.
@@ -92,8 +95,21 @@ Examples
         $ gdal raster select --band 3,2,1 bgr.tif rgb.tif --overwrite
 
 .. example::
+   :title: Select input bands by their color interpretation
+
+   .. code-block:: bash
+
+        $ gdal raster select --band red,green,blue input.tif rgb.tif --overwrite
+
+.. example::
    :title: Convert a RGBA dataset to a YCbCR JPEG compressed GeoTIFF
 
    .. code-block:: bash
 
         $ gdal raster select --band 1,2,3 --mask 4 --co COMPRESS=JPEG,PHOTOMETRIC=YCBCR rgba.tif rgb_mask.tif
+
+
+.. below is an allow-list for spelling checker.
+
+.. spelling:word-list::
+    nir
