@@ -393,7 +393,7 @@ DDFRecord *ADRGDataset::FindRecordInGENForIMG(DDFModule &module,
         if (record->GetFieldCount() >= 5)
         {
             DDFField *field = record->GetField(0);
-            DDFFieldDefn *fieldDefn = field->GetFieldDefn();
+            const DDFFieldDefn *fieldDefn = field->GetFieldDefn();
             if (!(strcmp(fieldDefn->GetName(), "001") == 0 &&
                   fieldDefn->GetSubfieldCount() == 2))
             {
@@ -470,7 +470,7 @@ ADRGDataset *ADRGDataset::OpenDataset(const char *pszGENFileName,
     DDFField *field = record->GetField(1);
     if (field == nullptr)
         return nullptr;
-    DDFFieldDefn *fieldDefn = field->GetFieldDefn();
+    const DDFFieldDefn *fieldDefn = field->GetFieldDefn();
 
     if (!(strcmp(fieldDefn->GetName(), "DSI") == 0 &&
           fieldDefn->GetSubfieldCount() == 2))
@@ -616,7 +616,7 @@ ADRGDataset *ADRGDataset::OpenDataset(const char *pszGENFileName,
     }
     CPLDebug("ADRG", "BAD=%s", osBAD.c_str());
 
-    const DDFSubfieldDefn *subfieldDefn = fieldDefn->GetSubfield(14);
+    const DDFSubfieldDefn *subfieldDefn = fieldDefn->GetSubfields()[14].get();
     if (!(strcmp(subfieldDefn->GetName(), "TIF") == 0 &&
           (subfieldDefn->GetFormat())[0] == 'A'))
     {
@@ -858,7 +858,7 @@ char **ADRGDataset::GetGENListFromTHF(const char *pszFileName)
         if (record->GetFieldCount() >= 2)
         {
             DDFField *field = record->GetField(0);
-            DDFFieldDefn *fieldDefn = field->GetFieldDefn();
+            const DDFFieldDefn *fieldDefn = field->GetFieldDefn();
             if (!(strcmp(fieldDefn->GetName(), "001") == 0 &&
                   fieldDefn->GetSubfieldCount() == 2))
             {
@@ -979,7 +979,7 @@ char **ADRGDataset::GetIMGListFromGEN(const char *pszFileName,
         if (record->GetFieldCount() >= 5)
         {
             DDFField *field = record->GetField(0);
-            DDFFieldDefn *fieldDefn = field->GetFieldDefn();
+            const DDFFieldDefn *fieldDefn = field->GetFieldDefn();
             if (!(strcmp(fieldDefn->GetName(), "001") == 0 &&
                   fieldDefn->GetSubfieldCount() == 2))
             {
