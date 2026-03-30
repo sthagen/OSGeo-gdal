@@ -736,13 +736,20 @@ TileOffsets[i] + TileByteCounts[i].
 Examples
 --------
 
-::
+.. example::
+   :title: Create a COG with ``gdalwarp``
+   :id: raster.cog-gdalwarp
 
-    gdalwarp src1.tif src2.tif out.tif -of COG
+   .. code-block:: bash
 
-::
+        $ gdalwarp src1.tif src2.tif out.tif -of COG
 
-    gdal_translate world.tif world_webmerc_cog.tif -of COG -co TILING_SCHEME=GoogleMapsCompatible -co COMPRESS=JPEG
+.. example::
+   :title: Create a Web Mercator COG with Google Maps–Compatible Tiling and JPEG Compression
+
+   .. code-block:: bash
+
+        $ gdal_translate world.tif world_webmerc_cog.tif -of COG -co TILING_SCHEME=GoogleMapsCompatible -co COMPRESS=JPEG
 
 See Also
 --------

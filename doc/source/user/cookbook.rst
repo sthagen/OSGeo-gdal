@@ -19,13 +19,23 @@ General How do I...
 -------------------
 
 ... get the GDAL version?
-   :example:`gdal-version`.
+   :example:`gdal-version`
 
 Raster How do I...
 ------------------
 
 ... resize a raster?
    :example:`gdal-raster-resize-cubic`.
+
+... create a Cloud Optimized GeoTIFF (COG)?
+
+- :example:`gdal-raster-convert-cog`
+- :example:`raster.cog-gdalwarp`
+
+... check if a GeoTIFF is a Cloud Optimized GeoTIFF (COG)?
+
+- :example:`gdal-dataset-identify-cog`
+- :example:`gdal-raster-info-cog`
 
 Vector How do I...
 ------------------

@@ -1197,6 +1197,7 @@ gpx
 gradians
 Grantor
 graylevel
+graticule
 grayscale
 Grayscale
 grc
