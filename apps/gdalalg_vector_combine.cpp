@@ -39,6 +39,31 @@ GDALVectorCombineAlgorithm::GDALVectorCombineAlgorithm(bool standaloneStep)
     AddArg("keep-nested", 0,
            _("Avoid combining the components of multipart geometries"),
            &m_keepNested);
+
+    AddArg("add-extra-fields", 0,
+           _("Whether to add extra fields, depending on if they have identical "
+             "values within each group"),
+           &m_addExtraFields)
+        .SetChoices(NO, SOMETIMES_IDENTICAL, ALWAYS_IDENTICAL)
+        .SetDefault(m_addExtraFields)
+        .AddValidationAction(
+            [this]()
+            {
+                // We check the SQLITE driver availability, because we need to
+                // issue a SQL request using the SQLITE dialect, but that works
+                // on any source dataset.
+                if (m_addExtraFields != NO &&
+                    GetGDALDriverManager()->GetDriverByName("SQLITE") ==
+                        nullptr)
+                {
+                    ReportError(CE_Failure, CPLE_NotSupported,
+                                "The SQLITE driver must be available for "
+                                "add-extra-fields=%s",
+                                m_addExtraFields.c_str());
+                    return false;
+                }
+                return true;
+            });
 }
 
 namespace
@@ -50,14 +75,11 @@ class GDALVectorCombineOutputLayer final
      * value within the rows of the group, and add them to the destination
      * feature definition, after the group-by fields.
      */
-    void IdentifySrcFieldsThatCanBeCopied(GDALDataset &srcDS)
+    void IdentifySrcFieldsThatCanBeCopied(GDALDataset &srcDS,
+                                          const std::string &addExtraFields)
     {
         const OGRFeatureDefn *srcDefn = m_srcLayer.GetLayerDefn();
-        if (srcDefn->GetFieldCount() > static_cast<int>(m_groupBy.size()) &&
-            // We check the SQLITE driver availability, because we need to
-            // issue a SQL reques using the SQLITE dialect, but that works
-            // on any source dataset.
-            GetGDALDriverManager()->GetDriverByName("SQLITE"))
+        if (srcDefn->GetFieldCount() > static_cast<int>(m_groupBy.size()))
         {
             std::vector<std::pair<std::string, int>> extraFieldCandidates;
 
@@ -81,7 +103,11 @@ class GDALVectorCombineOutputLayer final
                 if (addComma)
                     sql += ", ";
                 addComma = true;
-                sql += "MAX(";
+                if (addExtraFields ==
+                    GDALVectorCombineAlgorithm::ALWAYS_IDENTICAL)
+                    sql += "MIN(";
+                else
+                    sql += "MAX(";
                 sql += CPLQuotedSQLIdentifier(fieldName.c_str());
                 sql += ')';
             }
@@ -135,10 +161,10 @@ class GDALVectorCombineOutputLayer final
                         }
                         else
                         {
-                            CPLDebugOnly("gdalalg_vector_combine",
-                                         "Field %s has never unique values "
-                                         "per group",
-                                         srcFieldInfo.first.c_str());
+                            CPLDebugOnly(
+                                "gdalalg_vector_combine",
+                                "Field %s has the same values within a group",
+                                srcFieldInfo.first.c_str());
                         }
                     }
                 }
@@ -150,7 +176,8 @@ class GDALVectorCombineOutputLayer final
   public:
     explicit GDALVectorCombineOutputLayer(
         GDALDataset &srcDS, OGRLayer &srcLayer, int geomFieldIndex,
-        const std::vector<std::string> &groupBy, bool keepNested)
+        const std::vector<std::string> &groupBy, bool keepNested,
+        const std::string &addExtraFields)
         : GDALVectorNonStreamingAlgorithmLayer(srcLayer, geomFieldIndex),
           m_groupBy(groupBy), m_defn(OGRFeatureDefnRefCountedPtr::makeInstance(
                                   srcLayer.GetLayerDefn()->GetName())),
@@ -170,7 +197,8 @@ class GDALVectorCombineOutputLayer final
             m_defn->AddFieldDefn(srcDefn->GetFieldDefn(iField));
         }
 
-        IdentifySrcFieldsThatCanBeCopied(srcDS);
+        if (addExtraFields != GDALVectorCombineAlgorithm::NO)
+            IdentifySrcFieldsThatCanBeCopied(srcDS, addExtraFields);
 
         // Create a new geometry field corresponding to each input geometry
         // field. An appropriate type is worked out below.
@@ -449,7 +477,7 @@ class GDALVectorCombineOutputLayer final
             }
         }
 
-        // Copy extra fields from source features that have a unique value
+        // Copy extra fields from source features that have a same value
         // among each groups
         for (const auto &[poDstFeature, pairSourceFeatureUniqueValues] :
              mapDstFeatureToOtherFields)
@@ -614,7 +642,8 @@ bool GDALVectorCombineAlgorithm::RunStep(GDALPipelineStepRunContext &ctxt)
                                 layerProgressData] : progressHelper)
     {
         auto poLayer = std::make_unique<GDALVectorCombineOutputLayer>(
-            *poSrcDS, *poSrcLayer, -1, m_groupBy, m_keepNested);
+            *poSrcDS, *poSrcLayer, -1, m_groupBy, m_keepNested,
+            m_addExtraFields);
 
         if (!poDstDS->AddProcessedLayer(std::move(poLayer), layerProgressFunc,
                                         layerProgressData.get()))
