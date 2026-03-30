@@ -671,6 +671,65 @@ def test_gdalalg_raster_pixel_info_from_to_vector_dataset(tmp_vsimem, include_fi
         assert out_lyr.GetNextFeature() is None
 
 
+def test_gdalalg_raster_pixel_info_from_vector_dataset_no_layer():
+
+    position_dataset = gdal.GetDriverByName("MEM").CreateVector("")
+
+    with pytest.raises(Exception, match="Dataset '' has no vector layer"):
+        gdal.alg.raster.pixel_info(
+            input="../gcore/data/byte.tif",
+            position_dataset=position_dataset,
+            output_format="MEM",
+            output="",
+        )
+
+
+def test_gdalalg_raster_pixel_info_from_vector_dataset_no_geom_field():
+
+    position_dataset = gdal.GetDriverByName("MEM").CreateVector("")
+    position_dataset.CreateLayer("no_geom_field", geom_type=ogr.wkbNone)
+
+    with pytest.raises(
+        Exception, match="Layer 'no_geom_field' of '' has no geometry column"
+    ):
+        gdal.alg.raster.pixel_info(
+            input="../gcore/data/byte.tif",
+            position_dataset=position_dataset,
+            output_format="MEM",
+            output="",
+        )
+
+
+def test_gdalalg_raster_pixel_info_from_vector_dataset_no_mem():
+
+    position_dataset = gdal.GetDriverByName("MEM").CreateVector("")
+    lyr = position_dataset.CreateLayer("test")
+    f = ogr.Feature(lyr.GetLayerDefn())
+    f.SetGeometry(ogr.CreateGeometryFromWkt("POINT(0 0)"))
+    lyr.CreateFeature(f)
+
+    with gdal.alg.raster.pixel_info(
+        input="../gcore/data/byte.tif",
+        position_dataset=position_dataset,
+        output_format="MEM",
+        output="",
+    ) as alg:
+        ds = alg.Output()
+        lyr = ds.GetLayer(0)
+        f = lyr.GetNextFeature()
+        assert f.ExportToJson(as_object=True) == {
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [440720.0, 3751320.0]},
+            "properties": {
+                "column": 0.0,
+                "line": 0.0,
+                "band_1_raw_value": 107.0,
+                "band_1_unscaled_value": 107.0,
+            },
+            "id": 0,
+        }
+
+
 def test_gdalalg_raster_pixel_info_from_vector_dataset_to_geojson(tmp_vsimem):
 
     position_dataset = gdal.GetDriverByName("MEM").CreateVector("")
