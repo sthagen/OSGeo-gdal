@@ -288,7 +288,7 @@ def test_gdalalg_vector_combine_group_by_invalid(alg):
     with pytest.raises(Exception, match="attribute field .* does not exist"):
         alg.Run()
 
-    with pytest.raises(Exception, match="must be a list of unique field names"):
+    with pytest.raises(Exception, match="must be a list of unique values"):
         alg["group-by"] = ["EAS_ID", "AREA", "EAS_ID"]
 
 

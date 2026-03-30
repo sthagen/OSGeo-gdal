@@ -1,10 +1,5 @@
-find_package(Grok MODULE)
-if (GDAL_USE_GROK)
-  if (NOT GROK_FOUND)
-    message(FATAL_ERROR "Configured to use GDAL_USE_GROK, but not found")
-  endif ()
-endif ()
-cmake_dependent_option(GDAL_USE_GROK "Set ON to use grok" ON GROK_FOUND OFF)
-if (GDAL_USE_GROK)
-  string(APPEND GDAL_IMPORT_DEPENDENCIES "find_dependency(Grok MODULE)\n")
-endif ()
+gdal_check_package(Grok "Enable JPEG2000 support with Grok library"
+                   CONFIG
+                   CAN_DISABLE
+                   TARGETS GROK::grokj2k
+                   VERSION 20.2)

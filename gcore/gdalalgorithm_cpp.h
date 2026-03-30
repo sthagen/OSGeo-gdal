@@ -541,6 +541,16 @@ class CPL_DLL GDALAlgorithmArgDecl final
         return *this;
     }
 
+    /** Declares whether, for list type of arguments, there might be duplicate
+     * values in the list.
+     * The default is true.
+     */
+    GDALAlgorithmArgDecl &SetDuplicateValuesAllowed(bool allowed)
+    {
+        m_duplicateValuesAllowed = allowed;
+        return *this;
+    }
+
     //! @cond Doxygen_Suppress
     GDALAlgorithmArgDecl &SetChoices()
     {
@@ -904,6 +914,15 @@ class CPL_DLL GDALAlgorithmArgDecl final
         return m_repeatedArgAllowed;
     }
 
+    /** Return whether, for list type of arguments, duplicated values in the list
+     * are allowed.
+     * The default is true.
+     */
+    inline bool GetDuplicateValuesAllowed() const
+    {
+        return m_duplicateValuesAllowed;
+    }
+
     /** Return if the argument is a positional one. */
     inline bool IsPositional() const
     {
@@ -1138,6 +1157,7 @@ class CPL_DLL GDALAlgorithmArgDecl final
     bool m_removeSQLComments = false;
     bool m_autoOpenDataset = true;
     bool m_userProvided = false;
+    bool m_duplicateValuesAllowed = true;
     std::map<std::string, std::vector<std::string>> m_metadata{};
     std::vector<std::string> m_aliases{};
     std::vector<std::string> m_hiddenAliases{};
@@ -1296,6 +1316,12 @@ class CPL_DLL GDALAlgorithmArg /* non-final */
     inline bool GetRepeatedArgAllowed() const
     {
         return m_decl.GetRepeatedArgAllowed();
+    }
+
+    /** Alias for GDALAlgorithmArgDecl::GetDuplicateValuesAllowed() */
+    inline bool GetDuplicateValuesAllowed() const
+    {
+        return m_decl.GetDuplicateValuesAllowed();
     }
 
     /** Alias for GDALAlgorithmArgDecl::IsPositional() */
@@ -1943,6 +1969,13 @@ class CPL_DLL GDALInConstructionAlgorithmArg final : public GDALAlgorithmArg
     GDALInConstructionAlgorithmArg &SetRepeatedArgAllowed(bool allowed)
     {
         m_decl.SetRepeatedArgAllowed(allowed);
+        return *this;
+    }
+
+    /** Alias for GDALAlgorithmArgDecl::SetDuplicateValuesAllowed() */
+    GDALInConstructionAlgorithmArg &SetDuplicateValuesAllowed(bool allowed)
+    {
+        m_decl.SetDuplicateValuesAllowed(allowed);
         return *this;
     }
 

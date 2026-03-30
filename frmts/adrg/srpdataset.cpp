@@ -927,7 +927,7 @@ DDFRecord *SRPDataset::FindRecordInGENForIMG(DDFModule &module,
     CPLString osShortIMGFilename = CPLGetFilename(pszIMGFileName);
 
     DDFField *field = nullptr;
-    DDFFieldDefn *fieldDefn = nullptr;
+    const DDFFieldDefn *fieldDefn = nullptr;
 
     // Now finds the record.
     while (true)
@@ -1006,7 +1006,7 @@ SRPDataset *SRPDataset::OpenDataset(const char *pszGENFileName,
     DDFField *field = record->GetField(1);
     if (field == nullptr)
         return nullptr;
-    DDFFieldDefn *fieldDefn = field->GetFieldDefn();
+    const DDFFieldDefn *fieldDefn = field->GetFieldDefn();
 
     if (!(strcmp(fieldDefn->GetName(), "DSI") == 0 &&
           fieldDefn->GetSubfieldCount() == 2))
@@ -1062,7 +1062,7 @@ char **SRPDataset::GetGENListFromTHF(const char *pszFileName)
     DDFModule module;
     DDFRecord *record = nullptr;
     DDFField *field = nullptr;
-    DDFFieldDefn *fieldDefn = nullptr;
+    const DDFFieldDefn *fieldDefn = nullptr;
     CPLStringList aosFilenames;
 
     if (!module.Open(pszFileName, TRUE))
@@ -1217,7 +1217,7 @@ void SRPDataset::AddMetadatafromFromTHF(const char *pszFileName)
     DDFModule module;
     DDFRecord *record = nullptr;
     DDFField *field = nullptr;
-    DDFFieldDefn *fieldDefn = nullptr;
+    const DDFFieldDefn *fieldDefn = nullptr;
 
     int bSuccess = 0;
     if (!module.Open(pszFileName, TRUE))
@@ -1338,7 +1338,7 @@ char **SRPDataset::GetIMGListFromGEN(const char *pszFileName,
 {
     DDFRecord *record = nullptr;
     DDFField *field = nullptr;
-    DDFFieldDefn *fieldDefn = nullptr;
+    const DDFFieldDefn *fieldDefn = nullptr;
     int nFilenames = 0;
     char **papszFileNames = nullptr;
     int nRecordIndex = -1;

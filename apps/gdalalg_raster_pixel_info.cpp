@@ -240,7 +240,7 @@ bool GDALRasterPixelInfoAlgorithm::RunStep(GDALPipelineStepRunContext &)
     {
         m_format = "MEM";
     }
-    else if (m_outputDataset.GetName().empty())
+    else if (m_outputDataset.GetName().empty() && m_format != "MEM")
     {
         if (m_format.empty())
         {
@@ -303,15 +303,15 @@ bool GDALRasterPixelInfoAlgorithm::RunStep(GDALPipelineStepRunContext &)
         {
             ReportError(
                 CE_Failure, CPLE_AppDefined, "Cannot find layer '%s' in '%s'",
-                m_inputLayerNames[0].c_str(), poVectorSrcDS->GetDescription());
+                m_inputLayerNames.empty() ? "" : m_inputLayerNames[0].c_str(),
+                poVectorSrcDS->GetDescription());
             return false;
         }
         if (poSrcLayer->GetGeomType() == wkbNone)
         {
             ReportError(CE_Failure, CPLE_AppDefined,
                         "Layer '%s' of '%s' has no geometry column",
-                        m_inputLayerNames[0].c_str(),
-                        poVectorSrcDS->GetDescription());
+                        poSrcLayer->GetName(), poVectorSrcDS->GetDescription());
             return false;
         }
 
@@ -409,7 +409,7 @@ bool GDALRasterPixelInfoAlgorithm::RunStep(GDALPipelineStepRunContext &)
         }
     }
 
-    if (!osOutFilename.empty() || !m_standaloneStep)
+    if (!osOutFilename.empty() || m_format == "MEM" || !m_standaloneStep)
     {
         if (bIsGeoJSON)
         {
@@ -1077,7 +1077,8 @@ bool GDALRasterPixelInfoAlgorithm::RunStep(GDALPipelineStepRunContext &)
     }
     else if (poOutDS)
     {
-        if (m_outputDataset.GetName().empty() && m_standaloneStep)
+        if (m_format != "MEM" && m_outputDataset.GetName().empty() &&
+            m_standaloneStep)
         {
             poOutDS.reset();
             if (!isInteractive)

@@ -160,3 +160,22 @@ Examples
 
    .. command-output:: gdal raster info --format=JSON --stats utmsmall.tif
       :cwd: ../../data/with_stats
+
+.. example::
+   :title: Check if a remote GeoTIFF is a COG
+   :id: gdal-raster-info-cog
+
+   Search for ``LAYOUT=COG`` in the ``Image Structure Metadata``. The example below uses |jq| and returns `true` if the remote image
+   is a COG.
+
+   .. tabs::
+
+      .. code-tab:: bash
+
+        $ gdal raster info https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/36/Q/WD/2020/7/S2A_36QWD_20200701_0_L2A/TCI.tif --of=JSON \
+        | jq '.metadata.IMAGE_STRUCTURE.LAYOUT == "COG"'
+
+      .. code-tab:: ps1
+
+        > gdal raster info https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/36/Q/WD/2020/7/S2A_36QWD_20200701_0_L2A/TCI.tif --of=JSON `
+        | jq '.metadata.IMAGE_STRUCTURE.LAYOUT == \"COG\"'
