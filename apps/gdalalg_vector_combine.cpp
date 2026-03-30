@@ -12,6 +12,7 @@
 
 #include "gdalalg_vector_combine.h"
 
+#include "cpl_enumerate.h"
 #include "cpl_error.h"
 #include "gdal_priv.h"
 #include "gdalalg_vector_geom.h"
@@ -45,9 +46,110 @@ namespace
 class GDALVectorCombineOutputLayer final
     : public GDALVectorNonStreamingAlgorithmLayer
 {
+    /** Identify which fields have, at least for one group, the same
+     * value within the rows of the group, and add them to the destination
+     * feature definition, after the group-by fields.
+     */
+    void IdentifySrcFieldsThatCanBeCopied(GDALDataset &srcDS)
+    {
+        const OGRFeatureDefn *srcDefn = m_srcLayer.GetLayerDefn();
+        if (srcDefn->GetFieldCount() > static_cast<int>(m_groupBy.size()) &&
+            // We check the SQLITE driver availability, because we need to
+            // issue a SQL reques using the SQLITE dialect, but that works
+            // on any source dataset.
+            GetGDALDriverManager()->GetDriverByName("SQLITE"))
+        {
+            std::vector<std::pair<std::string, int>> extraFieldCandidates;
+
+            const auto itSrcFields = srcDefn->GetFields();
+            for (const auto [iSrcField, srcFieldDefn] :
+                 cpl::enumerate(itSrcFields))
+            {
+                const char *fieldName = srcFieldDefn->GetNameRef();
+                if (std::find(m_groupBy.begin(), m_groupBy.end(), fieldName) ==
+                    m_groupBy.end())
+                {
+                    extraFieldCandidates.emplace_back(
+                        fieldName, static_cast<int>(iSrcField));
+                }
+            }
+
+            std::string sql("SELECT ");
+            bool addComma = false;
+            for (const auto &[fieldName, _] : extraFieldCandidates)
+            {
+                if (addComma)
+                    sql += ", ";
+                addComma = true;
+                sql += "MAX(";
+                sql += CPLQuotedSQLIdentifier(fieldName.c_str());
+                sql += ')';
+            }
+            sql += " FROM (SELECT ";
+            addComma = false;
+            for (const auto &[fieldName, _] : extraFieldCandidates)
+            {
+                if (addComma)
+                    sql += ", ";
+                addComma = true;
+                sql += "(COUNT(DISTINCT COALESCE(";
+                sql += CPLQuotedSQLIdentifier(fieldName.c_str());
+                sql += ", '__NULL__')) == 1) AS ";
+                sql += CPLQuotedSQLIdentifier(fieldName.c_str());
+            }
+            sql += " FROM ";
+            sql += CPLQuotedSQLIdentifier(GetLayerDefn()->GetName());
+            if (!m_groupBy.empty())
+            {
+                sql += " GROUP BY ";
+                addComma = false;
+                for (const auto &fieldName : m_groupBy)
+                {
+                    if (addComma)
+                        sql += ", ";
+                    addComma = true;
+                    sql += CPLQuotedSQLIdentifier(fieldName.c_str());
+                }
+            }
+            sql += ") dummy_table_name";
+
+            auto poSQLyr = srcDS.ExecuteSQL(sql.c_str(), nullptr, "SQLite");
+            if (poSQLyr)
+            {
+                auto poResultFeature =
+                    std::unique_ptr<OGRFeature>(poSQLyr->GetNextFeature());
+                if (poResultFeature)
+                {
+                    CPLAssert(poResultFeature->GetFieldCount() ==
+                              static_cast<int>(extraFieldCandidates.size()));
+                    for (const auto &[iSqlCol, srcFieldInfo] :
+                         cpl::enumerate(extraFieldCandidates))
+                    {
+                        const int iSrcField = srcFieldInfo.second;
+                        if (poResultFeature->GetFieldAsInteger(
+                                static_cast<int>(iSqlCol)) == 1)
+                        {
+                            m_defn->AddFieldDefn(
+                                srcDefn->GetFieldDefn(iSrcField));
+                            m_srcExtraFieldIndices.push_back(iSrcField);
+                        }
+                        else
+                        {
+                            CPLDebugOnly("gdalalg_vector_combine",
+                                         "Field %s has never unique values "
+                                         "per group",
+                                         srcFieldInfo.first.c_str());
+                        }
+                    }
+                }
+                srcDS.ReleaseResultSet(poSQLyr);
+            }
+        }
+    }
+
   public:
     explicit GDALVectorCombineOutputLayer(
-        OGRLayer &srcLayer, int geomFieldIndex,
+        GDALDataset &srcDS, OGRLayer &srcLayer, int geomFieldIndex,
         const std::vector<std::string> &groupBy, bool keepNested)
         : GDALVectorNonStreamingAlgorithmLayer(srcLayer, geomFieldIndex),
           m_groupBy(groupBy), m_defn(OGRFeatureDefnRefCountedPtr::makeInstance(
@@ -64,9 +166,11 @@ class GDALVectorCombineOutputLayer final
             const auto iField = srcDefn->GetFieldIndex(fieldName.c_str());
             CPLAssert(iField >= 0);
 
-            m_srcFieldIndices.push_back(iField);
+            m_srcGroupByFieldIndices.push_back(iField);
             m_defn->AddFieldDefn(srcDefn->GetFieldDefn(iField));
         }
+
+        IdentifySrcFieldsThatCanBeCopied(srcDS);
 
         // Create a new geometry field corresponding to each input geometry
         // field. An appropriate type is worked out below.
@@ -155,16 +259,40 @@ class GDALVectorCombineOutputLayer final
 
         GIntBig nFeaturesRead = 0;
 
-        std::vector<std::string> fieldValues(m_srcFieldIndices.size());
-        const auto srcDstFieldMap =
-            m_defn->ComputeMapForSetFrom(m_srcLayer.GetLayerDefn(), true);
+        struct PairSourceFeatureUniqueValues
+        {
+            std::unique_ptr<OGRFeature> poSrcFeature{};
+            std::vector<std::optional<std::string>> srcUniqueValues{};
+        };
+
+        std::map<OGRFeature *, PairSourceFeatureUniqueValues>
+            mapDstFeatureToOtherFields;
+
+        std::vector<std::string> fieldValues(m_srcGroupByFieldIndices.size());
+        std::vector<std::string> extraFieldValues(
+            m_srcExtraFieldIndices.size());
+
+        std::vector<int> srcDstFieldMap(
+            m_srcLayer.GetLayerDefn()->GetFieldCount(), -1);
+        for (const auto [iDstField, iSrcField] :
+             cpl::enumerate(m_srcGroupByFieldIndices))
+        {
+            srcDstFieldMap[iSrcField] = static_cast<int>(iDstField);
+        }
+
         for (const auto &srcFeature : m_srcLayer)
         {
-            for (size_t iDstField = 0; iDstField < m_srcFieldIndices.size();
-                 iDstField++)
+            for (const auto [iDstField, iSrcField] :
+                 cpl::enumerate(m_srcGroupByFieldIndices))
             {
-                const int iSrcField = m_srcFieldIndices[iDstField];
                 fieldValues[iDstField] =
+                    srcFeature->GetFieldAsString(iSrcField);
+            }
+
+            for (const auto [iExtraField, iSrcField] :
+                 cpl::enumerate(m_srcExtraFieldIndices))
+            {
+                extraFieldValues[iExtraField] =
                     srcFeature->GetFieldAsString(iSrcField);
             }
 
@@ -194,10 +322,43 @@ class GDALVectorCombineOutputLayer final
 
                     dstFeature->SetGeomField(iGeomField, std::move(poGeom));
                 }
+
+                if (!m_srcExtraFieldIndices.empty())
+                {
+                    PairSourceFeatureUniqueValues pair;
+                    pair.poSrcFeature.reset(srcFeature->Clone());
+                    for (const std::string &s : extraFieldValues)
+                        pair.srcUniqueValues.push_back(s);
+                    mapDstFeatureToOtherFields[dstFeature] = std::move(pair);
+                }
             }
             else
             {
                 dstFeature = it->second.get();
+
+                // Check that the extra field values for that source feature
+                // are the same as for other source features of the same group.
+                // If not the case, cancel the extra field value for that group.
+                if (!m_srcExtraFieldIndices.empty())
+                {
+                    auto iterOtherFields =
+                        mapDstFeatureToOtherFields.find(dstFeature);
+                    CPLAssert(iterOtherFields !=
+                              mapDstFeatureToOtherFields.end());
+                    auto &srcUniqueValues =
+                        iterOtherFields->second.srcUniqueValues;
+                    CPLAssert(srcUniqueValues.size() ==
+                              extraFieldValues.size());
+                    for (const auto &[i, sVal] :
+                         cpl::enumerate(extraFieldValues))
+                    {
+                        if (srcUniqueValues[i].has_value() &&
+                            *(srcUniqueValues[i]) != sVal)
+                        {
+                            srcUniqueValues[i].reset();
+                        }
+                    }
+                }
             }
 
             for (int iGeomField = 0; iGeomField < nGeomFields; iGeomField++)
@@ -288,6 +449,26 @@ class GDALVectorCombineOutputLayer final
             }
         }
 
+        // Copy extra fields from source features that have a unique value
+        // among each groups
+        for (const auto &[poDstFeature, pairSourceFeatureUniqueValues] :
+             mapDstFeatureToOtherFields)
+        {
+            for (const auto [iExtraField, iSrcField] :
+                 cpl::enumerate(m_srcExtraFieldIndices))
+            {
+                const int iDstField = static_cast<int>(
+                    m_srcGroupByFieldIndices.size() + iExtraField);
+                if (pairSourceFeatureUniqueValues.srcUniqueValues[iExtraField])
+                {
+                    const auto poRawField =
+                        pairSourceFeatureUniqueValues.poSrcFeature
+                            ->GetRawFieldRef(iSrcField);
+                    poDstFeature->SetField(iDstField, poRawField);
+                }
+            }
+        }
+
         if (pfnProgress)
         {
             pfnProgress(1.0, "", pProgressData);
@@ -373,7 +554,8 @@ class GDALVectorCombineOutputLayer final
     }
 
     const std::vector<std::string> m_groupBy{};
-    std::vector<int> m_srcFieldIndices{};
+    std::vector<int> m_srcGroupByFieldIndices{};
+    std::vector<int> m_srcExtraFieldIndices{};
     std::map<std::vector<std::string>, std::unique_ptr<OGRFeature>>
         m_features{};
     std::optional<decltype(m_features)::const_iterator> m_itFeature{};
@@ -432,7 +614,7 @@ bool GDALVectorCombineAlgorithm::RunStep(GDALPipelineStepRunContext &ctxt)
                                 layerProgressData] : progressHelper)
     {
         auto poLayer = std::make_unique<GDALVectorCombineOutputLayer>(
-            *poSrcLayer, -1, m_groupBy, m_keepNested);
+            *poSrcDS, *poSrcLayer, -1, m_groupBy, m_keepNested);
 
         if (!poDstDS->AddProcessedLayer(std::move(poLayer), layerProgressFunc,
                                         layerProgressData.get()))

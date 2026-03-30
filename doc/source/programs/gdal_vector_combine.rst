@@ -34,6 +34,9 @@ PostGIS' ``ST_Collect`` is preferred (a two-component GeometryCollection
 containing the Polygon and MultiPolygon), then :option:`--keep-nested` can be
 used.
 
+Fields from source features that have a unique values among the features
+belonging to a same group are copied to the corresponding output feature.
+
 ``combine`` can be used as a step of :ref:`gdal_vector_pipeline`.
 
 Program-Specific Options
