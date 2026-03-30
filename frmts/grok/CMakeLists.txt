@@ -19,8 +19,8 @@ add_gdal_driver(TARGET gdal_JP2Grok
 )
 
 if(TARGET gdal_JP2Grok_core)
-    target_include_directories(gdal_JP2Grok_core PRIVATE $<TARGET_PROPERTY:GROK::Grok,INTERFACE_INCLUDE_DIRECTORIES>)
-    target_compile_definitions(gdal_JP2Grok_core PRIVATE $<TARGET_PROPERTY:GROK::Grok,INTERFACE_COMPILE_DEFINITIONS>)
+    target_include_directories(gdal_JP2Grok_core PRIVATE $<TARGET_PROPERTY:GROK::grokj2k,INTERFACE_INCLUDE_DIRECTORIES>)
+    target_compile_definitions(gdal_JP2Grok_core PRIVATE $<TARGET_PROPERTY:GROK::grokj2k,INTERFACE_COMPILE_DEFINITIONS>)
 endif()
 
 if(NOT TARGET gdal_JP2Grok)
@@ -29,7 +29,7 @@ endif()
 
 gdal_standard_includes(gdal_JP2Grok)
 target_include_directories(gdal_JP2Grok PRIVATE ../opjlike)
-gdal_target_link_libraries(gdal_JP2Grok PRIVATE GROK::Grok)
+gdal_target_link_libraries(gdal_JP2Grok PRIVATE GROK::grokj2k)
 
 if (GDAL_USE_CURL)
     target_compile_definitions(gdal_JP2Grok PRIVATE -DHAVE_CURL)
