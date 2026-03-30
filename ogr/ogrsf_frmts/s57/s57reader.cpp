@@ -1755,7 +1755,7 @@ bool S57Reader::FetchLine(const DDFRecord *poSRecord, int iStartVertex,
         int nVBase = 0;
 
         if (iDirection < 0)
-            nVBase = iStartVertex + nPoints + nVCount;
+            nVBase = iStartVertex + nPoints + nVCount - 1;
         else
             nVBase = iStartVertex + nPoints;
 
