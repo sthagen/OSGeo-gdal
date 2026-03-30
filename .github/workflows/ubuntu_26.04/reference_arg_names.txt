@@ -241,7 +241,6 @@ pixel-distance
 pixel-function
 pixel-function-arg
 pixels
-polygon-mode
 polygonize
 position
 position-crs

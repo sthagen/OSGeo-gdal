@@ -23,12 +23,8 @@ Description
 :program:`gdal vector concave-hull` computes the smallest concave polygon that
 covers the input geometry. Generally the result will be a Polygon, but for
 degenerate inputs it may be a LineString or a Point.
-It uses the :cpp:func:`OGRGeometry::ConcaveHull` method.
-
-When using :option:`--polygon-mode`, the input geometries must be (valid) polygons
-or multipolygons, and they are used as an additional constraint to generate the
-output hull, such that it contains all input polygons. This mode
-uses the :cpp:func:`OGRGeometry::ConcaveHullOfPolygons` method.
+It uses the :cpp:func:`OGRGeometry::ConcaveHullOfPolygons` method for polygonal
+input, and :cpp:func:`OGRGeometry::ConcaveHull` otherwise.
 
 This command can also be used as a step of :ref:`gdal_vector_pipeline`.
 
@@ -42,11 +38,6 @@ This command can also be used as a step of :ref:`gdal_vector_pipeline`.
 Program-Specific Options
 ------------------------
 
-.. option:: --polygon-mode
-
-   Whether the input polygons/multipolygons are used as an additional constraint
-   to generate the output hull, such that it contains all input polygons.
-
 .. option:: --allow-holes
 
    Allow result polygons to contain holes.
@@ -55,15 +46,13 @@ Program-Specific Options
 
    Whether the hull must follow the outer boundaries of the input polygons.
 
-   Only allowed when used with :option:`--polygon-mode`.
-
 .. option:: --ratio <RATIO>
 
    Ratio controlling the concavity of the geometry.
 
    A value of 1 produces the convex hull; decreasing values of
-   the ratio generally produce polygons of increasing concavity (and in
-   :option:`--polygon-mode`, a value of 0 produces the original polygons).
+   the ratio generally produce polygons of increasing concavity (and with
+   polygonal input, a value of 0 produces the original polygons).
 
 
 Standard Options
@@ -142,17 +131,13 @@ Examples
 
    The ``sql`` stage helps rendering smaller countries on top of larger ones.
 
-   If omitting ``--polygon-mode``, artifacts appear, mostly related to countries
-   around the anti-meridian, or attempt at creating a single polygon for mainland
-   Netherlands and Saint Eustatius island in the Carribean
-
    .. code-block:: bash
 
         gdal vector pipeline ! \
             read /vsizip//vsicurl/https://naciscdn.org/naturalearth/10m/cultural/ne_10m_admin_1_states_provinces.zip ! \
             combine --group-by admin,geonunit ! \
             dissolve ! \
-            concave-hull --polygon-mode --ratio 0.1 ! \
+            concave-hull --ratio 0.1 ! \
             rename-layer --output-layer countries_concave_hull_of_polygons ! \
             sql --sql "SELECT * FROM countries_concave_hull_of_polygons ORDER BY ST_Area(geometry) DESC" --dialect SQLite ! \
             write countries_concave_hull_of_polygons.gpkg

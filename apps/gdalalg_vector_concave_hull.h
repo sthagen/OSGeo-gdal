@@ -30,7 +30,6 @@ class GDALVectorConcaveHullAlgorithm /* non final */
     struct Options : public GDALVectorGeomAbstractAlgorithm::OptionsBase
     {
         double m_ratio = 0.0;
-        bool m_ofPolygons = false;
         bool m_allowHoles = false;
         bool m_tight = false;
     };
