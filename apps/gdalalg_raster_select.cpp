@@ -55,6 +55,9 @@ GDALRasterSelectAlgorithm::GDALRasterSelectAlgorithm(bool standaloneStep)
                 return true;
             });
     }
+
+    AddArg("exclude", 0, _("Exclude specified bands"), &m_exclude);
+
     {
         auto &arg = AddArg(
             "mask", 0,
@@ -92,10 +95,32 @@ bool GDALRasterSelectAlgorithm::RunStep(GDALPipelineStepRunContext &)
     CPLStringList aosOptions;
     aosOptions.AddString("-of");
     aosOptions.AddString("VRT");
-    for (const std::string &v : m_bands)
+    if (m_exclude)
     {
-        aosOptions.AddString("-b");
-        aosOptions.AddString(CPLString(v).replaceAll(':', ',').c_str());
+        if (m_bands.size() >= static_cast<size_t>(poSrcDS->GetRasterCount()))
+        {
+            ReportError(CE_Failure, CPLE_AppDefined,
+                        "Cannot exclude all input bands");
+            return false;
+        }
+        for (int i = 1; i <= poSrcDS->GetRasterCount(); ++i)
+        {
+            const std::string iStr = std::to_string(i);
+            if (std::find(m_bands.begin(), m_bands.end(), iStr) ==
+                m_bands.end())
+            {
+                aosOptions.AddString("-b");
+                aosOptions.AddString(iStr);
+            }
+        }
+    }
+    else
+    {
+        for (const std::string &v : m_bands)
+        {
+            aosOptions.AddString("-b");
+            aosOptions.AddString(CPLString(v).replaceAll(':', ',').c_str());
+        }
     }
     if (!m_mask.empty())
     {

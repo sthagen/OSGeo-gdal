@@ -33,6 +33,13 @@ This subcommand is also available as a potential step of :ref:`gdal_raster_pipel
 Program-Specific Options
 ------------------------
 
+.. option:: --exclude
+
+    .. versionadded:: 3.13
+
+    Modifies the behavior of the algorithm such that all bands are selected,
+    except the ones mentioned by :option:`--band`.
+
 .. option:: --band <BAND>
 
     Select one or several input bands. Bands are numbered from 1.

@@ -96,3 +96,27 @@ def test_gdalalg_raster_select_mask_error(tmp_vsimem):
                 out_filename,
             ],
         )
+
+
+def test_gdalalg_raster_select_exclude():
+
+    with gdal.alg.raster.select(
+        input="../gcore/data/rgbsmall.tif",
+        output="",
+        output_format="MEM",
+        exclude=True,
+        band=1,
+    ) as alg:
+        ds = alg.Output()
+        assert ds.RasterCount == 2
+        assert ds.GetRasterBand(1).GetColorInterpretation() == gdal.GCI_GreenBand
+        assert ds.GetRasterBand(2).GetColorInterpretation() == gdal.GCI_BlueBand
+
+    with pytest.raises(Exception, match="Cannot exclude all input bands"):
+        gdal.alg.raster.select(
+            input="../gcore/data/rgbsmall.tif",
+            output="",
+            output_format="MEM",
+            exclude=True,
+            band=[1, 2, 3],
+        )
