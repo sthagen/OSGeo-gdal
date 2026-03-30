@@ -72,7 +72,7 @@ class CPL_DLL GDALProxyDataset : public GDALDataset
     CPLErr SetGeoTransform(const GDALGeoTransform &) override;
 
     void *GetInternalHandle(const char *) override;
-    GDALDriver *GetDriver() override;
+    GDALDriver *GetDriver() const override;
     char **GetFileList() override;
 
     int GetGCPCount() override;

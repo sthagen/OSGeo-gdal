@@ -371,7 +371,7 @@ class CPL_DLL GDALDataset : public GDALMajorObject
                            CSLConstList papszOptions = nullptr);
 
     virtual void *GetInternalHandle(const char *pszHandleName);
-    virtual GDALDriver *GetDriver(void);
+    virtual GDALDriver *GetDriver(void) const;
     virtual char **GetFileList(void);
 
     const char *GetDriverName() const;

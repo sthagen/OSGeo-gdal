@@ -33,22 +33,7 @@ GDALVectorCombineAlgorithm::GDALVectorCombineAlgorithm(bool standaloneStep)
 {
     AddArg("group-by", 0,
            _("Names of field(s) by which inputs should be grouped"), &m_groupBy)
-        .AddValidationAction(
-            [this]()
-            {
-                auto fields = m_groupBy;
-
-                std::sort(fields.begin(), fields.end());
-                if (std::adjacent_find(fields.begin(), fields.end()) !=
-                    fields.end())
-                {
-                    CPLError(
-                        CE_Failure, CPLE_AppDefined,
-                        "--group-by must be a list of unique field names.");
-                    return false;
-                }
-                return true;
-            });
+        .SetDuplicateValuesAllowed(false);
 
     AddArg("keep-nested", 0,
            _("Avoid combining the components of multipart geometries"),

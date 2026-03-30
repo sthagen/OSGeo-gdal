@@ -72,6 +72,7 @@ GDALRasterContourAlgorithm::GDALRasterContourAlgorithm(bool standaloneStep)
         .SetMutualExclusionGroup("levels")
         .SetMinValueExcluded(0);
     AddArg("levels", 0, _("List of contour levels"), &m_levels)
+        .SetDuplicateValuesAllowed(false)
         .SetMutualExclusionGroup("levels");
     AddArg("exp-base", 'e', _("Base for exponential contour level generation"),
            &m_expBase)

@@ -1452,7 +1452,7 @@ class COGProxyDataset final : public GDALProxyDataset
         return true;
     }
 
-    GDALDriver *GetDriver() override
+    GDALDriver *GetDriver() const override
     {
         return m_poCOGDriver;
     }

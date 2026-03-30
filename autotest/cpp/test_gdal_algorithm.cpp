@@ -4977,6 +4977,165 @@ TEST_F(test_gdal_algorithm, AddOverwriteLayerArg_without_update)
     }
 }
 
+TEST_F(test_gdal_algorithm, duplicate_values)
+{
+    class MyAlgorithm : public MyAlgorithmWithDummyRun
+    {
+      public:
+        std::vector<std::string> m_strListDuplicatesAllowed{};
+        std::vector<std::string> m_strList{};
+        std::vector<int> m_intList{};
+        std::vector<double> m_doubleList{};
+        std::vector<GDALArgDatasetValue> m_datasetList{};
+
+        MyAlgorithm()
+        {
+            AddArg("strListDuplicatesAllowed", 0, "strListDuplicatesAllowed",
+                   &m_strListDuplicatesAllowed);
+            AddArg("strList", 0, "strList", &m_strList)
+                .SetDuplicateValuesAllowed(false);
+            AddArg("intList", 0, "intList", &m_intList)
+                .SetDuplicateValuesAllowed(false);
+            AddArg("doubleList", 0, "doubleList", &m_doubleList)
+                .SetDuplicateValuesAllowed(false);
+            AddArg("datasetListNoAutoOpen", 0, "datasetList", &m_datasetList)
+                .SetAutoOpenDataset(false)
+                .SetDuplicateValuesAllowed(false);
+            AddArg("datasetListAutoOpen", 0, "datasetList", &m_datasetList)
+                .SetDuplicateValuesAllowed(false);
+        }
+    };
+
+    {
+        MyAlgorithm alg;
+        EXPECT_TRUE(alg.ParseCommandLineArguments(
+            {"--strListDuplicatesAllowed=foo,bar,foo"}));
+    }
+
+    {
+        MyAlgorithm alg;
+        EXPECT_TRUE(alg.ParseCommandLineArguments({"--strList=foo,bar"}));
+    }
+
+    {
+        MyAlgorithm alg;
+        CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+        EXPECT_FALSE(alg.ParseCommandLineArguments({"--strList=foo,bar,foo"}));
+        EXPECT_STREQ(CPLGetLastErrorMsg(),
+                     "'strList' must be a list of unique values.");
+    }
+
+    {
+        MyAlgorithm alg;
+        EXPECT_TRUE(alg.ParseCommandLineArguments({"--intList=2,1"}));
+    }
+
+    {
+        MyAlgorithm alg;
+        CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+        EXPECT_FALSE(alg.ParseCommandLineArguments({"--intList=1,2,1"}));
+        EXPECT_STREQ(CPLGetLastErrorMsg(),
+                     "'intList' must be a list of unique values.");
+    }
+
+    {
+        MyAlgorithm alg;
+        EXPECT_TRUE(alg.ParseCommandLineArguments({"--doubleList=2,nan,1"}));
+    }
+
+    {
+        MyAlgorithm alg;
+        CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+        EXPECT_FALSE(
+            alg.ParseCommandLineArguments({"--doubleList=nan,2,nan,1"}));
+        EXPECT_STREQ(CPLGetLastErrorMsg(),
+                     "'doubleList' must be a list of unique values.");
+    }
+
+    {
+        MyAlgorithm alg;
+        CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+        EXPECT_FALSE(alg.ParseCommandLineArguments({"--doubleList=1,2,1"}));
+        EXPECT_STREQ(CPLGetLastErrorMsg(),
+                     "'doubleList' must be a list of unique values.");
+    }
+
+    {
+        MyAlgorithm alg;
+        EXPECT_TRUE(
+            alg.ParseCommandLineArguments({"--datasetListNoAutoOpen=foo,bar"}));
+    }
+
+    {
+        MyAlgorithm alg;
+        CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+        EXPECT_FALSE(alg.ParseCommandLineArguments(
+            {"--datasetListNoAutoOpen=foo,bar,foo"}));
+        EXPECT_STREQ(
+            CPLGetLastErrorMsg(),
+            "'datasetListNoAutoOpen' must be a list of unique values.");
+    }
+
+    {
+        auto poDS1 = std::unique_ptr<GDALDataset>(
+            GetGDALDriverManager()->GetDriverByName("MEM")->Create(
+                "", 1, 1, 1, GDT_Byte, nullptr));
+        auto poDS2 = std::unique_ptr<GDALDataset>(
+            GetGDALDriverManager()->GetDriverByName("MEM")->Create(
+                "", 1, 1, 1, GDT_Byte, nullptr));
+        std::vector<GDALArgDatasetValue> values;
+        values.emplace_back(poDS1.get());
+        values.emplace_back(poDS2.get());
+        MyAlgorithm alg;
+        alg.GetArg("datasetListAutoOpen")->Set(std::move(values));
+        EXPECT_TRUE(alg.ValidateArguments());
+    }
+
+    {
+        auto poDS1 = std::unique_ptr<GDALDataset>(
+            GetGDALDriverManager()->GetDriverByName("MEM")->Create(
+                "", 1, 1, 1, GDT_Byte, nullptr));
+        std::vector<GDALArgDatasetValue> values;
+        values.emplace_back(poDS1.get());
+        values.emplace_back(poDS1.get());
+        MyAlgorithm alg;
+        CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+        alg.GetArg("datasetListAutoOpen")->Set(std::move(values));
+        EXPECT_FALSE(alg.ValidateArguments());
+        EXPECT_STREQ(CPLGetLastErrorMsg(),
+                     "'datasetListAutoOpen' must be a list of unique values.");
+    }
+
+    {
+        auto poDS1 = std::unique_ptr<GDALDataset>(
+            GDALDataset::Open(GCORE_DATA_DIR "byte.tif"));
+        auto poDS2 = std::unique_ptr<GDALDataset>(
+            GDALDataset::Open(GCORE_DATA_DIR "uint16.tif"));
+        std::vector<GDALArgDatasetValue> values;
+        values.emplace_back(poDS1.get());
+        values.emplace_back(poDS2.get());
+        MyAlgorithm alg;
+        alg.GetArg("datasetListAutoOpen")->Set(std::move(values));
+        EXPECT_TRUE(alg.ValidateArguments());
+    }
+
+    {
+        auto poDS1 = std::unique_ptr<GDALDataset>(
+            GDALDataset::Open(GCORE_DATA_DIR "byte.tif"));
+        auto poDS2 = std::unique_ptr<GDALDataset>(
+            GDALDataset::Open(GCORE_DATA_DIR "byte.tif"));
+        std::vector<GDALArgDatasetValue> values;
+        values.emplace_back(poDS1.get());
+        values.emplace_back(poDS2.get());
+        MyAlgorithm alg;
+        CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+        alg.GetArg("datasetListAutoOpen")->Set(std::move(values));
+        EXPECT_FALSE(alg.ValidateArguments());
+        EXPECT_STREQ(CPLGetLastErrorMsg(),
+                     "'datasetListAutoOpen' must be a list of unique values.");
+    }
+}
+
 }  // namespace test_gdal_algorithm
 
 #if defined(__clang__)
