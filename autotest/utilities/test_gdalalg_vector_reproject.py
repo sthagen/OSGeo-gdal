@@ -11,6 +11,7 @@
 # SPDX-License-Identifier: MIT
 ###############################################################################
 
+import gdaltest
 import ogrtest
 import pytest
 
@@ -155,3 +156,26 @@ def test_gdalalg_vector_reproject_polar_projected_to_geographic(input_wkt, outpu
         out_f = out_lyr.GetNextFeature()
         out_g = out_f.GetGeometryRef()
         ogrtest.check_feature_geometry(out_g, output_wkt)
+
+
+@pytest.mark.require_driver("OSM")
+@pytest.mark.require_driver("GDALG")
+def test_gdalalg_vector_reproject_test_ogrsf(tmp_path):
+
+    import test_cli_utilities
+
+    if test_cli_utilities.get_test_ogrsf_path() is None:
+        pytest.skip()
+
+    gdalg_filename = tmp_path / "tmp.gdalg.json"
+    open(gdalg_filename, "wb").write(
+        b'{"type": "gdal_streamed_alg","command_line": "gdal vector reproject ../ogr/data/osm/test.pbf --active-layer point --dst-crs EPSG:3857 --output-format=stream dummy_dataset_name","relative_paths_relative_to_this_file":false}'
+    )
+
+    ret = gdaltest.runexternal(
+        test_cli_utilities.get_test_ogrsf_path() + f" -ro {gdalg_filename}"
+    )
+
+    assert "INFO" in ret
+    assert "ERROR" not in ret
+    assert "FAILURE" not in ret
