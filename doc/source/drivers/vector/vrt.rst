@@ -359,9 +359,9 @@ Examples
    database DISEASE is used to form a spatial layer. The virtual file uses
    the "x" and "y" columns to get the spatial location. It also marks the
    layer as a point layer, and as being in the WGS84 coordinate system.
-   
+
    .. code-block:: XML
-   
+
       <OGRVRTDataSource>
           <OGRVRTLayer name="worms">
               <SrcDataSource>ODBC:DISEASE,worms</SrcDataSource>
@@ -379,21 +379,21 @@ Examples
    names from a source layer to other names. This is particularly true when
    you want to transcode to a format whose schema is fixed, such as GPX
    (<name>, <desc>, etc.). This can be accomplished using SQL this way:
-   
+
    .. code-block:: XML
-   
+
       <OGRVRTDataSource>
           <OGRVRTLayer name="remapped_layer">
               <SrcDataSource>your_source.shp</SrcDataSource>
               <SrcSQL>SELECT src_field_1 AS name, src_field_2 AS desc FROM your_source_layer_name</SrcSQL>
           </OGRVRTLayer>
       </OGRVRTDataSource>
-   
+
    This can also be accomplished using explicit field
    definitions:
-   
+
    .. code-block:: XML
-   
+
       <OGRVRTDataSource>
           <OGRVRTLayer name="remapped_layer">
               <SrcDataSource>your_source.shp</SrcDataSource>
@@ -409,9 +409,9 @@ Examples
    The following example will only return features from the source layer
    that intersect the (0,40)-(10,50) region. Furthermore, returned
    geometries will be clipped to fit into that region.
-   
+
    .. code-block:: XML
-   
+
       <OGRVRTDataSource>
           <OGRVRTLayer name="source">
               <SrcDataSource>source.shp</SrcDataSource>
@@ -424,9 +424,9 @@ Examples
 
    The following example will return the source.shp layer reprojected to
    EPSG:4326.
-   
+
    .. code-block:: XML
-   
+
       <OGRVRTDataSource>
           <OGRVRTWarpedLayer>
               <OGRVRTLayer name="source">
@@ -441,9 +441,9 @@ Examples
 
    The following example will return a layer that is the concatenation of
    source1.shp and source2.shp.
-   
+
    .. code-block:: XML
-   
+
       <OGRVRTDataSource>
           <OGRVRTUnionLayer name="unionLayer">
               <OGRVRTLayer name="source1">
@@ -467,9 +467,9 @@ Examples
    for replacing the original geometries by points which are inside the
    corresponding source polygons. Note that for using the last three layers
    of this VRT file GDAL must be compiled with SQLite and SpatiaLite.
-   
+
    .. code-block:: XML
-   
+
       <OGRVRTDataSource>
           <OGRVRTLayer name="polygons">
               <SrcDataSource>polygons.shp</SrcDataSource>
@@ -493,19 +493,19 @@ Examples
 
    The following example will expose all the attribute and geometry fields
    of the source layer:
-   
+
    .. code-block:: XML
-   
+
       <OGRVRTDataSource>
           <OGRVRTLayer name="test">
               <SrcDataSource>PG:dbname=testdb</SrcDataSource>
           </OGRVRTLayer>
       </OGRVRTDataSource>
-   
+
    To expose only part (or all!) of the fields:
-   
+
    .. code-block:: XML
-   
+
       <OGRVRTDataSource>
           <OGRVRTLayer name="other_test">
               <SrcDataSource>PG:dbname=testdb</SrcDataSource>
@@ -520,13 +520,13 @@ Examples
                   <ExtentYMax>90</ExtentYMax>
               </GeometryField>
               <Field name="vrt_field_1" src="src_field_1" />
-          </OGRVRTLayer>w
+          </OGRVRTLayer>
       </OGRVRTDataSource>
-   
+
    To reproject the 'pg_geom_field_2' geometry field to EPSG:4326:
-   
+
    .. code-block:: XML
-   
+
       <OGRVRTDataSource>
           <OGRVRTWarpedLayer>
               <OGRVRTLayer name="other_test">
@@ -536,12 +536,12 @@ Examples
               <TargetSRS>EPSG:32631</TargetSRS>
           </OGRVRTWarpedLayer>
       </OGRVRTDataSource>
-   
+
    To make the union of several multi-geometry layers and keep only a few
    of them:
-   
+
    .. code-block:: XML
-   
+
       <OGRVRTDataSource>
           <OGRVRTUnionLayer name="unionLayer">
               <OGRVRTLayer name="source1">
