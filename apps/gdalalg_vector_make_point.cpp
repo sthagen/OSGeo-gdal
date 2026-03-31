@@ -74,7 +74,6 @@ class GDALVectorMakePointAlgorithmLayer final
           m_hasZ(!zField.empty()), m_hasM(!mField.empty()), m_srs(srs),
           m_defn(oSrcLayer.GetLayerDefn()->Clone())
     {
-        m_defn->Reference();
         if (m_srs)
         {
             m_srs->Reference();
@@ -111,7 +110,6 @@ class GDALVectorMakePointAlgorithmLayer final
 
     ~GDALVectorMakePointAlgorithmLayer() override
     {
-        m_defn->Release();
         if (m_srs)
         {
             m_srs->Release();
@@ -180,7 +178,7 @@ class GDALVectorMakePointAlgorithmLayer final
 
     const OGRFeatureDefn *GetLayerDefn() const override
     {
-        return m_defn;
+        return m_defn.get();
     }
 
     int TestCapability(const char *pszCap) const override
@@ -208,7 +206,7 @@ class GDALVectorMakePointAlgorithmLayer final
     bool m_zFieldIsString = false;
     bool m_mFieldIsString = false;
     OGRSpatialReference *m_srs;
-    OGRFeatureDefn *m_defn;
+    const OGRFeatureDefnRefCountedPtr m_defn;
 
     CPL_DISALLOW_COPY_ASSIGN(GDALVectorMakePointAlgorithmLayer)
 };
@@ -252,7 +250,7 @@ void GDALVectorMakePointAlgorithmLayer::TranslateFeature(
         poGeom->assignSpatialReference(m_srs);
     }
 
-    auto poDstFeature = std::make_unique<OGRFeature>(m_defn);
+    auto poDstFeature = std::make_unique<OGRFeature>(m_defn.get());
     poDstFeature->SetFID(poSrcFeature->GetFID());
     poDstFeature->SetFrom(poSrcFeature.get());
     poDstFeature->SetGeometry(std::move(poGeom));

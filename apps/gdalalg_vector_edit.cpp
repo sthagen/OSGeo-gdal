@@ -86,13 +86,11 @@ class GDALVectorEditAlgorithmLayer final : public GDALVectorPipelineOutputLayer
         const std::vector<std::string> &layerMetadata,
         const std::vector<std::string> &unsetLayerMetadata, bool unsetFID)
         : GDALVectorPipelineOutputLayer(oSrcLayer),
-          m_bOverrideCrs(!overrideCrs.empty()), m_unsetFID(unsetFID)
+          m_bOverrideCrs(!overrideCrs.empty()), m_unsetFID(unsetFID),
+          m_poFeatureDefn(oSrcLayer.GetLayerDefn()->Clone())
     {
         SetDescription(oSrcLayer.GetDescription());
         SetMetadata(oSrcLayer.GetMetadata());
-
-        m_poFeatureDefn = oSrcLayer.GetLayerDefn()->Clone();
-        m_poFeatureDefn->Reference();
 
         if (activeLayer.empty() || activeLayer == GetDescription())
         {
@@ -143,7 +141,6 @@ class GDALVectorEditAlgorithmLayer final : public GDALVectorPipelineOutputLayer
 
     ~GDALVectorEditAlgorithmLayer() override
     {
-        m_poFeatureDefn->Release();
         if (m_poSRS)
             m_poSRS->Release();
     }
@@ -157,14 +154,14 @@ class GDALVectorEditAlgorithmLayer final : public GDALVectorPipelineOutputLayer
 
     const OGRFeatureDefn *GetLayerDefn() const override
     {
-        return m_poFeatureDefn;
+        return m_poFeatureDefn.get();
     }
 
     void TranslateFeature(
         std::unique_ptr<OGRFeature> poSrcFeature,
         std::vector<std::unique_ptr<OGRFeature>> &apoOutFeatures) override
     {
-        poSrcFeature->SetFDefnUnsafe(m_poFeatureDefn);
+        poSrcFeature->SetFDefnUnsafe(m_poFeatureDefn.get());
         if (m_bOverrideCrs)
         {
             for (int i = 0; i < m_poFeatureDefn->GetGeomFieldCount(); ++i)
@@ -190,7 +187,7 @@ class GDALVectorEditAlgorithmLayer final : public GDALVectorPipelineOutputLayer
   private:
     const bool m_bOverrideCrs;
     const bool m_unsetFID;
-    OGRFeatureDefn *m_poFeatureDefn = nullptr;
+    const OGRFeatureDefnRefCountedPtr m_poFeatureDefn;
     OGRSpatialReference *m_poSRS = nullptr;
 
     CPL_DISALLOW_COPY_ASSIGN(GDALVectorEditAlgorithmLayer)

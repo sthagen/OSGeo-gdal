@@ -69,6 +69,8 @@ GDALRasterAsFeaturesAlgorithm::~GDALRasterAsFeaturesAlgorithm() = default;
 GDALRasterAsFeaturesAlgorithmStandalone::
     ~GDALRasterAsFeaturesAlgorithmStandalone() = default;
 
+namespace
+{
 struct RasterAsFeaturesOptions
 {
     OGRwkbGeometryType geomType{wkbNone};
@@ -98,6 +100,7 @@ class GDALRasterAsFeaturesLayer final
           m_end(GDALRasterBand::WindowIterator(
               m_ds.GetRasterXSize(), m_ds.GetRasterYSize(),
               m_ds.GetRasterXSize(), m_ds.GetRasterYSize(), 1, 0)),
+          m_defn(options.outputLayerName.c_str()),
           m_includeXY(options.includeXY),
           m_includeRowCol(options.includeRowCol),
           m_excludeNoDataPixels(options.skipNoData)
@@ -124,7 +127,6 @@ class GDALRasterAsFeaturesLayer final
         }
 
         SetDescription(options.outputLayerName.c_str());
-        m_defn = new OGRFeatureDefn(options.outputLayerName.c_str());
         if (options.geomType == wkbNone)
         {
             m_defn->SetGeomType(wkbNone);
@@ -134,7 +136,6 @@ class GDALRasterAsFeaturesLayer final
             m_defn->GetGeomFieldDefn(0)->SetType(options.geomType);
             m_defn->GetGeomFieldDefn(0)->SetSpatialRef(ds.GetSpatialRef());
         }
-        m_defn->Reference();
 
         if (m_includeXY)
         {
@@ -163,8 +164,6 @@ class GDALRasterAsFeaturesLayer final
 
         GDALRasterAsFeaturesLayer::ResetReading();
     }
-
-    ~GDALRasterAsFeaturesLayer() override;
 
     void ResetReading() override
     {
@@ -197,7 +196,7 @@ class GDALRasterAsFeaturesLayer final
 
     OGRFeatureDefn *GetLayerDefn() const override
     {
-        return m_defn;
+        return m_defn.get();
     }
 
     OGRFeature *GetNextRawFeature()
@@ -220,7 +219,7 @@ class GDALRasterAsFeaturesLayer final
 
             if (emitFeature)
             {
-                feature.reset(OGRFeature::CreateFeature(m_defn));
+                feature.reset(OGRFeature::CreateFeature(m_defn.get()));
 
                 for (int fieldPos : m_bandFields)
                 {
@@ -406,16 +405,13 @@ class GDALRasterAsFeaturesLayer final
     int m_row{0};
     int m_col{0};
 
-    OGRFeatureDefn *m_defn{nullptr};
+    const OGRFeatureDefnRefCountedPtr m_defn;
     bool m_includeXY;
     bool m_includeRowCol;
     bool m_excludeNoDataPixels;
 };
 
-GDALRasterAsFeaturesLayer::~GDALRasterAsFeaturesLayer()
-{
-    m_defn->Release();
-}
+}  // namespace
 
 bool GDALRasterAsFeaturesAlgorithm::RunStep(GDALPipelineStepRunContext &)
 {

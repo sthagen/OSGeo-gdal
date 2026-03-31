@@ -365,16 +365,7 @@ bool GDALVectorIndexAlgorithm::RunImpl(GDALProgressFunc pfnProgress,
     int nLocationFieldIdx = -1;
     int nSourceCRSFieldIdx = -1;
 
-    struct OGRFeatureDefnReleaser
-    {
-        void operator()(OGRFeatureDefn *poFDefn)
-        {
-            if (poFDefn)
-                poFDefn->Release();
-        }
-    };
-
-    std::unique_ptr<OGRFeatureDefn, OGRFeatureDefnReleaser> poRefFeatureDefn;
+    OGRFeatureDefnRefCountedPtr poRefFeatureDefn;
     if (poDstLayer)
     {
         nLocationFieldIdx =
