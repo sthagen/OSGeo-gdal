@@ -381,8 +381,10 @@ bool GDALVectorCreateAlgorithm::RunStep(GDALPipelineStepRunContext &)
             {
                 OGRGeomFieldDefn oGeomFieldDefn(m_geometryFieldName.c_str(),
                                                 eDstType);
-                std::unique_ptr<OGRSpatialReference> poSRS =
-                    std::make_unique<OGRSpatialReference>();
+                std::unique_ptr<OGRSpatialReference,
+                                OGRSpatialReferenceReleaser>
+                    poSRS;
+                poSRS.reset(std::make_unique<OGRSpatialReference>().release());
                 if (!m_crs.empty())
                 {
                     if (poSRS->SetFromUserInput(m_crs.c_str()) != OGRERR_NONE)
@@ -394,7 +396,7 @@ bool GDALVectorCreateAlgorithm::RunStep(GDALPipelineStepRunContext &)
                     }
                     else
                     {
-                        oGeomFieldDefn.SetSpatialRef(poSRS.release());
+                        oGeomFieldDefn.SetSpatialRef(poSRS.get());
                     }
                 }
                 geometryFieldDefinitions.push_back(oGeomFieldDefn);
@@ -517,7 +519,7 @@ bool GDALVectorCreateAlgorithm::CreateLayer(
     {
 
         poDstLayer = poDstDS->CreateLayer(
-            layerName.c_str(), poGeomFieldDefn.release(),
+            layerName.c_str(), poGeomFieldDefn.get(),
             CPLStringList(GetLayerCreationOptions()).List());
     }
 

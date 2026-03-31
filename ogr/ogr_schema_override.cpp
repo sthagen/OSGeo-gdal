@@ -809,9 +809,10 @@ OGRGeomFieldDefn OGRGeomFieldDefnOverride::ToGeometryFieldDefn(
 
     if (m_oSRS.has_value())
     {
-        std::unique_ptr<OGRSpatialReference> poSRS =
-            std::make_unique<OGRSpatialReference>(m_oSRS.value());
-        oGeomFieldDefn.SetSpatialRef(poSRS.release());
+        std::unique_ptr<OGRSpatialReference, OGRSpatialReferenceReleaser> poSRS;
+        poSRS.reset(
+            std::make_unique<OGRSpatialReference>(m_oSRS.value()).release());
+        oGeomFieldDefn.SetSpatialRef(poSRS.get());
     }
 
     return oGeomFieldDefn;
