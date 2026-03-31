@@ -4419,7 +4419,7 @@ OGRGeometryH OGR_G_ConvexHull(OGRGeometryH hTarget)
 /************************************************************************/
 
 /**
- * \brief Compute "concave hull" of a geometry.
+ * \brief Compute the concave hull of a geometry.
  *
  * The concave hull is fully contained within the convex hull and also
  * contains all the points of the input, but in a smaller area.
@@ -4442,6 +4442,7 @@ OGRGeometryH OGR_G_ConvexHull(OGRGeometryH hTarget)
  * @return a new geometry to be freed by the caller, or NULL if an error occurs.
  *
  * @since GDAL 3.6
+ * @see OGRGeometry::ConcaveHullOfPolygons()
  */
 
 OGRGeometry *OGRGeometry::ConcaveHull(double dfRatio, bool bAllowHoles) const
@@ -4481,7 +4482,7 @@ OGRGeometry *OGRGeometry::ConcaveHull(double dfRatio, bool bAllowHoles) const
 /*                         OGR_G_ConcaveHull()                          */
 /************************************************************************/
 /**
- * \brief Compute "concave hull" of a geometry.
+ * \brief Compute the concave hull of a geometry.
  *
  * The concave hull is fully contained within the convex hull and also
  * contains all the points of the input, but in a smaller area.
@@ -4506,6 +4507,7 @@ OGRGeometry *OGRGeometry::ConcaveHull(double dfRatio, bool bAllowHoles) const
  * or NULL if an error occurs.
  *
  * @since GDAL 3.6
+ * @see OGR_G_ConcaveHullOfPolygons()
  */
 
 OGRGeometryH OGR_G_ConcaveHull(OGRGeometryH hTarget, double dfRatio,
@@ -4516,6 +4518,166 @@ OGRGeometryH OGR_G_ConcaveHull(OGRGeometryH hTarget, double dfRatio,
 
     return OGRGeometry::ToHandle(
         OGRGeometry::FromHandle(hTarget)->ConcaveHull(dfRatio, bAllowHoles));
+}
+
+/************************************************************************/
+/*                       ConcaveHullOfPolygons()                        */
+/************************************************************************/
+
+/**
+ * \brief Compute the concave hull of a set of polygons, respecting
+ * the polygons as constraints.
+ *
+ * A concave hull is a (possibly) non-convex polygon containing all the input
+ * polygons.
+ * The computed hull "fills the gap" between the polygons,
+ * and does not intersect their interior.
+ * A set of polygons has a sequence of hulls of increasing concaveness,
+ * determined by a numeric target parameter.
+ *
+ * The concave hull is constructed by removing the longest outer edges
+ * of the Delaunay Triangulation of the space between the polygons,
+ * until the target criterion parameter is reached.
+ * The "Maximum Edge Length" parameter limits the length of the longest edge
+ * between polygons to be no larger than this value.
+ * This can be expressed as a ratio between the lengths of the longest and
+ * shortest edges.
+ *
+ * See https://lin-ear-th-inking.blogspot.com/2022/05/concave-hulls-of-polygons.html
+ * and https://lin-ear-th-inking.blogspot.com/2022/05/algorithm-for-concave-hull-of-polygons.html
+ * for more details.
+ *
+ * The input geometry must be a valid Polygon or MultiPolygon (i.e. they must
+ * be non-overlapping).
+ *
+ * A new geometry object is created and returned containing the concave
+ * hull of the geometry on which the method is invoked.
+ *
+ * This method is the same as the C function OGR_G_ConcaveHullOfPolygons().
+ *
+ * This method is built on the GEOS >= 3.11 library
+ * If OGR is built without the GEOS >= 3.11 library, this method will always
+ * fail, issuing a CPLE_NotSupported error.
+ *
+ * @param dfLengthRatio Specifies the Maximum Edge Length as a fraction of the
+ *                      difference between the longest and shortest edge lengths
+ *                      between the polygons.
+ *                      This normalizes the Maximum Edge Length to be scale-free.
+ *                      A value of 1 produces the convex hull; a value of 0 produces
+ *                      the original polygons.
+ * @param bIsTight Whether the hull must follow the outer boundaries of the input
+ *                 polygons.
+ * @param bAllowHoles Whether the concave hull is allowed to contain holes
+ *
+ * @return a new geometry to be freed by the caller, or NULL if an error occurs.
+ *
+ * @since GDAL 3.13
+ * @see OGRGeometry::ConcaveHull()
+ */
+
+OGRGeometry *OGRGeometry::ConcaveHullOfPolygons(double dfLengthRatio,
+                                                bool bIsTight,
+                                                bool bAllowHoles) const
+{
+#ifndef HAVE_GEOS
+    (void)dfLengthRatio;
+    (void)bIsTight;
+    (void)bAllowHoles;
+    CPLError(CE_Failure, CPLE_NotSupported, "GEOS support not enabled.");
+    return nullptr;
+#elif GEOS_VERSION_MAJOR == 3 && GEOS_VERSION_MINOR < 11
+    (void)dfLengthRatio;
+    (void)bIsTight;
+    (void)bAllowHoles;
+    CPLError(CE_Failure, CPLE_NotSupported,
+             "GEOS 3.11 or later needed for ConcaveHullOfPolygons.");
+    return nullptr;
+#else
+    OGRGeometry *poOGRProduct = nullptr;
+
+    GEOSContextHandle_t hGEOSCtxt = createGEOSContext();
+    GEOSGeom hGeosGeom = exportToGEOS(hGEOSCtxt);
+    if (hGeosGeom != nullptr)
+    {
+        GEOSGeom hGeosHull = GEOSConcaveHullOfPolygons_r(
+            hGEOSCtxt, hGeosGeom, dfLengthRatio, bIsTight, bAllowHoles);
+        GEOSGeom_destroy_r(hGEOSCtxt, hGeosGeom);
+
+        poOGRProduct =
+            BuildGeometryFromGEOS(hGEOSCtxt, hGeosHull, this, nullptr);
+    }
+    freeGEOSContext(hGEOSCtxt);
+
+    return poOGRProduct;
+#endif /* HAVE_GEOS */
+}
+
+/************************************************************************/
+/*                    OGR_G_ConcaveHullOfPolygons()                     */
+/************************************************************************/
+/**
+ * \brief Compute the concave hull of a set of polygons, respecting
+ * the polygons as constraints.
+ *
+ * A concave hull is a (possibly) non-convex polygon containing all the input
+ * polygons.
+ * The computed hull "fills the gap" between the polygons,
+ * and does not intersect their interior.
+ * A set of polygons has a sequence of hulls of increasing concaveness,
+ * determined by a numeric target parameter.
+ *
+ * The concave hull is constructed by removing the longest outer edges
+ * of the Delaunay Triangulation of the space between the polygons,
+ * until the target criterion parameter is reached.
+ * The "Maximum Edge Length" parameter limits the length of the longest edge
+ * between polygons to be no larger than this value.
+ * This can be expressed as a ratio between the lengths of the longest and
+ * shortest edges.
+ *
+ * See https://lin-ear-th-inking.blogspot.com/2022/05/concave-hulls-of-polygons.html
+ * and https://lin-ear-th-inking.blogspot.com/2022/05/algorithm-for-concave-hull-of-polygons.html
+ * for more details.
+ *
+ * The input geometry must be a valid Polygon or MultiPolygon (i.e. they must
+ * be non-overlapping).
+ *
+ * A new geometry object is created and returned containing the concave
+ * hull of the geometry on which the method is invoked.
+ *
+ * This function is the same as the C++ method OGRGeometry::ConcaveHullOfPolygons().
+ *
+ * This function is built on the GEOS >= 3.11 library
+ * If OGR is built without the GEOS >= 3.11 library, this function will always
+ * fail, issuing a CPLE_NotSupported error.
+ *
+ * @param hTarget The Geometry to calculate the concave hull of.
+ * @param dfLengthRatio Specifies the Maximum Edge Length as a fraction of the
+ *                      difference between the longest and shortest edge lengths
+ *                      between the polygons.
+ *                      This normalizes the Maximum Edge Length to be scale-free.
+ *                      A value of 1 produces the convex hull; a value of 0 produces
+ *                      the original polygons.
+ * @param bIsTight Whether the hull must follow the outer boundaries of the input
+ *                 polygons.
+ * @param bAllowHoles Whether the concave hull is allowed to contain holes
+ *
+ * @return a new geometry to be freed by the caller with OGR_G_DestroyGeometry,
+ * or NULL if an error occurs.
+ *
+ * @since GDAL 3.13
+ * @see OGR_G_ConcaveHull()
+ */
+
+OGRGeometryH OGR_G_ConcaveHullOfPolygons(OGRGeometryH hTarget,
+                                         double dfLengthRatio, bool bIsTight,
+                                         bool bAllowHoles)
+
+{
+    VALIDATE_POINTER1(hTarget, "OGR_G_ConcaveHullOfPolygons", nullptr);
+
+    return OGRGeometry::ToHandle(
+        OGRGeometry::FromHandle(hTarget)->ConcaveHullOfPolygons(
+            dfLengthRatio, bIsTight, bAllowHoles));
 }
 
 /************************************************************************/

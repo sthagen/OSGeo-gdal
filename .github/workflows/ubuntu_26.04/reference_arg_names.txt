@@ -324,6 +324,7 @@ target-aligned-pixels
 target-height
 target-values
 tee-pipeline
+tight
 tile-size
 tiling-scheme
 title

@@ -31,6 +31,7 @@ class GDALVectorConcaveHullAlgorithm /* non final */
     {
         double m_ratio = 0.0;
         bool m_allowHoles = false;
+        bool m_tight = false;
     };
 
     std::unique_ptr<OGRLayerWithTranslateFeature>
