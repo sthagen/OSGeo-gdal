@@ -27,7 +27,7 @@
     (defined(DOXYGEN_SKIP) || __cplusplus >= 201703L || _MSC_VER >= 1920)
 
 #include "cpl_error.h"
-
+#include "ogr_feature.h"
 #include <limits>
 #include <functional>
 #include <map>
@@ -2924,6 +2924,29 @@ class CPL_DLL GDALAlgorithmRegistry
     /** Add a field name argument */
     GDALInConstructionAlgorithmArg &
     AddFieldNameArg(std::string *pValue, const char *helpMessage = nullptr);
+
+    /**
+     *  Parse and validate a field definition in the form &lt;NAME&gt;:&lt;TYPE&gt;[(&lt;WIDTH&gt;[,&lt;PRECISION&gt;])]
+     *  \param osStrDef the field definition string to parse
+     *  \param poFieldDefn the field definition to populate
+     *  \param posError error message in case of failure
+     *  \return true on success, false on failure with osError set to the error message
+     */
+    static bool ParseFieldDefinition(const std::string &osStrDef,
+                                     OGRFieldDefn *poFieldDefn,
+                                     std::string *posError);
+
+    /**
+     *  Add field definition argument
+     *  in the form &lt;NAME&gt;:&lt;TYPE&gt;[(&lt;WIDTH&gt;[,&lt;PRECISION&gt;])]
+     *  \param pValues the field definitions as strings
+     *  \param pFieldDefns the field definitions to populate
+     *  \param helpMessage optional help message for this argument
+     */
+    GDALInConstructionAlgorithmArg &
+    AddFieldDefinitionArg(std::vector<std::string> *pValues,
+                          std::vector<OGRFieldDefn> *pFieldDefns,
+                          const char *helpMessage = nullptr);
 
     /** Add a field type (or subtype) argument */
     GDALInConstructionAlgorithmArg &AddFieldTypeSubtypeArg(
