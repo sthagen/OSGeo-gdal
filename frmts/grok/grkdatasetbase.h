@@ -522,7 +522,7 @@ struct GRKCodecWrapper
      * @param numResolutions number of resolutions
      * @return true if successful
      */
-    bool setUpDecompress(int numThreads, char *pszFilename,
+    bool setUpDecompress(int numThreads, const char *pszFilename,
                          vsi_l_offset nCodeStreamLength, uint32_t *nTileW,
                          uint32_t *nTileH, int *numResolutions)
     {
@@ -1780,8 +1780,17 @@ struct JP2GRKDatasetBase : public JP2DatasetBase
                              nPromoteAlphaBandIdx);
         };
 
-        auto postPreload = decompressAsynch(nullptr, nullptr, nXOff, nYOff,
-                                            nXSize, nYSize, rowCopy);
+        // When reading a subset of bands, tile images must persist
+        // across per-band reads.  Use CACHE_IMAGE so that tile row
+        // release keeps the decoded pixels alive.
+        const int nTotalComps =
+            (m_codec && m_codec->psImage) ? m_codec->psImage->numcomps : 0;
+        const bool needPersistentTiles =
+            (!this->bSingleTiled && nBandCount < nTotalComps);
+
+        auto postPreload =
+            decompressAsynch(nullptr, nullptr, nXOff, nYOff, nXSize, nYSize,
+                             rowCopy, needPersistentTiles);
 
         try
         {
@@ -1862,7 +1871,8 @@ struct JP2GRKDatasetBase : public JP2DatasetBase
     PostPreload decompressAsynch(decompress_callback cb, void *user_data,
                                  int swath_x0, int swath_y0, int swath_width,
                                  int swath_height,
-                                 RowCopyFunc rowCopy = nullptr)
+                                 RowCopyFunc rowCopy = nullptr,
+                                 bool needPersistentTiles = false)
     {
         PostPreload rc;
 
@@ -1876,8 +1886,7 @@ struct JP2GRKDatasetBase : public JP2DatasetBase
             m_codec->open(fp_, nCodeStreamStart);
             uint32_t nTileW = 0, nTileH = 0;
             int numRes = 0;
-            char *pszFilename = const_cast<char *>(m_osFilename.c_str());
-            if (!m_codec->setUpDecompress(GetNumThreads(), pszFilename,
+            if (!m_codec->setUpDecompress(GetNumThreads(), m_osFilename.c_str(),
                                           nCodeStreamLength, &nTileW, &nTileH,
                                           &numRes))
             {
@@ -1944,7 +1953,9 @@ struct JP2GRKDatasetBase : public JP2DatasetBase
             decompressParams.simulate_synchronous = true;
             decompressParams.decompress_callback = cb;
             decompressParams.decompress_callback_user_data = user_data;
-            decompressParams.core.tile_cache_strategy = GRK_TILE_CACHE_IMAGE;
+            decompressParams.core.tile_cache_strategy =
+                needPersistentTiles ? GRK_TILE_CACHE_IMAGE
+                                    : GRK_TILE_CACHE_NONE;
             // For multi-tile images, skip composite allocation to avoid
             // a full-resolution buffer.  Single-tile images need the
             // composite because Grok stores their data there (not in the
@@ -2096,6 +2107,33 @@ struct JP2GRKDatasetBase : public JP2DatasetBase
         const int nWidthToRead = std::min(nBlockXSize, nRasterXSize_ - nXOff);
         const int nHeightToRead = std::min(nBlockYSize, nRasterYSize_ - nYOff);
 
+        // The async decompress pipeline decodes a fixed decode window and
+        // cleans up tiles after processing.  IReadBlock calls us for each
+        // block, potentially a different tile each time.  For multi-tile
+        // images, reset the codec so a fresh decompress can target just
+        // this block's region.
+        if (!bSingleTiled && (hasCachedPostPreload_ || initializedAsync))
+        {
+            delete m_codec;
+            m_codec = new GRKCodecWrapper();
+            m_codec->open(fp_, nCodeStreamStart);
+            uint32_t tileW = 0, tileH = 0;
+            int numRes = 0;
+            if (!m_codec->setUpDecompress(GetNumThreads(), m_osFilename.c_str(),
+                                          nCodeStreamLength, &tileW, &tileH,
+                                          &numRes))
+            {
+                delete m_codec;
+                m_codec = nullptr;
+                CPLError(CE_Failure, CPLE_AppDefined,
+                         "readBlockInit: codec reinit failed");
+                return CE_Failure;
+            }
+            CPLErrorReset();
+            hasCachedPostPreload_ = false;
+            initializedAsync = false;
+        }
+
         auto postPreload = decompressAsynch(nullptr, nullptr, nXOff, nYOff,
                                             nWidthToRead, nHeightToRead);
         if (!postPreload.asynch_)
@@ -2105,8 +2143,11 @@ struct JP2GRKDatasetBase : public JP2DatasetBase
             return CE_Failure;
         }
 
-        uint16_t tileno = postPreload.tile_y0 * postPreload.num_tile_cols +
-                          postPreload.tile_x0;
+        // Compute the tile index from block coordinates (not from
+        // postPreload.tile_x0/y0, which reflect the full decompress range).
+        uint16_t tileno =
+            static_cast<uint16_t>(nBlockYOff) * postPreload.num_tile_cols +
+            static_cast<uint16_t>(nBlockXOff);
         grk_image *img =
             grk_decompress_get_tile_image(m_codec->pCodec, tileno, true);
         // For single-tile images, Grok puts data in the composite

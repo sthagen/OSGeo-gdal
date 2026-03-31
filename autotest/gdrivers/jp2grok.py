@@ -1024,6 +1024,51 @@ def test_jp2grok_lossless_byte():
 
 
 ###############################################################################
+# Test multi-tile multi-row round-trip via DirectRasterIO swath path.
+# Regression test for TileCompletion releasing tile images too early:
+# TileCache::release() must respect tile_cache_strategy so that
+# GRK_TILE_CACHE_IMAGE keeps per-tile images alive until copied.
+
+
+def test_jp2grok_multitile_multirow(tmp_vsimem):
+    gdaltest.importorskip_gdal_array()
+    np = pytest.importorskip("numpy")
+
+    # 256x256 image with 64x64 tiles → 4x4 tile grid (4 tile rows)
+    width, height = 256, 256
+    src_ds = gdal.GetDriverByName("MEM").Create("", width, height, 3, gdal.GDT_Byte)
+    # Fill each band with a distinct gradient so we can detect corruption
+    for b in range(3):
+        band = src_ds.GetRasterBand(b + 1)
+        arr = np.empty((height, width), dtype=np.uint8)
+        for y in range(height):
+            arr[y, :] = (y + b * 80) % 256
+        band.WriteArray(arr)
+
+    out_path = tmp_vsimem / "jp2grok_multitile_multirow.jp2"
+    out_ds = gdaltest.jp2grok_drv.CreateCopy(
+        out_path,
+        src_ds,
+        options=["BLOCKXSIZE=64", "BLOCKYSIZE=64", "REVERSIBLE=YES", "QUALITY=100"],
+    )
+    del out_ds
+
+    # Re-open and read via DirectRasterIO (triggers async swath decompress)
+    ds = gdal.Open(out_path)
+    assert ds is not None
+    for b in range(3):
+        ref_arr = np.empty((height, width), dtype=np.uint8)
+        for y in range(height):
+            ref_arr[y, :] = (y + b * 80) % 256
+        got_arr = ds.GetRasterBand(b + 1).ReadAsArray()
+        assert np.array_equal(
+            ref_arr, got_arr
+        ), f"Band {b + 1} data mismatch after multi-row tile decompress"
+    ds = None
+    src_ds = None
+
+
+###############################################################################
 # Test driver metadata
 
 
