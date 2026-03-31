@@ -15,9 +15,9 @@ add_gdal_driver(
 gdal_standard_includes(ogr_ODS)
 target_include_directories(ogr_ODS PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
 
-add_executable(testparser EXCLUDE_FROM_ALL testparser.cpp)
+add_executable(testparser EXCLUDE_FROM_ALL testparser.cpp ods_formula_node.cpp ods_formula.cpp)
 gdal_standard_includes(testparser)
-target_link_libraries(testparser PRIVATE $<TARGET_NAME:${GDAL_LIB_TARGET_NAME}> ogr_ODS)
+target_link_libraries(testparser PRIVATE $<TARGET_NAME:${GDAL_LIB_TARGET_NAME}>)
 if (GDAL_USE_EXPAT)
   target_link_libraries(testparser PRIVATE ${EXPAT_TARGET})
 endif()
