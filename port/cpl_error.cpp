@@ -1583,6 +1583,16 @@ CPLErrorStateBackuper::~CPLErrorStateBackuper()
 /*! @cond Doxygen_Suppress */
 
 /************************************************************************/
+/*               CPLErrorAccumulator::Context::Context()                */
+/************************************************************************/
+
+CPLErrorAccumulator::Context::Context(CPLErrorAccumulator &sAccumulator)
+{
+    CPLPushErrorHandlerEx(CPLErrorAccumulator::Accumulator, &sAccumulator);
+    CPLSetCurrentErrorHandlerCatchDebug(false);
+}
+
+/************************************************************************/
 /*               CPLErrorAccumulator::Context::~Context()               */
 /************************************************************************/
 
@@ -1597,9 +1607,7 @@ CPLErrorAccumulator::Context::~Context()
 
 CPLErrorAccumulator::Context CPLErrorAccumulator::InstallForCurrentScope()
 {
-    CPLPushErrorHandlerEx(CPLErrorAccumulator::Accumulator, this);
-    CPLSetCurrentErrorHandlerCatchDebug(false);
-    return CPLErrorAccumulator::Context();
+    return CPLErrorAccumulator::Context(*this);
 }
 
 /************************************************************************/
