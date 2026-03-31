@@ -907,6 +907,94 @@ class CPL_DLL OGRFeatureDefn
 };
 
 #ifdef GDAL_COMPILATION
+/*! @cond Doxygen_Suppress */
+
+/** Smart pointer around OGRFeatureDefn.
+ *
+ * It uses OGRFeatureDefn built-in reference counting, to increase the reference
+ * count when assigning a raw pointer to the smart pointer, and decrease it
+ * when releasing it.
+ * Somewhat similar to https://www.boost.org/doc/libs/latest/libs/smart_ptr/doc/html/smart_ptr.html#intrusive_ptr
+ */
+struct OGRFeatureDefnRefCountedPtr
+{
+  public:
+    inline explicit OGRFeatureDefnRefCountedPtr(
+        OGRFeatureDefn *poFDefn = nullptr)
+        : m_poFeatureDefn(poFDefn)
+    {
+        if (m_poFeatureDefn)
+            m_poFeatureDefn->Reference();
+    }
+
+    inline explicit OGRFeatureDefnRefCountedPtr(std::nullptr_t)
+    {
+    }
+
+    inline explicit OGRFeatureDefnRefCountedPtr(const char *pszName)
+        : OGRFeatureDefnRefCountedPtr(new OGRFeatureDefn(pszName))
+    {
+    }
+
+    inline ~OGRFeatureDefnRefCountedPtr()
+    {
+        reset(nullptr);
+    }
+
+    inline void reset(OGRFeatureDefn *poFDefn)
+    {
+        if (m_poFeatureDefn)
+            m_poFeatureDefn->Release();
+        m_poFeatureDefn = poFDefn;
+        if (m_poFeatureDefn)
+            m_poFeatureDefn->Reference();
+    }
+
+    inline OGRFeatureDefn *get() const
+    {
+        return m_poFeatureDefn;
+    }
+
+    inline OGRFeatureDefn &operator*() const
+    {
+        return *m_poFeatureDefn;
+    }
+
+    inline OGRFeatureDefn *operator->() const
+    {
+        return m_poFeatureDefn;
+    }
+
+    inline operator bool() const
+    {
+        return m_poFeatureDefn != nullptr;
+    }
+
+  private:
+    OGRFeatureDefn *m_poFeatureDefn{};
+
+    OGRFeatureDefnRefCountedPtr(const OGRFeatureDefnRefCountedPtr &) = delete;
+    OGRFeatureDefnRefCountedPtr &
+    operator=(const OGRFeatureDefnRefCountedPtr &) = delete;
+    OGRFeatureDefnRefCountedPtr(OGRFeatureDefnRefCountedPtr &&) = delete;
+    OGRFeatureDefnRefCountedPtr &
+    operator=(OGRFeatureDefnRefCountedPtr &&) = delete;
+};
+
+inline bool operator==(const OGRFeatureDefnRefCountedPtr &lhs, std::nullptr_t)
+{
+    return lhs.get() == nullptr;
+}
+
+inline bool operator!=(const OGRFeatureDefnRefCountedPtr &lhs, std::nullptr_t)
+{
+    return lhs.get() != nullptr;
+}
+
+/*! @endcond */
+#endif
+
+#ifdef GDAL_COMPILATION
 /** Return an object that temporary unseals the OGRFeatureDefn
  *
  * The returned object calls Unseal() initially, and when it is destroyed
