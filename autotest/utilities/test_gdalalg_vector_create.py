@@ -106,7 +106,7 @@ def test_gdal_vector_create_errors(tmp_vsimem, args, match):
 
 
 @pytest.mark.require_driver("GPKG")
-def test_overwrite_update_overwrite_layer(tmp_vsimem):
+def test_gdalalg_vector_create_overwrite_update_overwrite_layer(tmp_vsimem):
 
     out_file = str(tmp_vsimem / "test_overwrite.gpkg")
 
@@ -244,7 +244,7 @@ def test_overwrite_update_overwrite_layer(tmp_vsimem):
     ), "Unexpected CRS after overwrite"
 
 
-def test_overwrite_shapefile(tmp_vsimem):
+def test_gdalalg_vector_create_overwrite_shapefile(tmp_vsimem):
     out_file = str(tmp_vsimem / "test_overwrite.shp")
 
     # ulink any existing file to ensure a clean state
@@ -285,7 +285,7 @@ def test_overwrite_shapefile(tmp_vsimem):
 
 
 @pytest.mark.require_driver("GPKG")
-def test_ogr_schema(tmp_vsimem):
+def test_gdalalg_vector_create_ogr_schema(tmp_vsimem):
 
     ogr_schema = r"""
 {
@@ -375,7 +375,7 @@ def test_ogr_schema(tmp_vsimem):
 
 
 @pytest.mark.require_driver("GPKG")
-def test_aspatial_layer(tmp_vsimem):
+def test_gdalalg_vector_create_aspatial_layer(tmp_vsimem):
     alg = get_create_alg()
 
     out_file = str(tmp_vsimem / "test_aspatial.gpkg")
@@ -423,7 +423,9 @@ def test_aspatial_layer(tmp_vsimem):
         (["layer_2", "layer_3"], "", ["layer_2", "layer_3"]),
     ],
 )
-def test_layer_names(tmp_vsimem, input_names, output_name, expected_names):
+def test_gdalalg_vector_create_layer_names(
+    tmp_vsimem, input_names, output_name, expected_names
+):
     alg = get_create_alg()
 
     in_file = str(tmp_vsimem / "test_layer_names_in.gpkg")
@@ -495,7 +497,7 @@ def test_layer_names(tmp_vsimem, input_names, output_name, expected_names):
         ),
     ],
 )
-def test_mutex_options(tmp_vsimem, options, match):
+def test_gdalalg_vector_create_mutex_options(tmp_vsimem, options, match):
     alg = get_create_alg()
 
     out_file = str(tmp_vsimem / "test_mutex.gpkg")
@@ -510,7 +512,7 @@ def test_mutex_options(tmp_vsimem, options, match):
         alg.Run()
 
 
-def test_single_layer_format(tmp_vsimem):
+def test_gdalalg_vector_create_single_layer_format(tmp_vsimem):
 
     out_file = str(tmp_vsimem / "test_single_layer.shp")
 
@@ -558,7 +560,7 @@ def test_single_layer_format(tmp_vsimem):
 
 
 @pytest.mark.require_driver("GPKG")
-def test_dateime_timezone_round_trip(tmp_vsimem):
+def test_gdalalg_vector_create_datetime_timezone_round_trip(tmp_vsimem):
 
     out_file = str(tmp_vsimem / "test_datetime.gpkg")
 
