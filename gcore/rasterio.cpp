@@ -47,7 +47,8 @@
 #include <immintrin.h>
 #define HAVE_SSE2
 // AVX2 dispatch: compile AVX2 code with target attribute, detect at runtime
-#if defined(__GNUC__) || defined(__clang__)
+#if (defined(__GNUC__) || defined(__clang__)) &&                               \
+    defined(HAVE_AVX2_AT_COMPILE_TIME)
 #define HAVE_AVX2_DISPATCH
 #elif defined(_MSC_VER)
 #include <intrin.h>
