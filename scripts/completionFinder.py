@@ -130,6 +130,8 @@ def getCompletionScript(name, optList):
 
     if name.endswith(".py"):
         func_name = name[0:-3]
+    elif "-" in name:
+        func_name = name.replace("-", "_")
     else:
         func_name = name
 
