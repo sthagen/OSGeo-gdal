@@ -449,6 +449,45 @@ def test_ogr_geos_concavehull():
 ###############################################################################
 
 
+@gdaltest.disable_exceptions()
+def test_ogr_geos_concavehullofpolygons():
+
+    # Hourglass
+    g1 = ogr.CreateGeometryFromWkt("POLYGON((0 0,0.4 0.5,0 1,1 1,0.6 0.5,1 0,0 0))")
+
+    with gdal.quiet_errors():
+        res = g1.ConcaveHullOfPolygons(0.5, False, False)
+
+    if res is None:
+        assert "GEOS 3.11" in gdal.GetLastErrorMsg()
+        pytest.skip(gdal.GetLastErrorMsg())
+
+    assert g1.ConcaveHullOfPolygons(0, False, False).Equals(g1)
+    assert g1.ConcaveHullOfPolygons(1, False, False).Area() == 1.0
+    assert g1.ConcaveHullOfPolygons(1, True, False).Equals(g1)
+
+    # Two Pacman's facing each other
+    g1 = ogr.CreateGeometryFromWkt(
+        "MULTIPOLYGON(((0 0,0 1,1 1,1 0.9,0.1 0.9,0.1 0.1,1 0.1,1 0,0 0)),((1.1 1,2 1,2 0,1.1 0,1.1 0.1,1.9 0.1,1.9 0.9, 1.1 0.9,1.1 1)))"
+    )
+
+    res = g1.ConcaveHullOfPolygons(0.5, False, False)
+    assert res.GetGeometryType() == ogr.wkbPolygon
+    assert res.GetGeometryCount() == 1
+    assert res.Area() == 2.0
+
+    res = g1.ConcaveHullOfPolygons(0.5, False, True)
+    assert res.GetGeometryType() == ogr.wkbPolygon
+    assert res.GetGeometryCount() == 2
+
+    with gdal.quiet_errors():
+        res = g1.ConcaveHullOfPolygons(-1, False, False)
+    assert res is None
+
+
+###############################################################################
+
+
 def test_ogr_geos_distance():
 
     g1 = ogr.CreateGeometryFromWkt("POINT(0 0)")

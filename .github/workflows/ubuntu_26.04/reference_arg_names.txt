@@ -269,6 +269,7 @@ resume
 return-code
 scale
 scale-axes
+schema
 scheme
 sd-filename
 side
@@ -323,6 +324,7 @@ target-aligned-pixels
 target-height
 target-values
 tee-pipeline
+tight
 tile-size
 tiling-scheme
 title

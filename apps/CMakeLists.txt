@@ -107,6 +107,7 @@ target_sources(appslib PRIVATE
   gdalalg_vector_concave_hull.cpp
   gdalalg_vector_convert.cpp
   gdalalg_vector_convex_hull.cpp
+  gdalalg_vector_create.cpp
   gdalalg_vector_dissolve.cpp
   gdalalg_vector_edit.cpp
   gdalalg_vector_export_schema.cpp
@@ -369,7 +370,9 @@ if (BUILD_APPS)
     # gcore/gdal_version.h
     target_include_directories(${UTILCMD} PRIVATE $<TARGET_PROPERTY:gcore,BINARY_DIR>/gdal_version_full)
     gdal_standard_includes(${UTILCMD})
-    target_compile_options(${UTILCMD} PRIVATE ${GDAL_CXX_WARNING_FLAGS} ${WFLAG_OLD_STYLE_CAST})
+    if (NOT "${UTILCMD}" STREQUAL "gdalflattenmask")
+        target_compile_options(${UTILCMD} PRIVATE ${GDAL_CXX_WARNING_FLAGS} ${WFLAG_OLD_STYLE_CAST})
+    endif()
     add_dependencies(${UTILCMD} generate_gdal_version_h)
     if (MSVC OR MINGW)
       target_compile_definitions(${UTILCMD} PRIVATE -DSUPPORTS_WMAIN)

@@ -281,7 +281,7 @@ _gdalcompare()
 }
 complete -o default -F _gdalcompare gdalcompare.py
 complete -o default -F _gdalcompare gdalcompare
-_gdal-config()
+_gdal_config()
 {
   COMPREPLY=()
   cur="${COMP_WORDS[$COMP_CWORD]}"
@@ -298,7 +298,7 @@ _gdal-config()
   esac
   return 0
 }
-complete -o default -F _gdal-config gdal-config
+complete -o default -F _gdal_config gdal-config
 _gdal_contour()
 {
   COMPREPLY=()

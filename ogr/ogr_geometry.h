@@ -545,52 +545,65 @@ class CPL_DLL OGRGeometry
     // ISpatialRelation
     virtual OGRBoolean Intersects(const OGRGeometry *) const;
     virtual OGRBoolean Equals(const OGRGeometry *) const = 0;
-    virtual OGRBoolean Disjoint(const OGRGeometry *) const;
-    virtual OGRBoolean Touches(const OGRGeometry *) const;
-    virtual OGRBoolean Crosses(const OGRGeometry *) const;
+    OGRBoolean Disjoint(const OGRGeometry *) const;
+    OGRBoolean Touches(const OGRGeometry *) const;
+    OGRBoolean Crosses(const OGRGeometry *) const;
     virtual OGRBoolean Within(const OGRGeometry *) const;
     virtual OGRBoolean Contains(const OGRGeometry *) const;
-    virtual OGRBoolean Overlaps(const OGRGeometry *) const;
-    //    virtual OGRBoolean  Relate( const OGRGeometry *, const char * ) const;
-    //    virtual OGRGeometry *LocateAlong( double mValue ) const;
-    //    virtual OGRGeometry *LocateBetween( double mStart, double mEnd )
-    //    const;
+    OGRBoolean Overlaps(const OGRGeometry *) const;
 
-    virtual OGRGeometry *Boundary() const CPL_WARN_UNUSED_RESULT;
-    virtual double Distance(const OGRGeometry *) const;
-    virtual OGRGeometry *ConvexHull() const CPL_WARN_UNUSED_RESULT;
-    virtual OGRGeometry *
-    ConcaveHull(double dfRatio, bool bAllowHoles) const CPL_WARN_UNUSED_RESULT;
-    virtual OGRGeometry *
-    Buffer(double dfDist, int nQuadSegs = 30) const CPL_WARN_UNUSED_RESULT;
-    virtual OGRGeometry *
+    OGRGeometry *Boundary() const CPL_WARN_UNUSED_RESULT;
+
+    double Distance(const OGRGeometry *) const;
+
+    OGRGeometry *ConvexHull() const CPL_WARN_UNUSED_RESULT;
+
+    OGRGeometry *ConcaveHull(double dfRatio,
+                             bool bAllowHoles) const CPL_WARN_UNUSED_RESULT;
+
+    OGRGeometry *
+    ConcaveHullOfPolygons(double dfLengthRatio, bool bIsTight,
+                          bool bAllowHoles) const CPL_WARN_UNUSED_RESULT;
+
+    OGRGeometry *Buffer(double dfDist,
+                        int nQuadSegs = 30) const CPL_WARN_UNUSED_RESULT;
+
+    OGRGeometry *
     BufferEx(double dfDist,
              CSLConstList papszOptions) const CPL_WARN_UNUSED_RESULT;
-    virtual OGRGeometry *
-    Intersection(const OGRGeometry *) const CPL_WARN_UNUSED_RESULT;
-    virtual OGRGeometry *
-    Union(const OGRGeometry *) const CPL_WARN_UNUSED_RESULT;
-    virtual OGRGeometry *UnionCascaded() const CPL_WARN_UNUSED_RESULT;
+
+    OGRGeometry *Intersection(const OGRGeometry *) const CPL_WARN_UNUSED_RESULT;
+
+    OGRGeometry *Union(const OGRGeometry *) const CPL_WARN_UNUSED_RESULT;
+
+    OGRGeometry *UnionCascaded() const CPL_WARN_UNUSED_RESULT;
+
     OGRGeometry *UnaryUnion() const CPL_WARN_UNUSED_RESULT;
-    virtual OGRGeometry *
-    Difference(const OGRGeometry *) const CPL_WARN_UNUSED_RESULT;
-    virtual OGRGeometry *
+
+    OGRGeometry *Difference(const OGRGeometry *) const CPL_WARN_UNUSED_RESULT;
+
+    OGRGeometry *
     SymDifference(const OGRGeometry *) const CPL_WARN_UNUSED_RESULT;
-    virtual OGRErr Centroid(OGRPoint *poPoint) const;
-    virtual OGRGeometry *
-    Simplify(double dTolerance) const CPL_WARN_UNUSED_RESULT;
+
+    OGRErr Centroid(OGRPoint *poPoint) const;
+
+    OGRGeometry *Simplify(double dTolerance) const CPL_WARN_UNUSED_RESULT;
+
     OGRGeometry *
     SimplifyPreserveTopology(double dTolerance) const CPL_WARN_UNUSED_RESULT;
-    virtual OGRGeometry *
+
+    OGRGeometry *
     DelaunayTriangulation(double dfTolerance,
                           int bOnlyEdges) const CPL_WARN_UNUSED_RESULT;
-    virtual OGRGeometry *
+
+    OGRGeometry *
     ConstrainedDelaunayTriangulation() const CPL_WARN_UNUSED_RESULT;
 
-    virtual OGRGeometry *Polygonize() const CPL_WARN_UNUSED_RESULT;
-    virtual OGRGeometry *BuildArea() const CPL_WARN_UNUSED_RESULT;
+    OGRGeometry *Polygonize() const CPL_WARN_UNUSED_RESULT;
 
-    virtual double Distance3D(const OGRGeometry *poOtherGeom) const;
+    OGRGeometry *BuildArea() const CPL_WARN_UNUSED_RESULT;
+
+    double Distance3D(const OGRGeometry *poOtherGeom) const;
 
     OGRGeometry *SetPrecision(double dfGridSize, int nFlags) const;
 
