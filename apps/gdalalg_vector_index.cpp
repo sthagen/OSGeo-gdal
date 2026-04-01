@@ -395,7 +395,8 @@ bool GDALVectorIndexAlgorithm::RunImpl(GDALProgressFunc pfnProgress,
         {
             const auto poSrcCRS = poDstLayer->GetSpatialRef();
             if (poSrcCRS)
-                poTargetCRS.reset(poSrcCRS->Clone());
+                poTargetCRS =
+                    OGRSpatialReferenceRefCountedPtr::makeClone(poSrcCRS);
         }
 
         for (auto &&poFeature : poDstLayer)
@@ -441,7 +442,8 @@ bool GDALVectorIndexAlgorithm::RunImpl(GDALProgressFunc pfnProgress,
             const auto poSrcCRS =
                 poSrcDS->GetLayer(anLayerIndices[0])->GetSpatialRef();
             if (poSrcCRS)
-                poTargetCRS.reset(poSrcCRS->Clone());
+                poTargetCRS =
+                    OGRSpatialReferenceRefCountedPtr::makeClone(poSrcCRS);
         }
 
         poDstLayer = setupRet.outDS->CreateLayer(m_outputLayerName.c_str(),

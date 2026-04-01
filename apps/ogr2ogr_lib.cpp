@@ -683,9 +683,8 @@ static std::unique_ptr<OGRGeometry> LoadGeometry(const std::string &osDS,
     const auto poSRSSrc = poLyr->GetSpatialRef();
     if (poSRSSrc)
     {
-        auto poSRSClone = poSRSSrc->Clone();
-        oGC.assignSpatialReference(poSRSClone);
-        poSRSClone->Release();
+        auto poSRSClone = OGRSpatialReferenceRefCountedPtr::makeClone(poSRSSrc);
+        oGC.assignSpatialReference(poSRSClone.get());
     }
 
     for (auto &poFeat : poLyr)
@@ -1114,15 +1113,14 @@ const OGRFeatureDefn *OGRSplitListFieldLayer::GetLayerDefn() const
 /*                                                                      */
 /*      Apply GCP Transform to points                                   */
 /************************************************************************/
-
+namespace
+{
 class GCPCoordTransformation final : public OGRCoordinateTransformation
 {
     GCPCoordTransformation(const GCPCoordTransformation &other)
         : bUseTPS(other.bUseTPS), poSRS(other.poSRS)
     {
         hTransformArg.reset(GDALCloneTransformer(other.hTransformArg.get()));
-        if (poSRS)
-            poSRS->Reference();
     }
 
     GCPCoordTransformation &operator=(const GCPCoordTransformation &) = delete;
@@ -1131,11 +1129,13 @@ class GCPCoordTransformation final : public OGRCoordinateTransformation
     std::unique_ptr<void, decltype(&GDALDestroyTransformer)> hTransformArg{
         nullptr, GDALDestroyTransformer};
     const bool bUseTPS;
-    OGRSpatialReference *const poSRS;
+    const OGRSpatialReferenceRefCountedPtr poSRS;
 
     GCPCoordTransformation(int nGCPCount, const GDAL_GCP *pasGCPList,
-                           int nReqOrder, OGRSpatialReference *poSRSIn)
-        : bUseTPS(nReqOrder < 0), poSRS(poSRSIn)
+                           int nReqOrder, const OGRSpatialReference *poSRSIn)
+        : bUseTPS(nReqOrder < 0),
+          poSRS(const_cast<OGRSpatialReference *>(poSRSIn),
+                /* add_ref = */ true)
     {
         if (nReqOrder < 0)
         {
@@ -1147,8 +1147,6 @@ class GCPCoordTransformation final : public OGRCoordinateTransformation
             hTransformArg.reset(GDALCreateGCPTransformer(nGCPCount, pasGCPList,
                                                          nReqOrder, FALSE));
         }
-        if (poSRS)
-            poSRS->Reference();
     }
 
     OGRCoordinateTransformation *Clone() const override
@@ -1161,16 +1159,14 @@ class GCPCoordTransformation final : public OGRCoordinateTransformation
         return hTransformArg != nullptr;
     }
 
-    ~GCPCoordTransformation() override;
-
     const OGRSpatialReference *GetSourceCS() const override
     {
-        return poSRS;
+        return poSRS.get();
     }
 
     const OGRSpatialReference *GetTargetCS() const override
     {
-        return poSRS;
+        return poSRS.get();
     }
 
     virtual int Transform(size_t nCount, double *x, double *y, double *z,
@@ -1201,12 +1197,7 @@ class GCPCoordTransformation final : public OGRCoordinateTransformation
         return nullptr;
     }
 };
-
-GCPCoordTransformation::~GCPCoordTransformation()
-{
-    if (poSRS)
-        poSRS->Dereference();
-}
+}  // namespace
 
 /************************************************************************/
 /*                             CompositeCT                              */
@@ -1851,37 +1842,6 @@ void GDALVectorTranslateWrappedDataset::ReleaseResultSet(OGRLayer *poResultsSet)
 }
 
 /************************************************************************/
-/*                    OGR2OGRSpatialReferenceHolder                     */
-/************************************************************************/
-
-class OGR2OGRSpatialReferenceHolder
-{
-    OGRSpatialReference *m_poSRS = nullptr;
-
-    CPL_DISALLOW_COPY_ASSIGN(OGR2OGRSpatialReferenceHolder)
-
-  public:
-    OGR2OGRSpatialReferenceHolder() = default;
-
-    ~OGR2OGRSpatialReferenceHolder()
-    {
-        if (m_poSRS)
-            m_poSRS->Release();
-    }
-
-    void assignNoRefIncrease(OGRSpatialReference *poSRS)
-    {
-        CPLAssert(m_poSRS == nullptr);
-        m_poSRS = poSRS;
-    }
-
-    OGRSpatialReference *get()
-    {
-        return m_poSRS;
-    }
-};
-
-/************************************************************************/
 /*                   GDALVectorTranslateCreateCopy()                    */
 /************************************************************************/
 
@@ -2095,26 +2055,24 @@ GDALVectorTranslateCreateCopy(GDALDriver *poDriver, const char *pszDest,
 
     GDALDataset *poWrkSrcDS = poDS;
     std::unique_ptr<GDALDataset> poWrkSrcDSToFree;
-    OGR2OGRSpatialReferenceHolder oOutputSRSHolder;
+    OGRSpatialReferenceRefCountedPtr poOutputSRS;
 
     if (!psOptions->osOutputSRSDef.empty())
     {
-        oOutputSRSHolder.assignNoRefIncrease(new OGRSpatialReference());
-        oOutputSRSHolder.get()->SetAxisMappingStrategy(
-            OAMS_TRADITIONAL_GIS_ORDER);
-        if (oOutputSRSHolder.get()->SetFromUserInput(
-                psOptions->osOutputSRSDef.c_str()) != OGRERR_NONE)
+        poOutputSRS = OGRSpatialReferenceRefCountedPtr::newInstance();
+        poOutputSRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
+        if (poOutputSRS->SetFromUserInput(psOptions->osOutputSRSDef.c_str()) !=
+            OGRERR_NONE)
         {
             CPLError(CE_Failure, CPLE_AppDefined,
                      "Failed to process SRS definition: %s",
                      psOptions->osOutputSRSDef.c_str());
             return nullptr;
         }
-        oOutputSRSHolder.get()->SetCoordinateEpoch(
-            psOptions->dfOutputCoordinateEpoch);
+        poOutputSRS->SetCoordinateEpoch(psOptions->dfOutputCoordinateEpoch);
 
         poWrkSrcDSToFree = GDALVectorTranslateWrappedDataset::New(
-            poDS, oOutputSRSHolder.get(), psOptions->bTransform);
+            poDS, poOutputSRS.get(), psOptions->bTransform);
         if (poWrkSrcDSToFree == nullptr)
             return nullptr;
         poWrkSrcDS = poWrkSrcDSToFree.get();
@@ -2463,7 +2421,7 @@ GDALDatasetH GDALVectorTranslate(const char *pszDest, GDALDatasetH hDstDS,
     /* -------------------------------------------------------------------- */
     /*      Parse spatial filter SRS if needed.                             */
     /* -------------------------------------------------------------------- */
-    std::unique_ptr<OGRSpatialReference, OGRSpatialReferenceReleaser> poSpatSRS;
+    OGRSpatialReferenceRefCountedPtr poSpatSRS;
     if (psOptions->poSpatialFilter && !psOptions->osSpatSRSDef.empty())
     {
         if (!psOptions->osSQLStatement.empty())
@@ -2474,7 +2432,7 @@ GDALDatasetH GDALVectorTranslate(const char *pszDest, GDALDatasetH hDstDS,
         }
         OGREnvelope sEnvelope;
         psOptions->poSpatialFilter->getEnvelope(&sEnvelope);
-        poSpatSRS.reset(new OGRSpatialReference());
+        poSpatSRS = OGRSpatialReferenceRefCountedPtr::newInstance();
         poSpatSRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
         if (poSpatSRS->SetFromUserInput(psOptions->osSpatSRSDef.c_str()) !=
             OGRERR_NONE)
@@ -2997,22 +2955,20 @@ GDALDatasetH GDALVectorTranslate(const char *pszDest, GDALDatasetH hDstDS,
     /* -------------------------------------------------------------------- */
     /*      Parse the output SRS definition if possible.                    */
     /* -------------------------------------------------------------------- */
-    OGR2OGRSpatialReferenceHolder oOutputSRSHolder;
+    OGRSpatialReferenceRefCountedPtr poOutputSRS;
     if (!psOptions->osOutputSRSDef.empty())
     {
-        oOutputSRSHolder.assignNoRefIncrease(new OGRSpatialReference());
-        oOutputSRSHolder.get()->SetAxisMappingStrategy(
-            OAMS_TRADITIONAL_GIS_ORDER);
-        if (oOutputSRSHolder.get()->SetFromUserInput(
-                psOptions->osOutputSRSDef.c_str()) != OGRERR_NONE)
+        poOutputSRS = OGRSpatialReferenceRefCountedPtr::newInstance();
+        poOutputSRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
+        if (poOutputSRS->SetFromUserInput(psOptions->osOutputSRSDef.c_str()) !=
+            OGRERR_NONE)
         {
             CPLError(CE_Failure, CPLE_AppDefined,
                      "Failed to process SRS definition: %s",
                      psOptions->osOutputSRSDef.c_str());
             return nullptr;
         }
-        oOutputSRSHolder.get()->SetCoordinateEpoch(
-            psOptions->dfOutputCoordinateEpoch);
+        poOutputSRS->SetCoordinateEpoch(psOptions->dfOutputCoordinateEpoch);
     }
 
     /* -------------------------------------------------------------------- */
@@ -3045,7 +3001,7 @@ GDALDatasetH GDALVectorTranslate(const char *pszDest, GDALDatasetH hDstDS,
         poGCPCoordTrans = std::make_unique<GCPCoordTransformation>(
             static_cast<int>(psOptions->asGCPs.size()),
             gdal::GCP::c_ptr(psOptions->asGCPs), psOptions->nTransformOrder,
-            poSourceSRS ? poSourceSRS : oOutputSRSHolder.get());
+            poSourceSRS ? poSourceSRS : poOutputSRS.get());
         if (!(poGCPCoordTrans->IsValid()))
         {
             return nullptr;
@@ -3059,7 +3015,7 @@ GDALDatasetH GDALVectorTranslate(const char *pszDest, GDALDatasetH hDstDS,
     oSetup.m_poSrcDS = poDS;
     oSetup.m_poDstDS = poODS;
     oSetup.m_papszLCO = psOptions->aosLCO.List();
-    oSetup.m_poOutputSRS = oOutputSRSHolder.get();
+    oSetup.m_poOutputSRS = poOutputSRS.get();
     oSetup.m_bTransform = psOptions->bTransform;
     oSetup.m_bNullifyOutputSRS = psOptions->bNullifyOutputSRS;
     oSetup.m_poUserSourceSRS = poSourceSRS;
@@ -3102,7 +3058,7 @@ GDALDatasetH GDALVectorTranslate(const char *pszDest, GDALDatasetH hDstDS,
     oTranslator.m_bWrapDateline = psOptions->bWrapDateline;
     oTranslator.m_osDateLineOffset =
         CPLOPrintf("%g", psOptions->dfDateLineOffset);
-    oTranslator.m_poOutputSRS = oOutputSRSHolder.get();
+    oTranslator.m_poOutputSRS = poOutputSRS.get();
     oTranslator.m_bNullifyOutputSRS = psOptions->bNullifyOutputSRS;
     oTranslator.m_poUserSourceSRS = poSourceSRS;
     oTranslator.m_poGCPCoordTrans = poGCPCoordTrans.get();
@@ -5187,9 +5143,10 @@ SetupTargetLayer::Setup(OGRLayer *poSrcLayer, const char *pszNewLayerName,
                     poSrcFDefn->GetGeomFieldDefn(iSrcGeomField));
                 if (m_poOutputSRS != nullptr)
                 {
-                    auto poOutputSRSClone = m_poOutputSRS->Clone();
-                    oGFldDefn.SetSpatialRef(poOutputSRSClone);
-                    poOutputSRSClone->Release();
+                    auto poOutputSRSClone =
+                        OGRSpatialReferenceRefCountedPtr::makeClone(
+                            m_poOutputSRS);
+                    oGFldDefn.SetSpatialRef(poOutputSRSClone.get());
                 }
                 if (bForceGType)
                 {
