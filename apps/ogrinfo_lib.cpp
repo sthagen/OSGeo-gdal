@@ -1654,18 +1654,11 @@ static void ReportOnLayer(CPLString &osRet, CPLJSONObject &oLayer,
                     EmitFeatureJSON(poFeature.get());
                 }
             }
-            else
+            else if (psOptions->nLimit < 0 || psOptions->nLimit > 0)
             {
                 GIntBig nFeatureCount = 0;
                 for (auto &poFeature : poLayer)
                 {
-                    if (psOptions->nLimit >= 0 &&
-                        nFeatureCount >= psOptions->nLimit)
-                    {
-                        break;
-                    }
-                    ++nFeatureCount;
-
                     if (bJson)
                     {
                         EmitFeatureJSON(poFeature.get());
@@ -1677,6 +1670,13 @@ static void ReportOnLayer(CPLString &osRet, CPLJSONObject &oLayer,
                                       ->DumpReadableAsString(
                                           psOptions->aosOptions.List())
                                       .c_str());
+                    }
+
+                    ++nFeatureCount;
+                    if (psOptions->nLimit >= 0 &&
+                        nFeatureCount >= psOptions->nLimit)
+                    {
+                        break;
                     }
                 }
             }
