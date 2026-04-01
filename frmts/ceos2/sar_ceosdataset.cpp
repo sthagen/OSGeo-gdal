@@ -1239,7 +1239,7 @@ void SAR_CEOSDataset::ScanForMetadata()
             {
                 SetMetadataItem(sDef.pszMetadataItemName, osField.c_str());
                 if (EQUAL(sDef.pszMetadataItemName,
-                          "CEOS_PLATFORM_POS_NUMBER_DATA_POINTS"))
+                          "CEOS_PLATFORM_POS_NUMBER_POINTS"))
                 {
                     nPoints = std::clamp(atoi(osField), 0,
                                          (record->Length - OFFSET_POINT_1) /

@@ -52,7 +52,14 @@ def test_sar_ceos_alos2_L1_1():
     assert ds.RasterYSize == 32971
     assert ds.RasterCount == 1
     assert ds.GetRasterBand(1).DataType == gdal.GDT_CFloat32
-    assert ds.GetMetadata() == {
+    md = ds.GetMetadata()
+    count_removed = 0
+    for key in list(md.keys()):
+        if key.startswith("CEOS_PLATFORM_POS_VECTOR_"):
+            del md[key]
+            count_removed += 1
+    assert count_removed == int(md["CEOS_PLATFORM_POS_NUMBER_POINTS"]) * 6
+    assert md == {
         "CEOS_LOGICAL_VOLUME_ID": "AL2SAR20140212",
         "CEOS_PROCESSING_FACILITY": "SCMO",
         "CEOS_PROCESSING_AGENCY": "JAXA",
@@ -440,7 +447,14 @@ def test_sar_ceos_alos2_L1_5():
     assert ds.RasterYSize == 32294
     assert ds.RasterCount == 1
     assert ds.GetRasterBand(1).DataType == gdal.GDT_UInt16
-    assert ds.GetMetadata() == {
+    md = ds.GetMetadata()
+    count_removed = 0
+    for key in list(md.keys()):
+        if key.startswith("CEOS_PLATFORM_POS_VECTOR_"):
+            del md[key]
+            count_removed += 1
+    assert count_removed == int(md["CEOS_PLATFORM_POS_NUMBER_POINTS"]) * 6
+    assert md == {
         "CEOS_LOGICAL_VOLUME_ID": "AL2SAR20150316",
         "CEOS_PROCESSING_FACILITY": "EICS",
         "CEOS_PROCESSING_AGENCY": "JAXA",
@@ -832,7 +846,14 @@ def test_sar_ceos_alos4_L1_1():
     assert ds.RasterYSize == 40633
     assert ds.RasterCount == 1
     assert ds.GetRasterBand(1).DataType == gdal.GDT_CFloat32
-    assert ds.GetMetadata() == {
+    md = ds.GetMetadata()
+    count_removed = 0
+    for key in list(md.keys()):
+        if key.startswith("CEOS_PLATFORM_POS_VECTOR_"):
+            del md[key]
+            count_removed += 1
+    assert count_removed == int(md["CEOS_PLATFORM_POS_NUMBER_POINTS"]) * 6
+    assert md == {
         "CEOS_LOGICAL_VOLUME_ID": "AL4SAR20250509",
         "CEOS_PROCESSING_FACILITY": "EICS",
         "CEOS_PROCESSING_AGENCY": "JAXA",
