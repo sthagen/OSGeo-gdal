@@ -130,7 +130,7 @@ GDALVectorCreateAlgorithm::GDALVectorCreateAlgorithm(bool standaloneStep)
 bool GDALVectorCreateAlgorithm::RunStep(GDALPipelineStepRunContext &)
 {
 
-    const auto datasetName = m_outputDataset.GetName();
+    const std::string &datasetName = m_outputDataset.GetName();
     auto outputLayerName =
         m_outputLayerName.empty() ? datasetName : m_outputLayerName;
 
@@ -334,7 +334,7 @@ bool GDALVectorCreateAlgorithm::RunStep(GDALPipelineStepRunContext &)
         // Loop over layers in the OGR_SCHEMA and create them
         for (const auto &layerToCreate : layersToBeCreated)
         {
-            const auto oLayerOverride =
+            const auto &oLayerOverride =
                 oSchemaOverride.GetLayerOverride(layerToCreate);
             if (!oLayerOverride.IsValid())
             {
@@ -399,7 +399,7 @@ bool GDALVectorCreateAlgorithm::RunStep(GDALPipelineStepRunContext &)
                         oGeomFieldDefn.SetSpatialRef(poSRS.get());
                     }
                 }
-                geometryFieldDefinitions.push_back(oGeomFieldDefn);
+                geometryFieldDefinitions.push_back(std::move(oGeomFieldDefn));
             }
         }
 
