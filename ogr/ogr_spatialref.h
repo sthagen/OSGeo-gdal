@@ -752,6 +752,101 @@ struct CPL_DLL OGRSpatialReferenceReleaser
 
 /*! @endcond */
 
+/*! @cond Doxygen_Suppress */
+
+#include "ogr_refcountedptr.h"
+
+template <>
+struct OGRRefCountedPtr<OGRSpatialReference>
+    : public OGRRefCountedPtrBase<OGRSpatialReference>
+{
+    /** Constructs from a raw OGRSpatialReference instance.
+     *
+     * Be careful: a fresh OGRSpatialReference instance has a reference count
+     * equal to one, so you generally want to set add_ref = false
+     * So ``OGRSpatialReferenceRefCountedPtr srs(new OGRSpatialReference(), false)``
+     * or less error prone ``auto srs = OGRSpatialReferenceRefCountedPtr::newInstance()``
+     */
+    inline explicit OGRRefCountedPtr(OGRSpatialReference *poSRS, bool add_ref)
+        : OGRRefCountedPtrBase<OGRSpatialReference>(poSRS, add_ref)
+    {
+    }
+
+    /** Constructs with a null OGRSpatialReference instance.
+     */
+    inline explicit OGRRefCountedPtr()
+    {
+    }
+
+    /** Constructs with a null OGRSpatialReference instance.
+     */
+    inline explicit OGRRefCountedPtr(std::nullptr_t)
+    {
+    }
+
+    /** Constructs with a new OGRSpatialReference instance initialized
+     * with a WKT string (or in an empty state if pszWKT is nullptr).
+     */
+    inline static OGRRefCountedPtr newInstance(const char *pszWKT = nullptr)
+    {
+        // Initial ref_count of OGRSpatialReference is 1, so don't add a ref
+        return OGRRefCountedPtr(new OGRSpatialReference(pszWKT),
+                                /* add_ref = */ false);
+    }
+
+    /** Constructs with a clone of an existing OGRSpatialReference instance.
+     */
+    inline static OGRRefCountedPtr makeClone(const OGRSpatialReference *poSRS)
+    {
+        return OGRRefCountedPtr(poSRS ? poSRS->Clone() : nullptr,
+                                /* add_ref = */ false);
+    }
+
+    /** Constructs with a clone of an existing OGRSpatialReference instance.
+     */
+    inline static OGRRefCountedPtr makeClone(const OGRSpatialReference &oSRS)
+    {
+        return OGRRefCountedPtr(oSRS.Clone(),
+                                /* add_ref = */ false);
+    }
+
+    /** Reset the managed raw pointer.
+     *
+     * Release the current managed raw pointer.
+     */
+    inline void reset()
+    {
+        OGRRefCountedPtrBase<OGRSpatialReference>::reset(nullptr, false);
+    }
+
+    /** Reset the managed raw pointer.
+     *
+     * Release the current managed raw pointer and manages a new one.
+     * By default, increases the reference count of the new raw pointer (when
+     * not null).
+     */
+    inline void reset(OGRSpatialReference *poRawPtr, bool add_ref)
+    {
+        OGRRefCountedPtrBase<OGRSpatialReference>::reset(poRawPtr, add_ref);
+    }
+
+    /** Use reset(OGRSpatialReference *poRawPtr, bool add_ref) to be explicit
+     * about ref counting.
+     */
+    inline void reset(OGRSpatialReference *poRawPtr) = delete;
+};
+
+/** Smart pointer around OGRSpatialReference.
+ *
+ * It uses OGRSpatialReference built-in reference counting, to increase the reference
+ * count when assigning a raw pointer to the smart pointer, and decrease it
+ * when releasing it.
+ * Somewhat similar to https://www.boost.org/doc/libs/latest/libs/smart_ptr/doc/html/smart_ptr.html#intrusive_ptr
+ */
+using OGRSpatialReferenceRefCountedPtr = OGRRefCountedPtr<OGRSpatialReference>;
+
+/*! @endcond */
+
 /************************************************************************/
 /*                     OGRCoordinateTransformation                      */
 /*                                                                      */

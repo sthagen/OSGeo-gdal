@@ -915,17 +915,25 @@ template <>
 struct OGRRefCountedPtr<OGRFeatureDefn>
     : public OGRRefCountedPtrBase<OGRFeatureDefn>
 {
-    inline explicit OGRRefCountedPtr(OGRFeatureDefn *poFDefn = nullptr)
-        : OGRRefCountedPtrBase<OGRFeatureDefn>(poFDefn)
+    /** Constructs from a raw OGRFeatureDefn instance.
+     */
+    inline explicit OGRRefCountedPtr(OGRFeatureDefn *poFDefn = nullptr,
+                                     bool add_ref = true)
+        : OGRRefCountedPtrBase<OGRFeatureDefn>(poFDefn, add_ref)
     {
     }
 
+    /** Constructs with a null OGRFeatureDefn instance.
+     */
     inline explicit OGRRefCountedPtr(std::nullptr_t)
     {
     }
 
+    /** Constructs with a new OGRFeatureDefn instance with the provided name
+     */
     inline explicit OGRRefCountedPtr(const char *pszName)
-        : OGRRefCountedPtr(new OGRFeatureDefn(pszName))
+        // Initial ref_count of OGRFeatureDefn is 0, so do add a ref
+        : OGRRefCountedPtr(new OGRFeatureDefn(pszName), /* add_ref = */ true)
     {
     }
 };
