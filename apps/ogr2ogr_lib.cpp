@@ -764,7 +764,7 @@ class OGRSplitListFieldLayer : public OGRLayer
     };
 
     OGRLayer *poSrcLayer = nullptr;
-    OGRFeatureDefn *poFeatureDefn = nullptr;
+    OGRFeatureDefnRefCountedPtr poFeatureDefn{};
     std::vector<ListFieldDesc> asListFields{};
     const int nMaxSplitListSubFields;
 
@@ -775,7 +775,6 @@ class OGRSplitListFieldLayer : public OGRLayer
 
   public:
     OGRSplitListFieldLayer(OGRLayer *poSrcLayer, int nMaxSplitListSubFields);
-    ~OGRSplitListFieldLayer() override;
 
     bool BuildLayerDefn(GDALProgressFunc pfnProgress, void *pProgressArg);
 
@@ -835,16 +834,6 @@ OGRSplitListFieldLayer::OGRSplitListFieldLayer(OGRLayer *poSrcLayerIn,
       nMaxSplitListSubFields(
           nMaxSplitListSubFieldsIn < 0 ? INT_MAX : nMaxSplitListSubFieldsIn)
 {
-}
-
-/************************************************************************/
-/*                      ~OGRSplitListFieldLayer()                       */
-/************************************************************************/
-
-OGRSplitListFieldLayer::~OGRSplitListFieldLayer()
-{
-    if (poFeatureDefn)
-        poFeatureDefn->Release();
 }
 
 /************************************************************************/
@@ -942,9 +931,8 @@ bool OGRSplitListFieldLayer::BuildLayerDefn(GDALProgressFunc pfnProgress,
 
     /* Now let's build the target feature definition */
 
-    poFeatureDefn =
-        OGRFeatureDefn::CreateFeatureDefn(poSrcFeatureDefn->GetName());
-    poFeatureDefn->Reference();
+    poFeatureDefn.reset(
+        OGRFeatureDefn::CreateFeatureDefn(poSrcFeatureDefn->GetName()));
     poFeatureDefn->SetGeomType(wkbNone);
 
     for (const auto poSrcGeomFieldDefn : poSrcFeatureDefn->GetGeomFields())
@@ -1012,7 +1000,7 @@ std::unique_ptr<OGRFeature> OGRSplitListFieldLayer::TranslateFeature(
     if (poFeatureDefn == nullptr)
         return poSrcFeature;
 
-    auto poFeature = std::make_unique<OGRFeature>(poFeatureDefn);
+    auto poFeature = std::make_unique<OGRFeature>(poFeatureDefn.get());
     poFeature->SetFID(poSrcFeature->GetFID());
     for (int i = 0; i < poFeature->GetGeomFieldCount(); i++)
     {
@@ -1118,7 +1106,7 @@ const OGRFeatureDefn *OGRSplitListFieldLayer::GetLayerDefn() const
 {
     if (poFeatureDefn == nullptr)
         return poSrcLayer->GetLayerDefn();
-    return poFeatureDefn;
+    return poFeatureDefn.get();
 }
 
 /************************************************************************/
@@ -1625,7 +1613,7 @@ class GDALVectorTranslateWrappedDataset final : public GDALDataset
 class GDALVectorTranslateWrappedLayer final : public OGRLayerDecorator
 {
     std::vector<std::unique_ptr<OGRCoordinateTransformation>> m_apoCT{};
-    OGRFeatureDefn *m_poFDefn = nullptr;
+    OGRFeatureDefnRefCountedPtr m_poFDefn{};
 
     GDALVectorTranslateWrappedLayer(OGRLayer *poBaseLayer, bool bOwnBaseLayer);
     std::unique_ptr<OGRFeature>
@@ -1634,11 +1622,9 @@ class GDALVectorTranslateWrappedLayer final : public OGRLayerDecorator
     CPL_DISALLOW_COPY_ASSIGN(GDALVectorTranslateWrappedLayer)
 
   public:
-    ~GDALVectorTranslateWrappedLayer() override;
-
     const OGRFeatureDefn *GetLayerDefn() const override
     {
-        return m_poFDefn;
+        return m_poFDefn.get();
     }
 
     OGRFeature *GetNextFeature() override;
@@ -1663,8 +1649,7 @@ GDALVectorTranslateWrappedLayer::New(OGRLayer *poBaseLayer, bool bOwnBaseLayer,
 {
     auto poNew = std::unique_ptr<GDALVectorTranslateWrappedLayer>(
         new GDALVectorTranslateWrappedLayer(poBaseLayer, bOwnBaseLayer));
-    poNew->m_poFDefn = poBaseLayer->GetLayerDefn()->Clone();
-    poNew->m_poFDefn->Reference();
+    poNew->m_poFDefn.reset(poBaseLayer->GetLayerDefn()->Clone());
     if (!poOutputSRS)
         return poNew;
 
@@ -1721,12 +1706,6 @@ GDALVectorTranslateWrappedLayer::New(OGRLayer *poBaseLayer, bool bOwnBaseLayer,
     return poNew;
 }
 
-GDALVectorTranslateWrappedLayer::~GDALVectorTranslateWrappedLayer()
-{
-    if (m_poFDefn)
-        m_poFDefn->Release();
-}
-
 OGRFeature *GDALVectorTranslateWrappedLayer::GetNextFeature()
 {
     return TranslateFeature(
@@ -1746,7 +1725,7 @@ std::unique_ptr<OGRFeature> GDALVectorTranslateWrappedLayer::TranslateFeature(
 {
     if (poSrcFeat == nullptr)
         return nullptr;
-    auto poNewFeat = std::make_unique<OGRFeature>(m_poFDefn);
+    auto poNewFeat = std::make_unique<OGRFeature>(m_poFDefn.get());
     poNewFeat->SetFrom(poSrcFeat.get());
     poNewFeat->SetFID(poSrcFeat->GetFID());
     for (int i = 0; i < poNewFeat->GetGeomFieldCount(); i++)
