@@ -5232,3 +5232,23 @@ def test_ogr_geom_export_to_kml_errors(wkt, error_msg):
     g = ogr.CreateGeometryFromWkt(wkt)
     with pytest.raises(Exception, match=error_msg):
         g.ExportToKML()
+
+
+###############################################################################
+
+
+@gdaltest.enable_exceptions()
+@pytest.mark.require_driver("OpenFileGDB")
+def test_ogr_geom_organizePolygons_curves_and_self_intersecting_ring():
+
+    ds = ogr.Open("data/openfilegdb/geometry_testdata.gdb.zip")
+    lyr = ds.GetLayerByName("TEST_PL_FGDB")
+    f = lyr.GetNextFeature()
+
+    if ogrtest.have_geos():
+        out_geometry_summary = f.DumpReadableAsString({"DISPLAY_GEOMETRY": "SUMMARY"})
+        assert (
+            "MULTISURFACE : 1 geometries:\nCURVEPOLYGON : 6 points, 7 inner rings (5 points, 5 points (COMPOUNDCURVE : CIRCULARSTRING (3 points), CIRCULARSTRING (3 points)), 5 points (COMPOUNDCURVE : CIRCULARSTRING (3 points), CIRCULARSTRING (3 points)), 5 points, 91 points, 91 points, 4 points)"
+            in out_geometry_summary
+        )
+        assert f.GetGeometryRef().IsValid()
