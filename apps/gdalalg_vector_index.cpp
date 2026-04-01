@@ -342,12 +342,12 @@ bool GDALVectorIndexAlgorithm::RunImpl(GDALProgressFunc pfnProgress,
     if (m_outputLayerName.empty())
         m_outputLayerName = "tileindex";
 
-    std::unique_ptr<OGRSpatialReference, OGRSpatialReferenceReleaser>
-        poTargetCRS{};
+    OGRSpatialReferenceRefCountedPtr poTargetCRS;
     if (!m_crs.empty())
     {
-        poTargetCRS.reset(std::make_unique<OGRSpatialReference>().release());
+        poTargetCRS = OGRSpatialReferenceRefCountedPtr::newInstance();
         poTargetCRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
+        // already checked by GDALAlgorithmArg framework
         CPL_IGNORE_RET_VAL(poTargetCRS->SetFromUserInput(m_crs.c_str()));
     }
 

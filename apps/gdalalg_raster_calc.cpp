@@ -185,8 +185,7 @@ struct SourceProperties
     int nY{0};
     bool hasGT{false};
     GDALGeoTransform gt{};
-    std::unique_ptr<OGRSpatialReference, OGRSpatialReferenceReleaser> srs{
-        nullptr};
+    OGRSpatialReferenceRefCountedPtr srs{};
     std::vector<std::optional<double>> noData{};
     GDALDataType eDT{GDT_Unknown};
 };

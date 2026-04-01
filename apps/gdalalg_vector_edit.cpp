@@ -126,23 +126,19 @@ class GDALVectorEditAlgorithmLayer final : public GDALVectorPipelineOutputLayer
                 if (!EQUAL(overrideCrs.c_str(), "null") &&
                     !EQUAL(overrideCrs.c_str(), "none"))
                 {
-                    m_poSRS = new OGRSpatialReference();
+                    m_poSRS = OGRSpatialReferenceRefCountedPtr::newInstance();
                     m_poSRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
-                    m_poSRS->SetFromUserInput(overrideCrs.c_str());
+                    // already checked by GDALAlgorithmArg framework
+                    CPL_IGNORE_RET_VAL(
+                        m_poSRS->SetFromUserInput(overrideCrs.c_str()));
                 }
                 for (int i = 0; i < m_poFeatureDefn->GetGeomFieldCount(); ++i)
                 {
                     m_poFeatureDefn->GetGeomFieldDefn(i)->SetSpatialRef(
-                        m_poSRS);
+                        m_poSRS.get());
                 }
             }
         }
-    }
-
-    ~GDALVectorEditAlgorithmLayer() override
-    {
-        if (m_poSRS)
-            m_poSRS->Release();
     }
 
     const char *GetFIDColumn() const override
@@ -168,7 +164,7 @@ class GDALVectorEditAlgorithmLayer final : public GDALVectorPipelineOutputLayer
             {
                 auto poGeom = poSrcFeature->GetGeomFieldRef(i);
                 if (poGeom)
-                    poGeom->assignSpatialReference(m_poSRS);
+                    poGeom->assignSpatialReference(m_poSRS.get());
             }
         }
         if (m_unsetFID)
@@ -188,7 +184,7 @@ class GDALVectorEditAlgorithmLayer final : public GDALVectorPipelineOutputLayer
     const bool m_bOverrideCrs;
     const bool m_unsetFID;
     const OGRFeatureDefnRefCountedPtr m_poFeatureDefn;
-    OGRSpatialReference *m_poSRS = nullptr;
+    OGRSpatialReferenceRefCountedPtr m_poSRS{};
 
     CPL_DISALLOW_COPY_ASSIGN(GDALVectorEditAlgorithmLayer)
 };
