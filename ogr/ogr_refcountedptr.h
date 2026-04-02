@@ -46,6 +46,21 @@ template <class T> struct OGRRefCountedPtrBase
     {
     }
 
+    /** Copy constructor
+     *
+     * Set the raw pointer to the one used by other, and increase the reference
+     * count.
+     */
+    // cppcheck-suppress operatorEqVarError
+    inline OGRRefCountedPtrBase &operator=(const OGRRefCountedPtrBase &other)
+    {
+        if (this != &other)
+        {
+            reset(other.m_poRawPtr);
+        }
+        return *this;
+    }
+
     /** Move constructor
      *
      * Borrows the raw pointer managed by other, without changing its reference
@@ -139,8 +154,6 @@ template <class T> struct OGRRefCountedPtrBase
 
   private:
     T *m_poRawPtr{};
-
-    OGRRefCountedPtrBase &operator=(const OGRRefCountedPtrBase &) = delete;
 };
 
 /** Smart pointer around a class that has built-in reference counting.

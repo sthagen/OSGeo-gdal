@@ -792,13 +792,14 @@ struct OGRRefCountedPtr<OGRSpatialReference>
 
     /** Constructs with a null OGRSpatialReference instance.
      */
-    inline explicit OGRRefCountedPtr()
+    inline OGRRefCountedPtr()
     {
     }
 
     /** Constructs with a null OGRSpatialReference instance.
      */
-    inline explicit OGRRefCountedPtr(std::nullptr_t)
+    // cppcheck-suppress noExplicitConstructor
+    inline /* implicit */ OGRRefCountedPtr(std::nullptr_t)
     {
     }
 

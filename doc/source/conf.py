@@ -225,6 +225,7 @@ nitpick_ignore = [
     ("cpp:identifier", "GNM_EDGE_DIR_BOTH"),
     ("cpp:identifier", "OGRFeatureUniquePtr"),
     ("cpp:identifier", "OGRSpatialReferenceReleaser"),
+    ("cpp:identifier", "OGRSpatialReferenceRefCountedPtr"),
     ("cpp:identifier", "OGRStyleParamId"),
     ("cpp:identifier", "OGRStyleValue"),
     ("cpp:identifier", "string"),
