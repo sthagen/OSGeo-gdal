@@ -271,7 +271,7 @@ bool GDALVectorSQLAlgorithm::RunStep(GDALPipelineStepRunContext &)
                             "Execution of the SQL statement '%s' failed.%s",
                             sql.c_str(),
                             m_update ? ""
-                                     : " Perhaps you need to specify the "
+                                     : ".\nPerhaps you need to specify the "
                                        "'update' argument?");
                 return false;
             }
