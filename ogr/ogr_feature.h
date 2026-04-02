@@ -813,6 +813,28 @@ class CPL_DLL OGRFeatureDefn
 
     virtual OGRFeatureDefn *Clone() const;
 
+#ifdef DEPRECATE_OGRFEATUREDEFN_REF_COUNTING
+    int Reference()
+        CPL_WARN_DEPRECATED("Use OGRFeatureDefnRefCountedPtr instead")
+    {
+        return CPLAtomicInc(&nRefCount);
+    }
+
+    int Dereference()
+        CPL_WARN_DEPRECATED("Use OGRFeatureDefnRefCountedPtr instead")
+    {
+        return CPLAtomicDec(&nRefCount);
+    }
+
+    int GetReferenceCount() const
+        CPL_WARN_DEPRECATED("Use OGRFeatureDefnRefCountedPtr instead")
+    {
+        return nRefCount;
+    }
+
+    void Release()
+        CPL_WARN_DEPRECATED("Use OGRFeatureDefnRefCountedPtr instead");
+#else
     int Reference()
     {
         return CPLAtomicInc(&nRefCount);
@@ -832,6 +854,7 @@ class CPL_DLL OGRFeatureDefn
     }
 
     void Release();
+#endif
 
     virtual int IsGeometryIgnored() const;
     virtual void SetGeometryIgnored(int bIgnore);

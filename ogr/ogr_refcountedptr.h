@@ -77,11 +77,18 @@ template <class T> struct OGRRefCountedPtrBase
      */
     inline void reset(T *poRawPtr = nullptr, bool add_ref = true)
     {
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
         if (m_poRawPtr)
             m_poRawPtr->Release();
         m_poRawPtr = poRawPtr;
         if (m_poRawPtr && add_ref)
             m_poRawPtr->Reference();
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
     }
 
     /** Returns the raw pointer without changing its reference count */
@@ -119,8 +126,15 @@ template <class T> struct OGRRefCountedPtrBase
                                          bool add_ref = true)
         : m_poRawPtr(poRawPtr)
     {
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
         if (m_poRawPtr && add_ref)
             m_poRawPtr->Reference();
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
     }
 
   private:

@@ -179,10 +179,21 @@ class CPL_DLL OGRSpatialReference
 
     OGRSpatialReference &AssignAndSetThreadSafe(const OGRSpatialReference &);
 
+#ifdef DEPRECATE_OGRSPATIALREFERENCE_REF_COUNTING
+    int Reference()
+        CPL_WARN_DEPRECATED("Use OGRSpatialReferenceRefCountedPtr instead");
+    int Dereference()
+        CPL_WARN_DEPRECATED("Use OGRSpatialReferenceRefCountedPtr instead");
+    int GetReferenceCount() const
+        CPL_WARN_DEPRECATED("Use OGRSpatialReferenceRefCountedPtr instead");
+    void Release()
+        CPL_WARN_DEPRECATED("Use OGRSpatialReferenceRefCountedPtr instead");
+#else
     int Reference();
     int Dereference();
     int GetReferenceCount() const;
     void Release();
+#endif
 
     const char *GetName() const;
 
@@ -745,8 +756,15 @@ struct CPL_DLL OGRSpatialReferenceReleaser
 {
     void operator()(OGRSpatialReference *poSRS) const
     {
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
         if (poSRS)
             poSRS->Release();
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
     }
 };
 
