@@ -954,10 +954,11 @@ struct OGRRefCountedPtr<OGRFeatureDefn>
 
     /** Constructs with a new OGRFeatureDefn instance with the provided name
      */
-    inline explicit OGRRefCountedPtr(const char *pszName)
-        // Initial ref_count of OGRFeatureDefn is 0, so do add a ref
-        : OGRRefCountedPtr(new OGRFeatureDefn(pszName), /* add_ref = */ true)
+    inline static OGRRefCountedPtr newInstance(const char *pszName)
     {
+        // Initial ref_count of OGRFeatureDefn is 0, so do add a ref
+        return OGRRefCountedPtr(new OGRFeatureDefn(pszName),
+                                /* add_ref = */ true);
     }
 };
 

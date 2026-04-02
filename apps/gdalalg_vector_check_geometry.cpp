@@ -61,10 +61,11 @@ class GDALInvalidLocationLayer final : public GDALVectorPipelineOutputLayer
                              bool bSingleLayerOutput, int srcGeomField,
                              bool skipValid)
         : GDALVectorPipelineOutputLayer(layer),
-          m_defn(bSingleLayerOutput ? "error_location"
-                                    : std::string("error_location_")
-                                          .append(layer.GetDescription())
-                                          .c_str()),
+          m_defn(OGRFeatureDefnRefCountedPtr::newInstance(
+              bSingleLayerOutput ? "error_location"
+                                 : std::string("error_location_")
+                                       .append(layer.GetDescription())
+                                       .c_str())),
           m_geosContext(OGRGeometry::createGEOSContext()),
           m_srcGeomField(srcGeomField), m_skipValid(skipValid)
     {

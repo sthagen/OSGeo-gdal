@@ -60,8 +60,8 @@ class GDALVectorCheckCoverageOutputLayer final
                                                 double maximumGapWidth,
                                                 bool includeValid)
         : GDALGeosNonStreamingAlgorithmLayer(srcLayer, geomFieldIndex),
-          m_defn(name.c_str()), m_maximumGapWidth(maximumGapWidth),
-          m_includeValid(includeValid)
+          m_defn(OGRFeatureDefnRefCountedPtr::newInstance(name.c_str())),
+          m_maximumGapWidth(maximumGapWidth), m_includeValid(includeValid)
     {
         const OGRFeatureDefn *poSrcLayerDefn = srcLayer.GetLayerDefn();
         m_defn->SetGeomType(wkbMultiLineString);

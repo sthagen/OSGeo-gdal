@@ -100,7 +100,8 @@ class GDALRasterAsFeaturesLayer final
           m_end(GDALRasterBand::WindowIterator(
               m_ds.GetRasterXSize(), m_ds.GetRasterYSize(),
               m_ds.GetRasterXSize(), m_ds.GetRasterYSize(), 1, 0)),
-          m_defn(options.outputLayerName.c_str()),
+          m_defn(OGRFeatureDefnRefCountedPtr::newInstance(
+              options.outputLayerName.c_str())),
           m_includeXY(options.includeXY),
           m_includeRowCol(options.includeRowCol),
           m_excludeNoDataPixels(options.skipNoData)

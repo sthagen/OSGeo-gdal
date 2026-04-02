@@ -50,7 +50,8 @@ class GDALVectorCombineOutputLayer final
         OGRLayer &srcLayer, int geomFieldIndex,
         const std::vector<std::string> &groupBy, bool keepNested)
         : GDALVectorNonStreamingAlgorithmLayer(srcLayer, geomFieldIndex),
-          m_groupBy(groupBy), m_defn(srcLayer.GetLayerDefn()->GetName()),
+          m_groupBy(groupBy), m_defn(OGRFeatureDefnRefCountedPtr::newInstance(
+                                  srcLayer.GetLayerDefn()->GetName())),
           m_keepNested(keepNested)
     {
         const OGRFeatureDefn *srcDefn = m_srcLayer.GetLayerDefn();
