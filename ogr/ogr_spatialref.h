@@ -752,25 +752,6 @@ class CPL_DLL OGRSpatialReference
 };
 
 /*! @cond Doxygen_Suppress */
-struct CPL_DLL OGRSpatialReferenceReleaser
-{
-    void operator()(OGRSpatialReference *poSRS) const
-    {
-#ifdef __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-        if (poSRS)
-            poSRS->Release();
-#ifdef __GNUC__
-#pragma GCC diagnostic pop
-#endif
-    }
-};
-
-/*! @endcond */
-
-/*! @cond Doxygen_Suppress */
 
 #include "ogr_refcountedptr.h"
 
