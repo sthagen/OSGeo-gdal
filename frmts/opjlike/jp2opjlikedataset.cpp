@@ -19,6 +19,7 @@
 #include "cpl_atomic_ops.h"
 #include "cpl_multiproc.h"
 #include "cpl_string.h"
+#include "cpl_vsi_virtual.h"
 #include "cpl_worker_thread_pool.h"
 #include "gdal_frmts.h"
 #include "gdaljp2abstractdataset.h"
@@ -1533,7 +1534,15 @@ GDALDataset *JP2OPJLikeDataset<CODEC, BASE>::Open(GDALOpenInfo *poOpenInfo)
     /* -------------------------------------------------------------------- */
     /*      Look for color table or cdef box                                */
     /* -------------------------------------------------------------------- */
-    if (eCodecFormat == CODEC::cvtenum(JP2_CODEC_JP2))
+    if (eCodecFormat == CODEC::cvtenum(JP2_CODEC_JP2) &&
+        BASE::canPerformDirectIO())
+    {
+        /* Grok parses JP2 boxes natively; extract cdef/pclr from codec */
+        localctx.extractJP2BoxInfo(poDS->nBands, poDS->nRedIndex,
+                                   poDS->nGreenIndex, poDS->nBlueIndex,
+                                   poDS->nAlphaIndex, &poCT);
+    }
+    else if (eCodecFormat == CODEC::cvtenum(JP2_CODEC_JP2))
     {
         vsi_l_offset nCurOffset = VSIFTellL(poDS->fp_);
 
@@ -1746,19 +1755,20 @@ GDALDataset *JP2OPJLikeDataset<CODEC, BASE>::Open(GDALOpenInfo *poOpenInfo)
         }
 
         VSIFSeekL(poDS->fp_, nCurOffset, SEEK_SET);
+    }
 
-        if (poDS->eColorSpace == CODEC::cvtenum(JP2_CLRSPC_GRAY) &&
-            poDS->nBands == 4 && poDS->nRedIndex == 0 &&
-            poDS->nGreenIndex == 1 && poDS->nBlueIndex == 2 &&
-            poDS->m_osFilename.find("dop10rgbi") != std::string::npos)
-        {
-            CPLDebug(CODEC::debugId(),
-                     "Autofix wrong colorspace from Greyscale to sRGB");
-            // Workaround https://github.com/uclouvain/openjpeg/issues/1464
-            // dop10rgbi products from https://www.opengeodata.nrw.de/produkte/geobasis/lusat/dop/dop_jp2_f10/
-            // have a wrong color space.
-            poDS->eColorSpace = CODEC::cvtenum(JP2_CLRSPC_SRGB);
-        }
+    if (eCodecFormat == CODEC::cvtenum(JP2_CODEC_JP2) &&
+        poDS->eColorSpace == CODEC::cvtenum(JP2_CLRSPC_GRAY) &&
+        poDS->nBands == 4 && poDS->nRedIndex == 0 && poDS->nGreenIndex == 1 &&
+        poDS->nBlueIndex == 2 &&
+        poDS->m_osFilename.find("dop10rgbi") != std::string::npos)
+    {
+        CPLDebug(CODEC::debugId(),
+                 "Autofix wrong colorspace from Greyscale to sRGB");
+        // Workaround https://github.com/uclouvain/openjpeg/issues/1464
+        // dop10rgbi products from https://www.opengeodata.nrw.de/produkte/geobasis/lusat/dop/dop_jp2_f10/
+        // have a wrong color space.
+        poDS->eColorSpace = CODEC::cvtenum(JP2_CLRSPC_SRGB);
     }
 
     /* -------------------------------------------------------------------- */
@@ -2843,8 +2853,8 @@ GDALDataset *JP2OPJLikeDataset<CODEC, BASE>::CreateCopy(
 
     const char *pszAccess =
         STARTS_WITH_CI(pszFilename, "/vsisubfile/") ? "r+b" : "w+b";
-    VSILFILE *fp = VSIFOpenL(pszFilename, pszAccess);
-    if (fp == nullptr)
+    VSIVirtualHandleUniquePtr fpOwner(VSIFOpenL(pszFilename, pszAccess));
+    if (!fpOwner)
     {
         CPLError(CE_Failure, CPLE_AppDefined, "Cannot create file");
         CPLFree(localctx.pasBandParams);
@@ -2852,6 +2862,7 @@ GDALDataset *JP2OPJLikeDataset<CODEC, BASE>::CreateCopy(
         delete poGMLJP2Box;
         return nullptr;
     }
+    VSILFILE *fp = fpOwner.get();
 
     /* -------------------------------------------------------------------- */
     /*      Add JP2 boxes.                                                  */
@@ -2859,7 +2870,8 @@ GDALDataset *JP2OPJLikeDataset<CODEC, BASE>::CreateCopy(
     vsi_l_offset nStartJP2C = 0;
     int bUseXLBoxes = FALSE;
 
-    if (eCodecFormat == CODEC::cvtenum(JP2_CODEC_JP2))
+    if (eCodecFormat == CODEC::cvtenum(JP2_CODEC_JP2) &&
+        !BASE::canPerformDirectIO())
     {
         GDALJP2Box jPBox(fp);
         jPBox.SetType("jP  ");
@@ -3241,7 +3253,8 @@ GDALDataset *JP2OPJLikeDataset<CODEC, BASE>::CreateCopy(
         }
     }
 
-    if (eCodecFormat == CODEC::cvtenum(JP2_CODEC_JP2))
+    if (eCodecFormat == CODEC::cvtenum(JP2_CODEC_JP2) &&
+        !BASE::canPerformDirectIO())
     {
         // Start codestream box
         nStartJP2C = VSIFTellL(fp);
@@ -3308,7 +3321,6 @@ GDALDataset *JP2OPJLikeDataset<CODEC, BASE>::CreateCopy(
                     : static_cast<size_t>(nCodeStreamLength - nRead);
             if (VSIFReadL(abyBuffer, 1, nToRead, fpSrc) != nToRead)
             {
-                VSIFCloseL(fp);
                 VSIFCloseL(fpSrc);
                 delete poGMLJP2Box;
                 return nullptr;
@@ -3333,7 +3345,6 @@ GDALDataset *JP2OPJLikeDataset<CODEC, BASE>::CreateCopy(
                 !pfnProgress((nRead + nToRead) * 1.0 / nCodeStreamLength,
                              nullptr, pProgressData))
             {
-                VSIFCloseL(fp);
                 VSIFCloseL(fpSrc);
                 delete poGMLJP2Box;
                 return nullptr;
@@ -3354,10 +3365,34 @@ GDALDataset *JP2OPJLikeDataset<CODEC, BASE>::CreateCopy(
         {
             CPLError(CE_Failure, CPLE_AppDefined, "init compress failed");
             localctx.free();
-            VSIFCloseL(fp);
             delete poGMLJP2Box;
             return nullptr;
         }
+
+        /* Grok JP2: let codec handle box writing natively */
+        if (BASE::canPerformDirectIO() &&
+            eCodecFormat == CODEC::cvtenum(JP2_CODEC_JP2))
+        {
+            localctx.setupJP2Metadata(
+                bInspireTG, bProfile1, bGeoBoxesAfter,
+                (bGeoJP2Option && bGeoreferencingCompatOfGeoJP2) ? &oJP2MD
+                                                                 : nullptr,
+                poGMLJP2Box, nAlphaBandIndex, nRedBandIndex, nGreenBandIndex,
+                nBlueBandIndex, eColorSpace, nBands, poCT, poSrcDS,
+                papszOptions);
+        }
+
+        if (!localctx.initCodec(pszFilename, fpOwner))
+        {
+            CPLError(CE_Failure, CPLE_AppDefined,
+                     "codec initialization failed");
+            localctx.free();
+            delete poGMLJP2Box;
+            return nullptr;
+        }
+        if (!fpOwner)
+            fp = nullptr;
+
         const int nTilesX = DIV_ROUND_UP(nXSize, nBlockXSize);
         const int nTilesY = DIV_ROUND_UP(nYSize, nBlockYSize);
 
@@ -3387,7 +3422,6 @@ GDALDataset *JP2OPJLikeDataset<CODEC, BASE>::CreateCopy(
         if (pTempBuffer == nullptr)
         {
             localctx.free();
-            VSIFCloseL(fp);
             delete poGMLJP2Box;
             return nullptr;
         }
@@ -3402,7 +3436,6 @@ GDALDataset *JP2OPJLikeDataset<CODEC, BASE>::CreateCopy(
             {
                 localctx.free();
                 CPLFree(pTempBuffer);
-                VSIFCloseL(fp);
                 delete poGMLJP2Box;
                 return nullptr;
             }
@@ -3632,7 +3665,6 @@ GDALDataset *JP2OPJLikeDataset<CODEC, BASE>::CreateCopy(
         if (eErr != CE_None)
         {
             localctx.free();
-            VSIFCloseL(fp);
             delete poGMLJP2Box;
             return nullptr;
         }
@@ -3640,7 +3672,6 @@ GDALDataset *JP2OPJLikeDataset<CODEC, BASE>::CreateCopy(
         if (!localctx.finishCompress())
         {
             localctx.free();
-            VSIFCloseL(fp);
             delete poGMLJP2Box;
             return nullptr;
         }
@@ -3652,6 +3683,7 @@ GDALDataset *JP2OPJLikeDataset<CODEC, BASE>::CreateCopy(
     /* -------------------------------------------------------------------- */
     bool bRet = true;
     if (eCodecFormat == CODEC::cvtenum(JP2_CODEC_JP2) &&
+        !BASE::canPerformDirectIO() &&
         !CPLFetchBool(papszOptions, "JP2C_LENGTH_ZERO",
                       false) /* debug option */)
     {
@@ -3733,8 +3765,11 @@ GDALDataset *JP2OPJLikeDataset<CODEC, BASE>::CreateCopy(
         }
     }
 
-    if (VSIFCloseL(fp) != 0)
-        bRet = false;
+    if (fpOwner)
+    {
+        if (VSIFCloseL(fpOwner.release()) != 0)
+            bRet = false;
+    }
     delete poGMLJP2Box;
     if (!bRet)
         return nullptr;
