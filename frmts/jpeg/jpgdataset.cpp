@@ -2428,7 +2428,7 @@ CPLErr JPGDataset::StartDecompress()
         /* in libjpeg */
 
         // 1 MB for regular libjpeg usage
-        vsi_l_offset nRequiredMemory = 1024 * 1024;
+        uint64_t nRequiredMemory = 1024 * 1024;
 
         for (int ci = 0; ci < sDInfo.num_components; ci++)
         {
@@ -2439,12 +2439,20 @@ CPLErr JPGDataset::StartDecompress()
                          "Invalid sampling factor(s)");
                 return CE_Failure;
             }
-            nRequiredMemory +=
-                static_cast<vsi_l_offset>(DIV_ROUND_UP(
-                    compptr->width_in_blocks, compptr->h_samp_factor)) *
-                DIV_ROUND_UP(compptr->height_in_blocks,
-                             compptr->v_samp_factor) *
-                sizeof(JBLOCK);
+            const int nWidthSubsampled = cpl::div_round_up(
+                compptr->width_in_blocks, compptr->h_samp_factor);
+            const int nHeightSubsampled = cpl::div_round_up(
+                compptr->height_in_blocks, compptr->v_samp_factor);
+            const uint64_t nTmp =
+                static_cast<uint64_t>(nWidthSubsampled) * nHeightSubsampled;
+            if (nTmp > std::numeric_limits<uint64_t>::max() / sizeof(JBLOCK) ||
+                nRequiredMemory > std::numeric_limits<uint64_t>::max() -
+                                      nTmp * sizeof(JBLOCK))
+            {
+                CPLError(CE_Failure, CPLE_AppDefined, "Corrupted image");
+                return CE_Failure;
+            }
+            nRequiredMemory += nTmp * sizeof(JBLOCK);
         }
 
         if (nRequiredMemory > 10 * 1024 * 1024 && ppoActiveDS &&
