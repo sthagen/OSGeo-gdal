@@ -39,7 +39,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && echo "deb [arch=${TARGET_ARCH}] http://ports.ubuntu.com/ubuntu-ports/ noble-security main restricted universe" >> /etc/apt/sources.list \
     && dpkg --add-architecture ${TARGET_ARCH} \
     && apt-get update -y \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y g++-13-${GCC_ARCH}-linux-gnu \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends g++-13-${GCC_ARCH}-linux-gnu \
     && ln -s ${GCC_ARCH}-linux-gnu-gcc-13 /usr/bin/${GCC_ARCH}-linux-gnu-gcc \
     && ln -s ${GCC_ARCH}-linux-gnu-g++-13 /usr/bin/${GCC_ARCH}-linux-gnu-g++; \
     fi
@@ -249,7 +249,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         libzstd1 bash libpq5 libssl3 libopenjp2-7 libspatialite8 \
         libmuparser2v5 \
         libtcmalloc-minimal4 \
-    && apt-get install -y python-is-python3
+        python-is-python3
 
 # Order layers starting with less frequently varying ones
 # Only used for custom libopenjp2
