@@ -37,6 +37,7 @@ GDALVectorSQLAlgorithm::GetConstructorOptions(bool standaloneStep)
     opts.SetOutputDatasetRequired(false);
     opts.SetAddInputLayerNameArgument(false);
     opts.SetAddOutputLayerNameArgument(false);
+    opts.SetInputDatasetAlias("dataset");
     return opts;
 }
 
