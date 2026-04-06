@@ -38,7 +38,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && echo "deb [arch=${TARGET_ARCH}] http://ports.ubuntu.com/ubuntu-ports/ noble-security main restricted universe" >> /etc/apt/sources.list \
     && dpkg --add-architecture ${TARGET_ARCH} \
     && apt-get update -y \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y g++-13-${GCC_ARCH}-linux-gnu \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends g++-13-${GCC_ARCH}-linux-gnu \
     && ln -s ${GCC_ARCH}-linux-gnu-gcc-13 /usr/bin/${GCC_ARCH}-linux-gnu-gcc \
     && ln -s ${GCC_ARCH}-linux-gnu-g++-13 /usr/bin/${GCC_ARCH}-linux-gnu-g++; \
     fi
@@ -198,7 +198,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     . /buildscripts/bh-set-envvars.sh \
     && apt-get update -y \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         libspdlog-dev${APT_ARCH_SUFFIX} libmagic-dev${APT_ARCH_SUFFIX}
 
 COPY --link ./docker/ubuntu-full/tiledb-FindLZ4_EP.cmake.patch /buildscripts/tiledb-FindLZ4_EP.cmake.patch
@@ -432,18 +432,18 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     . /buildscripts/bh-set-envvars.sh \
     && apt-get update -y \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y -V ca-certificates lsb-release \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -V ca-certificates lsb-release \
     && curl --retry 3 --retry-all-errors --retry-delay 3 -LO -fsS https://apache.jfrog.io/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y -V ./apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb \
     && apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y -V libarrow${ARROW_SOVERSION}${APT_ARCH_SUFFIX} \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y -V libparquet${ARROW_SOVERSION}${APT_ARCH_SUFFIX} \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y -V libarrow-dataset${ARROW_SOVERSION}${APT_ARCH_SUFFIX} \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y -V libarrow-dev${APT_ARCH_SUFFIX}=${ARROW_VERSION} \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y -V libparquet-dev${APT_ARCH_SUFFIX}=${ARROW_VERSION} \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y -V libarrow-acero-dev${APT_ARCH_SUFFIX}=${ARROW_VERSION} \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y -V libarrow-dataset-dev${APT_ARCH_SUFFIX}=${ARROW_VERSION} \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y -V libarrow-compute-dev${APT_ARCH_SUFFIX}=${ARROW_VERSION} \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -V libarrow${ARROW_SOVERSION}${APT_ARCH_SUFFIX} \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -V libparquet${ARROW_SOVERSION}${APT_ARCH_SUFFIX} \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -V libarrow-dataset${ARROW_SOVERSION}${APT_ARCH_SUFFIX} \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -V libarrow-dev${APT_ARCH_SUFFIX}=${ARROW_VERSION} \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -V libparquet-dev${APT_ARCH_SUFFIX}=${ARROW_VERSION} \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -V libarrow-acero-dev${APT_ARCH_SUFFIX}=${ARROW_VERSION} \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -V libarrow-dataset-dev${APT_ARCH_SUFFIX}=${ARROW_VERSION} \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -V libarrow-compute-dev${APT_ARCH_SUFFIX}=${ARROW_VERSION} \
     && rm apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
 
 # Manually build ADBC packages to have support for BigQuery
@@ -548,11 +548,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && apt-get update -y \
     && apt-get upgrade -y \
     # PROJ dependencies
-    && apt-get install -y \
+    && apt-get install -y --no-install-recommends \
         libsqlite3-0 libtiff6 libcurl4 \
         unzip ca-certificates \
     # GDAL dependencies
-    && apt-get install -y \
+    && apt-get install -y --no-install-recommends \
         bash-completion libopenjp2-7 libcairo2 python3-numpy \
         libpng16-16 libjpeg-turbo8 libgif7 liblzma5 libgeos3.12.1 libgeos-c1v5 \
         libxml2 libexpat1 \
@@ -582,10 +582,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && apt-get purge -y curl \
     && apt-get install -y -V ./apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb \
     && apt-get update \
-    && apt-get install -y -V libarrow${ARROW_SOVERSION} \
-    && apt-get install -y -V libparquet${ARROW_SOVERSION} \
-    && apt-get install -y -V libarrow-dataset${ARROW_SOVERSION} \
-    && apt-get install -y -V libarrow-compute${ARROW_SOVERSION}
+    && apt-get install -y --no-install-recommends -V libarrow${ARROW_SOVERSION} \
+    && apt-get install -y --no-install-recommends -V libparquet${ARROW_SOVERSION} \
+    && apt-get install -y --no-install-recommends -V libarrow-dataset${ARROW_SOVERSION} \
+    && apt-get install -y --no-install-recommends -V libarrow-compute${ARROW_SOVERSION}
 
 # Install libduckdb
 ARG DUCKDB_VERSION=v1.5.1
@@ -614,7 +614,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   if echo "$WITH_ORACLE" | grep -Eiq "^(y(es)?|1|true)$" ; then ( \
       export DEBIAN_FRONTEND=noninteractive \
       && apt-get update \
-      && apt-get install -y -V libaio1t64 \
+      && apt-get install -y --no-install-recommends -V libaio1t64 \
       && ln -s libaio.so.1t64 /usr/lib/x86_64-linux-gnu/libaio.so.1 \
   ) ; fi \
   ; fi
