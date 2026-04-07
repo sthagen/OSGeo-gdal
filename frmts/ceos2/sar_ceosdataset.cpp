@@ -121,6 +121,7 @@ static CeosTypeCode_t QuadToTC(int a, int b, int c, int d)
 #define LEADER_PLATFORM_POSITION_PALSAR_TC QuadToTC(18, 30, 18, 20)
 #define LEADER_ATTITUDE_PALSAR_TC QuadToTC(18, 40, 18, 20)
 #define LEADER_RADIOMETRIC_PALSAR_TC QuadToTC(18, 50, 18, 20)
+#define LEADER_FACILITY_RELATED_PALSAR_TC QuadToTC(18, 200, 18, 70)
 
 /************************************************************************/
 /* ==================================================================== */
@@ -1392,6 +1393,131 @@ void SAR_CEOSDataset::ScanForMetadata()
             {
                 SetMetadataItem(sDef.pszMetadataItemName, osField.c_str());
             }
+        }
+    }
+
+    /* -------------------------------------------------------------------- */
+    /*      PALSAR-2 ALOS2 Facility related data                            */
+    /* -------------------------------------------------------------------- */
+    constexpr int FACILITY_RELATED_DATA_5_LAT_LONG_CONV_FACTORS = 5;
+    record = FindCeosRecord(
+        sVolume.RecordList, LEADER_FACILITY_RELATED_PALSAR_TC, CEOS_LEADER_FILE,
+        -1, FACILITY_RELATED_DATA_5_LAT_LONG_CONV_FACTORS - 1);
+    if (record && record->Length == 5000)
+    {
+        // Table 3-17 Facility related data records 5
+        // of https://www.eorc.jaxa.jp/ALOS/en/alos-2/pdf/product_format_description/PALSAR-2_xx_Format_CEOS_E_g.pdf
+
+        std::string coeffs;
+        for (int i = 0; i < 10; ++i)
+        {
+            GetCeosField(record, 17 + i * 20, "A20", szField);
+            CPLString osField(szField);
+            osField.Trim();
+            if (!coeffs.empty())
+                coeffs += ' ';
+            coeffs += osField;
+        }
+        // 10 coefficients to convert from the map projection (E, N) to pixel (P)
+        SetMetadataItem("CEOS_FACILITY_5_XY_PROJECTED_TO_PIXEL_COEFFICIENTS",
+                        coeffs.c_str());
+
+        coeffs.clear();
+        for (int i = 0; i < 10; ++i)
+        {
+            GetCeosField(record, 17 + 10 * 20 + i * 20, "A20", szField);
+            CPLString osField(szField);
+            osField.Trim();
+            if (!coeffs.empty())
+                coeffs += ' ';
+            coeffs += osField;
+        }
+        // 10 coefficients to convert from the map projection (E, N) to line (L)
+        SetMetadataItem("CEOS_FACILITY_5_XY_PROJECTED_TO_LINE_COEFFICIENTS",
+                        coeffs.c_str());
+
+        coeffs.clear();
+        for (int i = 0; i < 25; ++i)
+        {
+            GetCeosField(record, 1025 + i * 20, "A20", szField);
+            CPLString osField(szField);
+            osField.Trim();
+            if (!coeffs.empty())
+                coeffs += ' ';
+            coeffs += osField;
+        }
+        // 25 coefficients of the 8th polynomial expression to convert from pixel (P) and line (L) to latitude (φ)
+        SetMetadataItem("CEOS_FACILITY_5_PIXEL_LINE_TO_LAT_COEFFICIENTS",
+                        coeffs.c_str());
+
+        coeffs.clear();
+        for (int i = 0; i < 25; ++i)
+        {
+            GetCeosField(record, 1025 + i * 20, "A20", szField);
+            CPLString osField(szField);
+            osField.Trim();
+            if (!coeffs.empty())
+                coeffs += ' ';
+            coeffs += osField;
+        }
+        // 25 coefficients of the 8th polynomial expression to convert from pixel (P) and line (L) to longitude (λ)
+        SetMetadataItem("CEOS_FACILITY_5_PIXEL_LINE_TO_LON_COEFFICIENTS",
+                        coeffs.c_str());
+
+        {
+            GetCeosField(record, 2025, "A20", szField);
+            CPLString osField(szField);
+            osField.Trim();
+            SetMetadataItem("CEOS_FACILITY_5_ORIGIN_PIXEL", osField.c_str());
+        }
+
+        {
+            GetCeosField(record, 2045, "A20", szField);
+            CPLString osField(szField);
+            osField.Trim();
+            SetMetadataItem("CEOS_FACILITY_5_ORIGIN_LINE", osField.c_str());
+        }
+
+        coeffs.clear();
+        for (int i = 0; i < 25; ++i)
+        {
+            GetCeosField(record, 2065 + i * 20, "A20", szField);
+            CPLString osField(szField);
+            osField.Trim();
+            if (!coeffs.empty())
+                coeffs += ' ';
+            coeffs += osField;
+        }
+        // 25 coefficients of the 8th polynomial expression to convert from latitude (Φ) and longitude (Λ) to pixel (p)
+        SetMetadataItem("CEOS_FACILITY_5_LAT_LON_TO_PIXEL_COEFFICIENTS",
+                        coeffs.c_str());
+
+        coeffs.clear();
+        for (int i = 0; i < 25; ++i)
+        {
+            GetCeosField(record, 2065 + 25 * 20 + i * 20, "A20", szField);
+            CPLString osField(szField);
+            osField.Trim();
+            if (!coeffs.empty())
+                coeffs += ' ';
+            coeffs += osField;
+        }
+        // 25 coefficients of the 8th polynomial expression to convert from latitude (Φ) and longitude (Λ) to pixel (p)
+        SetMetadataItem("CEOS_FACILITY_5_LAT_LON_TO_LINE_COEFFICIENTS",
+                        coeffs.c_str());
+
+        {
+            GetCeosField(record, 3065, "A20", szField);
+            CPLString osField(szField);
+            osField.Trim();
+            SetMetadataItem("CEOS_FACILITY_5_ORIGIN_LAT", osField.c_str());
+        }
+
+        {
+            GetCeosField(record, 3085, "A20", szField);
+            CPLString osField(szField);
+            osField.Trim();
+            SetMetadataItem("CEOS_FACILITY_5_ORIGIN_LON", osField.c_str());
         }
     }
 }
