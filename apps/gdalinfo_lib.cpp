@@ -678,12 +678,12 @@ char *GDALInfo(GDALDatasetH hDataset, const GDALInfoOptions *psOptions)
                         {
                             bCRSAlreadyEmitted = true;
                             Concat(osStr, psOptions->bStdoutOutput,
-                                   "Coordinate Reference System name: %s\n",
-                                   poSRS->GetName());
+                                   "Coordinate Reference System:\n");
+                            Concat(osStr, psOptions->bStdoutOutput,
+                                   "  - name: %s\n", poSRS->GetName());
 
                             Concat(osStr, psOptions->bStdoutOutput,
-                                   "Coordinate Reference System ID: %s\n",
-                                   osCRSId.c_str());
+                                   "  - ID: %s\n", osCRSId.c_str());
 
                             const char *pszHorizType =
                                 poSRS->IsGeographic()
@@ -694,7 +694,7 @@ char *GDALInfo(GDALDatasetH hDataset, const GDALInfoOptions *psOptions)
                                 : poSRS->IsProjected() ? "Projected"
                                                        : "Other";
                             Concat(osStr, psOptions->bStdoutOutput,
-                                   "Coordinate Reference System type: %s\n",
+                                   "  - type: %s\n",
                                    poSRS->IsCompound()
                                        ? std::string("Compound of ")
                                              .append(pszHorizType)
@@ -719,15 +719,13 @@ char *GDALInfo(GDALDatasetH hDataset, const GDALInfoOptions *psOptions)
                                     if (osConversion == osMethod)
                                     {
                                         Concat(osStr, psOptions->bStdoutOutput,
-                                               "Coordinate Reference System "
-                                               "projection type: %s\n",
+                                               "  - projection type: %s\n",
                                                osConversion.c_str());
                                     }
                                     else
                                     {
                                         Concat(osStr, psOptions->bStdoutOutput,
-                                               "Coordinate Reference System "
-                                               "projection type: %s, %s\n",
+                                               "  - projection type: %s, %s\n",
                                                osConversion.c_str(),
                                                osMethod.c_str());
                                     }
@@ -737,7 +735,7 @@ char *GDALInfo(GDALDatasetH hDataset, const GDALInfoOptions *psOptions)
                                 if (pszLinearUnits)
                                 {
                                     Concat(osStr, psOptions->bStdoutOutput,
-                                           "Coordinate Reference System units: "
+                                           "  - units: "
                                            "%s\n",
                                            pszLinearUnits);
                                 }
@@ -768,7 +766,7 @@ char *GDALInfo(GDALDatasetH hDataset, const GDALInfoOptions *psOptions)
                                         osAreaOfUse += "...";
                                     }
                                     Concat(osStr, psOptions->bStdoutOutput,
-                                           "Coordinate Reference System area "
+                                           "  - area "
                                            "of use: %s, west %.2f, south %.2f, "
                                            "east %.2f, north %.2f\n",
                                            osAreaOfUse.c_str(), dfWest, dfSouth,
@@ -777,7 +775,7 @@ char *GDALInfo(GDALDatasetH hDataset, const GDALInfoOptions *psOptions)
                                 else
                                 {
                                     Concat(osStr, psOptions->bStdoutOutput,
-                                           "Coordinate Reference System area "
+                                           "  - area "
                                            "of use: west %.2f, south %.2f, "
                                            "east %.2f, north %.2f\n",
                                            dfWest, dfSouth, dfEast, dfNorth);

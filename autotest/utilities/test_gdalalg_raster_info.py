@@ -195,47 +195,40 @@ def test_gdalalg_raster_info_crs():
     ) as alg:
         output_string = alg.Output()
         assert (
-            "Coordinate Reference System name: NAD27 / UTM zone 11N\n" in output_string
-        )
-        assert "Coordinate Reference System ID: EPSG:26711\n" in output_string
-        assert "Coordinate Reference System type: Projected\n" in output_string
-        assert (
-            "Coordinate Reference System projection type: UTM zone 11N, Transverse Mercator\n"
-            in output_string
-        )
-        assert "Coordinate Reference System units: metre\n" in output_string
-        assert (
-            "Coordinate Reference System area of use: North America..., west -120.00, south 26.93, east -114.00, north 78.13\n"
+            """Coordinate Reference System:
+  - name: NAD27 / UTM zone 11N
+  - ID: EPSG:26711
+  - type: Projected
+  - projection type: UTM zone 11N, Transverse Mercator
+  - units: metre
+  - area of use: North America..., west -120.00, south 26.93, east -114.00, north 78.13\n"""
             in output_string
         )
 
     with gdal.alg.raster.info(input="data/utmsmall.tif", output_format="text") as alg:
         output_string = alg.Output()
-        assert (
-            "Coordinate Reference System name: NAD27 / UTM zone 11N\n" in output_string
-        )
-        assert "Coordinate Reference System ID: EPSG:26711\n" in output_string
-        assert "Coordinate Reference System type: Projected\n" in output_string
-        assert (
-            "Coordinate Reference System projection type: Transverse Mercator\n"
-            in output_string
-        )
-        assert "Coordinate Reference System units: metre\n" in output_string
-        assert "Coordinate Reference System area of use" not in output_string
+        assert """Coordinate Reference System:
+  - name: NAD27 / UTM zone 11N
+  - ID: EPSG:26711
+  - type: Projected
+  - projection type: Transverse Mercator
+  - units: metre""" in output_string
+        assert "  - area of use" not in output_string
 
     with gdal.alg.raster.info(
         input="../gdrivers/data/small_world.tif", output_format="text"
     ) as alg:
         output_string = alg.Output()
-        assert "Coordinate Reference System name: WGS 84\n" in output_string
-        assert "Coordinate Reference System ID: EPSG:4326\n" in output_string
-        assert "Coordinate Reference System type: Geographic 2D\n" in output_string
-        assert "Coordinate Reference System projection type" not in output_string
-        assert "Coordinate Reference System units" not in output_string
         assert (
-            "Coordinate Reference System area of use: World, west -180.00, south -90.00, east 180.00, north 90.00\n"
+            """Coordinate Reference System:
+  - name: WGS 84
+  - ID: EPSG:4326
+  - type: Geographic 2D
+  - area of use: World, west -180.00, south -90.00, east 180.00, north 90.00"""
             in output_string
         )
+        assert "  - projection type" not in output_string
+        assert "  - units" not in output_string
 
     src_ds = gdal.GetDriverByName("MEM").Create("", 1, 1)
     srs = osr.SpatialReference()
@@ -243,19 +236,13 @@ def test_gdalalg_raster_info_crs():
     src_ds.SetSpatialRef(srs)
     with gdal.alg.raster.info(input=src_ds, output_format="text") as alg:
         output_string = alg.Output()
+        assert "name: WGS 84 + EGM2008 height\n" in output_string
+        assert "ID: EPSG:9518\n" in output_string
+        assert "type: Compound of Geographic\n" in output_string
+        assert "projection type" not in output_string
+        assert "units" not in output_string
         assert (
-            "Coordinate Reference System name: WGS 84 + EGM2008 height\n"
-            in output_string
-        )
-        assert "Coordinate Reference System ID: EPSG:9518\n" in output_string
-        assert (
-            "Coordinate Reference System type: Compound of Geographic\n"
-            in output_string
-        )
-        assert "Coordinate Reference System projection type" not in output_string
-        assert "Coordinate Reference System units" not in output_string
-        assert (
-            "Coordinate Reference System area of use: World, west -180.00, south -90.00, east 180.00, north 90.00\n"
+            "area of use: World, west -180.00, south -90.00, east 180.00, north 90.00\n"
             in output_string
         )
 
@@ -273,14 +260,8 @@ def test_gdalalg_raster_info_crs():
     src_ds.SetSpatialRef(srs)
     with gdal.alg.raster.info(input=src_ds, output_format="text") as alg:
         output_string = alg.Output()
-        assert (
-            "Coordinate Reference System name: Moon (2015) - Sphere / Ocentric\n"
-            in output_string
-        )
-        assert (
-            "Coordinate Reference System ID: urn:ogc:def:crs:IAU:2015:30100\n"
-            in output_string
-        )
+        assert "name: Moon (2015) - Sphere / Ocentric\n" in output_string
+        assert "ID: urn:ogc:def:crs:IAU:2015:30100\n" in output_string
 
     with gdal.alg.raster.info(
         input="data/utmsmall.tif", output_format="text", crs_format="WKT2"
