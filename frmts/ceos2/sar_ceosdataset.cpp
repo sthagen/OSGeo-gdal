@@ -118,9 +118,9 @@ static CeosTypeCode_t QuadToTC(int a, int b, int c, int d)
 /* PALSAR-2 ALOS2 */
 // https://www.eorc.jaxa.jp/ALOS/en/alos-2/pdf/product_format_description/PALSAR-2_xx_Format_CEOS_E_g.pdf
 // Table 3.2-3 Record Type of Each Record
-#define LEADER_PLATFORM_POSITION_TC QuadToTC(18, 30, 18, 20)
-#define LEADER_PLATFORM_ATTITUDE_TC QuadToTC(18, 40, 18, 20)
-#define LEADER_PLATFORM_RADIOMETRIC_TC QuadToTC(18, 50, 18, 20)
+#define LEADER_PLATFORM_POSITION_PALSAR_TC QuadToTC(18, 30, 18, 20)
+#define LEADER_ATTITUDE_PALSAR_TC QuadToTC(18, 40, 18, 20)
+#define LEADER_RADIOMETRIC_PALSAR_TC QuadToTC(18, 50, 18, 20)
 
 /************************************************************************/
 /* ==================================================================== */
@@ -1194,8 +1194,9 @@ void SAR_CEOSDataset::ScanForMetadata()
     /* -------------------------------------------------------------------- */
     /*      PALSAR-2 ALOS2 Platform position data                           */
     /* -------------------------------------------------------------------- */
-    record = FindCeosRecord(sVolume.RecordList, LEADER_PLATFORM_POSITION_TC,
-                            CEOS_LEADER_FILE, -1, -1);
+    record =
+        FindCeosRecord(sVolume.RecordList, LEADER_PLATFORM_POSITION_PALSAR_TC,
+                       CEOS_LEADER_FILE, -1, -1);
     if (record && record->Length > 387)
     {
         // Table 3.3-7 Platform position data records
@@ -1291,9 +1292,9 @@ void SAR_CEOSDataset::ScanForMetadata()
     }
 
     /* -------------------------------------------------------------------- */
-    /*      PALSAR-2 ALOS2 Platform attitude data                           */
+    /*      PALSAR-2 ALOS2 Attitude data                                    */
     /* -------------------------------------------------------------------- */
-    record = FindCeosRecord(sVolume.RecordList, LEADER_PLATFORM_ATTITUDE_TC,
+    record = FindCeosRecord(sVolume.RecordList, LEADER_ATTITUDE_PALSAR_TC,
                             CEOS_LEADER_FILE, -1, -1);
     if (record)
     {
@@ -1355,32 +1356,32 @@ void SAR_CEOSDataset::ScanForMetadata()
     }
 
     /* -------------------------------------------------------------------- */
-    /*      PALSAR-2 ALOS2 Platform radiometric data                        */
+    /*      PALSAR-2 ALOS2 Radiometric data                                 */
     /* -------------------------------------------------------------------- */
-    record = FindCeosRecord(sVolume.RecordList, LEADER_PLATFORM_RADIOMETRIC_TC,
+    record = FindCeosRecord(sVolume.RecordList, LEADER_RADIOMETRIC_PALSAR_TC,
                             CEOS_LEADER_FILE, -1, -1);
     if (record)
     {
         // Table 3.3-9 Radiometric data records
         // of https://www.eorc.jaxa.jp/ALOS/en/alos-2/pdf/product_format_description/PALSAR-2_xx_Format_CEOS_E_g.pdf
         constexpr FieldDef asFieldDefs[] = {
-            {"CEOS_PLATFORM_RADIOMETRIC_CALIBRATION_FACTOR", 21, "A16"},
-            {"CEOS_PLATFORM_RADIOMETRIC_DT_1_1_REAL", 37, "A16"},
-            {"CEOS_PLATFORM_RADIOMETRIC_DT_1_1_IMAG", 53, "A16"},
-            {"CEOS_PLATFORM_RADIOMETRIC_DT_1_2_REAL", 69, "A16"},
-            {"CEOS_PLATFORM_RADIOMETRIC_DT_1_2_IMAG", 85, "A16"},
-            {"CEOS_PLATFORM_RADIOMETRIC_DT_2_1_REAL", 101, "A16"},
-            {"CEOS_PLATFORM_RADIOMETRIC_DT_2_1_IMAG", 117, "A16"},
-            {"CEOS_PLATFORM_RADIOMETRIC_DT_2_2_REAL", 133, "A16"},
-            {"CEOS_PLATFORM_RADIOMETRIC_DT_2_2_IMAG", 149, "A16"},
-            {"CEOS_PLATFORM_RADIOMETRIC_DR_1_1_REAL", 165, "A16"},
-            {"CEOS_PLATFORM_RADIOMETRIC_DR_1_1_IMAG", 181, "A16"},
-            {"CEOS_PLATFORM_RADIOMETRIC_DR_1_2_REAL", 197, "A16"},
-            {"CEOS_PLATFORM_RADIOMETRIC_DR_1_2_IMAG", 213, "A16"},
-            {"CEOS_PLATFORM_RADIOMETRIC_DR_2_1_REAL", 229, "A16"},
-            {"CEOS_PLATFORM_RADIOMETRIC_DR_2_1_IMAG", 245, "A16"},
-            {"CEOS_PLATFORM_RADIOMETRIC_DR_2_2_REAL", 261, "A16"},
-            {"CEOS_PLATFORM_RADIOMETRIC_DR_2_2_IMAG", 277, "A16"},
+            {"CEOS_RADIOMETRIC_CALIBRATION_FACTOR", 21, "A16"},
+            {"CEOS_RADIOMETRIC_DT_1_1_REAL", 37, "A16"},
+            {"CEOS_RADIOMETRIC_DT_1_1_IMAG", 53, "A16"},
+            {"CEOS_RADIOMETRIC_DT_1_2_REAL", 69, "A16"},
+            {"CEOS_RADIOMETRIC_DT_1_2_IMAG", 85, "A16"},
+            {"CEOS_RADIOMETRIC_DT_2_1_REAL", 101, "A16"},
+            {"CEOS_RADIOMETRIC_DT_2_1_IMAG", 117, "A16"},
+            {"CEOS_RADIOMETRIC_DT_2_2_REAL", 133, "A16"},
+            {"CEOS_RADIOMETRIC_DT_2_2_IMAG", 149, "A16"},
+            {"CEOS_RADIOMETRIC_DR_1_1_REAL", 165, "A16"},
+            {"CEOS_RADIOMETRIC_DR_1_1_IMAG", 181, "A16"},
+            {"CEOS_RADIOMETRIC_DR_1_2_REAL", 197, "A16"},
+            {"CEOS_RADIOMETRIC_DR_1_2_IMAG", 213, "A16"},
+            {"CEOS_RADIOMETRIC_DR_2_1_REAL", 229, "A16"},
+            {"CEOS_RADIOMETRIC_DR_2_1_IMAG", 245, "A16"},
+            {"CEOS_RADIOMETRIC_DR_2_2_REAL", 261, "A16"},
+            {"CEOS_RADIOMETRIC_DR_2_2_IMAG", 277, "A16"},
         };
         for (const auto &sDef : asFieldDefs)
         {
