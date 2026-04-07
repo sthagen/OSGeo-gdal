@@ -2113,6 +2113,15 @@ char *GDALVectorInfo(GDALDatasetH hDataset,
             }
             else if (CPLGetLastErrorType() != CE_None)
             {
+                // sqlite3 emits messages with "readonly" and GDAL with "read-only"
+                if (psOptions->bIsCli &&
+                    (strstr(CPLGetLastErrorMsg(), "readonly") ||
+                     strstr(CPLGetLastErrorMsg(), "read-only")))
+                {
+                    CPLError(CE_Warning, CPLE_AppDefined,
+                             "Perhaps you want to run \"gdal vector sql "
+                             "--update\" instead?");
+                }
                 return nullptr;
             }
         }
