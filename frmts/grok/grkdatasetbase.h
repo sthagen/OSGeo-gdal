@@ -1133,7 +1133,7 @@ struct GRKCodecWrapper
         {
             const GByte *asocData = poGMLJP2Box->GetWritableData();
             int asocLen = static_cast<int>(poGMLJP2Box->GetDataLength());
-            flattenAndSetAsocBoxes(asocData, asocLen);
+            flattenAndSetAsocBoxes(psImage, asocData, asocLen);
         }
 
         /* XMP UUID */
@@ -1162,12 +1162,8 @@ struct GRKCodecWrapper
                 const GByte *p = poMDBox->GetWritableData();
                 GIntBig n = poMDBox->GetDataLength();
                 if (n > 0)
-                {
-                    psImage->meta->xml_len = static_cast<size_t>(n);
-                    psImage->meta->xml_buf =
-                        static_cast<uint8_t *>(malloc(psImage->meta->xml_len));
-                    memcpy(psImage->meta->xml_buf, p, psImage->meta->xml_len);
-                }
+                    grk_image_meta_set_field(psImage->meta, "xml", p,
+                                             static_cast<size_t>(n));
             }
         }
 
@@ -1252,7 +1248,8 @@ struct GRKCodecWrapper
         }
     }
 
-    void flattenAndSetAsocBoxes(const GByte *asocData, int asocDataLen)
+    static void flattenAndSetAsocBoxes(grk_image *image, const GByte *asocData,
+                                       int asocDataLen)
     {
         struct AsocEntry
         {
@@ -1311,7 +1308,7 @@ struct GRKCodecWrapper
                     entries[i].xml.empty() ? nullptr : entries[i].xml.data();
                 asocs[i].xml_len = static_cast<uint32_t>(entries[i].xml.size());
             }
-            grk_image_meta_set_asocs(psImage->meta, asocs.data(),
+            grk_image_meta_set_asocs(image->meta, asocs.data(),
                                      static_cast<uint32_t>(asocs.size()));
         }
     }
@@ -1358,6 +1355,187 @@ struct GRKCodecWrapper
             CPLError(CE_Failure, CPLE_AppDefined, "grk_compress_init() failed");
             return false;
         }
+        return true;
+    }
+
+    /**
+     * @brief Rewrite JP2 boxes via Grok transcode.
+     *
+     * Replaces the driver-side box rewriting logic in Close() by using
+     * grk_transcode() to copy the codestream verbatim while writing
+     * updated metadata boxes.
+     *
+     * @param pszFilename source (and destination) file path
+     * @param poDS        dataset carrying updated metadata
+     * @return true on success
+     */
+    static bool rewriteBoxes(const char *pszFilename, GDALDataset *poDS)
+    {
+        CPLDebug("GROK", "Rewriting boxes via transcode for %s", pszFilename);
+
+        /* Read source header to get image */
+        grk_stream_params srcStreamParams{};
+        safe_strcpy(srcStreamParams.file, pszFilename);
+
+        grk_decompress_parameters dparams{};
+        auto *decCodec = grk_decompress_init(&srcStreamParams, &dparams);
+        if (!decCodec)
+        {
+            CPLError(CE_Failure, CPLE_AppDefined,
+                     "grk_decompress_init() failed for rewrite");
+            return false;
+        }
+
+        grk_header_info srcHeader{};
+        if (!grk_decompress_read_header(decCodec, &srcHeader))
+        {
+            CPLError(CE_Failure, CPLE_AppDefined,
+                     "grk_decompress_read_header() failed for rewrite");
+            grk_object_unref(decCodec);
+            return false;
+        }
+
+        auto *srcImage = grk_decompress_get_image(decCodec);
+        if (!srcImage)
+        {
+            CPLError(CE_Failure, CPLE_AppDefined,
+                     "grk_decompress_get_image() failed for rewrite");
+            grk_object_unref(decCodec);
+            return false;
+        }
+
+        /* Prepare updated metadata on the image */
+        if (!srcImage->meta)
+            srcImage->meta = grk_image_meta_new();
+
+        /* GeoTIFF UUID */
+        GDALJP2Metadata oJP2MD;
+        if (poDS->GetGCPCount() > 0)
+        {
+            oJP2MD.SetGCPs(poDS->GetGCPCount(), poDS->GetGCPs());
+            oJP2MD.SetSpatialRef(poDS->GetGCPSpatialRef());
+        }
+        else
+        {
+            const OGRSpatialReference *poSRS = poDS->GetSpatialRef();
+            if (poSRS)
+                oJP2MD.SetSpatialRef(poSRS);
+            GDALGeoTransform gt;
+            if (poDS->GetGeoTransform(gt) == CE_None &&
+                gt != GDALGeoTransform())
+                oJP2MD.SetGeoTransform(gt);
+        }
+        const char *pszAreaOrPoint =
+            poDS->GetMetadataItem(GDALMD_AREA_OR_POINT);
+        oJP2MD.bPixelIsPoint =
+            pszAreaOrPoint && EQUAL(pszAreaOrPoint, GDALMD_AOP_POINT);
+
+        {
+            std::unique_ptr<GDALJP2Box> poGeoBox(oJP2MD.CreateJP2GeoTIFF());
+            if (poGeoBox)
+            {
+                const GByte *p = poGeoBox->GetWritableData();
+                GIntBig n = poGeoBox->GetDataLength();
+                if (n > 16)
+                    grk_image_meta_set_field(srcImage->meta, "geotiff", p + 16,
+                                             static_cast<size_t>(n - 16));
+            }
+        }
+
+        /* IPR box */
+        {
+            std::unique_ptr<GDALJP2Box> poIPRBox(
+                GDALJP2Metadata::CreateIPRBox(poDS));
+            if (poIPRBox)
+            {
+                const GByte *p = poIPRBox->GetWritableData();
+                GIntBig n = poIPRBox->GetDataLength();
+                if (n > 0)
+                    grk_image_meta_set_field(srcImage->meta, "ipr", p,
+                                             static_cast<size_t>(n));
+            }
+        }
+
+        /* XMP UUID */
+        {
+            std::unique_ptr<GDALJP2Box> poXMPBox(
+                GDALJP2Metadata::CreateXMPBox(poDS));
+            if (poXMPBox)
+            {
+                const GByte *p = poXMPBox->GetWritableData();
+                GIntBig n = poXMPBox->GetDataLength();
+                if (n > 16)
+                    grk_image_meta_set_field(srcImage->meta, "xmp", p + 16,
+                                             static_cast<size_t>(n - 16));
+            }
+        }
+
+        /* GDAL metadata XML box */
+        {
+            std::unique_ptr<GDALJP2Box> poMDBox(
+                GDALJP2Metadata::CreateGDALMultiDomainMetadataXMLBox(poDS,
+                                                                     false));
+            if (poMDBox)
+            {
+                const GByte *p = poMDBox->GetWritableData();
+                GIntBig n = poMDBox->GetDataLength();
+                if (n > 0)
+                    grk_image_meta_set_field(srcImage->meta, "xml", p,
+                                             static_cast<size_t>(n));
+            }
+        }
+
+        /* GMLJP2 asoc boxes */
+        bool bHasSRS = poDS->GetSpatialRef() != nullptr &&
+                       !poDS->GetSpatialRef()->IsEmpty();
+        GDALGeoTransform gt;
+        bool bHasGT =
+            poDS->GetGeoTransform(gt) == CE_None && gt != GDALGeoTransform();
+        if (bHasSRS && bHasGT && poDS->GetGCPCount() == 0)
+        {
+            std::unique_ptr<GDALJP2Box> poGMLBox(oJP2MD.CreateGMLJP2(
+                poDS->GetRasterXSize(), poDS->GetRasterYSize()));
+            if (poGMLBox)
+            {
+                const GByte *asocData = poGMLBox->GetWritableData();
+                int asocLen = static_cast<int>(poGMLBox->GetDataLength());
+                flattenAndSetAsocBoxes(srcImage, asocData, asocLen);
+            }
+        }
+
+        /* Transcode: copy codestream, rewrite boxes */
+        grk_cparameters cparams{};
+        grk_compress_set_default_params(&cparams);
+        cparams.cod_format = GRK_FMT_JP2;
+
+        CPLString osTmpFilename(CPLSPrintf("%s.tmp", pszFilename));
+
+        grk_stream_params transSrcParams{};
+        safe_strcpy(transSrcParams.file, pszFilename);
+
+        grk_stream_params dstParams{};
+        safe_strcpy(dstParams.file, osTmpFilename.c_str());
+
+        uint64_t written =
+            grk_transcode(&transSrcParams, &dstParams, &cparams, srcImage);
+        grk_object_unref(decCodec);
+
+        if (written == 0)
+        {
+            CPLError(CE_Failure, CPLE_AppDefined,
+                     "grk_transcode() failed for box rewrite");
+            VSIUnlink(osTmpFilename);
+            return false;
+        }
+
+        if (VSIRename(osTmpFilename, pszFilename) != 0)
+        {
+            CPLError(CE_Failure, CPLE_AppDefined, "Failed to rename %s to %s",
+                     osTmpFilename.c_str(), pszFilename);
+            VSIUnlink(osTmpFilename);
+            return false;
+        }
+
         return true;
     }
 

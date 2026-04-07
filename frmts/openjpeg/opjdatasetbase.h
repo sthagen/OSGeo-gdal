@@ -711,6 +711,11 @@ struct OPJCodecWrapper
     {
     }
 
+    static bool rewriteBoxes(const char *, GDALDataset *)
+    {
+        return false;
+    }
+
     bool compressTile(int tileIndex, GByte *buff, uint32_t buffLen)
     {
         if (!pCodec || !pStream)
