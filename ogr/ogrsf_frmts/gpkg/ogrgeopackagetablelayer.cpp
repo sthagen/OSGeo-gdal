@@ -5764,7 +5764,7 @@ void OGRGeoPackageTableLayer::SetCreationParameters(
                 {
                     bool bOK = false;
                     auto poSRSTmp =
-                        OGRSpatialReferenceRefCountedPtr::newInstance();
+                        OGRSpatialReferenceRefCountedPtr::makeInstance();
                     if (m_iSrs < 32767)
                     {
                         CPLErrorHandlerPusher oErrorHandler(

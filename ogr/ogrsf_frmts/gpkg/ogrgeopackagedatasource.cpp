@@ -241,7 +241,7 @@ GDALGeoPackageDataset::GetSpatialRef(int iSrsId, bool bFallbackToEPSG,
 
     if (iSrsId == 0 || iSrsId == -1)
     {
-        auto poSpatialRef = OGRSpatialReferenceRefCountedPtr::newInstance();
+        auto poSpatialRef = OGRSpatialReferenceRefCountedPtr::makeInstance();
         poSpatialRef->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
 
         // See corresponding tests in GDALGeoPackageDataset::GetSrsId
@@ -278,7 +278,7 @@ GDALGeoPackageDataset::GetSpatialRef(int iSrsId, bool bFallbackToEPSG,
             CPLDebug("GPKG",
                      "unable to read srs_id '%d' from gpkg_spatial_ref_sys",
                      iSrsId);
-            auto poSRS = OGRSpatialReferenceRefCountedPtr::newInstance();
+            auto poSRS = OGRSpatialReferenceRefCountedPtr::makeInstance();
             if (poSRS->importFromEPSG(iSrsId) == OGRERR_NONE)
             {
                 poSRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
@@ -315,7 +315,7 @@ GDALGeoPackageDataset::GetSpatialRef(int iSrsId, bool bFallbackToEPSG,
     const double dfCoordinateEpoch =
         pszCoordinateEpoch ? CPLAtof(pszCoordinateEpoch) : 0.0;
 
-    auto poSpatialRef = OGRSpatialReferenceRefCountedPtr::newInstance();
+    auto poSpatialRef = OGRSpatialReferenceRefCountedPtr::makeInstance();
     poSpatialRef->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
     // Try to import first from EPSG code, and then from WKT
     if (!(pszOrganization && pszOrganizationCoordsysID &&

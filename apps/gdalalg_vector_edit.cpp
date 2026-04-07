@@ -126,7 +126,7 @@ class GDALVectorEditAlgorithmLayer final : public GDALVectorPipelineOutputLayer
                 if (!EQUAL(overrideCrs.c_str(), "null") &&
                     !EQUAL(overrideCrs.c_str(), "none"))
                 {
-                    m_poSRS = OGRSpatialReferenceRefCountedPtr::newInstance();
+                    m_poSRS = OGRSpatialReferenceRefCountedPtr::makeInstance();
                     m_poSRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
                     // already checked by GDALAlgorithmArg framework
                     CPL_IGNORE_RET_VAL(

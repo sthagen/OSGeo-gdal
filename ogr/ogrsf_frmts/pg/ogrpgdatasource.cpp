@@ -2359,7 +2359,7 @@ const OGRSpatialReference *OGRPGDataSource::FetchSRS(int nId)
         const char *pszWKT = PQgetvalue(hResult, 0, 0);
         const char *pszAuthName = PQgetvalue(hResult, 0, 1);
         const char *pszAuthSRID = PQgetvalue(hResult, 0, 2);
-        poSRS = OGRSpatialReferenceRefCountedPtr::newInstance();
+        poSRS = OGRSpatialReferenceRefCountedPtr::makeInstance();
         poSRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
 
         // Try to import first from EPSG code, and then from WKT

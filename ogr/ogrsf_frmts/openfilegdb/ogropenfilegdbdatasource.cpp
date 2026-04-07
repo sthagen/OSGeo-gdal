@@ -2191,7 +2191,7 @@ OGROpenFileGDBDataSource::BuildSRS(const CPLXMLNode *psInfo)
             return bSuccess;
         };
 
-        poSRS = OGRSpatialReferenceRefCountedPtr::newInstance();
+        poSRS = OGRSpatialReferenceRefCountedPtr::makeInstance();
         poSRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
         if (!ImportFromCode(*poSRS.get(), nLatestWKID, nWKID))
         {
@@ -2206,11 +2206,11 @@ OGROpenFileGDBDataSource::BuildSRS(const CPLXMLNode *psInfo)
             if (nVCSWKID > 0 || nLatestVCSWKID > 0)
             {
                 auto poVertSRS =
-                    OGRSpatialReferenceRefCountedPtr::newInstance();
+                    OGRSpatialReferenceRefCountedPtr::makeInstance();
                 if (ImportFromCode(*poVertSRS.get(), nLatestVCSWKID, nVCSWKID))
                 {
                     auto poCompoundSRS =
-                        OGRSpatialReferenceRefCountedPtr::newInstance();
+                        OGRSpatialReferenceRefCountedPtr::makeInstance();
                     if (poCompoundSRS->SetCompoundCS(
                             std::string(poSRS->GetName())
                                 .append(" + ")
@@ -2252,7 +2252,7 @@ OGROpenFileGDBDataSource::BuildSRS(const char *pszWKT)
     if (poSRS)
         return poSRS;
 
-    poSRS = OGRSpatialReferenceRefCountedPtr::newInstance();
+    poSRS = OGRSpatialReferenceRefCountedPtr::makeInstance();
     poSRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
     if (poSRS->importFromWkt(pszWKT) != OGRERR_NONE)
     {

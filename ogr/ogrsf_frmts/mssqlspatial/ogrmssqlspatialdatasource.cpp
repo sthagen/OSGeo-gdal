@@ -1437,7 +1437,7 @@ OGRSpatialReference *OGRMSSQLSpatialDataSource::FetchSRS(int nId)
         {
             if (oStmt.GetColData(0))
             {
-                auto poSRS = OGRSpatialReferenceRefCountedPtr::newInstance();
+                auto poSRS = OGRSpatialReferenceRefCountedPtr::makeInstance();
                 poSRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
                 const char *pszWKT = oStmt.GetColData(0);
                 if (poSRS->importFromWkt(pszWKT) == OGRERR_NONE)
@@ -1463,7 +1463,7 @@ OGRSpatialReference *OGRMSSQLSpatialDataSource::FetchSRS(int nId)
     /* -------------------------------------------------------------------- */
     /*      Try looking up the EPSG list                                    */
     /* -------------------------------------------------------------------- */
-    auto poSRS = OGRSpatialReferenceRefCountedPtr::newInstance();
+    auto poSRS = OGRSpatialReferenceRefCountedPtr::makeInstance();
     poSRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
     if (poSRS->importFromEPSG(nId) == OGRERR_NONE)
     {

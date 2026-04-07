@@ -1455,7 +1455,7 @@ OGROAPIFLayer::GetSupportedSRSList(int /*iGeomField*/)
     {
         for (const auto &osCRS : m_oSupportedCRSList)
         {
-            auto poSRS = OGRSpatialReferenceRefCountedPtr::newInstance();
+            auto poSRS = OGRSpatialReferenceRefCountedPtr::makeInstance();
             if (poSRS->SetFromUserInput(
                     osCRS.c_str(),
                     OGRSpatialReference::

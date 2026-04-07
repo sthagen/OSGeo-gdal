@@ -803,7 +803,7 @@ OGRSpatialReferenceRefCountedPtr OGROCIDataSource::FetchSRS(int nId)
     /* -------------------------------------------------------------------- */
     /*      Turn into a spatial reference.                                  */
     /* -------------------------------------------------------------------- */
-    auto poSRS = OGRSpatialReferenceRefCountedPtr::newInstance();
+    auto poSRS = OGRSpatialReferenceRefCountedPtr::makeInstance();
     poSRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
     if (poSRS->importFromWkt(papszResult[0]) != OGRERR_NONE)
     {

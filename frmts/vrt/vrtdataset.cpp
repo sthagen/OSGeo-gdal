@@ -517,7 +517,7 @@ CPLErr VRTDataset::XMLInit(const CPLXMLNode *psTree, const char *pszVRTPathIn)
     const CPLXMLNode *psSRSNode = CPLGetXMLNode(psTree, "SRS");
     if (psSRSNode)
     {
-        m_poSRS = OGRSpatialReferenceRefCountedPtr::newInstance();
+        m_poSRS = OGRSpatialReferenceRefCountedPtr::makeInstance();
         m_poSRS->SetFromUserInput(
             CPLGetXMLValue(psSRSNode, nullptr, ""),
             OGRSpatialReference::SET_FROM_USER_INPUT_LIMITATIONS_get());

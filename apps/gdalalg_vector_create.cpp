@@ -370,7 +370,7 @@ bool GDALVectorCreateAlgorithm::RunStep(GDALPipelineStepRunContext &)
                 if (!m_crs.empty())
                 {
                     auto poSRS =
-                        OGRSpatialReferenceRefCountedPtr::newInstance();
+                        OGRSpatialReferenceRefCountedPtr::makeInstance();
                     if (poSRS->SetFromUserInput(m_crs.c_str()) != OGRERR_NONE)
                     {
                         ReportError(CE_Failure, CPLE_AppDefined,

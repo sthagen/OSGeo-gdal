@@ -2059,7 +2059,7 @@ GDALVectorTranslateCreateCopy(GDALDriver *poDriver, const char *pszDest,
 
     if (!psOptions->osOutputSRSDef.empty())
     {
-        poOutputSRS = OGRSpatialReferenceRefCountedPtr::newInstance();
+        poOutputSRS = OGRSpatialReferenceRefCountedPtr::makeInstance();
         poOutputSRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
         if (poOutputSRS->SetFromUserInput(psOptions->osOutputSRSDef.c_str()) !=
             OGRERR_NONE)
@@ -2432,7 +2432,7 @@ GDALDatasetH GDALVectorTranslate(const char *pszDest, GDALDatasetH hDstDS,
         }
         OGREnvelope sEnvelope;
         psOptions->poSpatialFilter->getEnvelope(&sEnvelope);
-        poSpatSRS = OGRSpatialReferenceRefCountedPtr::newInstance();
+        poSpatSRS = OGRSpatialReferenceRefCountedPtr::makeInstance();
         poSpatSRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
         if (poSpatSRS->SetFromUserInput(psOptions->osSpatSRSDef.c_str()) !=
             OGRERR_NONE)
@@ -2958,7 +2958,7 @@ GDALDatasetH GDALVectorTranslate(const char *pszDest, GDALDatasetH hDstDS,
     OGRSpatialReferenceRefCountedPtr poOutputSRS;
     if (!psOptions->osOutputSRSDef.empty())
     {
-        poOutputSRS = OGRSpatialReferenceRefCountedPtr::newInstance();
+        poOutputSRS = OGRSpatialReferenceRefCountedPtr::makeInstance();
         poOutputSRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
         if (poOutputSRS->SetFromUserInput(psOptions->osOutputSRSDef.c_str()) !=
             OGRERR_NONE)

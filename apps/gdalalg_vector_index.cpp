@@ -345,7 +345,7 @@ bool GDALVectorIndexAlgorithm::RunImpl(GDALProgressFunc pfnProgress,
     OGRSpatialReferenceRefCountedPtr poTargetCRS;
     if (!m_crs.empty())
     {
-        poTargetCRS = OGRSpatialReferenceRefCountedPtr::newInstance();
+        poTargetCRS = OGRSpatialReferenceRefCountedPtr::makeInstance();
         poTargetCRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
         // already checked by GDALAlgorithmArg framework
         CPL_IGNORE_RET_VAL(poTargetCRS->SetFromUserInput(m_crs.c_str()));

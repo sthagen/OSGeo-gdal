@@ -264,7 +264,7 @@ bool GDALVectorMakePointAlgorithm::RunStep(GDALPipelineStepRunContext &)
     OGRSpatialReferenceRefCountedPtr poCRS;
     if (!m_dstCrs.empty())
     {
-        poCRS = OGRSpatialReferenceRefCountedPtr::newInstance();
+        poCRS = OGRSpatialReferenceRefCountedPtr::makeInstance();
         poCRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
         auto eErr = poCRS->SetFromUserInput(m_dstCrs.c_str());
         if (eErr != OGRERR_NONE)

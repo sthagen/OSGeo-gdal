@@ -1401,7 +1401,7 @@ int OGRWFSDataSource::Open(const char *pszFilename, int bUpdateIn,
                     if (pszDefaultSRS)
                     {
                         auto poSRS =
-                            OGRSpatialReferenceRefCountedPtr::newInstance();
+                            OGRSpatialReferenceRefCountedPtr::makeInstance();
                         if (poSRS->SetFromUserInput(
                                 pszDefaultSRS,
                                 OGRSpatialReference::
@@ -1425,7 +1425,7 @@ int OGRWFSDataSource::Open(const char *pszFilename, int bUpdateIn,
                             if (pszSRS && IsValidCRSName(pszSRS))
                             {
                                 auto poSRS = OGRSpatialReferenceRefCountedPtr::
-                                    newInstance();
+                                    makeInstance();
                                 if (poSRS->SetFromUserInput(
                                         EQUAL(pszSRS, "CRS:84") ? "OGC:CRS84"
                                                                 : pszSRS,

@@ -3476,7 +3476,7 @@ static CPLErr LoadCutline(const std::string &osCutlineDSNameOrWKT,
         OGRSpatialReferenceRefCountedPtr poSRS;
         if (!osSRS.empty())
         {
-            poSRS = OGRSpatialReferenceRefCountedPtr::newInstance();
+            poSRS = OGRSpatialReferenceRefCountedPtr::makeInstance();
             poSRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
             poSRS->SetFromUserInput(osSRS.c_str());
         }
@@ -3570,7 +3570,7 @@ static CPLErr LoadCutline(const std::string &osCutlineDSNameOrWKT,
     /* -------------------------------------------------------------------- */
     if (!osSRS.empty())
     {
-        auto poSRS = OGRSpatialReferenceRefCountedPtr::newInstance();
+        auto poSRS = OGRSpatialReferenceRefCountedPtr::makeInstance();
         poSRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
         poSRS->SetFromUserInput(osSRS.c_str());
         poMultiPolygon->assignSpatialReference(poSRS.get());

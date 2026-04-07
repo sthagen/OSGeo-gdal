@@ -61,7 +61,7 @@ class GDALInvalidLocationLayer final : public GDALVectorPipelineOutputLayer
                              bool bSingleLayerOutput, int srcGeomField,
                              bool skipValid)
         : GDALVectorPipelineOutputLayer(layer),
-          m_defn(OGRFeatureDefnRefCountedPtr::newInstance(
+          m_defn(OGRFeatureDefnRefCountedPtr::makeInstance(
               bSingleLayerOutput ? "error_location"
                                  : std::string("error_location_")
                                        .append(layer.GetDescription())

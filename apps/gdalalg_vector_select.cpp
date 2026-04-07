@@ -100,7 +100,7 @@ class GDALVectorSelectAlgorithmLayer final
     explicit GDALVectorSelectAlgorithmLayer(
         OGRLayer &oSrcLayer, const std::string &osOutputLayerName)
         : GDALVectorPipelineOutputLayer(oSrcLayer),
-          m_poFeatureDefn(OGRFeatureDefnRefCountedPtr::newInstance(
+          m_poFeatureDefn(OGRFeatureDefnRefCountedPtr::makeInstance(
               osOutputLayerName.empty() ? oSrcLayer.GetName()
                                         : osOutputLayerName.c_str()))
     {

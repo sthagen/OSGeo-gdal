@@ -764,7 +764,7 @@ struct OGRRefCountedPtr<OGRSpatialReference>
      * Be careful: a fresh OGRSpatialReference instance has a reference count
      * equal to one, so you generally want to set add_ref = false
      * So ``OGRSpatialReferenceRefCountedPtr srs(new OGRSpatialReference(), false)``
-     * or less error prone ``auto srs = OGRSpatialReferenceRefCountedPtr::newInstance()``
+     * or less error prone ``auto srs = OGRSpatialReferenceRefCountedPtr::makeInstance()``
      */
     inline explicit OGRRefCountedPtr(OGRSpatialReference *poSRS, bool add_ref)
         : OGRRefCountedPtrBase<OGRSpatialReference>(poSRS, add_ref)
@@ -787,7 +787,7 @@ struct OGRRefCountedPtr<OGRSpatialReference>
     /** Constructs with a new OGRSpatialReference instance initialized
      * with a WKT string (or in an empty state if pszWKT is nullptr).
      */
-    inline static OGRRefCountedPtr newInstance(const char *pszWKT = nullptr)
+    inline static OGRRefCountedPtr makeInstance(const char *pszWKT = nullptr)
     {
         // Initial ref_count of OGRSpatialReference is 1, so don't add a ref
         return OGRRefCountedPtr(new OGRSpatialReference(pszWKT),
