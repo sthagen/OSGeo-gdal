@@ -97,6 +97,15 @@ GDALVectorInfoAlgorithm::GDALVectorInfoAlgorithm(bool standaloneStep)
                             "Option 'sql' and 'where' are mutually exclusive");
                 return false;
             }
+
+            if (m_crsFormat != "AUTO" && m_format == "json")
+            {
+                ReportError(CE_Failure, CPLE_AppDefined,
+                            "'crs-format' cannot be set when 'format' is set "
+                            "to 'json'");
+                return false;
+            }
+
             return true;
         });
 }

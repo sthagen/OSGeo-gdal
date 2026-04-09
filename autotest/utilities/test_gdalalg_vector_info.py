@@ -323,6 +323,13 @@ def test_gdalalg_vector_info_crs():
     if gdaltest.is_travis_branch("ubuntu_2204"):
         pytest.skip()
 
+    with pytest.raises(
+        Exception, match="'crs-format' cannot be set when 'format' is set to 'json'"
+    ):
+        gdal.alg.vector.info(
+            input="../ogr/data/poly.shp", output_format="json", crs_format="WKT2"
+        )
+
     with gdal.alg.vector.info(
         input="../ogr/data/poly.shp", output_format="text"
     ) as alg:
@@ -387,7 +394,7 @@ def test_gdalalg_vector_info_crs():
             """Layer Coordinate Reference System:
   - name: WGS 84
   - ID: EPSG:4978
-  - type: Other
+  - type: Geocentric
   - area of use: World, west -180.00, south -90.00, east 180.00, north 90.00"""
             in output_string
         )

@@ -190,6 +190,13 @@ def test_gdalalg_raster_info_pipeline():
 @pytest.mark.require_proj(8, 2)  # For IAU testing
 def test_gdalalg_raster_info_crs():
 
+    with pytest.raises(
+        Exception, match="'crs-format' cannot be set when 'format' is set to 'json'"
+    ):
+        gdal.alg.raster.info(
+            input="../gcore/data/byte.tif", output_format="json", crs_format="WKT2"
+        )
+
     with gdal.alg.raster.info(
         input="../gcore/data/byte.tif", output_format="text"
     ) as alg:

@@ -1266,204 +1266,24 @@ static void ReportOnLayer(CPLString &osRet, CPLJSONObject &oLayer,
             }
             else if (psOptions->bIsCli)
             {
-                bool bCRSAlreadyEmitted = false;
-                const char *pszAuthCode = poSRS->GetAuthorityCode(nullptr);
-                const char *pszAuthName = poSRS->GetAuthorityName(nullptr);
-                if (pszAuthName && pszAuthCode &&
-                    psOptions->osCRSFormat == "AUTO")
+                std::string osIntroText;
+                if (poGFldDefn)
                 {
-                    OGRSpatialReference oSRSFromAuthCode;
-                    CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
-                    const char *const apszComparisonCriteria[] = {
-                        "IGNORE_DATA_AXIS_TO_SRS_AXIS_MAPPING=YES",
-                        "CRITERION=EQUIVALENT_EXCEPT_AXIS_ORDER_GEOGCRS",
-                        "IGNORE_COORDINATE_EPOCH=YES", nullptr};
-                    if (oSRSFromAuthCode.SetFromUserInput(
-                            std::string(pszAuthName)
-                                .append(":")
-                                .append(pszAuthCode)
-                                .c_str()) == OGRERR_NONE &&
-                        oSRSFromAuthCode.IsSame(poSRS, apszComparisonCriteria))
-                    {
-                        std::string osCRSId;
-                        if (STARTS_WITH_CI(pszAuthName, "IAU_"))
-                        {
-                            osCRSId = "urn:ogc:def:crs:IAU:";
-                            osCRSId += pszAuthName + strlen("IAU_");
-                            osCRSId += ':';
-                            osCRSId += pszAuthCode;
-                        }
-                        else if (strchr(pszAuthName, '_') == nullptr)
-                        {
-                            osCRSId = pszAuthName;
-                            osCRSId += ':';
-                            osCRSId += pszAuthCode;
-                        }
-
-                        if (!osCRSId.empty())
-                        {
-                            bCRSAlreadyEmitted = true;
-
-                            if (poGFldDefn)
-                                Concat(osRet, psOptions->bStdoutOutput,
-                                       "Coordinate Reference System of field "
-                                       "%s:\n",
-                                       poGFldDefn->GetNameRef());
-                            else
-                                Concat(osRet, psOptions->bStdoutOutput,
-                                       "Layer Coordinate Reference System:\n");
-
-                            Concat(osRet, psOptions->bStdoutOutput,
-                                   "  - name: %s\n", poSRS->GetName());
-
-                            Concat(osRet, psOptions->bStdoutOutput,
-                                   "  - ID: %s\n", osCRSId.c_str());
-
-                            const char *pszHorizType =
-                                poSRS->IsGeographic()
-                                    ? (poSRS->IsCompound() ? "Geographic"
-                                       : poSRS->GetAxesCount() == 3
-                                           ? "Geographic 3D"
-                                           : "Geographic 2D")
-                                : poSRS->IsProjected() ? "Projected"
-                                                       : "Other";
-                            Concat(osRet, psOptions->bStdoutOutput,
-                                   "  - type: %s\n",
-                                   poSRS->IsCompound()
-                                       ? std::string("Compound of ")
-                                             .append(pszHorizType)
-                                             .c_str()
-                                       : pszHorizType);
-                            if (poSRS->IsProjected())
-                            {
-                                // Create a copy since we want to force the internal
-                                // WKT tree model to be WKT2 as we are going to
-                                // request CONVERSION
-                                OGRSpatialReference oSRS(*poSRS);
-                                const char *pszConversion =
-                                    oSRS.GetAttrValue("CONVERSION");
-                                const std::string osConversion =
-                                    pszConversion ? pszConversion : "";
-                                const char *pszMethod =
-                                    oSRS.GetAttrValue("CONVERSION|METHOD");
-                                const std::string osMethod =
-                                    pszMethod ? pszMethod : "";
-                                if (!osConversion.empty() && !osMethod.empty())
-                                {
-                                    if (osConversion == osMethod)
-                                    {
-                                        Concat(osRet, psOptions->bStdoutOutput,
-                                               "  - projection type: %s\n",
-                                               osConversion.c_str());
-                                    }
-                                    else
-                                    {
-                                        Concat(osRet, psOptions->bStdoutOutput,
-                                               "  - projection type: %s, %s\n",
-                                               osConversion.c_str(),
-                                               osMethod.c_str());
-                                    }
-                                }
-                                const char *pszLinearUnits = nullptr;
-                                poSRS->GetLinearUnits(&pszLinearUnits);
-                                if (pszLinearUnits)
-                                {
-                                    Concat(osRet, psOptions->bStdoutOutput,
-                                           "  - units: "
-                                           "%s\n",
-                                           pszLinearUnits);
-                                }
-                            }
-                            double dfWest = 0;
-                            double dfSouth = 0;
-                            double dfEast = 0;
-                            double dfNorth = 0;
-                            const char *pszAreaName = nullptr;
-                            if (poSRS->GetAreaOfUse(&dfWest, &dfSouth, &dfEast,
-                                                    &dfNorth, &pszAreaName))
-                            {
-                                if (pszAreaName && pszAreaName[0])
-                                {
-                                    std::string osAreaOfUse(pszAreaName);
-                                    if (osAreaOfUse.back() == '.')
-                                        osAreaOfUse.pop_back();
-                                    if (osAreaOfUse.size() > 40)
-                                    {
-                                        auto nPos = osAreaOfUse.find(" - ");
-                                        if (nPos == std::string::npos)
-                                            nPos = osAreaOfUse.find(", ");
-                                        if (nPos == std::string::npos)
-                                            nPos = osAreaOfUse.find(' ');
-                                        if (nPos == std::string::npos)
-                                            nPos = 40;
-                                        osAreaOfUse.resize(nPos);
-                                        osAreaOfUse += "...";
-                                    }
-                                    Concat(osRet, psOptions->bStdoutOutput,
-                                           "  - area "
-                                           "of use: %s, west %.2f, south %.2f, "
-                                           "east %.2f, north %.2f\n",
-                                           osAreaOfUse.c_str(), dfWest, dfSouth,
-                                           dfEast, dfNorth);
-                                }
-                                else
-                                {
-                                    Concat(osRet, psOptions->bStdoutOutput,
-                                           "  - area "
-                                           "of use: west %.2f, south %.2f, "
-                                           "east %.2f, north %.2f\n",
-                                           dfWest, dfSouth, dfEast, dfNorth);
-                                }
-                            }
-                        }
-                    }
+                    osIntroText =
+                        std::string("Coordinate Reference System of field ")
+                            .append(poGFldDefn->GetNameRef());
                 }
-                if (!bCRSAlreadyEmitted)
+                else
                 {
-                    if (psOptions->osCRSFormat == "PROJJSON")
-                    {
-                        char *pszProjJson = nullptr;
-                        CPL_IGNORE_RET_VAL(
-                            poSRS->exportToPROJJSON(&pszProjJson, nullptr));
-
-                        if (poGFldDefn)
-                            Concat(osRet, psOptions->bStdoutOutput,
-                                   "Coordinate Reference System PROJJSON for "
-                                   "field %s:\n",
-                                   poGFldDefn->GetNameRef());
-                        else
-                            Concat(osRet, psOptions->bStdoutOutput,
-                                   "Layer Coordinate Reference System "
-                                   "PROJJSON:\n");
-
-                        if (pszProjJson)
-                        {
-                            Concat(osRet, psOptions->bStdoutOutput, "%s\n",
-                                   pszProjJson);
-                        }
-                        else
-                        {
-                            Concat(osRet, psOptions->bStdoutOutput,
-                                   "ERROR while exporting it to PROJJSON!\n");
-                        }
-                        CPLFree(pszProjJson);
-                    }
-                    else
-                    {
-
-                        if (poGFldDefn)
-                            Concat(osRet, psOptions->bStdoutOutput,
-                                   "Coordinate Reference System WKT for field "
-                                   "%s:\n",
-                                   poGFldDefn->GetNameRef());
-                        else
-                            Concat(osRet, psOptions->bStdoutOutput,
-                                   "Layer Coordinate Reference System WKT:\n");
-
-                        Concat(osRet, psOptions->bStdoutOutput, "%s\n",
-                               osWkt.c_str());
-                    }
+                    osIntroText = "Layer Coordinate Reference System";
                 }
+
+                EmitTextDisplayOfCRS(poSRS, psOptions->osCRSFormat, osIntroText,
+                                     [&osRet, psOptions](const std::string &s)
+                                     {
+                                         Concat(osRet, psOptions->bStdoutOutput,
+                                                "%s", s.c_str());
+                                     });
             }
             else
             {
