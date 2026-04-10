@@ -65,9 +65,15 @@ OGRShapeLayer::OGRShapeLayer(OGRShapeDataSource *poDSIn,
         m_nTotalShapeCount = m_hSHP->nRecords;
         if (m_hDBF != nullptr && m_hDBF->nRecords != m_nTotalShapeCount)
         {
-            CPLDebug("Shape",
-                     "Inconsistent record number in .shp (%d) and in .dbf (%d)",
-                     m_hSHP->nRecords, m_hDBF->nRecords);
+            CPLError(
+                CE_Warning, CPLE_AppDefined,
+                "Inconsistent record number in .shx (%d) and in .dbf (%d). "
+                "Using (arbitrarily) the former.\n"
+                "This dataset is likely corrupted. You may try to re-open "
+                "this dataset with the SHAPE_RESTORE_SHX configuration "
+                "option set to YES to attempt repairing it, but first "
+                "back up the original .shp, .shx and .dbf files.",
+                m_hSHP->nRecords, m_hDBF->nRecords);
         }
     }
     else if (m_hDBF != nullptr)
