@@ -17,6 +17,7 @@
 #include "gdal_priv.h"
 #include "rawdataset.h"
 #include "ogr_srs_api.h"
+#include "cpl_vsi_virtual.h"
 
 #include <algorithm>
 #include <cinttypes>
@@ -122,6 +123,7 @@ static CeosTypeCode_t QuadToTC(int a, int b, int c, int d)
 #define LEADER_ATTITUDE_PALSAR_TC QuadToTC(18, 40, 18, 20)
 #define LEADER_RADIOMETRIC_PALSAR_TC QuadToTC(18, 50, 18, 20)
 #define LEADER_FACILITY_RELATED_PALSAR_TC QuadToTC(18, 200, 18, 70)
+#define IMAGE_PROCESSED_DATA_RECORD_PALSAR_TC QuadToTC(50, 11, 18, 20)
 
 /************************************************************************/
 /* ==================================================================== */
@@ -1520,6 +1522,96 @@ void SAR_CEOSDataset::ScanForMetadata()
             SetMetadataItem("CEOS_FACILITY_5_ORIGIN_LON", osField.c_str());
         }
     }
+
+    /* -------------------------------------------------------------------- */
+    /*      PALSAR Level 1.5/Level 3.1 processed record metadata            */
+    /* -------------------------------------------------------------------- */
+    record = FindCeosRecord(sVolume.RecordList,
+                            IMAGE_PROCESSED_DATA_RECORD_PALSAR_TC,
+                            CEOS_IMAGRY_OPT_FILE, -1, 2);
+    constexpr int NEEDED_SIZE_IN_PROCESSED_DATA_RECORD_PALSAR = 128;
+    if (record && record->Length >= NEEDED_SIZE_IN_PROCESSED_DATA_RECORD_PALSAR)
+    {
+        const auto ReadProcessedDataRecord =
+            [this](const CeosRecord_t *curRecord,
+                   const char *pszMDNameSuffix = "")
+        {
+            int32_t nInt32 = 0;
+
+            GetCeosField(curRecord, 65, "B4", &nInt32);
+            SetMetadataItem(CPLSPrintf("CEOS_SLANT_RANGE_FIRST_PIXEL%s_METERS",
+                                       pszMDNameSuffix),
+                            CPLSPrintf("%d", nInt32));
+
+            GetCeosField(curRecord, 69, "B4", &nInt32);
+            SetMetadataItem(CPLSPrintf("CEOS_SLANT_RANGE_MID_PIXEL%s_METERS",
+                                       pszMDNameSuffix),
+                            CPLSPrintf("%d", nInt32));
+
+            GetCeosField(curRecord, 73, "B4", &nInt32);
+            SetMetadataItem(CPLSPrintf("CEOS_SLANT_RANGE_LAST_PIXEL%s_METERS",
+                                       pszMDNameSuffix),
+                            CPLSPrintf("%d", nInt32));
+
+            GetCeosField(curRecord, 77, "B4", &nInt32);
+            SetMetadataItem(CPLSPrintf("CEOS_DOPPLER_CENTROID_FIRST_PIXEL%s_HZ",
+                                       pszMDNameSuffix),
+                            CPLSPrintf("%.3f", nInt32 / 1000.0));
+
+            GetCeosField(curRecord, 81, "B4", &nInt32);
+            SetMetadataItem(CPLSPrintf("CEOS_DOPPLER_CENTROID_MID_PIXEL%s_HZ",
+                                       pszMDNameSuffix),
+                            CPLSPrintf("%.3f", nInt32 / 1000.0));
+
+            GetCeosField(curRecord, 85, "B4", &nInt32);
+            SetMetadataItem(CPLSPrintf("CEOS_DOPPLER_CENTROID_LAST_PIXEL%s_HZ",
+                                       pszMDNameSuffix),
+                            CPLSPrintf("%.3f", nInt32 / 1000.0));
+
+            GetCeosField(curRecord, 89, "B4", &nInt32);
+            SetMetadataItem(
+                CPLSPrintf("CEOS_AZIMUTH_FM_RATE_FIRST_PIXEL%s_HZ_PER_MS",
+                           pszMDNameSuffix),
+                CPLSPrintf("%d", nInt32));
+
+            GetCeosField(curRecord, 93, "B4", &nInt32);
+            SetMetadataItem(
+                CPLSPrintf("CEOS_AZIMUTH_FM_RATE_MID_PIXEL%s_HZ_PER_MS",
+                           pszMDNameSuffix),
+                CPLSPrintf("%d", nInt32));
+
+            GetCeosField(curRecord, 97, "B4", &nInt32);
+            SetMetadataItem(
+                CPLSPrintf("CEOS_AZIMUTH_FM_RATE_LAST_PIXEL%s_HZ_PER_MS",
+                           pszMDNameSuffix),
+                CPLSPrintf("%d", nInt32));
+        };
+
+        ReadProcessedDataRecord(record);
+
+        // The above values are per-record. In practice they seem to be constant
+        // among all records, but I could not find any statement on that, so
+        // also read and report them from the last record.
+        // We cannot use FindCeosRecord() to fetch it because ProcessData() limits
+        // to 4 records for the image file (for memory and performance reasons)
+        struct CeosSARImageDesc *ImageDesc = &(sVolume.ImageDesc);
+        const vsi_l_offset nOffsetToLastRecordStart =
+            ImageDesc->FileDescriptorLength +
+            static_cast<vsi_l_offset>(ImageDesc->BytesPerRecord) *
+                (nRasterYSize - 1);
+        CeosRecord_t lastRecord;
+        memset(&lastRecord, 0, sizeof(lastRecord));
+        std::vector<GByte> abyLeader(
+            NEEDED_SIZE_IN_PROCESSED_DATA_RECORD_PALSAR);
+        if (fpImage->Seek(nOffsetToLastRecordStart, SEEK_SET) == 0 &&
+            fpImage->Read(abyLeader.data(), abyLeader.size()) ==
+                abyLeader.size())
+        {
+            lastRecord.Buffer = abyLeader.data();
+            lastRecord.Length = static_cast<int>(abyLeader.size());
+            ReadProcessedDataRecord(&lastRecord, "_LAST_LINE");
+        }
+    }
 }
 
 /************************************************************************/
@@ -1828,8 +1920,8 @@ GDALDataset *SAR_CEOSDataset::Open(GDALOpenInfo *poOpenInfo)
     /* -------------------------------------------------------------------- */
 
     psVolume->ImagryOptionsFile = TRUE;
-    if (ProcessData(poDS->fpImage, CEOS_IMAGRY_OPT_FILE, psVolume, 4,
-                    VSI_L_OFFSET_MAX, false) != CE_None)
+    if (ProcessData(poDS->fpImage, CEOS_IMAGRY_OPT_FILE, psVolume,
+                    /* max_records = */ 4, VSI_L_OFFSET_MAX, false) != CE_None)
     {
         return nullptr;
     }
