@@ -5019,3 +5019,16 @@ def test_ogr_parquet_create_metadata_file_alg_incompatible_schemas(tmp_vsimem):
             input=[tmp_vsimem / "one.parquet", tmp_vsimem / "two.parquet"],
             output=tmp_vsimem / "_metadata",
         )
+
+
+###############################################################################
+# See https://github.com/OSGeo/gdal/issues/14320
+
+
+def test_ogr_parquet_read_geoparquet_1_1_no_explicit_crs_but_geoarrow_wkb_declared():
+
+    ds = ogr.Open(
+        "data/parquet/geoparquet_1_1_no_explicit_crs_but_geoarrow_wkb_declared.parquet"
+    )
+    lyr = ds.GetLayer(0)
+    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4326"
