@@ -284,3 +284,15 @@ def test_gdalalg_raster_info_crs():
     ) as alg:
         output_string = alg.Output()
         assert 'Coordinate Reference System PROJJSON:\n{\n  "$schema":' in output_string
+
+    src_ds = gdal.GetDriverByName("MEM").Create("", 1, 1)
+    srs.SetFromUserInput("EPSG:3857")
+    src_ds.SetSpatialRef(srs)
+    with gdal.alg.raster.info(input=src_ds, output_format="text") as alg:
+        output_string = alg.Output()
+        # Check we don't repeat twice the conversion and projection method name,
+        # that only differ by a hyphen.
+        assert (
+            "projection type: Popular Visualisation Pseudo Mercator\n"
+            in output_string.replace("-", " ")
+        )
