@@ -88,7 +88,7 @@ Program-Specific Options
 
 .. option:: -d, --dst-crs <SRC-CRS>
 
-    Set source spatial reference. If not specified the SRS found in the input
+    Set destination spatial reference. If not specified the SRS found in the input
     dataset will be used.
 
     .. include:: options/srs_def_gdalwarp.rst
