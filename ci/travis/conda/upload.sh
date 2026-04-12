@@ -48,7 +48,7 @@ for f in $files; do
 
   for ef in $existing_files; do
     echo "Removing $ef"
-    anaconda -t "$ANACONDA_TOKEN" remove --force "$ef" || true
+    anaconda -t "$ANACONDA_TOKEN" remove --force "$ef"
   done
 done
 
