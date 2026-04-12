@@ -25,7 +25,7 @@ if [ -z "$files" ]; then
 fi
 
 echo "Anaconda token is available, attempting to upload"
-conda install -c conda-forge python=3.12 anaconda-client jq curl -y
+conda install -c conda-forge -c defaults python=3.12 anaconda-client jq curl -y --strict-channel-priority
 
 # remove any existing packages for the same version
 for f in $files; do
