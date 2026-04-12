@@ -484,7 +484,13 @@ void EmitTextDisplayOfCRS(
                     const std::string osMethod = pszMethod ? pszMethod : "";
                     if (!osConversion.empty() && !osMethod.empty())
                     {
-                        if (osConversion == osMethod)
+                        // A bit of name laundering done to deal with EPSG:3857 where
+                        // osConversion = "Popular Visualisation Pseudo-Mercator"
+                        // osMethod = "Popular Visualisation Pseudo Mercator"
+                        // A bit unfortunate to have to do that workaround, but as it
+                        // is apparently ... popular ... let's do it.
+                        if (CPLString(osConversion).replaceAll('-', ' ') ==
+                            CPLString(osMethod).replaceAll('-', ' '))
                         {
                             printFunction(
                                 CPLSPrintf("  - projection type: %s\n",
