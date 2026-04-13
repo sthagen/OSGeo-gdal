@@ -49,8 +49,9 @@ Vector How do I...
 ... buffer geometries using an attribute?
    :example:`gdal-pipeline-buffer-line`.
 
-... list all layers in a GeoPackage with their geometry fields and types?
-    :example:`gdal-vector-info-geom-name`
+... list all layers in a dataset?
+    - :example:`gdal-vector-info-list-layers`
+    - :example:`gdal-vector-info-geom-name`
 
 Raster and Vector How do I...
 -----------------------------

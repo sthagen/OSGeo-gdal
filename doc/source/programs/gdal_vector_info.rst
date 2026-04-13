@@ -144,8 +144,16 @@ Examples
       :cwd: ../../data
 
 .. example::
+   :id: gdal-vector-info-list-layers
+   :title: List all layers in a dataset using ``jq``
+
+   .. code-block:: bash
+
+       gdal vector info av_2056.gpkg --format json | jq ".layers[].name"
+
+.. example::
    :id: gdal-vector-info-geom-name
-   :title: List all datasets and their geometry fields using ``jq``
+   :title: List all layers and their geometry fields using ``jq``
 
    .. tabs::
 
