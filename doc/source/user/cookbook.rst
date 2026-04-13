@@ -28,14 +28,12 @@ Raster How do I...
    :example:`gdal-raster-resize-cubic`.
 
 ... create a Cloud Optimized GeoTIFF (COG)?
-
-- :example:`gdal-raster-convert-cog`
-- :example:`raster.cog-gdalwarp`
+    - :example:`gdal-raster-convert-cog`
+    - :example:`raster.cog-gdalwarp`
 
 ... check if a GeoTIFF is a Cloud Optimized GeoTIFF (COG)?
-
-- :example:`gdal-dataset-identify-cog`
-- :example:`gdal-raster-info-cog`
+    - :example:`gdal-dataset-identify-cog`
+    - :example:`gdal-raster-info-cog`
 
 Vector How do I...
 ------------------
