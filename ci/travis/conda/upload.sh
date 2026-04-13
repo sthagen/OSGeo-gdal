@@ -44,7 +44,7 @@ for f in $files; do
     | select(.version == $version)
     | select(.attrs.subdir == $subdir)
     | .full_name
-  ')
+    ' | tr -d '\r')
 
   for ef in $existing_files; do
     echo "Removing $ef"
