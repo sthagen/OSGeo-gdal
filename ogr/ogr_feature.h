@@ -951,7 +951,6 @@ class CPL_DLL OGRFeatureDefn
     CPL_DISALLOW_COPY_ASSIGN(OGRFeatureDefn)
 };
 
-#ifdef GDAL_COMPILATION
 /*! @cond Doxygen_Suppress */
 
 #include "ogr_refcountedptr.h"
@@ -994,7 +993,6 @@ struct OGRRefCountedPtr<OGRFeatureDefn>
 using OGRFeatureDefnRefCountedPtr = OGRRefCountedPtr<OGRFeatureDefn>;
 
 /*! @endcond */
-#endif
 
 #ifdef GDAL_COMPILATION
 /** Return an object that temporary unseals the OGRFeatureDefn
