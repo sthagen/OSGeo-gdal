@@ -238,17 +238,31 @@ bool GDALVectorClipAlgorithm::RunStep(GDALPipelineStepRunContext &)
             if (m_activeLayer.empty() ||
                 m_activeLayer == poSrcLayer->GetDescription())
             {
+                const OGRSpatialReference *clipSRS =
+                    poClipGeom->getSpatialReference();
+                const OGRSpatialReference *layerSRS =
+                    poSrcLayer->GetSpatialRef();
+
                 auto poClipGeomForLayer =
                     std::unique_ptr<OGRGeometry>(poClipGeom->clone());
-                if (poClipGeomForLayer->getSpatialReference() &&
-                    poSrcLayer->GetSpatialRef())
+                if (clipSRS && layerSRS && !clipSRS->IsSame(layerSRS))
                 {
                     ret = poClipGeomForLayer->transformTo(
                               poSrcLayer->GetSpatialRef()) == OGRERR_NONE;
+                    if (ret && !poClipGeomForLayer->IsValid())
+                    {
+                        ReportError(
+                            CE_Failure, CPLE_AppDefined,
+                            "Clipping geometry became invalid upon "
+                            "transformation to the layer SRS. You can "
+                            "try transforming the geometry and repairing it "
+                            "separately with 'gdal vector reproject' "
+                            "and 'gdal vector make-valid'.");
+                        ret = false;
+                    }
                 }
                 if (ret)
                 {
-
                     outDS->AddLayer(
                         *poSrcLayer,
                         std::make_unique<GDALVectorClipAlgorithmLayer>(

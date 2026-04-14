@@ -449,6 +449,23 @@ def test_gdalalg_vector_clip_geom_invalid():
         clip.Run()
 
 
+def test_gdalalg_vector_clip_geom_invalid_after_transform():
+
+    srs = osr.SpatialReference("+proj=gnom +lat_0=90 +lon_0=-50 +R=6.4e6")
+
+    ds = gdal.GetDriverByName("MEM").CreateVector("")
+    ds.CreateLayer("features", srs=srs)
+
+    clip = get_clip_alg()
+    clip["input"] = ds
+    clip["geometry"] = "POLYGON ((-20 1, 0 1, 0 2, -10 1.0000001, -20 2, -20 1))"
+    clip["geometry-crs"] = "EPSG:4326"
+    clip["output-format"] = "MEM"
+
+    with pytest.raises(Exception, match="geometry became invalid"):
+        clip.Run()
+
+
 def test_gdalalg_vector_clip_intersection_incompatible_geometry_type():
 
     src_ds = gdal.GetDriverByName("MEM").Create("", 0, 0, 0, gdal.GDT_Unknown)
