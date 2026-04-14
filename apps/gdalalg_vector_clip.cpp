@@ -208,6 +208,13 @@ bool GDALVectorClipAlgorithm::RunStep(GDALPipelineStepRunContext &)
         ReportError(CE_Failure, CPLE_AppDefined, "%s", errMsg.c_str());
         return false;
     }
+    if (!poClipGeom->IsValid())
+    {
+        ReportError(CE_Failure, CPLE_AppDefined,
+                    "Clipping geometry is invalid. You can attempt to correct "
+                    "it with 'gdal vector make-valid'.");
+        return false;
+    }
 
     auto poLikeDS = m_likeDataset.GetDatasetRef();
     if (bSrcLayerHasSRS && !poClipGeom->getSpatialReference() && poLikeDS &&
@@ -241,6 +248,7 @@ bool GDALVectorClipAlgorithm::RunStep(GDALPipelineStepRunContext &)
                 }
                 if (ret)
                 {
+
                     outDS->AddLayer(
                         *poSrcLayer,
                         std::make_unique<GDALVectorClipAlgorithmLayer>(

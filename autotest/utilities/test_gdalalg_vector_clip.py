@@ -436,6 +436,19 @@ def test_gdalalg_vector_clip_geom_not_rectangle():
     assert out_lyr.GetNextFeature() is None
 
 
+def test_gdalalg_vector_clip_geom_invalid():
+
+    clip = get_clip_alg()
+    clip["input"] = "../ogr/data/poly.shp"
+    clip["geometry"] = (
+        "POLYGON ((478919 4763746, 480410 4763753, 478974 4764785, 479934 4764846, 478919 4763746))"
+    )
+    clip["output-format"] = "MEM"
+
+    with pytest.raises(Exception, match="geometry is invalid"):
+        clip.Run()
+
+
 def test_gdalalg_vector_clip_intersection_incompatible_geometry_type():
 
     src_ds = gdal.GetDriverByName("MEM").Create("", 0, 0, 0, gdal.GDT_Unknown)
