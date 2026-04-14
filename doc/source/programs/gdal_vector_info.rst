@@ -21,7 +21,8 @@ Description
 -----------
 
 :program:`gdal vector info` lists various information about a GDAL supported
-vector dataset.
+vector dataset, and returns them on the standard output stream when used from the
+command line, or in the ``output`` parameter when used from the API.
 
 Starting with GDAL 3.12, :program:`gdal vector info` can be used as the last
 step of a pipeline.
