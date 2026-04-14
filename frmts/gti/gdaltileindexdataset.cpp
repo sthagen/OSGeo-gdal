@@ -348,7 +348,8 @@ class GDALTileIndexDataset final : public GDALPamDataset
         m_aoOverviewDescriptor{};
 
     //! Array of overview datasets.
-    std::vector<std::unique_ptr<GDALDataset>> m_apoOverviews{};
+    std::vector<std::unique_ptr<GDALDataset, GDALDatasetUniquePtrReleaser>>
+        m_apoOverviews{};
 
     //! Cache of buffers used by VRTComplexSource to avoid memory reallocation.
     VRTSource::WorkingState m_oWorkingState{};
@@ -764,6 +765,35 @@ bool GDALTileIndexDataset::Open(GDALOpenInfo *poOpenInfo)
              strstr(reinterpret_cast<const char *>(poOpenInfo->pabyHeader),
                     "<GDALTileIndexDataset"))
     {
+        if (CPLTestBool(CPLGetConfigOption("GDAL_XML_VALIDATION", "YES")))
+        {
+            const char *pszXSD = CPLFindFile("gdal", "gdaltileindex.xsd");
+            if (pszXSD != nullptr)
+            {
+                CPLErrorAccumulator oAccumulator;
+                int bRet;
+                {
+                    auto oContext = oAccumulator.InstallForCurrentScope();
+                    CPL_IGNORE_RET_VAL(oContext);
+                    bRet = CPLValidateXML(poOpenInfo->pszFilename, pszXSD,
+                                          nullptr);
+                }
+                if (!bRet)
+                {
+                    const auto &aoErrors = oAccumulator.GetErrors();
+                    if (!aoErrors.empty() &&
+                        aoErrors[0].msg.find("missing libxml2 support") ==
+                            std::string::npos)
+                    {
+                        for (size_t i = 0; i < aoErrors.size(); i++)
+                        {
+                            CPLError(CE_Warning, CPLE_AppDefined, "%s",
+                                     aoErrors[i].msg.c_str());
+                        }
+                    }
+                }
+            }
+        }
         // CPLParseXMLFile() emits an error in case of failure
         m_psXMLTree.reset(CPLParseXMLFile(poOpenInfo->pszFilename));
         if (m_psXMLTree == nullptr)
@@ -855,7 +885,8 @@ bool GDALTileIndexDataset::Open(GDALOpenInfo *poOpenInfo)
             CSLFetchNameValue(poOpenInfo->papszOpenOptions, "FACTOR"))
     {
         dfOvrFactor = CPLAtof(pszFactor);
-        if (!(dfOvrFactor > 1.0))
+        // Written that way to catch NaN
+        if (!(dfOvrFactor >= 1.0))
         {
             CPLError(CE_Failure, CPLE_AppDefined, "Wrong overview factor");
             return false;
@@ -2416,6 +2447,20 @@ bool GDALTileIndexDataset::Open(GDALOpenInfo *poOpenInfo)
     {
         if (psRoot)
         {
+            // Return the number of child elements of psNode whose name is pszElt
+            const auto CountChildElements =
+                [](const CPLXMLNode *psNode, const char *pszElt)
+            {
+                int nCount = 0;
+                for (const CPLXMLNode *psIter = psNode->psChild; psIter;
+                     psIter = psIter->psNext)
+                {
+                    if (strcmp(psIter->pszValue, pszElt) == 0)
+                        ++nCount;
+                }
+                return nCount;
+            };
+
             for (const CPLXMLNode *psIter = psRoot->psChild; psIter;
                  psIter = psIter->psNext)
             {
@@ -2438,6 +2483,17 @@ bool GDALTileIndexDataset::Open(GDALOpenInfo *poOpenInfo)
                             GTI_XML_OVERVIEW_FACTOR, GTI_XML_OVERVIEW_ELEMENT);
                         return false;
                     }
+
+                    if (CountChildElements(psIter, GTI_XML_OVERVIEW_FACTOR) > 1)
+                    {
+                        CPLError(CE_Failure, CPLE_AppDefined,
+                                 "At most one of %s element "
+                                 "is allowed per %s child.",
+                                 GTI_XML_OVERVIEW_FACTOR,
+                                 GTI_XML_OVERVIEW_ELEMENT);
+                        return false;
+                    }
+
                     m_aoOverviewDescriptor.emplace_back(
                         std::string(pszDataset ? pszDataset : ""),
                         CPLStringList(
@@ -2950,11 +3006,61 @@ void GDALTileIndexDataset::LoadOverviews()
                 }
             }
 
-            std::unique_ptr<GDALDataset> poOvrDS(GDALDataset::Open(
-                !osResolvedDSName.empty() ? osResolvedDSName.c_str()
-                                          : GetDescription(),
-                GDAL_OF_RASTER | GDAL_OF_VERBOSE_ERROR, nullptr,
-                aosNewOpenOptions.List(), nullptr));
+            std::unique_ptr<GDALDataset, GDALDatasetUniquePtrReleaser> poOvrDS(
+                GDALDataset::Open(!osResolvedDSName.empty()
+                                      ? osResolvedDSName.c_str()
+                                      : GetDescription(),
+                                  GDAL_OF_RASTER | GDAL_OF_VERBOSE_ERROR,
+                                  nullptr, aosNewOpenOptions.List(), nullptr));
+
+            // Make it possible to use the Factor option on a GeoTIFF for
+            // example and translate it to an overview level.
+            if (poOvrDS && dfFactor > 1 &&
+                poOvrDS->GetRasterCount() == GetRasterCount() &&
+                aosOpenOptions.FetchNameValue("OVERVIEW_LEVEL") == nullptr)
+            {
+                auto poBand = poOvrDS->GetRasterBand(1);
+                for (int iOvr = 0; iOvr < poBand->GetOverviewCount(); ++iOvr)
+                {
+                    auto poOvrBand = poBand->GetOverview(iOvr);
+                    if (dfFactor * poOvrBand->GetXSize() <=
+                            poOvrDS->GetRasterXSize() ||
+                        dfFactor * poOvrBand->GetYSize() <=
+                            poOvrDS->GetRasterYSize())
+                    {
+                        GDALDataset *poNewOvrDS = GDALCreateOverviewDataset(
+                            poOvrDS.get(), iOvr, /*bThisLevelOnly = */ true);
+                        if (!poNewOvrDS)
+                            continue;
+
+                        const auto RelativeDifferenceBelowThreshold =
+                            [](double a, double b, double dfRelativeThreshold)
+                        {
+                            return std::fabs(a - b) <=
+                                   std::fabs(a) * dfRelativeThreshold;
+                        };
+                        constexpr double RELATIVE_THRESHOLD = 0.01;
+                        if (RelativeDifferenceBelowThreshold(
+                                dfFactor * poOvrBand->GetXSize(),
+                                poOvrDS->GetRasterXSize(),
+                                RELATIVE_THRESHOLD) &&
+                            RelativeDifferenceBelowThreshold(
+                                dfFactor * poOvrBand->GetYSize(),
+                                poOvrDS->GetRasterYSize(), RELATIVE_THRESHOLD))
+                        {
+                            CPLDebug("GTI",
+                                     "Using overview of size %dx%d as best "
+                                     "approximation for requested overview of "
+                                     "factor %f of %s",
+                                     poOvrBand->GetXSize(),
+                                     poOvrBand->GetYSize(), dfFactor,
+                                     osResolvedDSName.c_str());
+                        }
+
+                        poOvrDS.reset(poNewOvrDS);
+                    }
+                }
+            }
 
             const auto IsSmaller =
                 [](const GDALDataset *a, const GDALDataset *b)
@@ -2972,11 +3078,17 @@ void GDALTileIndexDataset::LoadOverviews()
             {
                 if (poOvrDS->GetRasterCount() == GetRasterCount())
                 {
+                    CPLDebug(
+                        "GTI", "Using overview of size %dx%d from %s",
+                        poOvrDS->GetRasterXSize(), poOvrDS->GetRasterYSize(),
+                        osResolvedDSName.empty() ? GetDescription()
+                                                 : osResolvedDSName.c_str());
                     m_apoOverviews.emplace_back(std::move(poOvrDS));
                     // Add the overviews of the overview, unless the OVERVIEW_LEVEL
-                    // option option is specified
+                    // option option or FACTOR is specified
                     if (aosOpenOptions.FetchNameValue("OVERVIEW_LEVEL") ==
-                        nullptr)
+                            nullptr &&
+                        dfFactor == 0)
                     {
                         const int nOverviewCount = m_apoOverviews.back()
                                                        ->GetRasterBand(1)
@@ -2985,8 +3097,9 @@ void GDALTileIndexDataset::LoadOverviews()
                         {
                             aosNewOpenOptions.SetNameValue("OVERVIEW_LEVEL",
                                                            CPLSPrintf("%d", i));
-                            std::unique_ptr<GDALDataset> poOvrOfOvrDS(
-                                GDALDataset::Open(
+                            std::unique_ptr<GDALDataset,
+                                            GDALDatasetUniquePtrReleaser>
+                                poOvrOfOvrDS(GDALDataset::Open(
                                     !osResolvedDSName.empty()
                                         ? osResolvedDSName.c_str()
                                         : GetDescription(),
@@ -2999,6 +3112,14 @@ void GDALTileIndexDataset::LoadOverviews()
                                 IsSmaller(poOvrOfOvrDS.get(),
                                           m_apoOverviews.back().get()))
                             {
+                                CPLDebug("GTI",
+                                         "Using automatically overview of size "
+                                         "%dx%d from %s",
+                                         poOvrOfOvrDS->GetRasterXSize(),
+                                         poOvrOfOvrDS->GetRasterYSize(),
+                                         osResolvedDSName.empty()
+                                             ? GetDescription()
+                                             : osResolvedDSName.c_str());
                                 m_apoOverviews.emplace_back(
                                     std::move(poOvrOfOvrDS));
                             }
@@ -3011,6 +3132,15 @@ void GDALTileIndexDataset::LoadOverviews()
                              "%s has not the same number of bands as %s",
                              poOvrDS->GetDescription(), GetDescription());
                 }
+            }
+            else if (poOvrDS)
+            {
+                CPLDebug("GTI",
+                         "Skipping overview of size %dx%d from %s as it is "
+                         "larger than a previously added overview",
+                         poOvrDS->GetRasterXSize(), poOvrDS->GetRasterYSize(),
+                         osResolvedDSName.empty() ? GetDescription()
+                                                  : osResolvedDSName.c_str());
             }
         }
     }
