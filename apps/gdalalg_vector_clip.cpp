@@ -249,6 +249,15 @@ bool GDALVectorClipAlgorithm::RunStep(GDALPipelineStepRunContext &)
                 {
                     ret = poClipGeomForLayer->transformTo(
                               poSrcLayer->GetSpatialRef()) == OGRERR_NONE;
+
+                    if (!ret)
+                    {
+                        ReportError(CE_Failure, CPLE_AppDefined,
+                                    "Could not transform clipping geometry to "
+                                    "layer SRS.");
+                        ret = false;
+                    }
+
                     if (ret && !poClipGeomForLayer->IsValid())
                     {
                         ReportError(
