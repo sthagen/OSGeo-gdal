@@ -166,12 +166,12 @@ namespace testapp
                     ?? throw new Exception("Failed to get layer from shape file by name.");
 
                 int featureIndex = 0;
-                while (true) using (Feature namFeat = shpLyr.GetNextFeature())
+                while (true) using (Feature feat = shpLyr.GetNextFeature())
                 {
-                    if (namFeat == null)
+                    if (feat == null)
                         break;
 
-                    string fieldValue = namFeat.GetFieldAsString("图层");
+                    string fieldValue = feat.GetFieldAsString("图层");
                     AssertEqual(nameFieldValues[featureIndex++], fieldValue, $"{nameof(Layer)}.{nameof(shpSrc.GetName)}");
                 }
             }
