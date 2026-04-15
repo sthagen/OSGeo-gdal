@@ -549,6 +549,13 @@ GDALDataset *CPHDDataset::OpenMultiDim(GDALOpenInfo *poOpenInfo)
 
         poShared->m_fp->Seek(poShared->nXmlBlockByteOffset, SEEK_SET);
         CPLString osBuffer;
+        if (poShared->nXmlBlockSize > std::numeric_limits<int>::max())
+        {
+            CPLError(CE_Failure, CPLE_AppDefined,
+                     "XML block size is too large for file %s",
+                     poOpenInfo->pszFilename);
+            return nullptr;
+        }
         try
         {
             if (poShared->nXmlBlockSize > 100 * 1024 * 1024)
@@ -985,6 +992,19 @@ std::shared_ptr<GDALMDArray> CPHDGroup::OpenMDArray(const std::string &osName,
                                  "incorrect.",
                                  m_poShared->m_osFilename.c_str());
                         return nullptr;
+                    }
+
+                    if constexpr (sizeof(size_t) <
+                                  sizeof(m_poShared->nPVPBlockSize))
+                    {
+                        if (m_poShared->nPVPBlockSize >
+                            std::numeric_limits<int>::max())
+                        {
+                            CPLError(CE_Failure, CPLE_AppDefined,
+                                     "PVP block size is too large for file %s",
+                                     m_poShared->m_osFilename.c_str());
+                            return nullptr;
+                        }
                     }
 
                     try

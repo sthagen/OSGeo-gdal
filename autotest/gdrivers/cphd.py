@@ -183,6 +183,9 @@ def test_cphd_multidim_basic(file):
         if not filename.exists():
             filename = "/vsis3/" + bucket + "/" + obj
 
+            if gdal.VSIStatL(filename) is None:
+                pytest.skip(f"{filename} no longer existing or reachable")
+
         with gdal.OpenEx(filename, gdal.OF_MULTIDIM_RASTER) as ds:
             rg = ds.GetRootGroup()
             if bucket == "umbra-open-data-catalog":

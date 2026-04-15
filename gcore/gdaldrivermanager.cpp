@@ -550,6 +550,7 @@ int GDALDriverManager::RegisterDriver(GDALDriver *poDriver, bool bHidden)
     // calling RegisterDriver()).
     if (poDriver->GetMetadataItem(GDAL_DCAP_RASTER) == nullptr &&
         poDriver->GetMetadataItem(GDAL_DCAP_VECTOR) == nullptr &&
+        poDriver->GetMetadataItem(GDAL_DCAP_MULTIDIM_RASTER) == nullptr &&
         poDriver->GetMetadataItem(GDAL_DCAP_GNM) == nullptr)
     {
         CPLDebug("GDAL", "Assuming DCAP_RASTER for driver %s. Please fix it.",
