@@ -17,6 +17,7 @@
 
 #if defined(SWIGCSHARP)
 %module GdalConst
+%include csharp_strings.i
 #else
 %module gdalconst
 #endif
@@ -291,6 +292,12 @@
 // without the prefix.
 // TODO GDAL 4.0: clean this up!
 
+#if defined(SWIGCSHARP)
+%csconst(1);
+#elif defined(SWIGJAVA)
+%javaconst(0);
+#endif
+
 #define DMD_LONGNAME "DMD_LONGNAME"
 #define GDAL_DMD_LONGNAME "DMD_LONGNAME"
 #define DMD_HELPTOPIC "DMD_HELPTOPIC"
@@ -454,6 +461,12 @@
 #define GDsCUpdateRelationship "UpdateRelationship"
 #define GDsCFastGetExtent "FastGetExtent"
 #define GDsCFastGetExtentWGS84LongLat "FastGetExtentWGS84LongLat"
+
+#if defined(SWIGCSHARP)
+%csconst(0);
+#elif defined(SWIGJAVA)
+%javaconst(0);
+#endif
 
 #endif
 
