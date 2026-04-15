@@ -43,6 +43,16 @@ From GDAL 3.12 to GDAL 3.13
     ``char **`` to use ``CSLConstList`` instead. Such change is compatible with
     earlier GDAL versions.
 
+- Behavior changes:
+
+  * RasterIO resampling/VRT: do it by default in the output buffer type
+    unless new field GDALRasterIOExtraArg::bOperateInBufType in set to false
+    (#14221).
+    For example, now by default is using non-nearest resampling in RasterIO()
+    to read a Byte band into a Float32 buffer, the result will generally be
+    non-integer values, matching what is assumed to be the default wished
+    behavior.
+
 From GDAL 3.11 to GDAL 3.12
 ---------------------------
 
