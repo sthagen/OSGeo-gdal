@@ -2587,9 +2587,9 @@ GDALDatasetH GDALTileIndexInternal(const char *pszDest,
             {
                 auto psArray = topArrays[iProjCode];
                 const char *pszSRSAuthName =
-                    poSrcSRS ? poSrcSRS->GetAuthorityName(nullptr) : nullptr;
+                    poSrcSRS ? poSrcSRS->GetAuthorityName() : nullptr;
                 const char *pszSRSAuthCode =
-                    poSrcSRS ? poSrcSRS->GetAuthorityCode(nullptr) : nullptr;
+                    poSrcSRS ? poSrcSRS->GetAuthorityCode() : nullptr;
                 if (pszSRSAuthName && pszSRSAuthCode)
                 {
                     std::string osCode(pszSRSAuthName);
@@ -2733,10 +2733,8 @@ GDALDatasetH GDALTileIndexInternal(const char *pszDest,
 
             if (i_SrcSRSName >= 0 && poSrcSRS)
             {
-                const char *pszAuthorityCode =
-                    poSrcSRS->GetAuthorityCode(nullptr);
-                const char *pszAuthorityName =
-                    poSrcSRS->GetAuthorityName(nullptr);
+                const char *pszAuthorityCode = poSrcSRS->GetAuthorityCode();
+                const char *pszAuthorityName = poSrcSRS->GetAuthorityName();
                 if (psOptions->eSrcSRSFormat == FORMAT_AUTO)
                 {
                     if (pszAuthorityName != nullptr &&

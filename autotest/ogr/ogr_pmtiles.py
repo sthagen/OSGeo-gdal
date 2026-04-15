@@ -55,7 +55,7 @@ def test_ogr_pmtiles_read_basic():
             5318507.966831126,
         )
     )
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "3857"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "3857"
     assert len([f for f in lyr]) == 8
     assert lyr.GetNextFeature() is None
     lyr.ResetReading()

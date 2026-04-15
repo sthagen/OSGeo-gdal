@@ -3083,8 +3083,8 @@ def test_pdf_iso32000_esri_as_epsg():
     gdal.ErrorReset()
     ds = gdal.Open("data/pdf/esri_102422_as_epsg_code.pdf")
     sr = ds.GetSpatialRef()
-    assert sr.GetAuthorityName(None) == "ESRI"
-    assert sr.GetAuthorityCode(None) == "102422"
+    assert sr.GetAuthorityName() == "ESRI"
+    assert sr.GetAuthorityCode() == "102422"
     assert gdal.GetLastErrorMsg() == ""
 
 

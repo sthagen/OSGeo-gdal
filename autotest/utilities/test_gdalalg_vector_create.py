@@ -240,7 +240,7 @@ def test_gdalalg_vector_create_overwrite_update_overwrite_layer(tmp_vsimem):
     assert lyr is not None, "Layer not found after overwrite"
     geom_defn = lyr.GetLayerDefn().GetGeomFieldDefn(0)
     assert (
-        geom_defn.GetSpatialRef().GetAuthorityCode(None) == "3857"
+        geom_defn.GetSpatialRef().GetAuthorityCode() == "3857"
     ), "Unexpected CRS after overwrite"
 
 
@@ -339,7 +339,7 @@ def test_gdalalg_vector_create_ogr_schema(tmp_vsimem):
     geom_defn = layer.GetLayerDefn().GetGeomFieldDefn(0)
     assert geom_defn.GetName() == "geom", "Unexpected geometry field name"
     assert geom_defn.GetType() == ogr.wkbPoint, "Unexpected geometry type"
-    assert geom_defn.GetSpatialRef().GetAuthorityCode(None) == "3857", "Unexpected CRS"
+    assert geom_defn.GetSpatialRef().GetAuthorityCode() == "3857", "Unexpected CRS"
 
     # Cleanup
     out_ds = None
@@ -370,7 +370,7 @@ def test_gdalalg_vector_create_ogr_schema(tmp_vsimem):
     assert geom_defn.GetName() == "geom", "Unexpected geometry field name with --like"
     assert geom_defn.GetType() == ogr.wkbPoint, "Unexpected geometry type with --like"
     assert (
-        geom_defn.GetSpatialRef().GetAuthorityCode(None) == "3857"
+        geom_defn.GetSpatialRef().GetAuthorityCode() == "3857"
     ), "Unexpected CRS with --like"
 
 
@@ -698,4 +698,4 @@ def test_gdal_vector_create_compact_crs(tmp_vsimem):
     geom_defn = layer.GetLayerDefn().GetGeomFieldDefn(0)
     assert geom_defn.GetName() == "geom1", "Unexpected geometry field name"
     assert geom_defn.GetType() == ogr.wkbPoint, "Unexpected geometry type"
-    assert geom_defn.GetSpatialRef().GetAuthorityCode(None) == "32632", "Unexpected CRS"
+    assert geom_defn.GetSpatialRef().GetAuthorityCode() == "32632", "Unexpected CRS"

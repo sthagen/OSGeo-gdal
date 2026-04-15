@@ -42,7 +42,7 @@ def test_gdalalg_vector_index_new_file():
         lyr = ds.GetLayer(0)
         assert lyr.GetName() == "tileindex"
         assert lyr.GetFeatureCount() == 1
-        assert lyr.GetSpatialRef().GetAuthorityCode(None) == "27700"
+        assert lyr.GetSpatialRef().GetAuthorityCode() == "27700"
         assert lyr.GetLayerDefn().GetFieldCount() == 1
         f = lyr.GetNextFeature()
         assert f["location"] == "../ogr/data/poly.shp,0"
@@ -66,7 +66,7 @@ def test_gdalalg_vector_index_absolute_path():
         lyr = ds.GetLayer(0)
         assert lyr.GetName() == "tileindex"
         assert lyr.GetFeatureCount() == 1
-        assert lyr.GetSpatialRef().GetAuthorityCode(None) == "27700"
+        assert lyr.GetSpatialRef().GetAuthorityCode() == "27700"
         assert lyr.GetLayerDefn().GetFieldCount() == 1
         f = lyr.GetNextFeature()
         assert (
@@ -137,7 +137,7 @@ def test_gdalalg_vector_index_new_file_dst_crs(tmp_vsimem):
         ds = alg.Output()
         lyr = ds.GetLayer(0)
         assert lyr.GetFeatureCount() == 1
-        assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4326"
+        assert lyr.GetSpatialRef().GetAuthorityCode() == "4326"
         assert lyr.GetLayerDefn().GetFieldCount() == 1
         f = lyr.GetNextFeature()
         ogrtest.check_feature_geometry(f, "POLYGON ((3 0,3 0,3 0,3 0,3 0))")

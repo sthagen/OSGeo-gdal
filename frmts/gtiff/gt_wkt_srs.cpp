@@ -1672,8 +1672,7 @@ OGRSpatialReferenceH GTIFGetOGISDefnAsOSR(GTIF *hGTIF, GTIFDefn *psDefn)
     }
 
     if ((bIs2DProjCRS || oSRS.IsGeographic()) &&
-        oSRS.GetAuthorityCode(nullptr) == nullptr &&
-        psDefn->UOMAngleInDegrees == 1.0)
+        oSRS.GetAuthorityCode() == nullptr && psDefn->UOMAngleInDegrees == 1.0)
     {
         const PJ_TYPE type = bIs2DProjCRS ? PJ_TYPE_PROJECTED_CRS
                              : oSRS.GetAxesCount() == 2
@@ -1797,8 +1796,7 @@ OGRSpatialReferenceH GTIFGetOGISDefnAsOSR(GTIF *hGTIF, GTIFDefn *psDefn)
 
         if (bCanBuildCompoundCRS)
         {
-            const bool bHorizontalHasCode =
-                oSRS.GetAuthorityCode(nullptr) != nullptr;
+            const bool bHorizontalHasCode = oSRS.GetAuthorityCode() != nullptr;
             const char *pszHorizontalName = oSRS.GetName();
             const std::string osHorizontalName(
                 pszHorizontalName ? pszHorizontalName : "unnamed");
@@ -3423,8 +3421,8 @@ int GTIFSetFromOGISDefnEx(GTIF *psGTIF, OGRSpatialReferenceH hSRS,
         // of the current SRS object and the one coming from the EPSG code
         // are the same, then by default, do not write them.
         bool bUseReferenceTOWGS84 = false;
-        const char *pszAuthName = poSRS->GetAuthorityName(nullptr);
-        const char *pszAuthCode = poSRS->GetAuthorityCode(nullptr);
+        const char *pszAuthName = poSRS->GetAuthorityName();
+        const char *pszAuthCode = poSRS->GetAuthorityCode();
         if (pszAuthName && EQUAL(pszAuthName, "EPSG") && pszAuthCode)
         {
             CPLErrorHandlerPusher oErrorHandler(CPLQuietErrorHandler);

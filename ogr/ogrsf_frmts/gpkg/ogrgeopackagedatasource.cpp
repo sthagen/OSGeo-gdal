@@ -140,8 +140,8 @@ GetTilingScheme(const char *pszName)
     }
     else
     {
-        const char *pszAuthName = oSRS.GetAuthorityName(nullptr);
-        const char *pszAuthCode = oSRS.GetAuthorityCode(nullptr);
+        const char *pszAuthName = oSRS.GetAuthorityName();
+        const char *pszAuthCode = oSRS.GetAuthorityCode();
         if (pszAuthName == nullptr || !EQUAL(pszAuthName, "EPSG") ||
             pszAuthCode == nullptr)
         {
@@ -594,23 +594,23 @@ int GDALGeoPackageDataset::GetSrsId(const OGRSpatialReference *poSRSIn)
         }
     }
 
-    const char *pszAuthorityName = poSRS->GetAuthorityName(nullptr);
+    const char *pszAuthorityName = poSRS->GetAuthorityName();
 
     if (pszAuthorityName == nullptr || strlen(pszAuthorityName) == 0)
     {
         // Try to force identify an EPSG code.
         poSRS->AutoIdentifyEPSG();
 
-        pszAuthorityName = poSRS->GetAuthorityName(nullptr);
+        pszAuthorityName = poSRS->GetAuthorityName();
         if (pszAuthorityName != nullptr && EQUAL(pszAuthorityName, "EPSG"))
         {
-            const char *pszAuthorityCode = poSRS->GetAuthorityCode(nullptr);
+            const char *pszAuthorityCode = poSRS->GetAuthorityCode();
             if (pszAuthorityCode != nullptr && strlen(pszAuthorityCode) > 0)
             {
                 /* Import 'clean' SRS */
                 poSRS->importFromEPSG(atoi(pszAuthorityCode));
 
-                pszAuthorityName = poSRS->GetAuthorityName(nullptr);
+                pszAuthorityName = poSRS->GetAuthorityName();
             }
         }
 
@@ -629,7 +629,7 @@ int GDALGeoPackageDataset::GetSrsId(const OGRSpatialReference *poSRSIn)
         "IGNORE_COORDINATE_EPOCH=YES", nullptr};
     if (pszAuthorityName != nullptr && strlen(pszAuthorityName) > 0)
     {
-        const char *pszAuthorityCode = poSRS->GetAuthorityCode(nullptr);
+        const char *pszAuthorityCode = poSRS->GetAuthorityCode();
         if (pszAuthorityCode)
         {
             if (CPLGetValueType(pszAuthorityCode) == CPL_VALUE_INTEGER)
@@ -6184,8 +6184,8 @@ GDALDataset *GDALGeoPackageDataset::CreateCopy(const char *pszFilename,
         OGRSpatialReference oSrcSRS;
         oSrcSRS.SetFromUserInput(poSrcDS->GetProjectionRef());
         oSrcSRS.AutoIdentifyEPSG();
-        if (oSrcSRS.GetAuthorityCode(nullptr) == nullptr ||
-            atoi(oSrcSRS.GetAuthorityCode(nullptr)) != nEPSGCode)
+        if (oSrcSRS.GetAuthorityCode() == nullptr ||
+            atoi(oSrcSRS.GetAuthorityCode()) != nEPSGCode)
         {
             nTargetBands++;
         }

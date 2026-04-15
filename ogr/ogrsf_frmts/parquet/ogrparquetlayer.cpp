@@ -511,8 +511,8 @@ bool OGRParquetLayerBase::DealWithArrow21GeometryGeographyNativeTypes(
                 OGRSpatialReference::SET_FROM_USER_INPUT_LIMITATIONS_get()) ==
             OGRERR_NONE)
         {
-            const char *pszAuthName = poSRS->GetAuthorityName(nullptr);
-            const char *pszAuthCode = poSRS->GetAuthorityCode(nullptr);
+            const char *pszAuthName = poSRS->GetAuthorityName();
+            const char *pszAuthCode = poSRS->GetAuthorityCode();
             if (pszAuthName && pszAuthCode && EQUAL(pszAuthName, "OGC") &&
                 EQUAL(pszAuthCode, "CRS84"))
                 poSRS->importFromEPSG(4326);

@@ -194,7 +194,7 @@ def test_multidim_getresampled(resampling):
     assert resampled_ar.GetDataType() == ar.GetDataType()
     srs = resampled_ar.GetSpatialRef()
     assert srs is not None
-    assert srs.GetAuthorityCode(None) == srs_ds.GetAuthorityCode(None)
+    assert srs.GetAuthorityCode() == srs_ds.GetAuthorityCode()
     dims = resampled_ar.GetDimensions()
     assert len(dims) == 2
     assert dims[0].GetName() == "dimY"
@@ -276,7 +276,7 @@ def test_multidim_getresampled_new_dims_with_variables(
     assert resampled_ar
     srs = resampled_ar.GetSpatialRef()
     assert srs is not None
-    assert srs.GetAuthorityCode(None) == srs_ds.GetAuthorityCode(None)
+    assert srs.GetAuthorityCode() == srs_ds.GetAuthorityCode()
     dims = resampled_ar.GetDimensions()
     assert len(dims) == 2
     assert dims[0].GetSize() == ds.RasterYSize // 2
@@ -301,7 +301,7 @@ def test_multidim_getresampled_with_srs():
     assert resampled_ar
     got_srs = resampled_ar.GetSpatialRef()
     assert got_srs is not None
-    assert got_srs.GetAuthorityCode(None) == srs.GetAuthorityCode(None)
+    assert got_srs.GetAuthorityCode() == srs.GetAuthorityCode()
     dims = resampled_ar.GetDimensions()
 
     expected_ds = gdal.Warp("", ds, options="-of MEM -t_srs EPSG:4267 -r nearest")

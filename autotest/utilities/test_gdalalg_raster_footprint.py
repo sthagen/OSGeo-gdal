@@ -36,7 +36,7 @@ def test_gdalalg_raster_footprint():
     assert last_pct[0] == 1.0
     ds = alg["output"].GetDataset()
     lyr = ds.GetLayerByName("footprint")
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "26711"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "26711"
     assert lyr.GetFeatureCount() == 1
     f = lyr.GetNextFeature()
     assert f["location"] == "../gcore/data/byte.tif"
@@ -326,7 +326,7 @@ def test_gdalalg_raster_dst_crs():
     assert alg.Run()
     ds = alg["output"].GetDataset()
     lyr = ds.GetLayer(0)
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4267"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "4267"
     f = lyr.GetNextFeature()
     assert f.GetGeometryRef().ExportToWkt().startswith("MULTIPOLYGON (((-117.6411")
 

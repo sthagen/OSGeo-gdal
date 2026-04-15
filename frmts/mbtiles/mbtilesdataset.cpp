@@ -1314,10 +1314,10 @@ CPLErr MBTilesDataset::SetSpatialRef(const OGRSpatialReference *poSRS)
         return CE_Failure;
     }
 
-    if (poSRS == nullptr || poSRS->GetAuthorityName(nullptr) == nullptr ||
-        !EQUAL(poSRS->GetAuthorityName(nullptr), "EPSG") ||
-        poSRS->GetAuthorityCode(nullptr) == nullptr ||
-        !EQUAL(poSRS->GetAuthorityCode(nullptr), "3857"))
+    if (poSRS == nullptr || poSRS->GetAuthorityName() == nullptr ||
+        !EQUAL(poSRS->GetAuthorityName(), "EPSG") ||
+        poSRS->GetAuthorityCode() == nullptr ||
+        !EQUAL(poSRS->GetAuthorityCode(), "3857"))
     {
         CPLError(CE_Failure, CPLE_NotSupported,
                  "Only EPSG:3857 supported on MBTiles dataset");
@@ -3328,8 +3328,8 @@ GDALDataset *MBTilesDataset::CreateCopy(const char *pszFilename,
         OGRSpatialReference oSrcSRS;
         oSrcSRS.SetFromUserInput(poSrcDS->GetProjectionRef());
         oSrcSRS.AutoIdentifyEPSG();
-        if (oSrcSRS.GetAuthorityCode(nullptr) == nullptr ||
-            atoi(oSrcSRS.GetAuthorityCode(nullptr)) != 3857)
+        if (oSrcSRS.GetAuthorityCode() == nullptr ||
+            atoi(oSrcSRS.GetAuthorityCode()) != 3857)
         {
             nTargetBands++;
         }

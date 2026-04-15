@@ -153,7 +153,7 @@ def _check_test_parquet(
     assert lyr_defn.GetGeomFieldDefn(0).GetName() == "geometry"
     srs = lyr_defn.GetGeomFieldDefn(0).GetSpatialRef()
     assert srs is not None
-    assert srs.GetAuthorityCode(None) == "4326"
+    assert srs.GetAuthorityCode() == "4326"
     if expect_layer_geom_type:
         assert lyr_defn.GetGeomFieldDefn(0).GetType() == ogr.wkbPoint
     # import pprint
@@ -921,7 +921,7 @@ def test_ogr_parquet_coordinate_epoch(epsg_code):
 
     srs = lyr.GetSpatialRef()
     assert srs is not None
-    assert int(srs.GetAuthorityCode(None)) == epsg_code
+    assert int(srs.GetAuthorityCode()) == epsg_code
     assert srs.GetCoordinateEpoch() == 2022.3
     lyr = None
     ds = None
@@ -958,7 +958,7 @@ def test_ogr_parquet_missing_crs_member():
 
     srs = lyr.GetSpatialRef()
     assert srs is not None
-    assert srs.GetAuthorityCode(None) == "4326"
+    assert srs.GetAuthorityCode() == "4326"
     lyr = None
     ds = None
 
@@ -1012,7 +1012,7 @@ def test_ogr_parquet_crs_identification_on_write(input_definition, expected_crs)
 
     srs = lyr.GetSpatialRef()
     assert srs is not None
-    assert srs.GetAuthorityCode(None) == expected_crs
+    assert srs.GetAuthorityCode() == expected_crs
     lyr = None
     ds = None
 
@@ -1948,7 +1948,7 @@ def test_ogr_parquet_write_crs_without_id_in_datum_ensemble_members():
 
     srs = lyr.GetSpatialRef()
     assert srs is not None
-    assert int(srs.GetAuthorityCode(None)) == 32631
+    assert int(srs.GetAuthorityCode()) == 32631
     lyr = None
     ds = None
 
@@ -3068,7 +3068,7 @@ def test_ogr_parquet_recognize_geo_from_geom_possible_names(geom_col_name, is_wk
         lyr = ds.GetLayer(0)
         assert lyr.GetGeometryColumn() == geom_col_name
         assert lyr.GetGeomType() == ogr.wkbUnknown
-        assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4326"
+        assert lyr.GetSpatialRef().GetAuthorityCode() == "4326"
         ds = None
 
     finally:
@@ -4489,7 +4489,7 @@ def test_ogr_parquet_write_use_geo_type(tmp_vsimem):
 
     with gdal.OpenEx(tmp_vsimem / "out.parquet") as ds:
         lyr = ds.GetLayer(0)
-        assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4326"
+        assert lyr.GetSpatialRef().GetAuthorityCode() == "4326"
         assert lyr.GetMetadataItem("EDGES") == "SPHERICAL"
 
     with gdal.GetDriverByName("Parquet").CreateVector(tmp_vsimem / "out.parquet") as ds:
@@ -4501,7 +4501,7 @@ def test_ogr_parquet_write_use_geo_type(tmp_vsimem):
 
     with gdal.OpenEx(tmp_vsimem / "out.parquet") as ds:
         lyr = ds.GetLayer(0)
-        assert lyr.GetSpatialRef().GetAuthorityCode(None) == "32631"
+        assert lyr.GetSpatialRef().GetAuthorityCode() == "32631"
         assert lyr.GetMetadataItem("EDGES") is None
 
 
@@ -4609,7 +4609,7 @@ def test_ogr_parquet_update(tmp_path):
         assert lyr.GetFIDColumn() == ""
         assert lyr.GetGeometryColumn() == "geometry"
         assert lyr.GetGeomType() == ogr.wkbPoint
-        assert lyr.GetSpatialRef().GetAuthorityCode(None) == "32631"
+        assert lyr.GetSpatialRef().GetAuthorityCode() == "32631"
         assert lyr.TestCapability(ogr.OLCSequentialWrite)
         assert lyr.TestCapability(ogr.OLCRandomWrite)
         assert lyr.TestCapability(ogr.OLCCreateField)
@@ -4626,7 +4626,7 @@ def test_ogr_parquet_update(tmp_path):
         assert lyr.GetFIDColumn() == ""
         assert lyr.GetGeometryColumn() == "geometry"
         assert lyr.GetGeomType() == ogr.wkbPoint
-        assert lyr.GetSpatialRef().GetAuthorityCode(None) == "32631"
+        assert lyr.GetSpatialRef().GetAuthorityCode() == "32631"
         assert lyr.GetFeatureCount() == 2
         f = lyr.GetNextFeature()
         assert f["str"] == "foo"
@@ -4689,7 +4689,7 @@ def test_ogr_parquet_update_with_creation_options_implicit(tmp_path):
         assert lyr.GetFIDColumn() == "my_fid"
         assert lyr.GetGeometryColumn() == "my_geom"
         assert lyr.GetGeomType() == ogr.wkbPoint
-        assert lyr.GetSpatialRef().GetAuthorityCode(None) == "32631"
+        assert lyr.GetSpatialRef().GetAuthorityCode() == "32631"
         f = ogr.Feature(lyr.GetLayerDefn())
         f["str"] = "bar"
         f["int"] = 456
@@ -4704,7 +4704,7 @@ def test_ogr_parquet_update_with_creation_options_implicit(tmp_path):
         assert lyr.GetFIDColumn() == "my_fid"
         assert lyr.GetGeometryColumn() == "my_geom"
         assert lyr.GetGeomType() == ogr.wkbPoint
-        assert lyr.GetSpatialRef().GetAuthorityCode(None) == "32631"
+        assert lyr.GetSpatialRef().GetAuthorityCode() == "32631"
         assert lyr.GetFeatureCount() == 2
         f = lyr.GetNextFeature()
         assert f["str"] == "foo"
@@ -5052,4 +5052,4 @@ def test_ogr_parquet_read_geoparquet_1_1_no_explicit_crs_but_geoarrow_wkb_declar
         "data/parquet/geoparquet_1_1_no_explicit_crs_but_geoarrow_wkb_declared.parquet"
     )
     lyr = ds.GetLayer(0)
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "4326"

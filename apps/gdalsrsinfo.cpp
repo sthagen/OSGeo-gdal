@@ -202,8 +202,8 @@ MAIN_START(argc, argv)
                            panConfidence[i]);
                 }
 
-                const char *pszAuthorityName = oSRS.GetAuthorityName(nullptr);
-                const char *pszAuthorityCode = oSRS.GetAuthorityCode(nullptr);
+                const char *pszAuthorityName = oSRS.GetAuthorityName();
+                const char *pszAuthorityCode = oSRS.GetAuthorityCode();
                 if (pszAuthorityName && pszAuthorityCode)
                 {
                     osIdentifiedCode = pszAuthorityName;

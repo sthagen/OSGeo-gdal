@@ -309,8 +309,8 @@ CPLJSONObject ZarrArray::SerializeSpecialAttributes()
 
             oZarrConventionsArray.Add(oConventionProj);
 
-            const char *pszAuthorityName = m_poSRS->GetAuthorityName(nullptr);
-            const char *pszAuthorityCode = m_poSRS->GetAuthorityCode(nullptr);
+            const char *pszAuthorityName = m_poSRS->GetAuthorityName();
+            const char *pszAuthorityCode = m_poSRS->GetAuthorityCode();
             if (pszAuthorityName && pszAuthorityCode)
             {
                 oAttrs.Set("proj:code", CPLSPrintf("%s:%s", pszAuthorityName,
@@ -488,8 +488,8 @@ CPLJSONObject ZarrArray::SerializeSpecialAttributes()
         CPLJSONObject oCRS;
         ExportToWkt2AndPROJJSON(oCRS, "wkt", "projjson");
 
-        const char *pszAuthorityCode = m_poSRS->GetAuthorityCode(nullptr);
-        const char *pszAuthorityName = m_poSRS->GetAuthorityName(nullptr);
+        const char *pszAuthorityCode = m_poSRS->GetAuthorityCode();
+        const char *pszAuthorityName = m_poSRS->GetAuthorityName();
         if (pszAuthorityCode && pszAuthorityName &&
             EQUAL(pszAuthorityName, "EPSG"))
         {

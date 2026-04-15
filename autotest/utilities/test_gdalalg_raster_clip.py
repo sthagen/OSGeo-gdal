@@ -71,7 +71,7 @@ def test_gdalalg_raster_clip_bbox():
     ds = alg["output"].GetDataset()
     assert ds.RasterXSize == 18
     assert ds.RasterYSize == 18
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "26711"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "26711"
     assert ds.GetGeoTransform() == pytest.approx(
         (440780, 60, 0, 3751260, 0, -60), rel=1e-8
     )
@@ -97,7 +97,7 @@ def test_gdalalg_raster_clip_like():
     ds = alg["output"].GetDataset()
     assert ds.RasterXSize == 18
     assert ds.RasterYSize == 18
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "26711"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "26711"
     assert ds.GetGeoTransform() == pytest.approx(
         (440780, 60, 0, 3751260, 0, -60), rel=1e-8
     )
@@ -209,7 +209,7 @@ def test_gdalalg_raster_clip_bbox_crs():
     ds = alg["output"].GetDataset()
     assert ds.RasterXSize == 6
     assert ds.RasterYSize == 20
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "26711"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "26711"
     assert ds.GetGeoTransform() == pytest.approx(
         (441620.0, 60.0, 0.0, 3751140.0, 0.0, -60.0), rel=1e-8
     )
@@ -231,7 +231,7 @@ def test_gdalgalg_raster_clip_geometry(tmp_vsimem):
     ds = alg["output"].GetDataset()
     assert ds.RasterXSize == 16
     assert ds.RasterYSize == 17
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "26711"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "26711"
     assert ds.GetGeoTransform() == pytest.approx(
         (440840, 60.0, 0.0, 3751260, 0.0, -60.0), rel=1e-8
     )
@@ -253,7 +253,7 @@ def test_gdalalg_raster_clip_geometry_add_alpha():
     ds = alg["output"].GetDataset()
     assert ds.RasterXSize == 20
     assert ds.RasterYSize == 20
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "26711"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "26711"
     assert ds.GetGeoTransform() == pytest.approx(src_ds.GetGeoTransform(), rel=1e-8)
     assert ds.GetRasterBand(1).ReadRaster(0, 0, 10, 10) == b"\x00" * 100
     assert ds.GetRasterBand(1).ReadRaster(10, 10, 10, 10) == src_ds.ReadRaster(

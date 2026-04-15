@@ -512,7 +512,7 @@ def test_gdalalg_raster_pipeline_reproject_no_args(tmp_vsimem):
     )
 
     with gdal.OpenEx(out_filename) as ds:
-        assert ds.GetSpatialRef().GetAuthorityCode(None) == "26711"
+        assert ds.GetSpatialRef().GetAuthorityCode() == "26711"
         assert ds.GetRasterBand(1).Checksum() == 4672
 
 
@@ -561,7 +561,7 @@ def test_gdalalg_raster_pipeline_reproject_bbox_arg(tmp_vsimem):
     )
 
     with gdal.OpenEx(out_filename) as ds:
-        assert ds.GetSpatialRef().GetAuthorityCode(None) == "4326"
+        assert ds.GetSpatialRef().GetAuthorityCode() == "4326"
         assert ds.GetGeoTransform() == pytest.approx(
             (-117.641, 0.0005909090909093286, 0.0, 33.9005, 0.0, -0.0005833333333333554)
         )
@@ -592,7 +592,7 @@ def test_gdalalg_raster_pipeline_reproject_almost_all_args(tmp_vsimem):
     )
 
     with gdal.OpenEx(out_filename) as ds:
-        assert ds.GetSpatialRef().GetAuthorityCode(None) == "4326"
+        assert ds.GetSpatialRef().GetAuthorityCode() == "4326"
         assert ds.GetGeoTransform() == pytest.approx(
             (-117.641, 0.0005, 0.0, 33.9008, 0.0, -0.0004), rel=1e-8
         )

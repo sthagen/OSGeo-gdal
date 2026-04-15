@@ -122,7 +122,7 @@ def test_gdalalg_raster_tile_basic(tmp_vsimem, tiling_scheme, tilesize):
         ds = gdal.Open(tmp_vsimem / "stacta.json")
         assert ds.RasterXSize == 256
         assert ds.RasterYSize == 256
-        assert ds.GetSpatialRef().GetAuthorityCode(None) == "3857"
+        assert ds.GetSpatialRef().GetAuthorityCode() == "3857"
         assert ds.GetGeoTransform() == pytest.approx(
             (
                 -13110479.09147343,
@@ -1621,7 +1621,7 @@ def test_gdalalg_raster_tile_output_format_gtiff(tmp_vsimem, output_format, tile
     with gdal.Open(tmp_vsimem / "10/177/409.tif") as ds:
         assert ds.RasterXSize == tile_size
         assert ds.RasterYSize == tile_size
-        assert ds.GetSpatialRef().GetAuthorityCode(None) == "3857"
+        assert ds.GetSpatialRef().GetAuthorityCode() == "3857"
         assert list(ds.GetGeoTransform()) == pytest.approx(
             [
                 -13110479.09147343,
@@ -1639,7 +1639,7 @@ def test_gdalalg_raster_tile_output_format_gtiff(tmp_vsimem, output_format, tile
         )
 
     with gdal.Open(tmp_vsimem / "11/354/818.tif") as ds:
-        assert ds.GetSpatialRef().GetAuthorityCode(None) == "3857"
+        assert ds.GetSpatialRef().GetAuthorityCode() == "3857"
         assert list(ds.GetGeoTransform()) == pytest.approx(
             [
                 -13110479.09147343,

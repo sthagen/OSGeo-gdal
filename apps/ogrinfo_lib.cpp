@@ -960,10 +960,8 @@ static void ReportOnLayer(CPLString &osRet, CPLJSONObject &oLayer,
                         bool authIdSet{false};
                         if (psOptions->bExportOgrSchema)
                         {
-                            const char *pszAuthCode =
-                                poSRS->GetAuthorityCode(nullptr);
-                            const char *pszAuthName =
-                                poSRS->GetAuthorityName(nullptr);
+                            const char *pszAuthCode = poSRS->GetAuthorityCode();
+                            const char *pszAuthName = poSRS->GetAuthorityName();
                             if (pszAuthName && pszAuthCode)
                             {
                                 std::string oSRS{pszAuthName};
@@ -1029,9 +1027,9 @@ static void ReportOnLayer(CPLString &osRet, CPLJSONObject &oLayer,
                         for (const auto &poSupportedSRS : srsList)
                         {
                             const char *pszAuthName =
-                                poSupportedSRS->GetAuthorityName(nullptr);
+                                poSupportedSRS->GetAuthorityName();
                             const char *pszAuthCode =
-                                poSupportedSRS->GetAuthorityCode(nullptr);
+                                poSupportedSRS->GetAuthorityCode();
                             CPLJSONObject oSupportedSRS;
                             if (pszAuthName && pszAuthCode)
                             {
@@ -1317,9 +1315,9 @@ static void ReportOnLayer(CPLString &osRet, CPLJSONObject &oLayer,
                 for (const auto &poSupportedSRS : srsList)
                 {
                     const char *pszAuthName =
-                        poSupportedSRS->GetAuthorityName(nullptr);
+                        poSupportedSRS->GetAuthorityName();
                     const char *pszAuthCode =
-                        poSupportedSRS->GetAuthorityCode(nullptr);
+                        poSupportedSRS->GetAuthorityCode();
                     if (!bFirst)
                         Concat(osRet, psOptions->bStdoutOutput, ", ");
                     bFirst = false;

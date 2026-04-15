@@ -726,7 +726,7 @@ def test_gdal_run():
         output_format="MEM",
         dst_crs="EPSG:4326",
     ) as alg:
-        assert alg.Output().GetSpatialRef().GetAuthorityCode(None) == "4326"
+        assert alg.Output().GetSpatialRef().GetAuthorityCode() == "4326"
 
     with gdal.Run(
         ["raster", "reproject"],
@@ -736,7 +736,7 @@ def test_gdal_run():
             "dst-crs": "EPSG:4326",
         },
     ) as alg:
-        assert alg.Output().GetSpatialRef().GetAuthorityCode(None) == "4326"
+        assert alg.Output().GetSpatialRef().GetAuthorityCode() == "4326"
 
 
 def test_gdal_drivers():

@@ -1079,7 +1079,7 @@ def test_zarr_read_crs(tmp_vsimem, crs_member):
     ar = rg.OpenMDArray(rg.GetMDArrayNames()[0])
     srs = ar.GetSpatialRef()
     assert srs is not None
-    assert srs.GetAuthorityCode(None) == "4326"
+    assert srs.GetAuthorityCode() == "4326"
     # Mapping is 1, 2 since the slowest varying axis in multidim
     # mode is the lines, which matches latitude as the first axis of the CRS.
     assert srs.GetDataAxisToSRSAxisMapping() == [1, 2]
@@ -1088,7 +1088,7 @@ def test_zarr_read_crs(tmp_vsimem, crs_member):
     # Open as classic CRS
     ds = gdal.Open(tmp_vsimem / "test.zarr")
     srs = ds.GetSpatialRef()
-    assert srs.GetAuthorityCode(None) == "4326"
+    assert srs.GetAuthorityCode() == "4326"
     # Inverted mapping in classic raster mode compared to multidim mode,
     # because the first "axis" in our data model is columns.
     assert srs.GetDataAxisToSRSAxisMapping() == [2, 1]
@@ -3819,7 +3819,7 @@ def test_zarr_pam_spatial_ref(tmp_vsimem):
         assert ar
         crs = ar.GetSpatialRef()
         assert crs is not None
-        assert crs.GetAuthorityCode(None) == "4326"
+        assert crs.GetAuthorityCode() == "4326"
         assert crs.GetDataAxisToSRSAxisMapping() == [1, 2]
         assert crs.GetCoordinateEpoch() == 2021.2
 
@@ -3829,7 +3829,7 @@ def test_zarr_pam_spatial_ref(tmp_vsimem):
         ds = gdal.Open(tmp_vsimem / "test.zarr")
         crs = ds.GetSpatialRef()
         assert crs is not None
-        assert crs.GetAuthorityCode(None) == "4326"
+        assert crs.GetAuthorityCode() == "4326"
         assert crs.GetDataAxisToSRSAxisMapping() == [2, 1]
 
     check_crs_classic_dataset()
@@ -5967,7 +5967,7 @@ def test_zarr_write_WGS84_and_EGM96_height(tmp_vsimem):
         ds.SetSpatialRef(srs)
     with gdal.Open(tmp_filename) as ds:
         srs = ds.GetSpatialRef()
-        assert srs.GetAuthorityCode(None) == "9707"
+        assert srs.GetAuthorityCode() == "9707"
         assert srs.GetDataAxisToSRSAxisMapping() == [2, 1]
 
 
@@ -6177,7 +6177,7 @@ def test_zarr_read_ossfuzz_444714656():
 def test_zarr_read_zarr_with_stac_proj_epsg():
 
     ds = gdal.Open("data/zarr/zarr_with_stac_proj_epsg.zarr")
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "26711"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "26711"
 
 
 ###############################################################################
@@ -6188,7 +6188,7 @@ def test_zarr_read_zarr_with_stac_proj_epsg():
 def test_zarr_read_zarr_with_stac_proj_wkt2():
 
     ds = gdal.Open("data/zarr/zarr_with_stac_proj_wkt2.zarr")
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "26711"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "26711"
 
 
 ###############################################################################
@@ -7638,7 +7638,7 @@ def test_zarr_read_spatial_proj_at_array_level():
 
     ds = gdal.Open("data/zarr/v3/spatial_proj_at_array_level.zarr")
     assert ds.GetGeoTransform() == (450000, 10, 0, 5000000, 0, -10)
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "32631"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "32631"
     assert ds.GetMetadata() == {"AREA_OR_POINT": "Area"}
 
 
@@ -7651,7 +7651,7 @@ def test_zarr_read_spatial_proj_at_parent_level():
 
     ds = gdal.Open("data/zarr/v3/spatial_proj_at_parent_level.zarr")
     assert ds.GetGeoTransform() == (450000, 10, 0, 5000000, 0, -10)
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "32631"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "32631"
     assert ds.GetMetadata() == {"AREA_OR_POINT": "Area"}
 
 
@@ -7664,7 +7664,7 @@ def test_zarr_read_spatial_proj_convention_at_root_level():
 
     ds = gdal.Open("data/zarr/v3/spatial_proj_convention_at_root_level.zarr")
     assert ds.GetGeoTransform() == (450000, 10, 0, 5000000, 0, -10)
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "32631"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "32631"
     assert ds.GetMetadata() == {"AREA_OR_POINT": "Area"}
 
 
@@ -8117,7 +8117,7 @@ def test_zarr_read_srs_eopf_sample_service(tmp_vsimem, filename, j):
     gdal.FileFromMemBuffer(tmp_vsimem / filename / ".zgroup", '{"zarr_format": 2}')
 
     ds = gdal.Open(tmp_vsimem / filename)
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "32632"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "32632"
 
 
 ###############################################################################

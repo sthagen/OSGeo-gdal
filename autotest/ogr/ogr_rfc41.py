@@ -786,7 +786,7 @@ def test_ogr_rfc41_8(require_ogr_sql_sqlite):  # noqa
     assert sql_lyr.GetLayerDefn().GetGeomFieldDefn(0).GetSpatialRef() is None
     assert sql_lyr.GetLayerDefn().GetGeomFieldDefn(1).GetType() == ogr.wkbPoint25D
     srs = sql_lyr.GetLayerDefn().GetGeomFieldDefn(1).GetSpatialRef()
-    assert srs.GetAuthorityCode(None) == "4326"
+    assert srs.GetAuthorityCode() == "4326"
     ds.ReleaseResultSet(sql_lyr)
 
     # Test INSERT INTO request

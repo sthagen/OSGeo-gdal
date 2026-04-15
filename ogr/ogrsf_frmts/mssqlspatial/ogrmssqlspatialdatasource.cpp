@@ -1442,10 +1442,8 @@ OGRSpatialReference *OGRMSSQLSpatialDataSource::FetchSRS(int nId)
                 const char *pszWKT = oStmt.GetColData(0);
                 if (poSRS->importFromWkt(pszWKT) == OGRERR_NONE)
                 {
-                    const char *pszAuthorityName =
-                        poSRS->GetAuthorityName(nullptr);
-                    const char *pszAuthorityCode =
-                        poSRS->GetAuthorityCode(nullptr);
+                    const char *pszAuthorityName = poSRS->GetAuthorityName();
+                    const char *pszAuthorityCode = poSRS->GetAuthorityCode();
                     if (pszAuthorityName && pszAuthorityCode &&
                         EQUAL(pszAuthorityName, "EPSG"))
                     {
@@ -1524,7 +1522,7 @@ int OGRMSSQLSpatialDataSource::FetchSRSId(const OGRSpatialReference *poSRS)
     // cppcheck-suppress uselessAssignmentPtrArg
     poSRS = nullptr;
 
-    pszAuthorityName = oSRS.GetAuthorityName(nullptr);
+    pszAuthorityName = oSRS.GetAuthorityName();
 
     if (pszAuthorityName == nullptr || strlen(pszAuthorityName) == 0)
     {
@@ -1535,16 +1533,16 @@ int OGRMSSQLSpatialDataSource::FetchSRSId(const OGRSpatialReference *poSRS)
          */
         oSRS.AutoIdentifyEPSG();
 
-        pszAuthorityName = oSRS.GetAuthorityName(nullptr);
+        pszAuthorityName = oSRS.GetAuthorityName();
         if (pszAuthorityName != nullptr && EQUAL(pszAuthorityName, "EPSG"))
         {
-            const char *pszAuthorityCode = oSRS.GetAuthorityCode(nullptr);
+            const char *pszAuthorityCode = oSRS.GetAuthorityCode();
             if (pszAuthorityCode != nullptr && strlen(pszAuthorityCode) > 0)
             {
                 /* Import 'clean' SRS */
                 oSRS.importFromEPSG(atoi(pszAuthorityCode));
 
-                pszAuthorityName = oSRS.GetAuthorityName(nullptr);
+                pszAuthorityName = oSRS.GetAuthorityName();
             }
         }
     }
@@ -1558,7 +1556,7 @@ int OGRMSSQLSpatialDataSource::FetchSRSId(const OGRSpatialReference *poSRS)
         /* For the root authority name 'EPSG', the authority code
          * should always be integral
          */
-        nAuthorityCode = atoi(oSRS.GetAuthorityCode(nullptr));
+        nAuthorityCode = atoi(oSRS.GetAuthorityCode());
 
         CPLODBCStatement oStmt(&oSession);
         oStmt.Appendf("SELECT srid FROM spatial_ref_sys WHERE "

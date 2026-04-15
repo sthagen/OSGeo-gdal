@@ -1455,22 +1455,22 @@ def test_netcdf_multidim_create_several_arrays_with_srs():
         rg = ds.GetRootGroup()
 
         ar = rg.OpenMDArray("ar_longlat_4326_1")
-        assert ar.GetSpatialRef().GetAuthorityCode(None) == "4326"
+        assert ar.GetSpatialRef().GetAuthorityCode() == "4326"
 
         ar = rg.OpenMDArray("ar_longlat_4326_2")
-        assert ar.GetSpatialRef().GetAuthorityCode(None) == "4326"
+        assert ar.GetSpatialRef().GetAuthorityCode() == "4326"
 
         ar = rg.OpenMDArray("ar_longlat_4258")
-        assert ar.GetSpatialRef().GetAuthorityCode(None) == "4258"
+        assert ar.GetSpatialRef().GetAuthorityCode() == "4258"
 
         ar = rg.OpenMDArray("ar_longlat_32631_1")
-        assert ar.GetSpatialRef().GetAuthorityCode(None) == "32631"
+        assert ar.GetSpatialRef().GetAuthorityCode() == "32631"
 
         ar = rg.OpenMDArray("ar_longlat_32631_2")
-        assert ar.GetSpatialRef().GetAuthorityCode(None) == "32631"
+        assert ar.GetSpatialRef().GetAuthorityCode() == "32631"
 
         ar = rg.OpenMDArray("ar_longlat_32632")
-        assert ar.GetSpatialRef().GetAuthorityCode(None) == "32632"
+        assert ar.GetSpatialRef().GetAuthorityCode() == "32632"
 
     read()
 
@@ -3658,7 +3658,7 @@ def test_netcdf_multidim_getresampled_with_geoloc_EMIT_L2A():
     assert dims[2].GetSize() == 2
     assert resampled_ar.GetDataType() == ar.GetDataType()
     assert resampled_ar.GetBlockSize() == [3, 3, 2]
-    assert resampled_ar.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert resampled_ar.GetSpatialRef().GetAuthorityCode() == "4326"
     assert resampled_ar.GetNoDataValue() == ar.GetNoDataValue()
     assert resampled_ar.GetUnit() == ar.GetUnit()
     assert (
@@ -3747,7 +3747,7 @@ def test_netcdf_multidim_getresampled_with_geoloc_EMIT_L2A():
     assert dims[2].GetName() == "bands"
     assert dims[2].GetSize() == 1
     assert resampled_ar.GetDataType() == ar.GetDataType()
-    assert resampled_ar.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert resampled_ar.GetSpatialRef().GetAuthorityCode() == "4326"
     assert resampled_ar.GetNoDataValue() == ar.GetNoDataValue()
     assert resampled_ar.GetUnit() == ar.GetUnit()
     assert (
@@ -3915,7 +3915,7 @@ def test_netcdf_multidim_getresampled_with_geoloc_EMIT_L2B_MIN():
     assert dims[1].GetSize() == 3
     assert resampled_ar.GetDataType() == ar.GetDataType()
     assert resampled_ar.GetBlockSize() == [3, 3]
-    assert resampled_ar.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert resampled_ar.GetSpatialRef().GetAuthorityCode() == "4326"
     assert resampled_ar.GetNoDataValue() == ar.GetNoDataValue()
     assert resampled_ar.GetUnit() == ar.GetUnit()
     assert (
@@ -4194,14 +4194,14 @@ def test_netcdf_multidim_WGS84_and_EGM96_height(tmp_path):
         ds.SetGeoTransform([2, 1, 0, 49, 0, -1])
     with gdal.Open(tmp_filename) as ds:
         srs = ds.GetSpatialRef()
-        assert srs.GetAuthorityCode(None) == "9707"
+        assert srs.GetAuthorityCode() == "9707"
         # We currently report a 3rd axis, which is dubious
         assert srs.GetDataAxisToSRSAxisMapping()[0:2] == [2, 1]
     with gdal.OpenEx(tmp_filename, gdal.OF_MULTIDIM_RASTER) as ds:
         rg = ds.GetRootGroup()
         ar = rg.OpenMDArray("Band1")
         srs = ar.GetSpatialRef()
-        assert srs.GetAuthorityCode(None) == "9707"
+        assert srs.GetAuthorityCode() == "9707"
         assert srs.GetDataAxisToSRSAxisMapping() == [1, 2]
 
 

@@ -1000,8 +1000,8 @@ OGRMapMLWriterDataset::ICreateLayer(const char *pszLayerName,
 
     if (m_oSRS.IsEmpty())
     {
-        const char *pszAuthName = poSRS->GetAuthorityName(nullptr);
-        const char *pszAuthCode = poSRS->GetAuthorityCode(nullptr);
+        const char *pszAuthName = poSRS->GetAuthorityName();
+        const char *pszAuthCode = poSRS->GetAuthorityCode();
         if (pszAuthName && pszAuthCode && EQUAL(pszAuthName, "EPSG"))
         {
             const int nEPSGCode = atoi(pszAuthCode);

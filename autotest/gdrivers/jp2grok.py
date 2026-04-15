@@ -1101,7 +1101,7 @@ def test_jp2grok_rewrite_boxes(tmp_path):
     # Check they were written into the file (not PAM)
     assert gdal.VSIStatL(tmp_path / ".aux.xml") is None
     ds = gdal.Open(tmpfile)
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "32631"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "32631"
     assert ds.GetGeoTransform() == (0, 1, 0, 3, 0, -1)
     # Verify pixel data survived the transcode
     got = ds.GetRasterBand(1).ReadAsArray()
@@ -1134,7 +1134,7 @@ def test_jp2grok_rewrite_boxes(tmp_path):
     assert got_gcp.GCPZ == 2
     assert got_gcp.GCPPixel == 3
     assert got_gcp.GCPLine == 4
-    assert ds.GetGCPSpatialRef().GetAuthorityCode(None) == "32631"
+    assert ds.GetGCPSpatialRef().GetAuthorityCode() == "32631"
     ds = None
 
     # Add metadata
@@ -1244,7 +1244,7 @@ def test_jp2grok_transcode_markers(
     # Pixel data and georeferencing must survive transcode
     ds = gdal.Open(dst_jp2)
     assert ds is not None
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "32631"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "32631"
     assert ds.GetGeoTransform() == (500000, 1, 0, 5000000, 0, -1)
     assert np.array_equal(ds.GetRasterBand(1).ReadAsArray(), pixel_data)
     ds = None

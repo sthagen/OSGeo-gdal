@@ -1107,9 +1107,9 @@ def test_ogr_csv_29(tmp_path):
     lyr = ds.GetLayerByName("test")
     assert lyr.GetLayerDefn().GetGeomFieldCount() == 2
     srs = lyr.GetLayerDefn().GetGeomFieldDefn(0).GetSpatialRef()
-    assert srs.GetAuthorityCode(None) == "4326"
+    assert srs.GetAuthorityCode() == "4326"
     srs = lyr.GetLayerDefn().GetGeomFieldDefn(1).GetSpatialRef()
-    assert srs.GetAuthorityCode(None) == "32632"
+    assert srs.GetAuthorityCode() == "32632"
     feat = lyr.GetNextFeature()
     geom = feat.GetGeomFieldRef("geom__WKT_lyr1_EPSG_4326")
     if geom.ExportToWkt() != "POINT (1 2)":

@@ -658,7 +658,7 @@ def test_mrf_setspatialref():
     ds = None
     gdal.Unlink(filename + ".aux.xml")
     ds = gdal.Open(filename)
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "32631"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "32631"
     ds = None
     gdal.GetDriverByName("MRF").Delete(filename)
 
