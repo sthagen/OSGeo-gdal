@@ -172,6 +172,7 @@ def test_gdalalg_vector_info_layer():
     assert info.ParseRunAndFinalize(["-l", "path", "data/path.shp"])
     output_string = info["output-string"]
     j = json.loads(output_string)
+    assert j["driverShortName"] == "ESRI Shapefile"
     assert j["layers"][0]["name"] == "path"
 
 
