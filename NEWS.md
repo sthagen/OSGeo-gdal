@@ -34,7 +34,7 @@ GDAL 3.12.x bugfix release.
   (the toolkit is AGPL v3 licensed)
 * S102/S104/S111 driver: add write support
 * NITF driver: add support for [CADRG writing](https://gdal.org/en/latest/drivers/raster/nitf.html#cadrg-compressed-arc-digitized-raster-graphics-write-support)
-* Various code linting, static code analyzer fixes, etc.
+* Add support for INTERLIS 2.4
 * Make cloud users aware of commercial cloud providers that don't sponsor the
   project and whose cloud storage protocol may be removed in the future (#14313)
 * Revert removal of OGR Tiger and UK. NTF drivers (but still to be considered
