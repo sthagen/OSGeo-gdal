@@ -539,6 +539,16 @@ def test_ogr_geos_issimple_false():
 ###############################################################################
 
 
+def test_ogr_geos_isvalid_line_one_point():
+
+    g1 = ogr.CreateGeometryFromWkt("LINESTRING(0 0)")
+
+    assert g1.GetInvalidityReason() is not None
+
+
+###############################################################################
+
+
 def test_ogr_geos_isvalid_true():
 
     g1 = ogr.CreateGeometryFromWkt("LINESTRING(0 0, 1 1)")
@@ -583,6 +593,8 @@ def test_ogr_geos_isvalid_true_triangle():
 
     assert isring == 1
 
+    assert g1.GetInvalidityReason() is None
+
 
 ###############################################################################
 
@@ -595,6 +607,8 @@ def test_ogr_geos_isvalid_false():
         isring = g1.IsValid()
 
     assert isring == 0
+
+    assert g1.GetInvalidityReason() is not None
 
 
 ###############################################################################

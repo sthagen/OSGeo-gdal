@@ -365,6 +365,9 @@ def test_ogr_geom_tin():
     tin.FlattenTo2D()
     assert not tin.IsValid(), "Problem with IsValid() in TIN"
 
+    if ogrtest.have_sfcgal():
+        assert "orientation" in tin.GetInvalidityReason()
+
     # 4 points
     invalid_wkt = "TIN (((0 0,0 1,1 1,1 0,0 0)))"
     with gdal.quiet_errors():
@@ -1553,6 +1556,7 @@ def test_ogr_geom_triangle_sfcgal():
         pytest.skip("SFCGAL is not available")
 
     g1 = ogr.CreateGeometryFromWkt("TRIANGLE ((0 0,100 0 100,0 100 100,0 0))")
+    assert g1.GetInvalidityReason() is None
     g2 = ogr.CreateGeometryFromWkt("TRIANGLE ((-1 -1,100 0 100,0 100 100,-1 -1))")
     assert g2.Intersects(g1)
 

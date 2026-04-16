@@ -426,7 +426,7 @@ class CPL_DLL OGRGeometry
     virtual int getCoordinateDimension() const;
     int CoordinateDimension() const;
     virtual OGRBoolean IsEmpty() const = 0;
-    virtual OGRBoolean IsValid() const;
+    virtual OGRBoolean IsValid(std::string *posReason = nullptr) const;
     virtual OGRGeometry *MakeValid(CSLConstList papszOptions = nullptr) const;
     virtual OGRGeometry *Normalize() const;
     virtual OGRBoolean IsSimple() const;
@@ -1934,7 +1934,7 @@ class CPL_DLL OGRCircularString : public OGRSimpleCurve
 {
   private:
     void ExtendEnvelopeWithCircular(OGREnvelope *psEnvelope) const;
-    OGRBoolean IsValidFast() const;
+    OGRBoolean IsValidFast(std::string *posReason = nullptr) const;
     int IsFullCircle(double &cx, double &cy, double &square_R) const;
 
   protected:
@@ -1982,7 +1982,7 @@ class CPL_DLL OGRCircularString : public OGRSimpleCurve
                                     OGRErr *err = nullptr) const override;
 
     // IGeometry interface.
-    OGRBoolean IsValid() const override;
+    OGRBoolean IsValid(std::string *posReason = nullptr) const override;
     void getEnvelope(OGREnvelope *psEnvelope) const override;
     void getEnvelope(OGREnvelope3D *psEnvelope) const override;
     OGRCircularString *clone() const override;
