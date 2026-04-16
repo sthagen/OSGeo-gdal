@@ -41,7 +41,7 @@ Program-Specific Options
 
     Output layer name.
 
-    Only meaningful when creating a single layer dataset. It allows to define or override
+    Only meaningful when creating a single layer dataset. It allows defining or overriding
     the name of the created layer.
 
 .. option:: -i, --like, --input <TEMPLATE-DATASET>

@@ -2239,7 +2239,7 @@ int MMRBand::WriteAttributeTable(GDALDataset &oSrcDS)
     if (!pBD_XP)
         return 1;
 
-    // Creating a simple REL that allows to MiraMon user to
+    // Creating a simple REL that allows MiraMon user to
     // document this RAT in case of need.
     auto pRATRel = std::make_unique<MMRRel>(m_osRATRELName);
     if (!pRATRel->OpenRELFile("wb"))

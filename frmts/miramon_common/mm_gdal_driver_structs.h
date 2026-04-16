@@ -636,7 +636,7 @@ struct MiraMonPolygonLayer
     }
 */
 
-// Information that allows to reuse memory stuff when
+// Information that allows reusing memory stuff when
 // features are being read
 struct MiraMonFeature
 {

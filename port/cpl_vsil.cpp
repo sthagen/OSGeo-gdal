@@ -4029,7 +4029,7 @@ void VSISetCredential(const char *pszPathPrefix, const char *pszKey,
  * virtual file system.
  *
  * That option may also be set as a configuration option with
- * CPLSetConfigOption(), but this function allows to specify them with a
+ * CPLSetConfigOption(), but this function allows specifying them with a
  * granularity at the level of a file path, which makes it easier if using the
  * same virtual file system but with different credentials (e.g. different
  * credentials for bucket "/vsis3/foo" and "/vsis3/bar")
@@ -4170,7 +4170,7 @@ const char *VSIGetPathSpecificOption(const char *pszPath, const char *pszKey,
  * identical or close to popular ones (typically AWS S3), but with slightly
  * different settings (at the very least the endpoint).
  *
- * This functions allows to duplicate the source virtual file system handler
+ * This functions allows duplicating the source virtual file system handler
  * as a new one with a different prefix (when the source virtual file system
  * handler supports the duplication operation).
  *

@@ -6802,7 +6802,7 @@ netCDF driver:
  * fix crash on invalid layer (ossfuzz 58469)
 
 OpenFileGDB driver:
- * allows to modify a record with a GlobalID field without regenerating it
+ * allows modifying a record with a GlobalID field without regenerating it
  * correctly read POINT EMPTY (#7986)
 
 Parquet driver:
