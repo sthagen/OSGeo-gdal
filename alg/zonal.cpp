@@ -993,6 +993,9 @@ class GDALZonalStatsImpl
         return ret;
     }
 
+    bool ReallocCellCenterBuffersIfNeeded(size_t &nBufXSize, size_t &nBufYSize,
+                                          const GDALRasterWindow &oWindow);
+
     void WarnIfZonesNotCovered(const GDALRasterBand *poZonesBand) const
     {
         OGREnvelope oZonesEnv;
@@ -1117,6 +1120,8 @@ class GDALZonalStatsImpl
 
         auto pabyZonesBuf = CreateBuffer();
         size_t nBufSize = 0;
+        size_t nBufXSize = 0;
+        size_t nBufYSize = 0;
 
         const auto windowIteratorWrapper =
             poAlignedValuesDS->GetRasterBand(1)->IterateWindows(m_maxCells);
@@ -1126,6 +1131,11 @@ class GDALZonalStatsImpl
         {
             const auto nWindowSize = static_cast<size_t>(oWindow.nXSize) *
                                      static_cast<size_t>(oWindow.nYSize);
+            if (!ReallocCellCenterBuffersIfNeeded(nBufXSize, nBufYSize,
+                                                  oWindow))
+            {
+                return false;
+            }
 
             if (nBufSize < nWindowSize)
             {
@@ -1139,16 +1149,6 @@ class GDALZonalStatsImpl
                 Realloc(m_pabyMaskBuf, nWindowSize,
                         GDALGetDataTypeSizeBytes(m_maskDataType),
                         bAllocSuccess);
-
-                if (m_stats_options.store_xy)
-                {
-                    Realloc(m_padfX, oWindow.nXSize,
-                            GDALGetDataTypeSizeBytes(GDT_Float64),
-                            bAllocSuccess);
-                    Realloc(m_padfY, oWindow.nYSize,
-                            GDALGetDataTypeSizeBytes(GDT_Float64),
-                            bAllocSuccess);
-                }
 
                 if (poWeightsBand)
                 {
@@ -1370,6 +1370,8 @@ class GDALZonalStatsImpl
         auto addHit = [](void *hit, void *hits)
         { static_cast<std::vector<void *> *>(hits)->push_back(hit); };
         size_t nBufSize = 0;
+        size_t nBufXSize = 0;
+        size_t nBufYSize = 0;
 
         const auto windowIteratorWrapper =
             m_src.GetRasterBand(m_options.bands.front())
@@ -1399,6 +1401,12 @@ class GDALZonalStatsImpl
 
             if (!aiHits.empty())
             {
+                if (!ReallocCellCenterBuffersIfNeeded(nBufXSize, nBufYSize,
+                                                      oChunkWindow))
+                {
+                    return false;
+                }
+
                 if (nBufSize < nWindowSize)
                 {
                     bool bAllocSuccess = true;
@@ -1411,15 +1419,6 @@ class GDALZonalStatsImpl
                     Realloc(m_pabyMaskBuf, nWindowSize,
                             GDALGetDataTypeSizeBytes(m_maskDataType),
                             bAllocSuccess);
-                    if (m_stats_options.store_xy)
-                    {
-                        Realloc(m_padfX, oChunkWindow.nXSize,
-                                GDALGetDataTypeSizeBytes(GDT_Float64),
-                                bAllocSuccess);
-                        Realloc(m_padfY, oChunkWindow.nYSize,
-                                GDALGetDataTypeSizeBytes(GDT_Float64),
-                                bAllocSuccess);
-                    }
                     if (m_weights != nullptr)
                     {
                         Realloc(m_padfWeightsBuf, nWindowSize,
@@ -1619,6 +1618,8 @@ class GDALZonalStatsImpl
         }
 
         size_t nBufSize = 0;
+        size_t nBufXSize = 0;
+        size_t nBufYSize = 0;
 
         OGRLayer *poSrcLayer = std::get<OGRLayer *>(m_zones);
         OGRLayer *poDstLayer = GetOutputLayer(false);
@@ -1699,6 +1700,12 @@ class GDALZonalStatsImpl
                 const size_t nWindowSize = static_cast<size_t>(oWindow.nXSize) *
                                            static_cast<size_t>(nRowsPerChunk);
 
+                if (!ReallocCellCenterBuffersIfNeeded(nBufXSize, nBufYSize,
+                                                      oWindow))
+                {
+                    return false;
+                }
+
                 if (nBufSize < nWindowSize)
                 {
                     bool bAllocSuccess = true;
@@ -1711,16 +1718,6 @@ class GDALZonalStatsImpl
                     Realloc(m_pabyMaskBuf, nWindowSize,
                             GDALGetDataTypeSizeBytes(m_maskDataType),
                             bAllocSuccess);
-
-                    if (m_stats_options.store_xy)
-                    {
-                        Realloc(m_padfX, oWindow.nXSize,
-                                GDALGetDataTypeSizeBytes(GDT_Float64),
-                                bAllocSuccess);
-                        Realloc(m_padfY, oWindow.nYSize,
-                                GDALGetDataTypeSizeBytes(GDT_Float64),
-                                bAllocSuccess);
-                    }
 
                     if (m_weights != nullptr)
                     {
@@ -1994,6 +1991,43 @@ class GDALZonalStatsImpl
     GEOSContextHandle_t m_geosContext{nullptr};
 #endif
 };
+
+bool GDALZonalStatsImpl::ReallocCellCenterBuffersIfNeeded(
+    size_t &nBufXSize, size_t &nBufYSize, const GDALRasterWindow &oWindow)
+{
+    if (!m_stats_options.store_xy)
+    {
+        return true;
+    }
+
+    if (nBufXSize < static_cast<size_t>(oWindow.nXSize))
+    {
+        bool bAllocSuccess = true;
+        Realloc(m_padfX, oWindow.nXSize, GDALGetDataTypeSizeBytes(GDT_Float64),
+                bAllocSuccess);
+        if (!bAllocSuccess)
+        {
+            return false;
+        }
+
+        nBufXSize = static_cast<size_t>(oWindow.nXSize);
+    }
+
+    if (nBufYSize < static_cast<size_t>(oWindow.nYSize))
+    {
+        bool bAllocSuccess = true;
+        Realloc(m_padfY, oWindow.nYSize, GDALGetDataTypeSizeBytes(GDT_Float64),
+                bAllocSuccess);
+        if (!bAllocSuccess)
+        {
+            return false;
+        }
+
+        nBufYSize = static_cast<size_t>(oWindow.nYSize);
+    }
+
+    return true;
+}
 
 static CPLErr GDALZonalStats(GDALDataset &srcDataset, GDALDataset *poWeights,
                              GDALDataset &zonesDataset, GDALDataset &dstDataset,
