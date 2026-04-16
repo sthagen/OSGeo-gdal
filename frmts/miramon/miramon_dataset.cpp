@@ -931,7 +931,7 @@ bool MMRDataset::IsCategoricalBand(GDALDataset &oSrcDS,
 }
 
 // In the RGB case, a map (.mmm) is generated with the RGB information of the bands.
-// This allows to visualize the RGB composition in MiraMon without having to create
+// This allows visualizing the RGB composition in MiraMon without having to create
 // a map in MiraMon and set the RGB information.
 void MMRDataset::WriteRGBMap()
 {
