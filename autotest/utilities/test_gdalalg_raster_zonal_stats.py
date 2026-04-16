@@ -1229,3 +1229,21 @@ def test_gdalalg_raster_zonal_stats_polygon_huge_extent_huge_raster(zonal):
     assert len(results) == 1
 
     assert results[0]["count"] == 2147483647.0
+
+
+def test_gdalalg_raster_zonal_stats_raster_zones_output_layer(zonal):
+
+    src_fname = "../gcore/data/byte.tif"
+    zones_ds = gdaltest.wkt_ds(["POLYGON EMPTY"])
+
+    zonal["input"] = src_fname
+    zonal["zones"] = zones_ds
+    zonal["stat"] = "count"
+    zonal["output-format"] = "MEM"
+    zonal["output-layer"] = "myresult"
+
+    assert zonal.Run()
+
+    out_ds = zonal.Output()
+
+    assert out_ds.GetLayer(0).GetName() == "myresult"

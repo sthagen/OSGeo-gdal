@@ -187,6 +187,10 @@ bool GDALRasterZonalStatsAlgorithm::RunStep(GDALPipelineStepRunContext &ctxt)
         aosOptions.AddNameValue("INCLUDE_FIELDS",
                                 Join(m_includeFields, ",").c_str());
     }
+    if (!m_outputLayerName.empty())
+    {
+        aosOptions.AddNameValue("OUTPUT_LAYER", m_outputLayerName.c_str());
+    }
     aosOptions.AddNameValue("PIXEL_INTERSECTION", m_pixels.c_str());
     if (m_memoryBytes != 0)
     {
