@@ -1246,7 +1246,7 @@ static void ReportOnLayer(CPLString &osRet, CPLJSONObject &oLayer,
         };
 
         const auto DisplaySRS =
-            [&osRet, &psOptions, apszWKTOptions,
+            [&osRet, &psOptions, &apszWKTOptions,
              DisplayExtraInfoSRS](const OGRSpatialReference *poSRS,
                                   const OGRGeomFieldDefn *poGFldDefn)
         {

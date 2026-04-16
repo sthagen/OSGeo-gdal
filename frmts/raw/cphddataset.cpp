@@ -852,44 +852,37 @@ bool CPHDGroup::AddSupportArray(const CPLXMLNode *psDataSupportArray)
                 return false;
             }
 
-            if (poBand)
-            {
-                auto dt = poBand->GetRasterDataType();
-                poSupportDS->SetBand(1, poBand.release());
-                auto poSupportArray = CPHDMDArray::Create(
-                    std::move(poSupportDS), "", std::string(pszArrayName),
-                    GDALExtendedDataType::Create(dt));
+            CPLAssert(poBand);
 
-                poSupportArray->m_apoAttributes.emplace_back(
-                    std::make_shared<GDALAttributeString>(
-                        "/" + std::string(pszArrayName), "element_format",
-                        CPLGetXMLValue(psSupportChild, "ElementFormat", "")));
-                poSupportArray->m_apoAttributes.emplace_back(
-                    std::make_shared<GDALAttributeNumeric>(
-                        "/" + std::string(pszArrayName), "x_0",
-                        CPLAtof(CPLGetXMLValue(psSupportChild, "X0", "0."))));
-                poSupportArray->m_apoAttributes.emplace_back(
-                    std::make_shared<GDALAttributeNumeric>(
-                        "/" + std::string(pszArrayName), "y_0",
-                        CPLAtof(CPLGetXMLValue(psSupportChild, "Y0", "0."))));
-                poSupportArray->m_apoAttributes.emplace_back(
-                    std::make_shared<GDALAttributeNumeric>(
-                        "/" + std::string(pszArrayName), "xss",
-                        CPLAtof(CPLGetXMLValue(psSupportChild, "XSS", "0."))));
-                poSupportArray->m_apoAttributes.emplace_back(
-                    std::make_shared<GDALAttributeNumeric>(
-                        "/" + std::string(pszArrayName), "yss",
-                        CPLAtof(CPLGetXMLValue(psSupportChild, "YSS", "0."))));
+            const auto dt = poBand->GetRasterDataType();
+            poSupportDS->SetBand(1, poBand.release());
+            auto poSupportArray = CPHDMDArray::Create(
+                std::move(poSupportDS), "", std::string(pszArrayName),
+                GDALExtendedDataType::Create(dt));
 
-                m_apoArrays.emplace_back(std::move(poSupportArray));
-            }
-            else
-            {
-                CPLError(CE_Failure, CPLE_AppDefined,
-                         "Unable to create support array %s : %s.",
-                         pszArrayName, m_poShared->m_osFilename.c_str());
-                return false;
-            }
+            poSupportArray->m_apoAttributes.emplace_back(
+                std::make_shared<GDALAttributeString>(
+                    "/" + std::string(pszArrayName), "element_format",
+                    CPLGetXMLValue(psSupportChild, "ElementFormat", "")));
+            poSupportArray->m_apoAttributes.emplace_back(
+                std::make_shared<GDALAttributeNumeric>(
+                    "/" + std::string(pszArrayName), "x_0",
+                    CPLAtof(CPLGetXMLValue(psSupportChild, "X0", "0."))));
+            poSupportArray->m_apoAttributes.emplace_back(
+                std::make_shared<GDALAttributeNumeric>(
+                    "/" + std::string(pszArrayName), "y_0",
+                    CPLAtof(CPLGetXMLValue(psSupportChild, "Y0", "0."))));
+            poSupportArray->m_apoAttributes.emplace_back(
+                std::make_shared<GDALAttributeNumeric>(
+                    "/" + std::string(pszArrayName), "xss",
+                    CPLAtof(CPLGetXMLValue(psSupportChild, "XSS", "0."))));
+            poSupportArray->m_apoAttributes.emplace_back(
+                std::make_shared<GDALAttributeNumeric>(
+                    "/" + std::string(pszArrayName), "yss",
+                    CPLAtof(CPLGetXMLValue(psSupportChild, "YSS", "0."))));
+
+            m_apoArrays.emplace_back(std::move(poSupportArray));
+
             break;
         }
     }
@@ -1059,7 +1052,7 @@ std::shared_ptr<GDALMDArray> CPHDGroup::OpenMDArray(const std::string &osName,
                     size_t nVectors = static_cast<size_t>(
                         poPVPArray->GetDimensions()[0]->GetSize());
 
-                    auto oEDT = poPVPArray->GetDataType();
+                    const auto &oEDT = poPVPArray->GetDataType();
 #if CPL_IS_LSB
                     // swap all numeric types as CPHD binary data is big endian
                     auto ptr = m_abyPVPData.data();

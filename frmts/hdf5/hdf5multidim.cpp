@@ -1712,7 +1712,7 @@ void HDF5Array::InstantiateDimensions(const std::string &osParentName,
                         poRootGroup->OpenDimensionFromFullname(osDimFullName);
                     if (poDim)
                     {
-                        oMapFullNameToDim[osDimFullName] = poDim;
+                        oMapFullNameToDim[osDimFullName] = std::move(poDim);
                     }
                 }
             }
