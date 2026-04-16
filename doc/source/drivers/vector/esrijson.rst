@@ -92,5 +92,4 @@ See Also
 --------
 
 -  :ref:`GeoJSON driver <vector.geojson>`
--  `GeoServices REST
-   Specification <http://www.esri.com/industries/landing-pages/geoservices/geoservices.html>`__
+-  `GeoServices REST Specification <https://geoservices.github.io/>`__

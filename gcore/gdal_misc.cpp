@@ -3669,7 +3669,9 @@ std::string GDALPrintDriverList(int nOptions, bool bJSON)
         CSLConstList papszMD = GDALGetMetadata(hDriver, nullptr);
 
         if (nOptions == GDAL_OF_RASTER &&
-            !CPLFetchBool(papszMD, GDAL_DCAP_RASTER, false))
+            !CPLFetchBool(papszMD, GDAL_DCAP_RASTER, false) &&
+            // HACK For CPHD driver to appear
+            !CPLFetchBool(papszMD, GDAL_DCAP_MULTIDIM_RASTER, false))
             continue;
         if (nOptions == GDAL_OF_VECTOR &&
             !CPLFetchBool(papszMD, GDAL_DCAP_VECTOR, false))

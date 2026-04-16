@@ -75,6 +75,7 @@ GDALVectorPipelineReadOutputDataset::GDALVectorPipelineReadOutputDataset(
     : m_srcDS(srcDS)
 {
     SetDescription(m_srcDS.GetDescription());
+    poDriver = m_srcDS.GetDriver();
 }
 
 /************************************************************************/

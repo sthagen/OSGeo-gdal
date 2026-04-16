@@ -1119,7 +1119,7 @@ _gdal_viewshed()
   cur="${COMP_WORDS[$COMP_CWORD]}"
   case "$cur" in
     -*)
-      key_list="--help --long-usage --help-general -of -ox -oy -oz -vv -iv -ov -co -a_nodata -tz -md -j -cc -b -om -os --quiet --version --build --license --formats --format --optfile --config --debug --pause --locale "
+      key_list="--help --long-usage --help-general -of -ox -oy -oz -vv -iv -ov -co -a_nodata -tz -md -j -cc -b -om -os -sd --quiet --version --build --license --formats --format --optfile --config --debug --pause --locale "
       if [ "$CURRENT_SHELL" = "bash" ]; then
         mapfile -t COMPREPLY < <(compgen -W "$key_list" -- "$cur")
       else
