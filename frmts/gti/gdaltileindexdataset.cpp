@@ -2988,7 +2988,10 @@ void GDALTileIndexDataset::LoadOverviews()
 
             std::string osResolvedDSName(osDSName);
             if (!m_osBaseDir.empty() && !osResolvedDSName.empty() &&
-                CPLIsFilenameRelative(osResolvedDSName.c_str()))
+                (cpl::starts_with(osResolvedDSName, GTI_PREFIX)
+                     ? CPLIsFilenameRelative(osResolvedDSName.c_str() +
+                                             strlen(GTI_PREFIX))
+                     : CPLIsFilenameRelative(osResolvedDSName.c_str())))
             {
                 if (cpl::starts_with(osResolvedDSName, GTI_PREFIX))
                 {
