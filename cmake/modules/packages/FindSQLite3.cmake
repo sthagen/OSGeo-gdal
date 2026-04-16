@@ -192,7 +192,14 @@ if(SQLite3_FOUND)
   # Alias SQLite3::SQLite3 to SQLite::SQLite3 since that's what PROJ will
   # expect (when static linking PROJ)
   if(NOT TARGET SQLite::SQLite3)
-    set_target_properties(SQLite3::SQLite3 PROPERTIES IMPORTED_GLOBAL TRUE)
+    get_target_property(IS_SQLITE3_IMPORTED SQLite3::SQLite3 IMPORTED)
+    if(IS_SQLITE3_IMPORTED AND CMAKE_VERSION VERSION_LESS "3.18")
+        set_target_properties(SQLite3::SQLite3 PROPERTIES IMPORTED_GLOBAL TRUE)
+        message(DEPRECATION "If your project consumes GDAL as a subdirectory \
+          and also uses either the SQLite3::SQLite3 or SQLite::SQLite3 target, \
+          make sure you have your own call to find_package.\nThese targets \
+          will no longer be available to the global CMake scope once GDAL bumps to CMake v3.18+.")
+    endif()
     add_library(SQLite::SQLite3 ALIAS SQLite3::SQLite3)
   endif()
 
