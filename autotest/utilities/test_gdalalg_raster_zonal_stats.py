@@ -611,8 +611,9 @@ def test_gdalalg_raster_zonal_stats_output_format_detection(
     assert out_ds.GetDriver().GetName() == "CSV"
 
 
+@pytest.mark.parametrize("include_field", ["ALL", "NONE", ["PRFEDEA", "EAS_ID"]])
 def test_gdalalg_raster_zonal_stats_polygon_zones_include_fields(
-    zonal, strategy, polyrast
+    zonal, strategy, polyrast, include_field
 ):
 
     zonal["input"] = polyrast
@@ -626,7 +627,14 @@ def test_gdalalg_raster_zonal_stats_polygon_zones_include_fields(
     with pytest.raises(Exception, match="Field .* not found"):
         zonal.Run()
 
-    zonal["include-field"] = ["PRFEDEA", "EAS_ID"]
+    zonal["include-field"] = include_field
+
+    if include_field == "ALL":
+        expected_fields = ["AREA", "EAS_ID", "PRFEDEA", "sum"]
+    elif include_field == "NONE":
+        expected_fields = ["sum"]
+    else:
+        expected_fields = ["PRFEDEA", "EAS_ID", "sum"]
 
     assert zonal.Run()
 
@@ -634,10 +642,14 @@ def test_gdalalg_raster_zonal_stats_polygon_zones_include_fields(
 
     f = out_ds.GetLayer(0).GetNextFeature()
 
-    assert field_names(f) == ["PRFEDEA", "EAS_ID", "sum"]
+    assert field_names(f) == expected_fields
 
-    assert f["PRFEDEA"] == "35043411"
-    assert f["EAS_ID"] == 168
+    if "PRFEDEA" in expected_fields:
+        assert f["PRFEDEA"] == "35043411"
+    if "EAS_ID" in expected_fields:
+        assert f["EAS_ID"] == 168
+    if "AREA" in expected_fields:
+        assert f["AREA"] == 215229.266
     assert f["sum"] == 369.0
 
 

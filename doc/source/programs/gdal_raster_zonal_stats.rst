@@ -121,7 +121,7 @@ Program-Specific Options
 .. option:: --include-field <INCLUDE-FIELD>
 
    Specifies one or more fields from the zones to be copied to the output. Only
-   available when vector zones are used.
+   available when vector zones are used. Since GDAL 3.13, the special values "ALL" and "NONE" can be used.
 
 .. option:: --pixels <PIXELS>
 
