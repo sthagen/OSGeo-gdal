@@ -67,6 +67,10 @@ struct GDALZonalStatsOptions
                     include_fields.push_back(pszField);
                 }
             }
+            else if (EQUAL(key, "OUTPUT_LAYER"))
+            {
+                output_layer = value;
+            }
             else if (EQUAL(key, "PIXEL_INTERSECTION"))
             {
                 if (EQUAL(value, "DEFAULT"))
@@ -194,6 +198,7 @@ struct GDALZonalStatsOptions
     int zones_band{};
     int weights_band{};
     CPLStringList layer_creation_options{};
+    std::string output_layer{"stats"};
 };
 
 template <typename T = GByte> auto CreateBuffer()
@@ -541,10 +546,8 @@ class GDALZonalStatsImpl
 
     OGRLayer *GetOutputLayer(bool createValueField)
     {
-        std::string osLayerName = "stats";
-
         OGRLayer *poLayer =
-            m_dst.CreateLayer(osLayerName.c_str(), nullptr,
+            m_dst.CreateLayer(m_options.output_layer.c_str(), nullptr,
                               m_options.layer_creation_options.List());
         if (!poLayer)
             return nullptr;
@@ -2118,6 +2121,8 @@ static CPLErr GDALZonalStats(GDALDataset &srcDataset, GDALDataset *poWeights,
  *   WEIGHTS_BAND: the band to read from WeightsDS
  *   ZONES_BAND: the band to read from hZonesDS, if hZonesDS is a raster
  *   ZONES_LAYER: the layer to read from hZonesDS, if hZonesDS is a vector
+ *   OUTPUT_LAYER: the layer name to create in hOutDS (since GDAL 3.13; default
+ *                 is "stats")
  *   LCO_{key}: layer creation option {key}
  *
  * @param pfnProgress optional progress reporting callback
