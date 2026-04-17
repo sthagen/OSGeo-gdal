@@ -653,6 +653,36 @@ def test_gdalalg_raster_zonal_stats_polygon_zones_include_fields(
     assert f["sum"] == 369.0
 
 
+def test_gdalalg_raster_zonal_stats_polygon_zones_include_geom(
+    zonal, strategy, polyrast
+):
+
+    zonal["input"] = polyrast
+    zonal["output"] = ""
+    zonal["output-format"] = "MEM"
+    zonal["strategy"] = strategy
+    zonal["stat"] = "sum"
+    zonal["include-geom"] = True
+    zonal["zones"] = "../ogr/data/poly.shp"
+
+    assert zonal.Run()
+
+    out_ds = zonal.Output()
+    out_lyr = out_ds.GetLayer(0)
+
+    src_ds = gdal.OpenEx("../ogr/data/poly.shp")
+    src_lyr = src_ds.GetLayer(0)
+
+    assert out_lyr.GetSpatialRef().IsSame(src_lyr.GetSpatialRef())
+
+    for src_feat, dst_feat in zip(src_lyr, out_lyr):
+        src_geom = src_feat.GetGeometryRef()
+        dst_geom = dst_feat.GetGeometryRef()
+
+        assert src_geom.GetSpatialReference().IsSame(dst_geom.GetSpatialReference())
+        ogrtest.check_feature_geometry(dst_feat, src_geom)
+
+
 def test_gdalalg_raster_zonal_stats_raster_zones_include_fields(zonal):
 
     zonal["input"] = "../gcore/data/byte.tif"
@@ -663,6 +693,19 @@ def test_gdalalg_raster_zonal_stats_raster_zones_include_fields(zonal):
     zonal["include-field"] = "id"
 
     with pytest.raises(Exception, match="Cannot include fields"):
+        zonal.Run()
+
+
+def test_gdalalg_raster_zonal_stats_raster_zones_include_geom(zonal):
+
+    zonal["input"] = "../gcore/data/byte.tif"
+    zonal["zones"] = "../gcore/data/byte.tif"
+    zonal["output"] = ""
+    zonal["output-format"] = "MEM"
+    zonal["stat"] = "sum"
+    zonal["include-geom"] = True
+
+    with pytest.raises(Exception, match="Cannot include geometry"):
         zonal.Run()
 
 

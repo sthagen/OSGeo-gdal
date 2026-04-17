@@ -121,6 +121,7 @@ id-metadata-item
 id-method
 ignore-missing-fields
 include-field
+include-geom
 include-row-col
 include-valid
 include-xy
