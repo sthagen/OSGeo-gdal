@@ -127,6 +127,7 @@ include-valid
 include-xy
 init
 input
+input-crs
 input-field
 input-format
 input-layer
@@ -226,6 +227,7 @@ operator
 optimization
 out-of-range-value
 output
+output-crs
 output-data-type
 output-format
 output-layer
