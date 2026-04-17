@@ -245,7 +245,7 @@ OGRGeometryH CPL_DLL OGR_G_Value(OGRGeometryH,
 void CPL_DLL OGR_G_Empty(OGRGeometryH);
 int CPL_DLL OGR_G_IsEmpty(OGRGeometryH);
 int CPL_DLL OGR_G_IsValid(OGRGeometryH);
-/*char    CPL_DLL *OGR_G_IsValidReason( OGRGeometryH );*/
+char CPL_DLL *OGR_G_GetInvalidityReason(OGRGeometryH) CPL_WARN_UNUSED_RESULT;
 OGRGeometryH CPL_DLL OGR_G_MakeValid(OGRGeometryH) CPL_WARN_UNUSED_RESULT;
 OGRGeometryH CPL_DLL OGR_G_MakeValidEx(OGRGeometryH,
                                        CSLConstList) CPL_WARN_UNUSED_RESULT;

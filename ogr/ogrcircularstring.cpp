@@ -686,14 +686,24 @@ OGRCircularString::CurveToLine(double dfMaxAngleStepSizeDegrees,
 /*                            IsValidFast()                             */
 /************************************************************************/
 
-OGRBoolean OGRCircularString::IsValidFast() const
+OGRBoolean OGRCircularString::IsValidFast(std::string *posReason) const
 
 {
     if (nPointCount == 1 || nPointCount == 2 ||
         (nPointCount >= 3 && (nPointCount % 2) == 0))
     {
-        CPLError(CE_Failure, CPLE_NotSupported,
-                 "Bad number of points in circular string : %d", nPointCount);
+        if (posReason)
+        {
+            *posReason =
+                CPLSPrintf("Invalid number of points in circular string : %d",
+                           nPointCount);
+        }
+        else
+        {
+            CPLError(CE_Failure, CPLE_NotSupported,
+                     "Invalid number of points in circular string : %d",
+                     nPointCount);
+        }
         return FALSE;
     }
     return TRUE;
@@ -703,10 +713,10 @@ OGRBoolean OGRCircularString::IsValidFast() const
 /*                              IsValid()                               */
 /************************************************************************/
 
-OGRBoolean OGRCircularString::IsValid() const
+OGRBoolean OGRCircularString::IsValid(std::string *posReason) const
 
 {
-    return IsValidFast() && OGRGeometry::IsValid();
+    return IsValidFast(posReason) && OGRGeometry::IsValid(posReason);
 }
 
 /************************************************************************/

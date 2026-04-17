@@ -28,6 +28,7 @@
 
 #include "cpl_conv.h"
 #include "cpl_error.h"
+#include "cpl_error_internal.h"
 #include "cpl_multiproc.h"
 #include "cpl_string.h"
 #include "ogr_api.h"
@@ -2262,20 +2263,26 @@ int OGR_G_IsEmpty(OGRGeometryH hGeom)
 /**
  * \brief Test if the geometry is valid.
  *
- * This method is the same as the C function OGR_G_IsValid().
+ * This method is the same as the C functions OGR_G_IsValid() and
+ * OGR_G_GetInvalidityReason().
  *
  * This method is built on the GEOS library, check it for the definition
  * of the geometry operation.
  * If OGR is built without the GEOS library, this method will always return
  * FALSE.
  *
- *
+ * @param[out] posReason (since 3.13) Pointer to a string to receive the reason
+ *                       for invalidity, or nullptr. When nullptr, invalidity
+ *                       reasons are emitted as CPL warnings.
  * @return TRUE if the geometry has no points, otherwise FALSE.
  */
 
-OGRBoolean OGRGeometry::IsValid() const
+OGRBoolean OGRGeometry::IsValid(std::string *posReason) const
 
 {
+    if (posReason)
+        posReason->clear();
+
     if (IsSFCGALCompatible())
     {
 #ifndef HAVE_SFCGAL
@@ -2303,6 +2310,18 @@ OGRBoolean OGRGeometry::IsValid() const
         }
 
         const int res = sfcgal_geometry_is_valid(poThis);
+        if (res != 1 && posReason)
+        {
+            char *pszReason = nullptr;
+            sfcgal_geometry_is_valid_detail(poThis, &pszReason, nullptr);
+            if (pszReason)
+            {
+                *posReason = pszReason;
+                free(pszReason);
+            }
+            else
+                *posReason = "unknown reason";
+        }
         sfcgal_geometry_delete(poThis);
         return res == 1;
 #endif
@@ -2324,13 +2343,61 @@ OGRBoolean OGRGeometry::IsValid() const
         GEOSContextHandle_t hGEOSCtxt =
             initGEOS_r(OGRGEOSWarningHandler, OGRGEOSWarningHandler);
 
-        GEOSGeom hThisGeosGeom = exportToGEOS(hGEOSCtxt);
+        GEOSGeom hThisGeosGeom;
+        if (posReason)
+        {
+            CPLErrorAccumulator oAccumulator;
+            {
+                auto oContext = oAccumulator.InstallForCurrentScope();
+                CPL_IGNORE_RET_VAL(oContext);
+                hThisGeosGeom = exportToGEOS(hGEOSCtxt);
+            }
+            if (!hThisGeosGeom && oAccumulator.GetErrors().size() == 1)
+            {
+                std::string msg = oAccumulator.GetErrors()[0].msg;
+
+                // Trim GEOS exception name
+                const auto subMsgPos = msg.find(": ");
+                if (subMsgPos != std::string::npos)
+                {
+                    msg = msg.substr(subMsgPos + strlen(": "));
+                }
+
+                // Trim newline from end of GEOS exception message
+                if (!msg.empty() && msg.back() == '\n')
+                {
+                    msg.pop_back();
+                }
+
+                *posReason = msg;
+            }
+        }
+        else
+        {
+            hThisGeosGeom = exportToGEOS(hGEOSCtxt);
+        }
 
         if (hThisGeosGeom != nullptr)
         {
-            bResult = GEOSisValid_r(hGEOSCtxt, hThisGeosGeom) == 1;
+            if (posReason)
+            {
+                CPLErrorAccumulator oAccumulator;
+                {
+                    auto oContext = oAccumulator.InstallForCurrentScope();
+                    CPL_IGNORE_RET_VAL(oContext);
+                    bResult = GEOSisValid_r(hGEOSCtxt, hThisGeosGeom) == 1;
+                }
+                if (!bResult && oAccumulator.GetErrors().size() == 1)
+                {
+                    *posReason = oAccumulator.GetErrors()[0].msg;
+                }
+            }
+            else
+            {
+                bResult = GEOSisValid_r(hGEOSCtxt, hThisGeosGeom) == 1;
+            }
 #ifdef DEBUG_VERBOSE
-            if (!bResult)
+            if (!bResult && !posReason)
             {
                 char *pszReason = GEOSisValidReason_r(hGEOSCtxt, hThisGeosGeom);
                 CPLDebug("OGR", "%s", pszReason);
@@ -2361,9 +2428,12 @@ OGRBoolean OGRGeometry::IsValid() const
  * If OGR is built without the GEOS library, this function will always return
  * FALSE.
  *
+ * If the geometry is invalid, the reason for its invalidity is emitted as a
+ * CPL warning. To get it in a string instead, use OGR_G_GetInvalidityReason()
+ *
  * @param hGeom The Geometry to test.
  *
- * @return TRUE if the geometry has no points, otherwise FALSE.
+ * @return TRUE if the geometry is valid, otherwise FALSE.
  */
 
 int OGR_G_IsValid(OGRGeometryH hGeom)
@@ -2372,6 +2442,50 @@ int OGR_G_IsValid(OGRGeometryH hGeom)
     VALIDATE_POINTER1(hGeom, "OGR_G_IsValid", FALSE);
 
     return OGRGeometry::FromHandle(hGeom)->IsValid();
+}
+
+/************************************************************************/
+/*                     OGR_G_GetInvalidityReason()                      */
+/************************************************************************/
+
+/**
+ * \brief Test if the geometry is valid and, if not, return the invalidity reason.
+ *
+ * This function is the same as the C++ method OGRGeometry::IsValid().
+ *
+ * This function is built on the GEOS library, check it for the definition
+ * of the geometry operation.
+ * If OGR is built without the GEOS library, this function will always return
+ * FALSE.
+ *
+ * @param hGeom The Geometry to test.
+ * @return a string with the invalidity reason, to free with CPLFree(),
+ * if the geometry is invalid, or nullptr if the geometry is valid.
+ *
+ * @since 3.13
+ */
+
+char *OGR_G_GetInvalidityReason(OGRGeometryH hGeom)
+
+{
+    VALIDATE_POINTER1(hGeom, "OGR_G_GetInvalidityReason", nullptr);
+
+    std::string osReason;
+    const int nRet = OGRGeometry::FromHandle(hGeom)->IsValid(&osReason);
+    if (osReason.empty())
+    {
+        if (!nRet)
+        {
+            // not sure if that can happen
+            return CPLStrdup("unknown reason");
+        }
+        else
+            return nullptr;
+    }
+    else
+    {
+        return CPLStrdup(osReason.c_str());
+    }
 }
 
 /************************************************************************/
