@@ -1921,7 +1921,8 @@ bool GDALAlgorithm::ParseArgument(
                      std::vector<double>, std::vector<GDALArgDatasetValue>>>
         &inConstructionValues)
 {
-    const bool isListArg = GDALAlgorithmArgTypeIsList(arg->GetType());
+    const bool isListArg =
+        GDALAlgorithmArgTypeIsList(arg->GetType()) && arg->GetMaxCount() > 1;
     if (arg->IsExplicitlySet() && !isListArg)
     {
         // Hack for "gdal info" to be able to pass an opened raster dataset
@@ -2028,6 +2029,13 @@ bool GDALAlgorithm::ParseArgument(
             {
                 valueVector.push_back(v);
             }
+            if (arg->GetMaxCount() == 1)
+            {
+                bool ret = arg->Set(std::move(valueVector));
+                inConstructionValues.erase(inConstructionValues.find(arg));
+                return ret;
+            }
+
             break;
         }
 
@@ -2066,6 +2074,13 @@ bool GDALAlgorithm::ParseArgument(
                     return false;
                 }
             }
+            if (arg->GetMaxCount() == 1)
+            {
+                bool ret = arg->Set(std::move(valueVector));
+                inConstructionValues.erase(inConstructionValues.find(arg));
+                return ret;
+            }
+
             break;
         }
 
@@ -2099,6 +2114,13 @@ bool GDALAlgorithm::ParseArgument(
                 }
                 valueVector.push_back(dfValue);
             }
+            if (arg->GetMaxCount() == 1)
+            {
+                bool ret = arg->Set(std::move(valueVector));
+                inConstructionValues.erase(inConstructionValues.find(arg));
+                return ret;
+            }
+
             break;
         }
 
@@ -2127,6 +2149,13 @@ bool GDALAlgorithm::ParseArgument(
                     valueVector.push_back(GDALArgDatasetValue(v));
                 }
             }
+            if (arg->GetMaxCount() == 1)
+            {
+                bool ret = arg->Set(std::move(valueVector));
+                inConstructionValues.erase(inConstructionValues.find(arg));
+                return ret;
+            }
+
             break;
         }
     }
