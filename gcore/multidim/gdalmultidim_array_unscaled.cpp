@@ -30,7 +30,8 @@ bool GDALMDArrayUnscaled::IRead(const GUInt64 *arrayStartIdx,
 {
     const double dfScale = m_dfScale;
     const double dfOffset = m_dfOffset;
-    const bool bDTIsComplex = GDALDataTypeIsComplex(m_dt.GetNumericDataType());
+    const bool bDTIsComplex =
+        CPL_TO_BOOL(GDALDataTypeIsComplex(m_dt.GetNumericDataType()));
     const auto dtDouble =
         GDALExtendedDataType::Create(bDTIsComplex ? GDT_CFloat64 : GDT_Float64);
     const size_t nDTSize = dtDouble.GetSize();
@@ -197,7 +198,8 @@ bool GDALMDArrayUnscaled::IWrite(const GUInt64 *arrayStartIdx,
 {
     const double dfScale = m_dfScale;
     const double dfOffset = m_dfOffset;
-    const bool bDTIsComplex = GDALDataTypeIsComplex(m_dt.GetNumericDataType());
+    const bool bDTIsComplex =
+        CPL_TO_BOOL(GDALDataTypeIsComplex(m_dt.GetNumericDataType()));
     const auto dtDouble =
         GDALExtendedDataType::Create(bDTIsComplex ? GDT_CFloat64 : GDT_Float64);
     const size_t nDTSize = dtDouble.GetSize();

@@ -36,7 +36,7 @@ PostGISRasterRasterBand::PostGISRasterRasterBand(PostGISRasterDataset *poDSIn,
     nBand = nBandIn;
 
     eDataType = eDataTypeIn;
-    m_bNoDataValueSet = bNoDataValueSetIn;
+    m_bNoDataValueSet = CPL_TO_BOOL(bNoDataValueSetIn);
     m_dfNoDataValue = dfNodata;
 
     nRasterXSize = poDS->GetRasterXSize();

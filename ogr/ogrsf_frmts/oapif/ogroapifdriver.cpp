@@ -1302,7 +1302,7 @@ OGROAPIFLayer::OGROAPIFLayer(OGROAPIFDataset *poDS, const CPLString &osName,
         !osActiveCRS.empty() ? osActiveCRS.c_str() : SRS_WKT_WGS84_LAT_LONG,
         OGRSpatialReference::SET_FROM_USER_INPUT_LIMITATIONS_get());
     poSRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
-    m_bIsGeographicCRS = poSRS->IsGeographic();
+    m_bIsGeographicCRS = CPL_TO_BOOL(poSRS->IsGeographic());
     m_bCRSHasGISFriendlyOrder =
         osActiveCRS.empty() || HasGISFriendlyAxisOrder(poSRS);
     m_osActiveCRS = osActiveCRS;
@@ -1495,7 +1495,7 @@ OGRErr OGROAPIFLayer::SetActiveSRS(int /*iGeomField*/,
                 OGRSpatialReference *poSRSClone = poSRS->Clone();
                 poSRSClone->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
                 poGeomFieldDefn->SetSpatialRef(poSRSClone);
-                m_bIsGeographicCRS = poSRSClone->IsGeographic();
+                m_bIsGeographicCRS = CPL_TO_BOOL(poSRSClone->IsGeographic());
                 m_bCRSHasGISFriendlyOrder = HasGISFriendlyAxisOrder(poSRSClone);
                 poSRSClone->Release();
             }

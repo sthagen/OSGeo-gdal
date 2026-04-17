@@ -1787,7 +1787,7 @@ void OGR_Fld_SetNullable(OGRFieldDefnH hDefn, int bNullableIn)
 
 void OGR_Fld_SetGenerated(OGRFieldDefnH hDefn, int bGeneratedIn)
 {
-    OGRFieldDefn::FromHandle(hDefn)->SetGenerated(bGeneratedIn);
+    OGRFieldDefn::FromHandle(hDefn)->SetGenerated(CPL_TO_BOOL(bGeneratedIn));
 }
 
 /************************************************************************/

@@ -3587,8 +3587,8 @@ GEOSGeom OGRGeometry::exportToGEOS(GEOSContextHandle_t hGEOSCtxt,
     std::unique_ptr<OGRGeometry> poModifiedInput = nullptr;
     const OGRGeometry *poGeosInput = this;
 
-    const bool bHasZ = poGeosInput->Is3D();
-    bool bHasM = poGeosInput->IsMeasured();
+    const bool bHasZ = CPL_TO_BOOL(poGeosInput->Is3D());
+    bool bHasM = CPL_TO_BOOL(poGeosInput->IsMeasured());
 
     if (poGeosInput->hasCurveGeometry())
     {

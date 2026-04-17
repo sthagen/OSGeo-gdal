@@ -684,7 +684,7 @@ struct OPJCodecWrapper
         opj_stream_set_skip_function(pStream, JP2Dataset_Skip);
         opj_stream_set_user_data(pStream, psJP2File, nullptr);
 
-        return opj_start_compress(pCodec, psImage, pStream);
+        return CPL_TO_BOOL(opj_start_compress(pCodec, psImage, pStream));
     }
 
     /* No-ops: OpenJPEG JP2 boxes are handled by GDAL's GDALJP2Box I/O */
@@ -726,14 +726,15 @@ struct OPJCodecWrapper
     {
         if (!pCodec || !pStream)
             return false;
-        return opj_write_tile(pCodec, tileIndex, buff, buffLen, pStream);
+        return CPL_TO_BOOL(
+            opj_write_tile(pCodec, tileIndex, buff, buffLen, pStream));
     }
 
     bool finishCompress(void)
     {
         bool rc = false;
         if (pCodec && pStream)
-            rc = opj_end_compress(pCodec, pStream);
+            rc = CPL_TO_BOOL(opj_end_compress(pCodec, pStream));
         if (!rc)
             CPLError(CE_Failure, CPLE_AppDefined, "opj_end_compress() failed");
         free();

@@ -236,8 +236,8 @@ size_t JPGVSIFileMultiplexerHandler::Read(void *pBuffer, size_t nBytes)
     }
     const size_t nRet = fp->Read(pBuffer, nBytes);
     m_nCurPos = fp->Tell();
-    m_bEOF = fp->Eof();
-    m_bError = fp->Error();
+    m_bEOF = CPL_TO_BOOL(fp->Eof());
+    m_bError = CPL_TO_BOOL(fp->Error());
     fp->ClearErr();
     m_poCommon->m_poCurrentOwner = this;
     return nRet;

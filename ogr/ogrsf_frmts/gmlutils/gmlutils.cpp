@@ -160,8 +160,8 @@ OGRGML_SRSCache_GetInfo(OGRGML_SRSCache *hSRSCache, const char *pszSRSName)
             return nullptr;
         }
         entry->nAxisCount = poSRS->GetAxesCount();
-        entry->bIsGeographic = poSRS->IsGeographic();
-        entry->bIsProjected = poSRS->IsProjected();
+        entry->bIsGeographic = CPL_TO_BOOL(poSRS->IsGeographic());
+        entry->bIsProjected = CPL_TO_BOOL(poSRS->IsProjected());
         entry->bInvertedAxisOrder = !STARTS_WITH(pszSRSName, "EPSG:") &&
                                     (poSRS->EPSGTreatsAsLatLong() ||
                                      poSRS->EPSGTreatsAsNorthingEasting());

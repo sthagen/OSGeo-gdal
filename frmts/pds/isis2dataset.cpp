@@ -719,12 +719,12 @@ GDALDataset *ISIS2Dataset::Open(GDALOpenInfo *poOpenInfo)
     }
 
     if (!poDS->bGotTransform)
-        poDS->bGotTransform = GDALReadWorldFile(poOpenInfo->pszFilename, "cbw",
-                                                poDS->m_gt.data());
+        poDS->bGotTransform = CPL_TO_BOOL(GDALReadWorldFile(
+            poOpenInfo->pszFilename, "cbw", poDS->m_gt.data()));
 
     if (!poDS->bGotTransform)
-        poDS->bGotTransform = GDALReadWorldFile(poOpenInfo->pszFilename, "wld",
-                                                poDS->m_gt.data());
+        poDS->bGotTransform = CPL_TO_BOOL(GDALReadWorldFile(
+            poOpenInfo->pszFilename, "wld", poDS->m_gt.data()));
 
     /* -------------------------------------------------------------------- */
     /*      Initialize any PAM information.                                 */
