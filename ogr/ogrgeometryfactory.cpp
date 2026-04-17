@@ -1951,7 +1951,8 @@ std::unique_ptr<OGRGeometry> OGRGeometryFactory::organizePolygons(
                         [&apoPolygons](const OGRCurvePolygon *poCurvePoly)
                     {
                         const bool bIsCurvePoly =
-                            wkbFlatten(poCurvePoly->getGeometryType());
+                            wkbFlatten(poCurvePoly->getGeometryType()) ==
+                            wkbCurvePolygon;
                         for (const auto *ring : poCurvePoly)
                         {
                             if (bIsCurvePoly)
