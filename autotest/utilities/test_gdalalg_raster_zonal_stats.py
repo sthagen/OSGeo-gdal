@@ -1247,3 +1247,31 @@ def test_gdalalg_raster_zonal_stats_raster_zones_output_layer(zonal):
     out_ds = zonal.Output()
 
     assert out_ds.GetLayer(0).GetName() == "myresult"
+
+
+@pytest.mark.parametrize("pixels", ["default", "all-touched"], indirect=True)
+def test_gdalalg_raster_zonal_stats_center_xy_alloc(zonal, strategy, pixels):
+
+    # See https://github.com/OSGeo/gdal/issues/14371#issuecomment-4256674808
+
+    nx, ny = 10, 10
+
+    src_ds = gdal.GetDriverByName("MEM").Create("", nx, ny, 1)
+    src_ds.SetGeoTransform((0, 1, 0, ny, 0, -1))
+
+    zones_ds = gdaltest.wkt_ds(
+        [
+            "POLYGON ((0 0, 1 0, 1 10, 0 10, 0 1))",
+            "POLYGON ((0 0, 10 0, 10 1, 0 1, 0 0))",
+        ]
+    )
+
+    zonal["input"] = src_ds
+    zonal["zones"] = zones_ds
+    zonal["output"] = ""
+    zonal["output-format"] = "MEM"
+    zonal["strategy"] = strategy
+    zonal["pixels"] = pixels
+    zonal["stat"] = ["count", "center_x", "center_y"]
+
+    assert zonal.Run()  # no crash
