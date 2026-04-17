@@ -3115,3 +3115,28 @@ def test_gml_aixm_ElevatedPoint():
         geom,
         "POINT (49 2)",
     )
+
+
+###############################################################################
+#
+
+
+@pytest.mark.require_proj(8, 0)
+def test_gml_export_compound_crs():
+
+    srs = osr.SpatialReference()
+    srs.ImportFromEPSG(9518)  #  WGS 84 + EGM2008 height
+    wkt = "POINT (30 10 5)"
+    geometry = ogr.CreateGeometryFromWkt(wkt, srs)
+    gml = geometry.ExportToGML(
+        options=[
+            "FORMAT=GML32",
+            "SRSDIMENSION_LOC=GEOMETRY",
+            "SRSNAME_FORMAT=SHORT",
+            "GMLID=TestPoint-1",
+        ]
+    )
+    assert (
+        gml
+        == '<gml:Point srsName="EPSG:9518" srsDimension="3" gml:id="TestPoint-1"><gml:pos>30 10 5</gml:pos></gml:Point>'
+    )
