@@ -2837,7 +2837,23 @@ def test_gti_xml_relative_filename(tmp_vsimem, prefix):
     assert gti_ds.GetRasterBand(1).GetOverview(0).Checksum() == expected_cs_ovr
 
 
-def test_gti_gpkg_relative_filename(tmp_vsimem):
+@pytest.mark.parametrize("prefix", ["", "GTI:"])
+def test_gti_gpkg_relative_filename(tmp_vsimem, prefix):
+
+    index_filename = str(tmp_vsimem / "index.gti.gpkg")
+
+    tile_filename = str(tmp_vsimem / "byte.tif")
+    gdal.Translate(tile_filename, "data/byte.tif")
+
+    src_ds = gdal.Open(tile_filename)
+    index_ds, _ = create_basic_tileindex(index_filename, src_ds)
+    del index_ds
+
+    gti_ds = gdal.Open(prefix + index_filename)
+    assert gti_ds.GetRasterBand(1).Checksum() == 4672
+
+
+def test_gti_gpkg_overview_relative_filename(tmp_vsimem):
 
     index_filename = str(tmp_vsimem / "index.gti.gpkg")
 

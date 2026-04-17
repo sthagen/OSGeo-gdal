@@ -1629,7 +1629,7 @@ bool GDALTileIndexDataset::Open(GDALOpenInfo *poOpenInfo)
         const char *pszTileName =
             poFeature->GetFieldAsString(m_nLocationFieldIndex);
         const std::string osTileName(GetAbsoluteFileName(
-            pszTileName, poOpenInfo->pszFilename, m_bSTACCollection));
+            pszTileName, osIndexDataset.c_str(), m_bSTACCollection));
         pszTileName = osTileName.c_str();
 
         auto poTileDS = std::shared_ptr<GDALDataset>(
@@ -2615,7 +2615,7 @@ bool GDALTileIndexDataset::Open(GDALOpenInfo *poOpenInfo)
     /* -------------------------------------------------------------------- */
     /*      Check for overviews.                                            */
     /* -------------------------------------------------------------------- */
-    oOvManager.Initialize(this, poOpenInfo->pszFilename);
+    oOvManager.Initialize(this, osIndexDataset.c_str());
 
     m_osWarpMemory = CSLFetchNameValueDef(poOpenInfo->papszOpenOptions,
                                           "WARPING_MEMORY_SIZE", "");
