@@ -892,8 +892,8 @@ int OGROCIDataSource::FetchSRSId(const OGRSpatialReference *poSRS)
 
     if (poSRS->IsGeographic() || poSRS->IsProjected())
     {
-        pszAuthName = poSRS->GetAuthorityName(nullptr);
-        pszAuthCode = poSRS->GetAuthorityCode(nullptr);
+        pszAuthName = poSRS->GetAuthorityName();
+        pszAuthCode = poSRS->GetAuthorityCode();
     }
 
     OGROCIStatement oCmdStatement(GetSession());

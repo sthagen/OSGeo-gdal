@@ -1443,9 +1443,7 @@ def test_osr_basic_set_from_user_input_IGNF():
     srs = osr.SpatialReference()
     assert srs.SetFromUserInput("IGNF:LAMB93") == 0
 
-    assert (
-        srs.GetAuthorityName(None) == "IGNF" and srs.GetAuthorityCode(None) == "LAMB93"
-    )
+    assert srs.GetAuthorityName() == "IGNF" and srs.GetAuthorityCode() == "LAMB93"
 
 
 def test_osr_basic_set_from_user_input_IGNF_non_existing_code():
@@ -1822,10 +1820,10 @@ def test_osr_promote_to_3D():
     sr.SetFromUserInput("WGS84")
 
     assert sr.PromoteTo3D() == 0
-    assert sr.GetAuthorityCode(None) == "4979"
+    assert sr.GetAuthorityCode() == "4979"
 
     assert sr.DemoteTo2D() == 0
-    assert sr.GetAuthorityCode(None) == "4326"
+    assert sr.GetAuthorityCode() == "4326"
 
 
 def test_osr_strip_vertical():
@@ -1836,9 +1834,7 @@ def test_osr_strip_vertical():
 
     assert sr.StripVertical() == 0
     assert not sr.IsCompound()
-    assert (
-        sr.GetAuthorityCode(None) == "2393"
-    )  # KKJ / Finland Uniform Coordinate System
+    assert sr.GetAuthorityCode() == "2393"  # KKJ / Finland Uniform Coordinate System
 
 
 def test_osr_SetVerticalPerspective():

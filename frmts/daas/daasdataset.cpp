@@ -1142,8 +1142,8 @@ bool GDALDAASDataset::SetupServerSideReprojection(const char *pszTargetSRS)
 
     // Check that we can find the EPSG code as we will need to
     // provide as a urn to getBuffer
-    const char *pszAuthorityCode = oSRS.GetAuthorityCode(nullptr);
-    const char *pszAuthorityName = oSRS.GetAuthorityName(nullptr);
+    const char *pszAuthorityCode = oSRS.GetAuthorityCode();
+    const char *pszAuthorityName = oSRS.GetAuthorityName();
     if (pszAuthorityName == nullptr || !EQUAL(pszAuthorityName, "EPSG") ||
         pszAuthorityCode == nullptr)
     {

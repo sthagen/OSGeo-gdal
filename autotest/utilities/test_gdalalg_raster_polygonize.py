@@ -36,7 +36,7 @@ def test_gdalalg_raster_polygonize():
     assert last_pct[0] == 1.0
     ds = alg["output"].GetDataset()
     lyr = ds.GetLayerByName("polygonize")
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "26711"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "26711"
     assert lyr.GetFeatureCount() == 281
     assert lyr.GetLayerDefn().GetFieldDefn(0).GetName() == "DN"
     assert lyr.GetLayerDefn().GetFieldDefn(0).GetType() == ogr.OFTInteger

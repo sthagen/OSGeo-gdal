@@ -792,7 +792,7 @@ OGRLayer *OGRNGWDataset::ICreateLayer(const char *pszNameIn,
 
     OGRSpatialReference *poSRSClone = poSpatialRef->Clone();
     poSRSClone->AutoIdentifyEPSG();
-    const char *pszEPSG = poSRSClone->GetAuthorityCode(nullptr);
+    const char *pszEPSG = poSRSClone->GetAuthorityCode();
     int nEPSG = -1;
     if (pszEPSG != nullptr)
     {

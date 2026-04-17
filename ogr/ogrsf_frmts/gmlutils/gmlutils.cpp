@@ -328,8 +328,8 @@ char *GML_GetSRSName(const OGRSpatialReference *poSRS,
         *pbCoordSwap = true;
     }
 
-    const char *pszAuthName = poSRS->GetAuthorityName(nullptr);
-    const char *pszAuthCode = poSRS->GetAuthorityCode(nullptr);
+    const char *pszAuthName = poSRS->GetAuthorityName();
+    const char *pszAuthCode = poSRS->GetAuthorityCode();
     if (nullptr != pszAuthName && nullptr != pszAuthCode)
     {
         if (eSRSNameFormat == SRSNAME_SHORT)

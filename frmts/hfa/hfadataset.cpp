@@ -4474,7 +4474,7 @@ CPLErr HFADataset::ReadProjection()
     // If we got a valid projection and managed to identify a EPSG code,
     // then do not use the ESRI PE String.
     const bool bTryReadingPEString =
-        poSRS == nullptr || poSRS->GetAuthorityCode(nullptr) == nullptr;
+        poSRS == nullptr || poSRS->GetAuthorityCode() == nullptr;
 
     // Special logic for PE string in ProjectionX node.
     char *pszPE_COORDSYS = nullptr;

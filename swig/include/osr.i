@@ -468,11 +468,11 @@ public:
     return (const char*)name;
   }
 
-  const char *GetAuthorityCode( const char *target_key ) {
+  const char *GetAuthorityCode( const char *target_key = NULL ) {
     return OSRGetAuthorityCode( self, target_key );
   }
 
-  const char *GetAuthorityName( const char *target_key ) {
+  const char *GetAuthorityName( const char *target_key = NULL ) {
     return OSRGetAuthorityName( self, target_key );
   }
 

@@ -34,7 +34,7 @@ def libertiff_open(filename, open_options=[]):
 def test_libertiff_basic():
     ds = libertiff_open("data/byte.tif")
     assert ds.GetMetadataItem("AREA_OR_POINT") == "Area"
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "26711"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "26711"
     assert ds.GetGeoTransform() == pytest.approx(
         (440720.0, 60.0, 0.0, 3751320.0, 0.0, -60.0)
     )
@@ -889,7 +889,7 @@ def test_libertiff_srs_read_epsg4326_3855_geotiff1_1():
 def test_libertiff_srs_read_epsg4979_geotiff1_1():
     ds = libertiff_open("data/epsg4979_geotiff1_1.tif")
     sr = ds.GetSpatialRef()
-    assert sr.GetAuthorityCode(None) == "4979"
+    assert sr.GetAuthorityCode() == "4979"
 
 
 def test_libertiff_strip_block_size():

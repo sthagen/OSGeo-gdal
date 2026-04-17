@@ -617,7 +617,7 @@ def test_ogr_mem_coordinate_epoch():
     ds = ogr.GetDriverByName("MEM").CreateDataSource("")
     lyr = ds.CreateLayer("foo", srs=srs)
     srs = lyr.GetSpatialRef()
-    assert srs.GetAuthorityCode(None) == "4326"
+    assert srs.GetAuthorityCode() == "4326"
     assert srs.GetCoordinateEpoch() == 2021.3
     assert srs.GetDataAxisToSRSAxisMapping() == [2, 1]
 

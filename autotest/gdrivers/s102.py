@@ -37,7 +37,7 @@ def test_s102_basic(filename):
     assert ds.RasterCount == 2
     assert ds.RasterXSize == 3
     assert ds.RasterYSize == 2
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "4326"
     assert ds.GetGeoTransform() == pytest.approx((1.8, 0.4, 0.0, 48.75, 0.0, -0.5))
     assert ds.GetMetadata_Dict() == {
         "AREA_OR_POINT": "Point",
@@ -91,7 +91,7 @@ def test_s102_elevation():
     assert ds.RasterCount == 2
     assert ds.RasterXSize == 3
     assert ds.RasterYSize == 2
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "4326"
     assert ds.GetGeoTransform() == pytest.approx((1.8, 0.4, 0.0, 48.75, 0.0, -0.5))
 
     elevation = ds.GetRasterBand(1)
@@ -126,7 +126,7 @@ def test_s102_north_up_no():
     assert ds.RasterCount == 2
     assert ds.RasterXSize == 3
     assert ds.RasterYSize == 2
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "4326"
     assert ds.GetGeoTransform() == pytest.approx((1.8, 0.4, 0.0, 47.75, 0.0, 0.5))
 
     depth = ds.GetRasterBand(1)
@@ -176,7 +176,7 @@ def test_s102_multidim():
     ar = rg.OpenMDArrayFromFullname(
         "/BathymetryCoverage/BathymetryCoverage.01/Group_001/values"
     )
-    assert ar.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert ar.GetSpatialRef().GetAuthorityCode() == "4326"
 
     assert ar.GetDimensions()[0].GetName() == "Y"
     y = ar.GetDimensions()[0].GetIndexingVariable()
@@ -238,7 +238,7 @@ def test_s102_QualityOfSurvey(filename, quality_group_name):
     assert ds.RasterCount == 1
     assert ds.RasterXSize == 3
     assert ds.RasterYSize == 2
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "4326"
     assert ds.GetGeoTransform() == pytest.approx((1.8, 0.4, 0.0, 48.75, 0.0, -0.5))
     band = ds.GetRasterBand(1)
     assert band.DataType == gdal.GDT_UInt32
@@ -294,7 +294,7 @@ def test_s102_QualityOfSurvey_multidim():
     ar = rg.OpenMDArrayFromFullname(
         "/QualityOfSurvey/QualityOfSurvey.01/Group_001/values"
     )
-    assert ar.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert ar.GetSpatialRef().GetAuthorityCode() == "4326"
     assert ar.GetNoDataValue() == 0
 
     assert ar.GetDimensions()[0].GetName() == "Y"
@@ -755,7 +755,7 @@ def test_s102_write_basic(tmp_path):
             creationOptions={"VERTICAL_DATUM": "MLLW"},
         )
         assert out_ds.GetRasterBand(1).Checksum() == 4672
-        assert out_ds.GetSpatialRef().GetAuthorityCode(None) == "32611"
+        assert out_ds.GetSpatialRef().GetAuthorityCode() == "32611"
         assert out_ds.GetGeoTransform() == (440720.0, 60.0, 0.0, 3751320.0, 0.0, -60.0)
 
         out_ds.Close()

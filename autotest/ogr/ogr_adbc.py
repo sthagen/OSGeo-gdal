@@ -330,7 +330,7 @@ def test_ogr_adbc_duckdb_parquet_with_spatial(OGR_ADBC_AUTO_LOAD_DUCKDB_SPATIAL)
                 float("inf"),
                 float("-inf"),
             )
-            assert lyr.GetSpatialRef().GetAuthorityCode(None) == "27700"
+            assert lyr.GetSpatialRef().GetAuthorityCode() == "27700"
             f = lyr.GetNextFeature()
             assert f.GetGeometryRef().ExportToWkt().startswith("POLYGON ((")
 

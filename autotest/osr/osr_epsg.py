@@ -29,7 +29,7 @@ def test_osr_epsg_1():
     with gdal.quiet_errors():
         srs.ImportFromEPSG(26591)
         assert "OSR_USE_NON_DEPRECATED" in gdal.GetLastErrorMsg()
-    assert srs.GetAuthorityCode(None) == "3003"
+    assert srs.GetAuthorityCode() == "3003"
 
 
 ###############################################################################
@@ -162,7 +162,7 @@ def test_osr_epsg_10():
 
     assert srs.AutoIdentifyEPSG() == 0
 
-    assert srs.GetAuthorityCode(None) == "3031", srs.ExportToWkt()
+    assert srs.GetAuthorityCode() == "3031", srs.ExportToWkt()
 
     srs_ref = osr.SpatialReference()
     srs_ref.ImportFromEPSG(3031)
@@ -192,7 +192,7 @@ def test_osr_epsg_10():
 
     assert srs.AutoIdentifyEPSG() == 0
 
-    assert srs.GetAuthorityCode(None) == "3995", srs.ExportToWkt()
+    assert srs.GetAuthorityCode() == "3995", srs.ExportToWkt()
 
     srs_ref = osr.SpatialReference()
     srs_ref.ImportFromEPSG(3995)
@@ -286,11 +286,11 @@ def test_osr_epsg_13():
     #    gdaltest.post_reason('fail')
     #    print(matches)
     #    return 'fail'
-    # if matches[0][0].GetAuthorityCode(None) != '4126' or matches[0][1] != 90:
+    # if matches[0][0].GetAuthorityCode() != '4126' or matches[0][1] != 90:
     #    gdaltest.post_reason('fail')
     #    print(matches)
     #    return 'fail'
-    # if matches[1][0].GetAuthorityCode(None) != '4669' or matches[1][1] != 90:
+    # if matches[1][0].GetAuthorityCode() != '4669' or matches[1][1] != 90:
     #    gdaltest.post_reason('fail')
     #    print(matches)
     #    return 'fail'
@@ -399,7 +399,7 @@ def test_osr_epsg_find_matches_wrong_axis_order():
 """)
     matches = sr.FindMatches()
     assert len(matches) == 1 and matches[0][1] == 90
-    assert matches[0][0].GetAuthorityCode(None) == "2193"
+    assert matches[0][0].GetAuthorityCode() == "2193"
     assert matches[0][0].GetDataAxisToSRSAxisMapping() == [2, 1]
 
 
@@ -495,7 +495,7 @@ def test_osr_epsg_auto_identify_epsg_nad83_cors96():
             ORDER[2],
             ANGLEUNIT["degree",0.0174532925199433]]]""")
     srs.AutoIdentifyEPSG()
-    assert srs.GetAuthorityCode(None) == "6783"
+    assert srs.GetAuthorityCode() == "6783"
 
 
 ###############################################################################
@@ -528,7 +528,7 @@ def test_osr_epsg_auto_identify_epsg_projcrs_with_geogcrs_without_axis_roder():
     )
     with pytest.raises(Exception):
         srs.AutoIdentifyEPSG()
-    assert srs.CloneGeogCS().GetAuthorityCode(None) is None
+    assert srs.CloneGeogCS().GetAuthorityCode() is None
 
 
 ###############################################################################
@@ -553,8 +553,8 @@ def test_osr_epsg_import_esri_code():
     with gdal.quiet_errors():
         srs.ImportFromEPSG(104905)
 
-    assert srs.GetAuthorityName(None) == "ESRI"
-    assert srs.GetAuthorityCode(None) == "104905"
+    assert srs.GetAuthorityName() == "ESRI"
+    assert srs.GetAuthorityCode() == "104905"
 
 
 ###############################################################################

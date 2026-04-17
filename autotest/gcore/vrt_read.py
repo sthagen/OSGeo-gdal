@@ -1487,7 +1487,7 @@ def test_vrt_protocol():
 
     ds = gdal.Open("vrt://data/byte.tif?bands=1&a_srs=EPSG:3031")
     crs = ds.GetSpatialRef()
-    assert crs.GetAuthorityCode(None) == "3031"
+    assert crs.GetAuthorityCode() == "3031"
 
     ds = gdal.Open("vrt://data/byte.tif?a_ullr=0,10,20,0")
     geotransform = ds.GetGeoTransform()

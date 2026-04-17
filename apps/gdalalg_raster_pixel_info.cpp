@@ -580,8 +580,8 @@ bool GDALRasterPixelInfoAlgorithm::RunStep(GDALPipelineStepRunContext &)
     bool canOutputGeoJSONGeom = false;
     if (poSrcCRS && bHasGT)
     {
-        const char *pszAuthName = poSrcCRS->GetAuthorityName(nullptr);
-        const char *pszAuthCode = poSrcCRS->GetAuthorityCode(nullptr);
+        const char *pszAuthName = poSrcCRS->GetAuthorityName();
+        const char *pszAuthCode = poSrcCRS->GetAuthorityCode();
         if (pszAuthName && pszAuthCode && EQUAL(pszAuthName, "EPSG"))
         {
             canOutputGeoJSONGeom = true;

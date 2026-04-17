@@ -333,8 +333,8 @@ def test_ogr_flatgeobuf_srs_epsg():
     lyr = ds.GetLayer(0)
     srs_got = lyr.GetSpatialRef()
     assert srs_got.IsSame(srs)
-    assert srs_got.GetAuthorityName(None) == "EPSG"
-    assert srs_got.GetAuthorityCode(None) == "32631"
+    assert srs_got.GetAuthorityName() == "EPSG"
+    assert srs_got.GetAuthorityCode() == "32631"
     ds = None
 
     ogr.GetDriverByName("FlatGeobuf").DeleteDataSource("/vsimem/test.fgb")
@@ -353,8 +353,8 @@ def test_ogr_flatgeobuf_srs_other_authority():
     lyr = ds.GetLayer(0)
     srs_got = lyr.GetSpatialRef()
     assert srs_got.IsSame(srs)
-    assert srs_got.GetAuthorityName(None) == "ESRI"
-    assert srs_got.GetAuthorityCode(None) == "104009"
+    assert srs_got.GetAuthorityName() == "ESRI"
+    assert srs_got.GetAuthorityCode() == "104009"
     ds = None
 
     ogr.GetDriverByName("FlatGeobuf").DeleteDataSource("/vsimem/test.fgb")
@@ -372,7 +372,7 @@ def test_ogr_flatgeobuf_srs_no_authority():
     lyr = ds.GetLayer(0)
     srs_got = lyr.GetSpatialRef()
     assert srs_got.IsSame(srs)
-    assert srs_got.GetAuthorityName(None) is None
+    assert srs_got.GetAuthorityName() is None
     ds = None
 
     ogr.GetDriverByName("FlatGeobuf").DeleteDataSource("/vsimem/test.fgb")
@@ -900,7 +900,7 @@ def test_ogr_flatgeobuf_coordinate_epoch():
     ds = gdal.OpenEx(filename)
     lyr = ds.GetLayer(0)
     srs = lyr.GetSpatialRef()
-    assert srs.GetAuthorityCode(None) == "4326"
+    assert srs.GetAuthorityCode() == "4326"
     assert srs.GetCoordinateEpoch() == 2021.3
     assert srs.GetDataAxisToSRSAxisMapping() == [2, 1]
     ds = None
@@ -1644,4 +1644,4 @@ def test_ogr_flatgeobuf_write_empty_file_no_spatial_index(tmp_vsimem):
         lyr = ds.GetLayer(0)
         assert lyr.GetFeatureCount() == 0
         assert lyr.GetExtent(can_return_null=True) is None
-        assert lyr.GetSpatialRef().GetAuthorityCode(None) == "32631"
+        assert lyr.GetSpatialRef().GetAuthorityCode() == "32631"

@@ -580,7 +580,7 @@ def test_tiledb_multidim_array_read_dim_label_and_spatial_ref(epsg_code, axis_ma
             60,
         ]
         srs = ar.GetSpatialRef()
-        assert srs.GetAuthorityCode(None) == str(epsg_code)
+        assert srs.GetAuthorityCode() == str(epsg_code)
         assert srs.GetDataAxisToSRSAxisMapping() == axis_mapping
 
         # Test that gdalmdiminfo can deal with dimensions whose indexing variable
@@ -645,7 +645,7 @@ def test_tiledb_multidim_array_read_gdal_raster_classic():
             [-179.55 + i * 0.90 for i in range(400)]
         )
         srs = ar.GetSpatialRef()
-        assert srs.GetAuthorityCode(None) == "4326"
+        assert srs.GetAuthorityCode() == "4326"
         assert srs.GetDataAxisToSRSAxisMapping() == [2, 3]
         ds_ref = gdal.Open("data/small_world.tif")
         assert ar.Read() == ds_ref.ReadRaster()

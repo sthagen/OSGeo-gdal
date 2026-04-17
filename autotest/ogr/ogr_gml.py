@@ -4080,7 +4080,7 @@ def test_ogr_gml_srs_name_in_xsd(tmp_vsimem, gml_format):
     ds = ogr.Open(filename)
     lyr = ds.GetLayer(0)
     srs = lyr.GetSpatialRef()
-    assert srs.GetAuthorityCode(None) == "4326"
+    assert srs.GetAuthorityCode() == "4326"
     assert srs.GetDataAxisToSRSAxisMapping() == [2, 1]
     f = lyr.GetNextFeature()
     assert f.GetGeometryRef().ExportToWkt() == "MULTIPOLYGON (((2 49,2 50,3 50,2 49)))"
@@ -4136,11 +4136,11 @@ def test_ogr_gml_force_srs_detection_multiple_geom_fields():
     lyr = ds.GetLayer(0)
     assert lyr.GetLayerDefn().GetGeomFieldDefn(0).GetSpatialRef() is None
     assert (
-        lyr.GetLayerDefn().GetGeomFieldDefn(1).GetSpatialRef().GetAuthorityCode(None)
+        lyr.GetLayerDefn().GetGeomFieldDefn(1).GetSpatialRef().GetAuthorityCode()
         == "32631"
     )
     assert (
-        lyr.GetLayerDefn().GetGeomFieldDefn(2).GetSpatialRef().GetAuthorityCode(None)
+        lyr.GetLayerDefn().GetGeomFieldDefn(2).GetSpatialRef().GetAuthorityCode()
         == "32632"
     )
     assert lyr.GetLayerDefn().GetGeomFieldDefn(3).GetSpatialRef() is None

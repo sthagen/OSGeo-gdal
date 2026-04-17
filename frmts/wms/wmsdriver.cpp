@@ -665,8 +665,8 @@ static CPLXMLNode *GDALWMSDatasetGetConfigFromArcGISJSON(const char *pszURL,
         {
             oSRS = *poSRSMatch;
             poSRSMatch->Release();
-            const char *pszAuthName = oSRS.GetAuthorityName(nullptr);
-            const char *pszCode = oSRS.GetAuthorityCode(nullptr);
+            const char *pszAuthName = oSRS.GetAuthorityName();
+            const char *pszCode = oSRS.GetAuthorityCode();
             if (pszAuthName && EQUAL(pszAuthName, "EPSG") && pszCode)
                 nWKID = atoi(pszCode);
         }

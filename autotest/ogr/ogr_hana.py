@@ -126,9 +126,10 @@ def test_ogr_hana_2():
     assert (
         layer.GetFeatureCount() == shp_layer.GetFeatureCount()
     ), "feature count does not match"
-    assert layer.GetSpatialRef().GetAuthorityCode(
-        None
-    ) == shp_layer.GetSpatialRef().GetAuthorityCode(None), "spatial ref does not match"
+    assert (
+        layer.GetSpatialRef().GetAuthorityCode()
+        == shp_layer.GetSpatialRef().GetAuthorityCode()
+    ), "spatial ref does not match"
 
     layer.SetAttributeFilter(None)
     field_count = layer.GetLayerDefn().GetFieldCount()
@@ -210,7 +211,7 @@ def test_ogr_hana_7():
     ds = open_datasource()
     layer = ds.ExecuteSQL("SELECT * FROM TPOLY")
     assert (
-        layer.GetSpatialRef().GetAuthorityCode(None) == "27700"
+        layer.GetSpatialRef().GetAuthorityCode() == "27700"
     ), "returned wrong spatial reference id"
     ds.ReleaseResultSet(layer)
 

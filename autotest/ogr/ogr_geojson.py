@@ -2993,7 +2993,7 @@ def test_ogr_geojson_62():
     )
     lyr = ds.GetLayer(0)
     srs = lyr.GetSpatialRef()
-    assert srs.GetAuthorityCode(None) == "32631"
+    assert srs.GetAuthorityCode() == "32631"
     assert srs.GetDataAxisToSRSAxisMapping() == [1, 2]
 
     # See https://github.com/OSGeo/gdal/issues/2035
@@ -3002,7 +3002,7 @@ def test_ogr_geojson_62():
     )
     lyr = ds.GetLayer(0)
     srs = lyr.GetSpatialRef()
-    assert srs.GetAuthorityCode(None) == "4326"
+    assert srs.GetAuthorityCode() == "4326"
     assert srs.GetDataAxisToSRSAxisMapping() == [2, 1]
 
     # crs type=EPSG (not even documented in GJ2008 spec!) tests. Just for coverage completeness
@@ -4034,7 +4034,7 @@ def test_ogr_geojson_crs_4326(filename):
     ds = ogr.Open("data/geojson/" + filename)
     lyr = ds.GetLayer(0)
     srs = lyr.GetSpatialRef()
-    assert srs.GetAuthorityCode(None) == "4326"
+    assert srs.GetAuthorityCode() == "4326"
     assert srs.GetDataAxisToSRSAxisMapping() == [2, 1]
 
 
@@ -4047,7 +4047,7 @@ def test_ogr_geojson_crs_4979(filename):
     ds = ogr.Open("data/geojson/" + filename)
     lyr = ds.GetLayer(0)
     srs = lyr.GetSpatialRef()
-    assert srs.GetAuthorityCode(None) == "4979"
+    assert srs.GetAuthorityCode() == "4979"
     assert srs.GetDataAxisToSRSAxisMapping() == [2, 1, 3]
 
 

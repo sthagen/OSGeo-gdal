@@ -1441,7 +1441,7 @@ def test_ogr_oapif_storage_crs_easting_northing():
 
     srs = lyr.GetSpatialRef()
     assert srs
-    assert srs.GetAuthorityCode(None) == "32631"
+    assert srs.GetAuthorityCode() == "32631"
     assert lyr.GetLayerDefn().GetFieldCount() == 1
 
     handler = webserver.SequentialHandler()
@@ -1541,7 +1541,7 @@ def test_ogr_oapif_storage_crs_latitude_longitude():
 
     srs = lyr.GetSpatialRef()
     assert srs
-    assert srs.GetAuthorityCode(None) == "4326"
+    assert srs.GetAuthorityCode() == "4326"
     assert srs.GetDataAxisToSRSAxisMapping() == [2, 1]
     assert srs.GetCoordinateEpoch() == 2022.5
     assert lyr.GetLayerDefn().GetFieldCount() == 1
@@ -1651,7 +1651,7 @@ def test_ogr_oapif_storage_crs_latitude_longitude_non_compliant_server():
 
     srs = lyr.GetSpatialRef()
     assert srs
-    assert srs.GetAuthorityCode(None) == "4326"
+    assert srs.GetAuthorityCode() == "4326"
     assert srs.GetDataAxisToSRSAxisMapping() == [2, 1]
     assert srs.GetCoordinateEpoch() == 2022.5
     assert lyr.GetLayerDefn().GetFieldCount() == 1
@@ -1747,13 +1747,13 @@ def test_ogr_oapif_crs_and_preferred_crs_open_options():
     supported_srs_list = lyr.GetSupportedSRSList()
     assert supported_srs_list
     assert len(supported_srs_list) == 2
-    assert supported_srs_list[0].GetAuthorityCode(None) == "32631"
+    assert supported_srs_list[0].GetAuthorityCode() == "32631"
     # Below doesn't work with early PROJ 6 versions
-    # assert supported_srs_list[1].GetAuthorityCode(None) == "CRS84"
+    # assert supported_srs_list[1].GetAuthorityCode() == "CRS84"
 
     srs = lyr.GetSpatialRef()
     assert srs
-    assert srs.GetAuthorityCode(None) == "32631"
+    assert srs.GetAuthorityCode() == "32631"
 
     json_info = gdal.VectorInfo(ds, format="json", featureCount=False)
     assert "supportedSRSList" in json_info["layers"][0]["geometryFields"][0]
@@ -1781,7 +1781,7 @@ def test_ogr_oapif_crs_and_preferred_crs_open_options():
     )
 
     assert lyr.SetActiveSRS(0, supported_srs_list[0]) == ogr.OGRERR_NONE
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "32631"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "32631"
     minx, maxx, miny, maxy = lyr.GetExtent()
     assert (minx, miny, maxx, maxy) == pytest.approx(
         (-611288.854779237, 4427761.561734099, 1525592.2813932528, 5620112.89047953),
@@ -1798,7 +1798,7 @@ def test_ogr_oapif_crs_and_preferred_crs_open_options():
     with webserver.install_http_handler(get_items_handler()):
         srs = lyr.GetSpatialRef()
         assert srs
-        assert srs.GetAuthorityCode(None) == "32631"
+        assert srs.GetAuthorityCode() == "32631"
 
     with webserver.install_http_handler(get_collections_handler()):
         ds = gdal.OpenEx(
@@ -1810,7 +1810,7 @@ def test_ogr_oapif_crs_and_preferred_crs_open_options():
     with webserver.install_http_handler(get_items_handler()):
         srs = lyr.GetSpatialRef()
         assert srs
-        assert srs.GetAuthorityCode(None) == "4326"
+        assert srs.GetAuthorityCode() == "4326"
 
     handler = webserver.SequentialHandler()
     handler.add(
@@ -1836,7 +1836,7 @@ def test_ogr_oapif_crs_and_preferred_crs_open_options():
             "", ds, format="MEM", dstSRS="EPSG:32631", reproject=True
         )
     out_lyr = out_ds.GetLayer(0)
-    assert out_lyr.GetSpatialRef().GetAuthorityCode(None) == "32631"
+    assert out_lyr.GetSpatialRef().GetAuthorityCode() == "32631"
     f = out_lyr.GetNextFeature()
     assert f.GetGeometryRef().ExportToWkt() == "POINT (500000 4500000)"
 

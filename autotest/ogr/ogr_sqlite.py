@@ -2777,7 +2777,7 @@ def test_ogr_spatialite_point_sql_check_srs(sqlite_test_db):
     lyr.CreateFeature(feat)
     with sqlite_test_db.ExecuteSQL("SELECT * FROM point") as sql_lyr:
         assert sql_lyr.GetLayerDefn().GetGeomFieldCount() == 1
-        assert sql_lyr.GetSpatialRef().GetAuthorityCode(None) == "4326"
+        assert sql_lyr.GetSpatialRef().GetAuthorityCode() == "4326"
 
 
 ###############################################################################

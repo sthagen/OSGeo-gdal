@@ -195,8 +195,8 @@ def test_tiff_srs_WGS_1984_Web_Mercator():
     sr = ds.GetSpatialRef()
     ds = None
 
-    assert sr.GetAuthorityName(None) == "ESRI"
-    assert sr.GetAuthorityCode(None) == "102113"
+    assert sr.GetAuthorityName() == "ESRI"
+    assert sr.GetAuthorityCode() == "102113"
 
 
 ###############################################################################
@@ -447,7 +447,7 @@ def test_tiff_srs_ProjectedCSTypeGeoKey_GeographicTypeGeoKey():
 
     ds = gdal.Open("data/utmsmall.tif")
     sr = ds.GetSpatialRef()
-    assert sr.GetAuthorityCode(None) == "26711"
+    assert sr.GetAuthorityCode() == "26711"
 
 
 def _test_tiff_srs(sr, expect_fail):
@@ -461,7 +461,7 @@ def _test_tiff_srs(sr, expect_fail):
     # The GeoTIFF driver is smart enough to figure out that a CRS with
     # '+proj=longlat +datum=WGS84' is EPSG:4326
     if (
-        sr.GetAuthorityCode(None) is None
+        sr.GetAuthorityCode() is None
         and "+proj=longlat +datum=WGS84" in sr.ExportToProj4()
     ):
         sr.ImportFromEPSG(4326)
@@ -601,7 +601,7 @@ def _create_geotiff1_1_from_copy_and_compare(srcfilename, options=[]):
 def test_tiff_srs_read_epsg4326_geotiff1_1():
     ds = gdal.Open("data/epsg4326_geotiff1_1.tif")
     sr = ds.GetSpatialRef()
-    assert sr.GetAuthorityCode(None) == "4326"
+    assert sr.GetAuthorityCode() == "4326"
 
 
 def test_tiff_srs_write_epsg4326_geotiff1_1():
@@ -613,7 +613,7 @@ def test_tiff_srs_write_epsg4326_geotiff1_1():
 def test_tiff_srs_read_epsg26711_geotiff1_1():
     ds = gdal.Open("data/epsg26711_geotiff1_1.tif")
     sr = ds.GetSpatialRef()
-    assert sr.GetAuthorityCode(None) == "26711"
+    assert sr.GetAuthorityCode() == "26711"
 
 
 def test_tiff_srs_write_epsg26711_geotiff1_1():
@@ -637,7 +637,7 @@ def test_tiff_srs_write_epsg4326_3855_geotiff1_1():
 def test_tiff_srs_read_epsg4979_geotiff1_1():
     ds = gdal.Open("data/epsg4979_geotiff1_1.tif")
     sr = ds.GetSpatialRef()
-    assert sr.GetAuthorityCode(None) == "4979"
+    assert sr.GetAuthorityCode() == "4979"
 
 
 def test_tiff_srs_write_epsg4979_geotiff1_1():
@@ -655,7 +655,7 @@ def test_tiff_srs_write_epsg4937_etrs89_3D_geotiff1_1():
     ds = None
     ds = gdal.Open(tmpfile)
     assert sr.GetName() == "ETRS89"
-    assert sr.GetAuthorityCode(None) == "4937"
+    assert sr.GetAuthorityCode() == "4937"
     ds = None
     gdal.Unlink(tmpfile)
 
@@ -664,7 +664,7 @@ def test_tiff_srs_write_epsg4937_etrs89_3D_geotiff1_1():
 def test_tiff_srs_read_epsg4326_5030_geotiff1_1():
     ds = gdal.Open("data/epsg4326_5030_geotiff1_1.tif")
     sr = ds.GetSpatialRef()
-    assert sr.GetAuthorityCode(None) == "4979"
+    assert sr.GetAuthorityCode() == "4979"
 
 
 def test_tiff_srs_read_epsg26711_3855_geotiff1_1():
@@ -689,7 +689,7 @@ def test_tiff_srs_read_epsg32631_4979_geotiff1_1():
     assert sr.GetName() == "WGS 84 / UTM zone 31N"
     sr_geog = osr.SpatialReference()
     sr_geog.CopyGeogCSFrom(sr)
-    assert sr_geog.GetAuthorityCode(None) == "4979"
+    assert sr_geog.GetAuthorityCode() == "4979"
 
 
 def test_tiff_srs_write_vertical_perspective():
@@ -830,7 +830,7 @@ def test_tiff_srs_write_epsg3857():
     ds = None
     ds = gdal.Open(tmpfile)
     assert sr.GetName() == "WGS 84 / Pseudo-Mercator"
-    assert sr.GetAuthorityCode(None) == "3857"
+    assert sr.GetAuthorityCode() == "3857"
     f = gdal.VSIFOpenL(tmpfile, "rb")
     data = gdal.VSIFReadL(1, 100000, f)
     gdal.VSIFCloseL(f)
@@ -841,7 +841,7 @@ def test_tiff_srs_write_epsg3857():
 def test_tiff_srs_read_epsg26730_with_linear_units_set():
     ds = gdal.Open("data/epsg26730_with_linear_units_set.tif")
     sr = ds.GetSpatialRef()
-    assert sr.GetAuthorityCode(None) == "26730"
+    assert sr.GetAuthorityCode() == "26730"
 
 
 def test_tiff_srs_read_user_defined_geokeys():
@@ -971,7 +971,7 @@ def test_tiff_srs_read_inconsistent_invflattening():
     with gdal.quiet_errors():
         srs = ds.GetSpatialRef()
     assert gdal.GetLastErrorMsg() != ""
-    assert srs.GetAuthorityCode(None) == "28992"
+    assert srs.GetAuthorityCode() == "28992"
     assert srs.GetAuthorityCode("GEOGCS") == "4289"
     assert srs.GetInvFlattening() == pytest.approx(
         299.1528131, abs=1e-7
@@ -982,7 +982,7 @@ def test_tiff_srs_read_inconsistent_invflattening():
     with gdaltest.config_option("GTIFF_SRS_SOURCE", "GEOKEYS"):
         srs = ds.GetSpatialRef()
     assert gdal.GetLastErrorMsg() == ""
-    assert srs.GetAuthorityCode(None) is None
+    assert srs.GetAuthorityCode() is None
     assert srs.GetAuthorityCode("GEOGCS") is None
     assert srs.GetInvFlattening() == pytest.approx(
         299.1528131, abs=1e-7
@@ -993,7 +993,7 @@ def test_tiff_srs_read_inconsistent_invflattening():
     with gdaltest.config_option("GTIFF_SRS_SOURCE", "EPSG"):
         srs = ds.GetSpatialRef()
     assert gdal.GetLastErrorMsg() == ""
-    assert srs.GetAuthorityCode(None) == "28992"
+    assert srs.GetAuthorityCode() == "28992"
     assert srs.GetAuthorityCode("GEOGCS") == "4289"
     assert srs.GetInvFlattening() == pytest.approx(
         299.1528128, abs=1e-7
@@ -1016,7 +1016,7 @@ def test_tiff_srs_dynamic_geodetic_crs():
     gdal.ErrorReset()
     srs = ds.GetSpatialRef()
     assert gdal.GetLastErrorMsg() == "", srs.ExportToWkt(["FORMAT=WKT2_2019"])
-    assert srs.GetAuthorityCode(None) == "8999"
+    assert srs.GetAuthorityCode() == "8999"
     assert srs.IsDynamic()
     ds = None
     gdal.Unlink("/vsimem/test_tiff_srs_dynamic_geodetic_crs.tif")
@@ -1040,7 +1040,7 @@ def test_tiff_srs_geographic_crs_3D(geotiff_version):
     srs = ds.GetSpatialRef()
     assert gdal.GetLastErrorMsg() == "", srs.ExportToWkt(["FORMAT=WKT2_2019"])
     if geotiff_version == "1.1":
-        assert srs.GetAuthorityCode(None) == "4959"
+        assert srs.GetAuthorityCode() == "4959"
     ds = None
     gdal.Unlink("/vsimem/test_tiff_srs_geographic_crs_3D.tif")
 
@@ -1058,7 +1058,7 @@ def test_tiff_srs_datum_name_with_space():
     gdal.ErrorReset()
     srs = ds.GetSpatialRef()
     assert gdal.GetLastErrorMsg() == "", srs.ExportToWkt(["FORMAT=WKT2_2019"])
-    assert srs.GetAuthorityCode(None) == "4312"
+    assert srs.GetAuthorityCode() == "4312"
     ds = None
     gdal.Unlink("/vsimem/test_tiff_srs_datum_name_with_space.tif")
 
@@ -1192,7 +1192,7 @@ def test_tiff_srs_epsg_2193_override():
     gdal.ErrorReset()
     srs = ds.GetSpatialRef()
     assert gdal.GetLastErrorMsg() == "", srs.ExportToWkt(["FORMAT=WKT2_2019"])
-    assert srs.GetAuthorityCode(None) == "2193"
+    assert srs.GetAuthorityCode() == "2193"
 
 
 def test_tiff_srs_projected_GTCitationGeoKey_with_underscore_and_GeogTOWGS84GeoKey():
@@ -1203,7 +1203,7 @@ def test_tiff_srs_projected_GTCitationGeoKey_with_underscore_and_GeogTOWGS84GeoK
     )
     gdal.ErrorReset()
     srs = ds.GetSpatialRef()
-    assert srs.GetAuthorityCode(None) == "2039"
+    assert srs.GetAuthorityCode() == "2039"
     assert "+proj=tmerc" in srs.ExportToProj4()
     if osr.GetPROJVersionMajor() >= 9:  # not necessarily the minimum version
         assert srs.GetName() == "Israel 1993 / Israeli TM Grid"
@@ -1296,7 +1296,7 @@ def test_tiff_srs_read_compound_with_EPSG_code(code):
     gdal.ErrorReset()
     got_srs = ds.GetSpatialRef()
     assert gdal.GetLastErrorMsg() == "", srs.ExportToWkt(["FORMAT=WKT2_2019"])
-    assert got_srs.GetAuthorityCode(None) == str(code)
+    assert got_srs.GetAuthorityCode() == str(code)
     assert got_srs.IsSame(srs)
     ds = None
     gdal.Unlink(filename)
@@ -1321,7 +1321,7 @@ def test_tiff_srs_read_compound_without_EPSG_code():
     gdal.ErrorReset()
     got_srs = ds.GetSpatialRef()
     assert gdal.GetLastErrorMsg() == "", srs.ExportToWkt(["FORMAT=WKT2_2019"])
-    assert got_srs.GetAuthorityCode(None) is None
+    assert got_srs.GetAuthorityCode() is None
     assert got_srs.GetAuthorityCode("GEOGCS") == "4326"
     assert got_srs.GetAuthorityCode("VERT_CS") == "5709"
     assert got_srs.IsSame(srs)
@@ -1343,7 +1343,7 @@ def test_tiff_srs_projection_method_unknown_of_geotiff_with_crs_code():
     ds = gdal.Open(filename)
     gdal.ErrorReset()
     srs = ds.GetSpatialRef()
-    assert srs.GetAuthorityCode(None) == "8857"
+    assert srs.GetAuthorityCode() == "8857"
     ds = None
     gdal.Unlink(filename)
 
@@ -1490,5 +1490,5 @@ def test_tiff_srs_infer_iau_code_from_srs_name():
 
     ds = gdal.Open("data/gtiff/tiff_srs_iau_2015_30110.tif")
     srs = ds.GetSpatialRef()
-    assert srs.GetAuthorityName(None) == "IAU_2015"
-    assert srs.GetAuthorityCode(None) == "30110"
+    assert srs.GetAuthorityName() == "IAU_2015"
+    assert srs.GetAuthorityCode() == "30110"

@@ -33,7 +33,7 @@ def test_gdal_footprint_lib_basic():
     out_ds = gdal.Footprint("", "../gcore/data/byte.tif", format="MEM")
     assert out_ds is not None
     lyr = out_ds.GetLayer(0)
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "26711"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "26711"
     assert lyr.GetFeatureCount() == 1
     f = lyr.GetNextFeature()
     assert f["location"] == "../gcore/data/byte.tif"
@@ -74,7 +74,7 @@ def test_gdal_footprint_lib_targetCoordinateSystem_georef():
     )
     assert out_ds is not None
     lyr = out_ds.GetLayer(0)
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "26711"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "26711"
     assert lyr.GetFeatureCount() == 1
     f = lyr.GetNextFeature()
     ogrtest.check_feature_geometry(
@@ -94,7 +94,7 @@ def test_gdal_footprint_lib_destSRS():
     )
     assert out_ds is not None
     lyr = out_ds.GetLayer(0)
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4267"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "4267"
     f = lyr.GetNextFeature()
     ogrtest.check_feature_geometry(
         f,

@@ -49,7 +49,7 @@ def test_gdalalg_vector_concat(GDAL_VECTOR_CONCAT_MAX_OPENED_DATASETS):
     assert ds.GetLayer(-1) is None
     assert ds.GetLayer(1) is None
     lyr = ds.GetLayerByName("poly")
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "27700"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "27700"
     assert len(lyr) == 20
     f = lyr.GetNextFeature()
     assert lyr.GetLayerDefn().GetFieldCount() == 3
@@ -112,7 +112,7 @@ def test_gdalalg_vector_concat_dst_crs():
     assert alg.Run()
     ds = alg["output"].GetDataset()
     lyr = ds.GetLayerByName("test")
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "4326"
     f = lyr.GetNextFeature()
     assert f.GetGeometryRef().ExportToWkt() == "POINT (2 49)"
     f = lyr.GetNextFeature()
@@ -126,7 +126,7 @@ def test_gdalalg_vector_concat_dst_crs():
     assert alg.Run()
     ds = alg["output"].GetDataset()
     lyr = ds.GetLayerByName("test")
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "4326"
     f = lyr.GetNextFeature()
     assert f.GetGeometryRef().ExportToWkt() == "POINT (2 49)"
     f = lyr.GetNextFeature()
@@ -140,7 +140,7 @@ def test_gdalalg_vector_concat_dst_crs():
     assert alg.Run()
     ds = alg["output"].GetDataset()
     lyr = ds.GetLayerByName("test")
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "32631"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "32631"
     f = lyr.GetNextFeature()
     ogrtest.check_feature_geometry(f, "POINT (426857.9877172817 5427937.523464922)")
     f = lyr.GetNextFeature()
@@ -171,7 +171,7 @@ def test_gdalalg_vector_concat_dst_crs():
     assert alg.Run()
     ds = alg["output"].GetDataset()
     lyr = ds.GetLayerByName("test")
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "4326"
     f = lyr.GetNextFeature()
     ogrtest.check_feature_geometry(f, "POINT (3 0)")
 

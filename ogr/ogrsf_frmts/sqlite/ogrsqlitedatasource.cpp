@@ -4373,7 +4373,7 @@ int OGRSQLiteDataSource::FetchSRSId(const OGRSpatialReference *poSRSIn)
     /* -------------------------------------------------------------------- */
     auto poSRS = OGRSpatialReferenceRefCountedPtr::makeClone(poSRSIn);
 
-    const char *pszAuthorityName = poSRS->GetAuthorityName(nullptr);
+    const char *pszAuthorityName = poSRS->GetAuthorityName();
     const char *pszAuthorityCode = nullptr;
 
     if (pszAuthorityName == nullptr || strlen(pszAuthorityName) == 0)
@@ -4385,17 +4385,17 @@ int OGRSQLiteDataSource::FetchSRSId(const OGRSpatialReference *poSRSIn)
          */
         poSRS->AutoIdentifyEPSG();
 
-        pszAuthorityName = poSRS->GetAuthorityName(nullptr);
+        pszAuthorityName = poSRS->GetAuthorityName();
         if (pszAuthorityName != nullptr && EQUAL(pszAuthorityName, "EPSG"))
         {
-            pszAuthorityCode = poSRS->GetAuthorityCode(nullptr);
+            pszAuthorityCode = poSRS->GetAuthorityCode();
             if (pszAuthorityCode != nullptr && strlen(pszAuthorityCode) > 0)
             {
                 /* Import 'clean' SRS */
                 poSRS->importFromEPSG(atoi(pszAuthorityCode));
 
-                pszAuthorityName = poSRS->GetAuthorityName(nullptr);
-                pszAuthorityCode = poSRS->GetAuthorityCode(nullptr);
+                pszAuthorityName = poSRS->GetAuthorityName();
+                pszAuthorityCode = poSRS->GetAuthorityCode();
             }
         }
     }
@@ -4412,7 +4412,7 @@ int OGRSQLiteDataSource::FetchSRSId(const OGRSpatialReference *poSRSIn)
 
     if (pszAuthorityName != nullptr && strlen(pszAuthorityName) > 0)
     {
-        pszAuthorityCode = poSRS->GetAuthorityCode(nullptr);
+        pszAuthorityCode = poSRS->GetAuthorityCode();
 
         if (pszAuthorityCode != nullptr && strlen(pszAuthorityCode) > 0)
         {

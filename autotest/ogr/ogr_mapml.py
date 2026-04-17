@@ -113,7 +113,7 @@ def test_ogr_mapml_basic():
     assert lyr.GetDataset().GetDescription() == ds.GetDescription()
     srs = lyr.GetSpatialRef()
     assert srs
-    assert srs.GetAuthorityCode(None) == "4326"
+    assert srs.GetAuthorityCode() == "4326"
     assert lyr.GetGeomType() == ogr.wkbUnknown
     assert lyr.GetName() == "test"
     assert lyr.TestCapability(ogr.OLCStringsAsUTF8)
@@ -378,7 +378,7 @@ def test_ogr_mapml_reprojection_to_wgs84():
     assert lyr.GetGeomType() == ogr.wkbPoint
     srs = lyr.GetSpatialRef()
     assert srs
-    assert srs.GetAuthorityCode(None) == "4326"
+    assert srs.GetAuthorityCode() == "4326"
     f = lyr.GetNextFeature()
     assert f.GetGeometryRef().ExportToWkt() == "POINT (3 0)"
     ds = None
@@ -402,7 +402,7 @@ def test_ogr_mapml_layer_srs_is_known():
     lyr = ds.GetLayer(0)
     srs = lyr.GetSpatialRef()
     assert srs
-    assert srs.GetAuthorityCode(None) == "3857"
+    assert srs.GetAuthorityCode() == "3857"
     f = lyr.GetNextFeature()
     assert f.GetGeometryRef().ExportToWkt() == "POINT (1 2)"
     ds = None

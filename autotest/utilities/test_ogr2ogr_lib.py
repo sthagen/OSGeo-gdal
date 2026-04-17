@@ -647,7 +647,7 @@ def test_ogr2ogr_lib_ct_no_srs():
         coordinateOperation="+proj=affine +s11=-1",
     )
     lyr = ds.GetLayer(0)
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "27700"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "27700"
     f = lyr.GetNextFeature()
     # f.DumpReadable()
     ogrtest.check_feature_geometry(
@@ -3047,7 +3047,7 @@ def test_ogr2ogr_lib_reproject_arrow_optim_ct(tmp_vsimem):
     assert "OGR2OGR: Using WriteArrowBatch()" in got_msg
 
     lyr = ds.GetLayer(0)
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "32632"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "32632"
     f = lyr.GetNextFeature()
     assert f.GetGeometryRef().ExportToWkt() == "POINT (-1 2)"
 

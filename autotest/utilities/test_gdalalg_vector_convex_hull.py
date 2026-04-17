@@ -55,8 +55,6 @@ def test_gdalalg_vector_convex_hull(alg, input_wkt, output_wkt):
     assert out_lyr.GetGeomType() == ogr.wkbUnknown
 
     ogrtest.check_feature_geometry(out_f, output_wkt)
-    assert (
-        out_f.GetGeometryRef().GetSpatialReference().GetAuthorityCode(None) == "32631"
-    )
+    assert out_f.GetGeometryRef().GetSpatialReference().GetAuthorityCode() == "32631"
     out_f = out_lyr.GetNextFeature()
     assert out_f is None

@@ -754,7 +754,7 @@ OGRJSONFGDataset::ICreateLayer(const char *pszNameIn,
         };
 
         const double dfCoordEpoch = poSRS->GetCoordinateEpoch();
-        const char *pszAuthName = poSRS->GetAuthorityName(nullptr);
+        const char *pszAuthName = poSRS->GetAuthorityName();
         if (!pszAuthName)
         {
             auto poBestMatch = poSRS->FindBestMatch();
@@ -766,10 +766,10 @@ OGRJSONFGDataset::ICreateLayer(const char *pszNameIn,
                 poSRSTmp->SetDataAxisToSRSAxisMapping(
                     poSRS->GetDataAxisToSRSAxisMapping());
                 poSRS = poSRSTmp.get();
-                pszAuthName = poSRS->GetAuthorityName(nullptr);
+                pszAuthName = poSRS->GetAuthorityName();
             }
         }
-        const char *pszAuthCode = poSRS->GetAuthorityCode(nullptr);
+        const char *pszAuthCode = poSRS->GetAuthorityCode();
         json_object *poObj = nullptr;
         if (pszAuthName && pszAuthCode)
         {

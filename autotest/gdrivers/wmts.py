@@ -2059,8 +2059,8 @@ def test_wmts_read_esri_code_disguised_as_epsg_and_wrong_axis_order():
             assert gdal.GetLastErrorMsg().startswith(
                 "Auto-correcting wrongly swapped TileMatrix.TopLeftCorner coordinates"
             )
-            assert ds.GetSpatialRef().GetAuthorityName(None) == "ESRI"
-            assert ds.GetSpatialRef().GetAuthorityCode(None) == "104905"
+            assert ds.GetSpatialRef().GetAuthorityName() == "ESRI"
+            assert ds.GetSpatialRef().GetAuthorityCode() == "104905"
             assert ds.GetGeoTransform() == pytest.approx(
                 (
                     -180.0,

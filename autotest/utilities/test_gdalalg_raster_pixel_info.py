@@ -655,7 +655,7 @@ def test_gdalalg_raster_pixel_info_from_to_vector_dataset(tmp_vsimem, include_fi
     with ogr.Open(tmp_vsimem / "out.gpkg") as out_ds:
         out_lyr = out_ds.GetLayer(0)
         assert out_lyr.GetGeomType() == ogr.wkbPoint
-        assert out_lyr.GetSpatialRef().GetAuthorityCode(None) == "4267"
+        assert out_lyr.GetSpatialRef().GetAuthorityCode() == "4267"
         f = out_lyr.GetNextFeature()
         assert f["line"] == pytest.approx(9.5)
         assert f["column"] == pytest.approx(10.5)
@@ -811,7 +811,7 @@ def test_gdalalg_raster_pixel_info_from_to_vector_dataset_with_pos_crs_user_crs(
     with ogr.Open(tmp_vsimem / "out.gpkg") as out_ds:
         out_lyr = out_ds.GetLayer(0)
         assert out_lyr.GetGeomType() == ogr.wkbPoint
-        assert out_lyr.GetSpatialRef().GetAuthorityCode(None) == "4267"
+        assert out_lyr.GetSpatialRef().GetAuthorityCode() == "4267"
         f = out_lyr.GetNextFeature()
         assert f["line"] == pytest.approx(9.5)
         assert f["column"] == pytest.approx(10.5)
@@ -844,7 +844,7 @@ def test_gdalalg_raster_pixel_info_from_to_vector_dataset_with_pos_crs_pixel(
     with ogr.Open(tmp_vsimem / "out.gpkg") as out_ds:
         out_lyr = out_ds.GetLayer(0)
         assert out_lyr.GetGeomType() == ogr.wkbPoint
-        assert out_lyr.GetSpatialRef().GetAuthorityCode(None) == "26711"
+        assert out_lyr.GetSpatialRef().GetAuthorityCode() == "26711"
         f = out_lyr.GetNextFeature()
         assert f["line"] == pytest.approx(9.5)
         assert f["column"] == pytest.approx(10.5)
@@ -874,7 +874,7 @@ def test_gdalalg_raster_pixel_info_from_to_vector_dataset_complex(tmp_vsimem):
     with ogr.Open(tmp_vsimem / "out.gpkg") as out_ds:
         out_lyr = out_ds.GetLayer(0)
         assert out_lyr.GetGeomType() == ogr.wkbPoint
-        assert out_lyr.GetSpatialRef().GetAuthorityCode(None) == "26711"
+        assert out_lyr.GetSpatialRef().GetAuthorityCode() == "26711"
         f = out_lyr.GetNextFeature()
         assert f["line"] == pytest.approx(10)
         assert f["column"] == pytest.approx(5)
@@ -964,7 +964,7 @@ def test_gdalalg_raster_pixel_info_in_pipeline(tmp_vsimem):
         out_ds = alg.Output()
         out_lyr = out_ds.GetLayer(0)
         assert out_lyr.GetGeomType() == ogr.wkbPoint
-        assert out_lyr.GetSpatialRef().GetAuthorityCode(None) == "26711"
+        assert out_lyr.GetSpatialRef().GetAuthorityCode() == "26711"
         f = out_lyr.GetNextFeature()
         assert f["line"] == pytest.approx(9.5)
         assert f["column"] == pytest.approx(10.5)

@@ -2478,7 +2478,7 @@ def test_ogr_pg_47(pg_ds, pg_postgis_version, pg_postgis_schema):
     lyr = pg_ds.GetLayerByName("test_geog")
     assert lyr.GetExtent() == (2.0, 2.0, 49.0, 49.0), "bad extent for test_geog"
 
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == str(srid)
+    assert lyr.GetSpatialRef().GetAuthorityCode() == str(srid)
 
     feat = lyr.GetNextFeature()
     geom = feat.GetGeometryRef()
@@ -5501,14 +5501,14 @@ def test_ogr_pg_alter_geom_field_defn(pg_ds):
     )
     assert lyr.GetGeometryColumn() == "new_geomfield_name"
     assert lyr.GetGeomType() == ogr.wkbPoint
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4269"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "4269"
     assert not lyr.GetLayerDefn().GetGeomFieldDefn(0).IsNullable()
 
     test_ds = reconnect(pg_ds, update=0)
     test_lyr = test_ds.GetLayer("ogr_pg_alter_geom_field_defn")
     assert test_lyr.GetGeometryColumn() == "new_geomfield_name"
     assert test_lyr.GetGeomType() == ogr.wkbPoint
-    assert test_lyr.GetSpatialRef().GetAuthorityCode(None) == "4269"
+    assert test_lyr.GetSpatialRef().GetAuthorityCode() == "4269"
     assert not test_lyr.GetLayerDefn().GetGeomFieldDefn(0).IsNullable()
     test_ds = None
 
@@ -5538,13 +5538,13 @@ def test_ogr_pg_alter_geom_field_defn(pg_ds):
         )
         == ogr.OGRERR_NONE
     )
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4269"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "4269"
 
     test_ds = reconnect(pg_ds, update=0)
     test_lyr = test_ds.GetLayer("ogr_pg_alter_geom_field_defn")
     assert test_lyr.GetGeometryColumn() == "new_geomfield_name"
     assert test_lyr.GetGeomType() == ogr.wkbPoint
-    assert test_lyr.GetSpatialRef().GetAuthorityCode(None) == "4269"
+    assert test_lyr.GetSpatialRef().GetAuthorityCode() == "4269"
     assert test_lyr.GetLayerDefn().GetGeomFieldDefn(0).IsNullable()
     test_ds = None
 
@@ -5585,7 +5585,7 @@ def test_ogr_pg_alter_geom_field_defn(pg_ds):
     test_lyr = test_ds.GetLayer("ogr_pg_alter_geom_field_defn")
     assert test_lyr.GetGeometryColumn() == "new_geomfield_name"
     assert test_lyr.GetGeomType() == ogr.wkbPoint
-    assert test_lyr.GetSpatialRef().GetAuthorityCode(None) == "4269"
+    assert test_lyr.GetSpatialRef().GetAuthorityCode() == "4269"
     assert test_lyr.GetLayerDefn().GetGeomFieldDefn(0).IsNullable()
     test_ds = None
 

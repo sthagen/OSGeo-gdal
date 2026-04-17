@@ -5178,9 +5178,9 @@ def test_ogr_wfs_vsimem_wfs200_supported_crs():
         supported_srs_list = lyr.GetSupportedSRSList()
         assert supported_srs_list is not None
         assert len(supported_srs_list) == 3
-        assert supported_srs_list[0].GetAuthorityCode(None) == "4326"
-        assert supported_srs_list[1].GetAuthorityCode(None) == "3857"
-        assert supported_srs_list[2].GetAuthorityCode(None) == "4258"
+        assert supported_srs_list[0].GetAuthorityCode() == "4326"
+        assert supported_srs_list[1].GetAuthorityCode() == "3857"
+        assert supported_srs_list[2].GetAuthorityCode() == "4258"
 
         # Test changing active SRS
         assert lyr.SetActiveSRS(0, supported_srs_list[1]) == ogr.OGRERR_NONE
@@ -5230,7 +5230,7 @@ def test_ogr_wfs_vsimem_wfs200_supported_crs():
                 (-10.0, 40.0, 15.0, 50.0),
                 abs=1e-3,
             )
-            assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4258"
+            assert lyr.GetSpatialRef().GetAuthorityCode() == "4258"
             f = lyr.GetNextFeature()
             assert f is not None
             assert f.GetGeometryRef().ExportToWkt() == "POINT (2 49)"

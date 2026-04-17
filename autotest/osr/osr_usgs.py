@@ -111,4 +111,4 @@ def test_osr_usgs_wgs84():
     srs2.ImportFromUSGS(proj_code, zone, params, datum_code)
 
     assert srs2.IsSame(srs)
-    assert srs2.GetAuthorityCode(None) == "32631"
+    assert srs2.GetAuthorityCode() == "32631"
