@@ -2,7 +2,9 @@
 
 set -ex
 
-. ../scripts/setdevenv.sh
+export SOURCE_DIR="$PWD/.."
+
+. "${SOURCE_DIR}/scripts/setdevenv.sh"
 
 cd autotest
 
@@ -24,9 +26,9 @@ export PATH=/usr/lib/llvm-21/bin:${PATH}
 export SKIP_MEM_INTENSIVE_TEST=YES
 export SKIP_VIRTUALMEM=YES
 export LD_PRELOAD=$(clang -print-file-name=libclang_rt.asan-x86_64.so)
-export ASAN_OPTIONS=allocator_may_return_null=1:symbolize=1:suppressions=$PWD/asan_suppressions.txt
-export LSAN_OPTIONS=detect_leaks=1,print_suppressions=0,suppressions=$PWD/lsan_suppressions.txt
-export UBSAN_OPTIONS=print_stacktrace=1,suppressions=$PWD/ubsan_suppressions.txt
+export ASAN_OPTIONS="allocator_may_return_null=1:symbolize=1:suppressions=${SOURCE_DIR}/autotest/asan_suppressions.txt"
+export LSAN_OPTIONS="detect_leaks=1,print_suppressions=0,suppressions=${SOURCE_DIR}/autotest/lsan_suppressions.txt"
+export UBSAN_OPTIONS="print_stacktrace=1,suppressions=${SOURCE_DIR}/autotest/ubsan_suppressions.txt"
 export PYTHONMALLOC=malloc
 
 gdalinfo gcore/data/byte.tif
