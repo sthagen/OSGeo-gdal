@@ -67,6 +67,10 @@ struct GDALZonalStatsOptions
                     include_fields.push_back(pszField);
                 }
             }
+            else if (EQUAL(key, "OUTPUT_LAYER"))
+            {
+                output_layer = value;
+            }
             else if (EQUAL(key, "PIXEL_INTERSECTION"))
             {
                 if (EQUAL(value, "DEFAULT"))
@@ -194,6 +198,7 @@ struct GDALZonalStatsOptions
     int zones_band{};
     int weights_band{};
     CPLStringList layer_creation_options{};
+    std::string output_layer{"stats"};
 };
 
 template <typename T = GByte> auto CreateBuffer()
@@ -541,10 +546,8 @@ class GDALZonalStatsImpl
 
     OGRLayer *GetOutputLayer(bool createValueField)
     {
-        std::string osLayerName = "stats";
-
         OGRLayer *poLayer =
-            m_dst.CreateLayer(osLayerName.c_str(), nullptr,
+            m_dst.CreateLayer(m_options.output_layer.c_str(), nullptr,
                               m_options.layer_creation_options.List());
         if (!poLayer)
             return nullptr;
@@ -990,6 +993,9 @@ class GDALZonalStatsImpl
         return ret;
     }
 
+    bool ReallocCellCenterBuffersIfNeeded(size_t &nBufXSize, size_t &nBufYSize,
+                                          const GDALRasterWindow &oWindow);
+
     void WarnIfZonesNotCovered(const GDALRasterBand *poZonesBand) const
     {
         OGREnvelope oZonesEnv;
@@ -1114,6 +1120,8 @@ class GDALZonalStatsImpl
 
         auto pabyZonesBuf = CreateBuffer();
         size_t nBufSize = 0;
+        size_t nBufXSize = 0;
+        size_t nBufYSize = 0;
 
         const auto windowIteratorWrapper =
             poAlignedValuesDS->GetRasterBand(1)->IterateWindows(m_maxCells);
@@ -1123,6 +1131,11 @@ class GDALZonalStatsImpl
         {
             const auto nWindowSize = static_cast<size_t>(oWindow.nXSize) *
                                      static_cast<size_t>(oWindow.nYSize);
+            if (!ReallocCellCenterBuffersIfNeeded(nBufXSize, nBufYSize,
+                                                  oWindow))
+            {
+                return false;
+            }
 
             if (nBufSize < nWindowSize)
             {
@@ -1136,16 +1149,6 @@ class GDALZonalStatsImpl
                 Realloc(m_pabyMaskBuf, nWindowSize,
                         GDALGetDataTypeSizeBytes(m_maskDataType),
                         bAllocSuccess);
-
-                if (m_stats_options.store_xy)
-                {
-                    Realloc(m_padfX, oWindow.nXSize,
-                            GDALGetDataTypeSizeBytes(GDT_Float64),
-                            bAllocSuccess);
-                    Realloc(m_padfY, oWindow.nYSize,
-                            GDALGetDataTypeSizeBytes(GDT_Float64),
-                            bAllocSuccess);
-                }
 
                 if (poWeightsBand)
                 {
@@ -1367,6 +1370,8 @@ class GDALZonalStatsImpl
         auto addHit = [](void *hit, void *hits)
         { static_cast<std::vector<void *> *>(hits)->push_back(hit); };
         size_t nBufSize = 0;
+        size_t nBufXSize = 0;
+        size_t nBufYSize = 0;
 
         const auto windowIteratorWrapper =
             m_src.GetRasterBand(m_options.bands.front())
@@ -1396,6 +1401,12 @@ class GDALZonalStatsImpl
 
             if (!aiHits.empty())
             {
+                if (!ReallocCellCenterBuffersIfNeeded(nBufXSize, nBufYSize,
+                                                      oChunkWindow))
+                {
+                    return false;
+                }
+
                 if (nBufSize < nWindowSize)
                 {
                     bool bAllocSuccess = true;
@@ -1408,15 +1419,6 @@ class GDALZonalStatsImpl
                     Realloc(m_pabyMaskBuf, nWindowSize,
                             GDALGetDataTypeSizeBytes(m_maskDataType),
                             bAllocSuccess);
-                    if (m_stats_options.store_xy)
-                    {
-                        Realloc(m_padfX, oChunkWindow.nXSize,
-                                GDALGetDataTypeSizeBytes(GDT_Float64),
-                                bAllocSuccess);
-                        Realloc(m_padfY, oChunkWindow.nYSize,
-                                GDALGetDataTypeSizeBytes(GDT_Float64),
-                                bAllocSuccess);
-                    }
                     if (m_weights != nullptr)
                     {
                         Realloc(m_padfWeightsBuf, nWindowSize,
@@ -1616,6 +1618,8 @@ class GDALZonalStatsImpl
         }
 
         size_t nBufSize = 0;
+        size_t nBufXSize = 0;
+        size_t nBufYSize = 0;
 
         OGRLayer *poSrcLayer = std::get<OGRLayer *>(m_zones);
         OGRLayer *poDstLayer = GetOutputLayer(false);
@@ -1696,6 +1700,12 @@ class GDALZonalStatsImpl
                 const size_t nWindowSize = static_cast<size_t>(oWindow.nXSize) *
                                            static_cast<size_t>(nRowsPerChunk);
 
+                if (!ReallocCellCenterBuffersIfNeeded(nBufXSize, nBufYSize,
+                                                      oWindow))
+                {
+                    return false;
+                }
+
                 if (nBufSize < nWindowSize)
                 {
                     bool bAllocSuccess = true;
@@ -1708,16 +1718,6 @@ class GDALZonalStatsImpl
                     Realloc(m_pabyMaskBuf, nWindowSize,
                             GDALGetDataTypeSizeBytes(m_maskDataType),
                             bAllocSuccess);
-
-                    if (m_stats_options.store_xy)
-                    {
-                        Realloc(m_padfX, oWindow.nXSize,
-                                GDALGetDataTypeSizeBytes(GDT_Float64),
-                                bAllocSuccess);
-                        Realloc(m_padfY, oWindow.nYSize,
-                                GDALGetDataTypeSizeBytes(GDT_Float64),
-                                bAllocSuccess);
-                    }
 
                     if (m_weights != nullptr)
                     {
@@ -1992,6 +1992,43 @@ class GDALZonalStatsImpl
 #endif
 };
 
+bool GDALZonalStatsImpl::ReallocCellCenterBuffersIfNeeded(
+    size_t &nBufXSize, size_t &nBufYSize, const GDALRasterWindow &oWindow)
+{
+    if (!m_stats_options.store_xy)
+    {
+        return true;
+    }
+
+    if (nBufXSize < static_cast<size_t>(oWindow.nXSize))
+    {
+        bool bAllocSuccess = true;
+        Realloc(m_padfX, oWindow.nXSize, GDALGetDataTypeSizeBytes(GDT_Float64),
+                bAllocSuccess);
+        if (!bAllocSuccess)
+        {
+            return false;
+        }
+
+        nBufXSize = static_cast<size_t>(oWindow.nXSize);
+    }
+
+    if (nBufYSize < static_cast<size_t>(oWindow.nYSize))
+    {
+        bool bAllocSuccess = true;
+        Realloc(m_padfY, oWindow.nYSize, GDALGetDataTypeSizeBytes(GDT_Float64),
+                bAllocSuccess);
+        if (!bAllocSuccess)
+        {
+            return false;
+        }
+
+        nBufYSize = static_cast<size_t>(oWindow.nYSize);
+    }
+
+    return true;
+}
+
 static CPLErr GDALZonalStats(GDALDataset &srcDataset, GDALDataset *poWeights,
                              GDALDataset &zonesDataset, GDALDataset &dstDataset,
                              const GDALZonalStatsOptions &options,
@@ -2118,6 +2155,8 @@ static CPLErr GDALZonalStats(GDALDataset &srcDataset, GDALDataset *poWeights,
  *   WEIGHTS_BAND: the band to read from WeightsDS
  *   ZONES_BAND: the band to read from hZonesDS, if hZonesDS is a raster
  *   ZONES_LAYER: the layer to read from hZonesDS, if hZonesDS is a vector
+ *   OUTPUT_LAYER: the layer name to create in hOutDS (since GDAL 3.13; default
+ *                 is "stats")
  *   LCO_{key}: layer creation option {key}
  *
  * @param pfnProgress optional progress reporting callback

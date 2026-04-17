@@ -2616,7 +2616,7 @@ struct curl_slist *VSIS3HandleHelper::GetCurlHeaders(
                         if (pszUsername == nullptr)
                             pszUsername = CPLGetConfigOption("USER", nullptr);
 
-                        if (pszDir != nullptr && pszUsername != nullptr)
+                        if (pszUsername != nullptr)
                         {
                             return CPLFormFilenameSafe(
                                 pszDir, CPLSPrintf(".gdal_%s", pszUsername),
