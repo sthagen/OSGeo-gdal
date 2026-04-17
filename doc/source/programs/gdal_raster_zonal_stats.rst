@@ -121,7 +121,13 @@ Program-Specific Options
 .. option:: --include-field <INCLUDE-FIELD>
 
    Specifies one or more fields from the zones to be copied to the output. Only
-   available when vector zones are used.
+   available when vector zones are used. Since GDAL 3.13, the special values "ALL" and "NONE" can be used.
+
+.. option:: --include-geom
+
+   Include the zone geometry in the output feature. Only available when vector zones are used.
+
+   .. versionadded:: 3.13
 
 .. option:: --pixels <PIXELS>
 
@@ -214,7 +220,8 @@ Examples
 
    .. code-block:: bash
 
-      gdal pipeline read points.geojson ! buffer 200 ! \
+      gdal pipeline read points.geojson ! \
+          buffer 200 ! \
           zonal-stats \
             --input dem.tif
             --zones _ \
@@ -233,9 +240,9 @@ Examples
           zonal-stats \
             --zones watersheds.shp \
             --stat max_center_x \
-            --stat max_center_y !
+            --stat max_center_y ! \
           make-point \
             --x max_center_x \
             --y max_center_y \
-            --dst-crs EPSG:4326 !
+            --dst-crs EPSG:4326 ! \
           write out.geojson
