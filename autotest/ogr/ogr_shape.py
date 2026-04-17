@@ -3294,6 +3294,23 @@ def test_ogr_shape_74(tmp_vsimem):
 
 
 ###############################################################################
+# Test organizePolygons() in OGR_ORGANIZE_POLYGONS=DEFAULT mode with
+# invalid ring (https://github.com/OSGeo/gdal/issues/14385)
+
+
+@pytest.mark.require_geos()
+def test_ogr_shape_issue_14385(tmp_vsimem):
+
+    ds = ogr.Open("data/shp/issue_14385.shp")
+    lyr = ds.GetLayer(0)
+    lyr.GetNextFeature()
+    f = lyr.GetNextFeature()
+    g = f.GetGeometryRef()
+    assert g.GetGeometryType() == ogr.wkbPolygon
+    assert g.GetGeometryCount() == 3
+
+
+###############################################################################
 # Test GetFileList()
 
 
@@ -6263,10 +6280,7 @@ def test_ogr_shape_read_huge_multipolygon():
     ellapsed_time = end - start
     assert ellapsed_time < 90
     g = f.GetGeometryRef()
-    if ogrtest.have_geos():
-        assert g.GetGeometryCount() == 157284
-    else:
-        assert g.GetGeometryCount() == 161782
+    assert g.GetGeometryCount() == 161782
 
 
 ###############################################################################
