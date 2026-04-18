@@ -536,7 +536,20 @@ For more details: :cpp:func:`OGR_G_IsValid`
 Returns
 -------
 int
-    True if the geometry has no points, otherwise False.
+    True if the geometry is invalid, otherwise False.
+";
+
+//////////////////////////////////////////////////////////////////////////////
+
+%feature("docstring")  GetInvalidityReason "
+Test if the geometry is valid and, if not, return the invalidity reason.
+
+For more details: :cpp:func:`OGR_G_GetInvalidityReason`
+
+Returns
+-------
+str
+    a string with the invalidity reason, or None if it is valid
 ";
 
 //////////////////////////////////////////////////////////////////////////////

@@ -507,7 +507,7 @@ def test_ogr_shape_18():
 
     assert srs_lyr is not None, "Missing projection definition."
 
-    assert srs_lyr.GetAuthorityCode(None) == "27700"
+    assert srs_lyr.GetAuthorityCode() == "27700"
 
 
 ###############################################################################
@@ -3294,6 +3294,23 @@ def test_ogr_shape_74(tmp_vsimem):
 
 
 ###############################################################################
+# Test organizePolygons() in OGR_ORGANIZE_POLYGONS=DEFAULT mode with
+# invalid ring (https://github.com/OSGeo/gdal/issues/14385)
+
+
+@pytest.mark.require_geos()
+def test_ogr_shape_issue_14385(tmp_vsimem):
+
+    ds = ogr.Open("data/shp/issue_14385.shp")
+    lyr = ds.GetLayer(0)
+    lyr.GetNextFeature()
+    f = lyr.GetNextFeature()
+    g = f.GetGeometryRef()
+    assert g.GetGeometryType() == ogr.wkbPolygon
+    assert g.GetGeometryCount() == 3
+
+
+###############################################################################
 # Test GetFileList()
 
 
@@ -4306,7 +4323,7 @@ def test_ogr_shape_etrs89_with_zero_TOWGS84(tmp_vsimem):
     ds = ogr.Open(tmp_vsimem / "test_ogr_shape_etrs89_with_zero_TOWGS84.shp")
     lyr = ds.GetLayer(0)
     srs = lyr.GetSpatialRef()
-    assert srs.GetAuthorityCode(None) == "3763"
+    assert srs.GetAuthorityCode() == "3763"
     assert "BOUNDCRS" not in srs.ExportToWkt(["FORMAT=WKT2"])
     ds = None
 
@@ -5672,7 +5689,7 @@ def test_ogr_shape_alter_geom_field_defn(tmp_vsimem):
     lyr = ds.GetLayer(0)
     srs = lyr.GetSpatialRef()
     assert srs is not None
-    assert srs.GetAuthorityCode(None) == "4269"
+    assert srs.GetAuthorityCode() == "4269"
 
     new_geom_field_defn = ogr.GeomFieldDefn("", ogr.wkbPoint)
     assert (
@@ -5703,7 +5720,7 @@ def test_ogr_shape_alter_geom_field_defn(tmp_vsimem):
     lyr = ds.GetLayer(0)
     srs = lyr.GetSpatialRef()
     assert srs is not None
-    assert srs.GetAuthorityCode(None) == "4326"
+    assert srs.GetAuthorityCode() == "4326"
 
     # Wrong index
     new_geom_field_defn = ogr.GeomFieldDefn("", ogr.wkbPoint)
@@ -5800,7 +5817,7 @@ def test_ogr_shape_prj_with_wrong_axis_order(tmp_vsimem):
     lyr = ds.GetLayer(0)
     # Axis order has been changed
     assert lyr.GetSpatialRef().GetAxisName(None, 0) == "Latitude"
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "4326"
     assert lyr.GetSpatialRef().GetDataAxisToSRSAxisMapping() == [2, 1]
 
 
@@ -6263,10 +6280,7 @@ def test_ogr_shape_read_huge_multipolygon():
     ellapsed_time = end - start
     assert ellapsed_time < 90
     g = f.GetGeometryRef()
-    if ogrtest.have_geos():
-        assert g.GetGeometryCount() == 157284
-    else:
-        assert g.GetGeometryCount() == 161782
+    assert g.GetGeometryCount() == 161782
 
 
 ###############################################################################

@@ -3095,7 +3095,7 @@ def test_jp2openjpeg_online_2():
     ds.GetRasterBand(1).Checksum()
     assert len(ds.GetGCPs()) == 15, "bad number of GCP"
 
-    assert ds.GetGCPSpatialRef().GetAuthorityCode(None) == "4326"
+    assert ds.GetGCPSpatialRef().GetAuthorityCode() == "4326"
 
     ds = None
 

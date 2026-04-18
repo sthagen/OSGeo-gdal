@@ -2455,8 +2455,8 @@ GenerateSTAC(const std::string &osDirectory, const std::string &osTitle,
         std::move(oTilesTileMatrixLink);
     oProperties["tiles:tile_matrix_links"] = std::move(oTilesTileMatrixLinks);
 
-    const char *pszAuthName = oSRS.GetAuthorityName(nullptr);
-    const char *pszAuthCode = oSRS.GetAuthorityCode(nullptr);
+    const char *pszAuthName = oSRS.GetAuthorityName();
+    const char *pszAuthCode = oSRS.GetAuthorityCode();
     if (pszAuthName && pszAuthCode)
     {
         oProperties["proj:code"] =
@@ -2904,8 +2904,8 @@ static void GenerateOpenLayers(
     }
     else if (!oSRS_TMS.IsEmpty() && tms.identifier() != "GoogleMapsCompatible")
     {
-        const char *pszAuthName = oSRS_TMS.GetAuthorityName(nullptr);
-        const char *pszAuthCode = oSRS_TMS.GetAuthorityCode(nullptr);
+        const char *pszAuthName = oSRS_TMS.GetAuthorityName();
+        const char *pszAuthCode = oSRS_TMS.GetAuthorityCode();
         if (pszAuthName && pszAuthCode && EQUAL(pszAuthName, "EPSG"))
         {
             substs["epsg_code"] = pszAuthCode;
@@ -4634,8 +4634,8 @@ bool GDALRasterTileAlgorithm::RunStep(GDALPipelineStepRunContext &ctxt)
         aosTO.SetNameValue("DST_SRS", oSRS_TMS.exportToWkt().c_str());
     }
 
-    const char *pszAuthName = oSRS_TMS.GetAuthorityName(nullptr);
-    const char *pszAuthCode = oSRS_TMS.GetAuthorityCode(nullptr);
+    const char *pszAuthName = oSRS_TMS.GetAuthorityName();
+    const char *pszAuthCode = oSRS_TMS.GetAuthorityCode();
     const int nEPSGCode =
         (pszAuthName && pszAuthCode && EQUAL(pszAuthName, "EPSG"))
             ? atoi(pszAuthCode)

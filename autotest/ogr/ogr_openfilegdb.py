@@ -2314,7 +2314,7 @@ def test_ogr_openfilegdb_inconsistent_crs_feature_dataset_and_feature_table():
     lyr = ds.GetLayer(0)
     srs = lyr.GetSpatialRef()
     assert srs is not None
-    assert srs.GetAuthorityCode(None) == "4326"
+    assert srs.GetAuthorityCode() == "4326"
 
 
 ###############################################################################

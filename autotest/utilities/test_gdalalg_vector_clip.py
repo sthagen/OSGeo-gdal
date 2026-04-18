@@ -184,7 +184,7 @@ def test_gdalalg_vector_clip_bbox_srs():
 
     out_ds = clip["output"].GetDataset()
     out_lyr = out_ds.GetLayer(0)
-    assert out_lyr.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert out_lyr.GetSpatialRef().GetAuthorityCode() == "4326"
     out_f = out_lyr.GetNextFeature()
     assert out_f["foo"] == "bar"
 

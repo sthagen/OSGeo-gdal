@@ -133,7 +133,7 @@ def tpoly(mssql_ds):
 
     got_srs = sql_lyr.GetSpatialRef()
     expected_srs = shp_lyr.GetSpatialRef()
-    assert got_srs.GetAuthorityCode(None) == expected_srs.GetAuthorityCode(
+    assert got_srs.GetAuthorityCode() == expected_srs.GetAuthorityCode(
         None
     ), "not matching spatial ref"
 

@@ -330,10 +330,10 @@ bool WCSDataset100::ExtractGridInfo()
     /* -------------------------------------------------------------------- */
     if (!m_oSRS.IsEmpty() && osCRS == "")
     {
-        const char *pszAuth = m_oSRS.GetAuthorityName(nullptr);
+        const char *pszAuth = m_oSRS.GetAuthorityName();
         if (pszAuth != nullptr && EQUAL(pszAuth, "EPSG"))
         {
-            pszAuth = m_oSRS.GetAuthorityCode(nullptr);
+            pszAuth = m_oSRS.GetAuthorityCode();
             if (pszAuth)
             {
                 osCRS = "EPSG:";

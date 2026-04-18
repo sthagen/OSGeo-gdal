@@ -2409,7 +2409,7 @@ int OGRPGDataSource::FetchSRSId(const OGRSpatialReference *poSRS)
     // cppcheck-suppress uselessAssignmentPtrArg
     poSRS = nullptr;
 
-    const char *pszAuthorityName = oSRS.GetAuthorityName(nullptr);
+    const char *pszAuthorityName = oSRS.GetAuthorityName();
 
     if (pszAuthorityName == nullptr || strlen(pszAuthorityName) == 0)
     {
@@ -2420,16 +2420,16 @@ int OGRPGDataSource::FetchSRSId(const OGRSpatialReference *poSRS)
          */
         oSRS.AutoIdentifyEPSG();
 
-        pszAuthorityName = oSRS.GetAuthorityName(nullptr);
+        pszAuthorityName = oSRS.GetAuthorityName();
         if (pszAuthorityName != nullptr && EQUAL(pszAuthorityName, "EPSG"))
         {
-            const char *pszAuthorityCode = oSRS.GetAuthorityCode(nullptr);
+            const char *pszAuthorityCode = oSRS.GetAuthorityCode();
             if (pszAuthorityCode != nullptr && strlen(pszAuthorityCode) > 0)
             {
                 /* Import 'clean' SRS */
                 oSRS.importFromEPSG(atoi(pszAuthorityCode));
 
-                pszAuthorityName = oSRS.GetAuthorityName(nullptr);
+                pszAuthorityName = oSRS.GetAuthorityName();
             }
         }
     }
@@ -2442,7 +2442,7 @@ int OGRPGDataSource::FetchSRSId(const OGRSpatialReference *poSRS)
     if (pszAuthorityName != nullptr)
     {
         /* Check that the authority code is integral */
-        nAuthorityCode = atoi(oSRS.GetAuthorityCode(nullptr));
+        nAuthorityCode = atoi(oSRS.GetAuthorityCode());
         if (nAuthorityCode > 0)
         {
             osCommand.Printf("SELECT srid FROM spatial_ref_sys WHERE "
@@ -2540,7 +2540,7 @@ int OGRPGDataSource::FetchSRSId(const OGRSpatialReference *poSRS)
 
     if (pszAuthorityName != nullptr && nAuthorityCode > 0)
     {
-        nAuthorityCode = atoi(oSRS.GetAuthorityCode(nullptr));
+        nAuthorityCode = atoi(oSRS.GetAuthorityCode());
 
         osCommand.Printf("INSERT INTO spatial_ref_sys "
                          "(srid,srtext,proj4text,auth_name,auth_srid) "

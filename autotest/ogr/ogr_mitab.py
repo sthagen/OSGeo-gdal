@@ -1616,7 +1616,7 @@ def test_ogr_mitab_35(tmp_vsimem):
         == 'CoordSys Earth Projection 3, 33, "m", 3, 46.5, 44, 49, 700000, 6600000'
     )
     srs = get_srs_from_coordsys(tmp_vsimem, coordsys)
-    assert srs.GetAuthorityCode(None) == "2154"
+    assert srs.GetAuthorityCode() == "2154"
     coordsys = get_coordsys_from_srs(tmp_vsimem, srs)
     assert (
         coordsys

@@ -569,7 +569,7 @@ def test_tiff_write_16():
     ds = gdal.Open("tmp/tw_16.tif")
     assert ds.GetGeoTransform() == (10, 5, 0, 30, 0, -5)
     assert ds.GetSpatialRef() is not None
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "4326"
 
     md = ds.GetMetadata()
     assert "test" in md, "Metadata absent from .aux.xml file."
@@ -10041,7 +10041,7 @@ def test_tiff_write_setspatialref_read_only():
     ds = gdal.Open(filename)
     got_srs = ds.GetSpatialRef()
     assert got_srs
-    assert got_srs.GetAuthorityCode(None) == "4326"
+    assert got_srs.GetAuthorityCode() == "4326"
     ds = None
 
     gdal.GetDriverByName("GTiff").Delete(filename)
@@ -10071,7 +10071,7 @@ def test_tiff_write_setspatialref_read_only_override_tifftags():
     ds = gdal.Open(filename)
     got_srs = ds.GetSpatialRef()
     assert got_srs
-    assert got_srs.GetAuthorityCode(None) == "4326"
+    assert got_srs.GetAuthorityCode() == "4326"
     ds = None
 
     ds = gdal.Open(filename, gdal.GA_Update)
@@ -10085,7 +10085,7 @@ def test_tiff_write_setspatialref_read_only_override_tifftags():
     ds = gdal.Open(filename)
     got_srs = ds.GetSpatialRef()
     assert got_srs
-    assert got_srs.GetAuthorityCode(None) == "32632"
+    assert got_srs.GetAuthorityCode() == "32632"
     ds = None
 
     gdal.GetDriverByName("GTiff").Delete(filename)
@@ -10180,7 +10180,7 @@ def test_tiff_write_setgcps_read_only():
     assert got_gcps[0].GCPY == gcps[0].GCPY
     got_srs = ds.GetGCPSpatialRef()
     assert got_srs
-    assert got_srs.GetAuthorityCode(None) == "4326"
+    assert got_srs.GetAuthorityCode() == "4326"
     ds = None
 
     gdal.GetDriverByName("GTiff").Delete(filename)
@@ -10216,7 +10216,7 @@ def test_tiff_write_setgcps_read_only_override_tifftags():
     assert got_gcps[0].GCPY == gcps[0].GCPY
     got_srs = ds.GetGCPSpatialRef()
     assert got_srs
-    assert got_srs.GetAuthorityCode(None) == "4326"
+    assert got_srs.GetAuthorityCode() == "4326"
     ds = None
 
     ds = gdal.Open(filename, gdal.GA_Update)

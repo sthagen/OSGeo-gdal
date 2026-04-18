@@ -851,11 +851,11 @@ CPLErr RMFDataset::WriteHeader()
         sHeader.dfStdP2 = adfPrjParams[1];
         sHeader.dfCenterLat = adfPrjParams[2];
         sHeader.dfCenterLong = adfPrjParams[3];
-        if (m_oSRS.GetAuthorityName(nullptr) != nullptr &&
-            m_oSRS.GetAuthorityCode(nullptr) != nullptr &&
-            EQUAL(m_oSRS.GetAuthorityName(nullptr), "EPSG"))
+        if (m_oSRS.GetAuthorityName() != nullptr &&
+            m_oSRS.GetAuthorityCode() != nullptr &&
+            EQUAL(m_oSRS.GetAuthorityName(), "EPSG"))
         {
-            sHeader.iEPSGCode = atoi(m_oSRS.GetAuthorityCode(nullptr));
+            sHeader.iEPSGCode = atoi(m_oSRS.GetAuthorityCode());
         }
 
         sExtHeader.nEllipsoid = static_cast<GInt32>(iEllips);

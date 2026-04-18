@@ -549,16 +549,16 @@ def test_ogrmerge_gpkg(
     assert lyr.GetExtent() == src_lyr.GetExtent()
     if a_srs:
         assert (
-            lyr.GetSpatialRef().GetAuthorityName(None)
+            lyr.GetSpatialRef().GetAuthorityName()
             + ":"
-            + lyr.GetSpatialRef().GetAuthorityCode(None)
+            + lyr.GetSpatialRef().GetAuthorityCode()
             == a_srs
         )
     elif t_srs:
         assert (
-            lyr.GetSpatialRef().GetAuthorityName(None)
+            lyr.GetSpatialRef().GetAuthorityName()
             + ":"
-            + lyr.GetSpatialRef().GetAuthorityCode(None)
+            + lyr.GetSpatialRef().GetAuthorityCode()
             == t_srs
         )
     else:

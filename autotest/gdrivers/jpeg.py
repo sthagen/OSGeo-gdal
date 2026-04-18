@@ -1856,7 +1856,7 @@ def test_jpeg_read_pix4d_xmp_crs_vertcs_ellipsoidal():
     # where pix4d_xmp_crs_vertcs_ellipsoidal.xml is the XMP content
     ds = gdal.Open("data/jpeg/pix4d_xmp_crs_vertcs_ellipsoidal.jpg")
     srs = ds.GetSpatialRef()
-    assert srs.GetAuthorityCode(None) == "6319"
+    assert srs.GetAuthorityCode() == "6319"
 
 
 ###############################################################################

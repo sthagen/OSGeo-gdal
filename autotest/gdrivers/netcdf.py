@@ -6300,7 +6300,7 @@ def test_netcdf_proj4string_geospatial_bounds_crs():
     assert ds.GetGeoTransform() == pytest.approx(
         (-5400000.0, 75000.0, 0.0, 5400000.0, 0.0, -75000.0)
     )
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "6931"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "6931"
 
 
 ###############################################################################

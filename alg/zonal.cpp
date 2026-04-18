@@ -58,14 +58,29 @@ struct GDALZonalStatsOptions
             }
             else if (EQUAL(key, "INCLUDE_FIELDS"))
             {
-                CPLStringList aosFields(CSLTokenizeString2(
-                    value, ",",
-                    CSLT_HONOURSTRINGS | CSLT_STRIPLEADSPACES |
-                        CSLT_STRIPENDSPACES));
-                for (const char *pszField : aosFields)
+                if (EQUAL(value, "NONE"))
                 {
-                    include_fields.push_back(pszField);
+                    // do nothing
                 }
+                else if (EQUAL(value, "ALL"))
+                {
+                    include_all_fields = true;
+                }
+                else
+                {
+                    CPLStringList aosFields(CSLTokenizeString2(
+                        value, ",",
+                        CSLT_HONOURSTRINGS | CSLT_STRIPLEADSPACES |
+                            CSLT_STRIPENDSPACES));
+                    for (const char *pszField : aosFields)
+                    {
+                        include_fields.push_back(pszField);
+                    }
+                }
+            }
+            else if (EQUAL(key, "INCLUDE_GEOM"))
+            {
+                include_geom = CPLTestBool(value);
             }
             else if (EQUAL(key, "OUTPUT_LAYER"))
             {
@@ -191,7 +206,9 @@ struct GDALZonalStatsOptions
     PixelIntersection pixels{DEFAULT};
     Strategy strategy{FEATURE_SEQUENTIAL};
     std::vector<std::string> stats{};
+    bool include_all_fields{false};
     std::vector<std::string> include_fields{};
+    bool include_geom{false};
     std::vector<int> bands{};
     std::string zones_layer{};
     std::size_t memory{0};
@@ -488,6 +505,15 @@ class GDALZonalStatsImpl
             const OGRFeatureDefn *poSrcDefn = poSrcLayer->GetLayerDefn();
             poZonesSRS = poSrcLayer->GetSpatialRef();
 
+            if (m_options.include_all_fields)
+            {
+                for (int i = 0; i < poSrcDefn->GetFieldCount(); i++)
+                {
+                    m_options.include_fields.emplace_back(
+                        poSrcDefn->GetFieldDefn(i)->GetNameRef());
+                }
+            }
+
             for (const auto &field : m_options.include_fields)
             {
                 if (poSrcDefn->GetFieldIndex(field.c_str()) == -1)
@@ -504,10 +530,18 @@ class GDALZonalStatsImpl
                              ->GetDataset()
                              ->GetSpatialRefRasterOnly();
 
-            if (!m_options.include_fields.empty())
+            if (m_options.include_all_fields ||
+                !m_options.include_fields.empty())
             {
                 CPLError(CE_Failure, CPLE_AppDefined,
                          "Cannot include fields from raster zones");
+                return false;
+            }
+
+            if (m_options.include_geom)
+            {
+                CPLError(CE_Failure, CPLE_AppDefined,
+                         "Cannot include geometry from raster zones");
                 return false;
             }
         }
@@ -546,8 +580,16 @@ class GDALZonalStatsImpl
 
     OGRLayer *GetOutputLayer(bool createValueField)
     {
+        const OGRGeomFieldDefn *poGeomDefn = nullptr;
+        if (m_options.include_geom)
+        {
+            const OGRFeatureDefn *poSrcDefn =
+                std::get<OGRLayer *>(m_zones)->GetLayerDefn();
+            poGeomDefn = poSrcDefn->GetGeomFieldDefn(0);
+        }
+
         OGRLayer *poLayer =
-            m_dst.CreateLayer(m_options.output_layer.c_str(), nullptr,
+            m_dst.CreateLayer(m_options.output_layer.c_str(), poGeomDefn,
                               m_options.layer_creation_options.List());
         if (!poLayer)
             return nullptr;
@@ -2110,7 +2152,10 @@ static CPLErr GDALZonalStats(GDALDataset &srcDataset, GDALDataset *poWeights,
  *   BANDS: a comma-separated list of band indices to be processed from the
  *          source dataset. If not present, all bands will be processed.
  *   INCLUDE_FIELDS: a comma-separated list of field names from the zones
- *          dataset to be included in output features.
+ *          dataset to be included in output features. Since GDAL 3.13, the
+ *          special values "ALL" and "NONE" can be used.
+ *   INCLUDE_GEOM: whether to include polygon zone geometry in the output
+ *                 features (since GDAL 3.13; default is "NO").
  *   PIXEL_INTERSECTION: controls which pixels are included in calculations:
  *          - DEFAULT: use default options to GDALRasterize
  *          - ALL_TOUCHED: use ALL_TOUCHED option of GDALRasterize

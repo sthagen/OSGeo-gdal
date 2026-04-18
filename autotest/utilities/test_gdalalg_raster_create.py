@@ -210,7 +210,7 @@ def test_gdalalg_raster_create_full():
     assert (
         ds.GetRasterBand(2).ReadRaster(0, 0, 1, 1, buf_type=gdal.GDT_UInt8) == b"\xfe"
     )
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "4326"
     assert ds.GetGeoTransform() == (2.0, 0.5, 0.0, 50.0, 0.0, -0.25)
     assert ds.GetMetadataItem("key") == "value"
 
@@ -234,7 +234,7 @@ def test_gdalalg_raster_create_copy():
     assert (
         ds.GetRasterBand(2).ReadRaster(0, 0, 1, 1, buf_type=gdal.GDT_UInt8) == b"\x00"
     )
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "4326"
     assert ds.GetGeoTransform() == (2.0, 0.5, 0.0, 50.0, 0.0, -0.25)
     assert ds.GetMetadataItem("key") is None
     assert ds.GetRasterBand(1).GetMetadataItem("foo") is None
@@ -409,7 +409,7 @@ def test_gdalalg_raster_create_copy_override_crs():
     alg["crs"] = "EPSG:32631"
     assert alg.Run()
     ds = alg["output"].GetDataset()
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "32631"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "32631"
 
 
 def test_gdalalg_raster_create_copy_override_bbox():

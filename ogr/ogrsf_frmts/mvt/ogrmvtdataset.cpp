@@ -5659,8 +5659,8 @@ bool OGRMVTWriterDataset::GenerateMetadata(
     // GDAL extension for custom tiling schemes
     if (!bIsStandardTilingScheme)
     {
-        const char *pszAuthName = m_poSRS->GetAuthorityName(nullptr);
-        const char *pszAuthCode = m_poSRS->GetAuthorityCode(nullptr);
+        const char *pszAuthName = m_poSRS->GetAuthorityName();
+        const char *pszAuthCode = m_poSRS->GetAuthorityCode();
         if (pszAuthName && pszAuthCode)
         {
             WriteMetadataItem("crs",

@@ -460,8 +460,8 @@ class CPL_DLL OGRSpatialReference
 
     int GetEPSGGeogCS() const;
 
-    const char *GetAuthorityCode(const char *pszTargetKey) const;
-    const char *GetAuthorityName(const char *pszTargetKey) const;
+    const char *GetAuthorityCode(const char *pszTargetKey = nullptr) const;
+    const char *GetAuthorityName(const char *pszTargetKey = nullptr) const;
     char *GetOGCURN() const;
 
     bool GetAreaOfUse(double *pdfWestLongitudeDeg, double *pdfSouthLatitudeDeg,

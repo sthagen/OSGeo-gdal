@@ -555,10 +555,8 @@ bool GDALVectorIndexAlgorithm::RunImpl(GDALProgressFunc pfnProgress,
 
             if (nSourceCRSFieldIdx >= 0 && poSrcCRS)
             {
-                const char *pszAuthorityCode =
-                    poSrcCRS->GetAuthorityCode(nullptr);
-                const char *pszAuthorityName =
-                    poSrcCRS->GetAuthorityName(nullptr);
+                const char *pszAuthorityCode = poSrcCRS->GetAuthorityCode();
+                const char *pszAuthorityName = poSrcCRS->GetAuthorityName();
                 const std::string osWKT = poSrcCRS->exportToWkt();
                 if (m_sourceCrsFormat == "auto")
                 {

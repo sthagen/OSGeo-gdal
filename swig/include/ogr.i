@@ -3976,6 +3976,10 @@ public:
     return (OGR_G_IsValid(self) > 0);
   }
 
+  retStringAndCPLFree* GetInvalidityReason () {
+    return OGR_G_GetInvalidityReason(self);
+  }
+
   bool IsSimple () {
     return (OGR_G_IsSimple(self) > 0);
   }

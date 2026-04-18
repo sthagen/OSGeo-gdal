@@ -7,8 +7,8 @@
 # Public domain
 # or licensed under MIT (LICENSE.TXT) Copyright 2019 Even Rouault <even.rouault@spatialys.com>
 
-ARG BASE_IMAGE=ubuntu:24.04
-ARG TARGET_BASE_IMAGE=ubuntu:24.04
+ARG BASE_IMAGE=ubuntu:26.04
+ARG TARGET_BASE_IMAGE=ubuntu:26.04
 
 FROM $BASE_IMAGE AS builder
 
@@ -29,18 +29,18 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     . /buildscripts/bh-set-envvars.sh \
     && if test "${TARGET_ARCH}" != ""; then \
     rm -f /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources \
-    && echo "deb [arch=amd64] http://us.archive.ubuntu.com/ubuntu/ noble main restricted universe" >> /etc/apt/sources.list \
-    && echo "deb [arch=amd64] http://us.archive.ubuntu.com/ubuntu/ noble-updates main restricted universe" >> /etc/apt/sources.list \
-    && echo "deb [arch=amd64] http://us.archive.ubuntu.com/ubuntu/ noble-backports main restricted universe" >> /etc/apt/sources.list \
-    && echo "deb [arch=amd64] http://security.ubuntu.com/ubuntu noble-security main restricted universe" >> /etc/apt/sources.list \
-    && echo "deb [arch=${TARGET_ARCH}] http://ports.ubuntu.com/ubuntu-ports/ noble main restricted universe" >> /etc/apt/sources.list \
-    && echo "deb [arch=${TARGET_ARCH}] http://ports.ubuntu.com/ubuntu-ports/ noble-updates main restricted universe" >> /etc/apt/sources.list \
-    && echo "deb [arch=${TARGET_ARCH}] http://ports.ubuntu.com/ubuntu-ports/ noble-security main restricted universe" >> /etc/apt/sources.list \
+    && echo "deb [arch=amd64] http://us.archive.ubuntu.com/ubuntu/ resolute main restricted universe" >> /etc/apt/sources.list \
+    && echo "deb [arch=amd64] http://us.archive.ubuntu.com/ubuntu/ resolute-updates main restricted universe" >> /etc/apt/sources.list \
+    && echo "deb [arch=amd64] http://us.archive.ubuntu.com/ubuntu/ resolute-backports main restricted universe" >> /etc/apt/sources.list \
+    && echo "deb [arch=amd64] http://security.ubuntu.com/ubuntu resolute-security main restricted universe" >> /etc/apt/sources.list \
+    && echo "deb [arch=${TARGET_ARCH}] http://ports.ubuntu.com/ubuntu-ports/ resolute main restricted universe" >> /etc/apt/sources.list \
+    && echo "deb [arch=${TARGET_ARCH}] http://ports.ubuntu.com/ubuntu-ports/ resolute-updates main restricted universe" >> /etc/apt/sources.list \
+    && echo "deb [arch=${TARGET_ARCH}] http://ports.ubuntu.com/ubuntu-ports/ resolute-security main restricted universe" >> /etc/apt/sources.list \
     && dpkg --add-architecture ${TARGET_ARCH} \
     && apt-get update -y \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends g++-13-${GCC_ARCH}-linux-gnu \
-    && ln -s ${GCC_ARCH}-linux-gnu-gcc-13 /usr/bin/${GCC_ARCH}-linux-gnu-gcc \
-    && ln -s ${GCC_ARCH}-linux-gnu-g++-13 /usr/bin/${GCC_ARCH}-linux-gnu-g++; \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends g++-15-${GCC_ARCH}-linux-gnu \
+    && ln -s ${GCC_ARCH}-linux-gnu-gcc-15 /usr/bin/${GCC_ARCH}-linux-gnu-gcc \
+    && ln -s ${GCC_ARCH}-linux-gnu-g++-15 /usr/bin/${GCC_ARCH}-linux-gnu-g++; \
     fi
 
 # Setup build env for PROJ
@@ -68,10 +68,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
        libpng-dev${APT_ARCH_SUFFIX} libjpeg-dev${APT_ARCH_SUFFIX} libgif-dev${APT_ARCH_SUFFIX} liblzma-dev${APT_ARCH_SUFFIX} libgeos-dev${APT_ARCH_SUFFIX} \
        curl libxml2-dev${APT_ARCH_SUFFIX} libexpat-dev${APT_ARCH_SUFFIX} libxerces-c-dev${APT_ARCH_SUFFIX} \
        libnetcdf-dev${APT_ARCH_SUFFIX} libpoppler-dev${APT_ARCH_SUFFIX} libpoppler-private-dev${APT_ARCH_SUFFIX} \
-       libspatialite-dev${APT_ARCH_SUFFIX} librasterlite2-dev${APT_ARCH_SUFFIX} swig ant libhdf4-alt-dev${APT_ARCH_SUFFIX} libhdf5-serial-dev${APT_ARCH_SUFFIX} \
+       libspatialite-dev${APT_ARCH_SUFFIX} librasterlite2-dev${APT_ARCH_SUFFIX} swig ant libhdf4-dev${APT_ARCH_SUFFIX} libhdf5-serial-dev${APT_ARCH_SUFFIX} \
        libfreexl-dev${APT_ARCH_SUFFIX} unixodbc-dev${APT_ARCH_SUFFIX}  mdbtools-dev${APT_ARCH_SUFFIX} libwebp-dev${APT_ARCH_SUFFIX} \
-       liblcms2-2 libpcre3-dev${APT_ARCH_SUFFIX} libcrypto++-dev${APT_ARCH_SUFFIX} libfyba-dev${APT_ARCH_SUFFIX} \
-       libkml-dev${APT_ARCH_SUFFIX} libmysqlclient-dev${APT_ARCH_SUFFIX} \
+       liblcms2-2 libpcre2-dev${APT_ARCH_SUFFIX} libcrypto++-dev${APT_ARCH_SUFFIX} libfyba-dev${APT_ARCH_SUFFIX} \
+       libkml-dev${APT_ARCH_SUFFIX} libmariadb-dev${APT_ARCH_SUFFIX} \
        libcfitsio-dev${APT_ARCH_SUFFIX} openjdk-"$JAVA_VERSION"-jdk${APT_ARCH_SUFFIX} libzstd-dev${APT_ARCH_SUFFIX} \
        libpq-dev${APT_ARCH_SUFFIX} libssl-dev${APT_ARCH_SUFFIX} libboost-dev${APT_ARCH_SUFFIX} \
        autoconf automake bash-completion libarmadillo-dev${APT_ARCH_SUFFIX} \
@@ -81,7 +81,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
        libarchive-dev${APT_ARCH_SUFFIX} \
        libaec-dev${APT_ARCH_SUFFIX} \
        libavif-dev${APT_ARCH_SUFFIX} \
-       libmuparser-dev${APT_ARCH_SUFFIX}
+       libmuparser-dev${APT_ARCH_SUFFIX} \
+       libarrow-dev${APT_ARCH_SUFFIX} \
+       libarrow-acero-dev${APT_ARCH_SUFFIX} \
+       libarrow-dataset-dev${APT_ARCH_SUFFIX} \
+       libparquet-dev${APT_ARCH_SUFFIX}
 
 ARG RSYNC_REMOTE
 ARG WITH_CCACHE
@@ -205,6 +209,8 @@ COPY --link ./docker/ubuntu-full/tiledb-FindLZ4_EP.cmake.patch /buildscripts/til
 COPY --link ./docker/ubuntu-full/tiledb-FindOpenSSL_EP.cmake.patch /buildscripts/tiledb-FindOpenSSL_EP.cmake.patch
 # Commit from TileDB 2.27.
 COPY --link ./docker/ubuntu-full/tiledb-cmake-ccache.patch /buildscripts/tiledb-cmake-ccache.patch
+COPY --link ./docker/ubuntu-full/tiledb-filesystem-posix.patch /buildscripts/tiledb-filesystem-posix.patch
+COPY --link ./docker/ubuntu-full/tiledb-external-blosc-shuffle.patch /buildscripts/tiledb-external-blosc-shuffle.patch
 RUN --mount=type=cache,id=ubuntu-full-tiledb,target=$HOME/.cache \
     . /buildscripts/bh-set-envvars.sh \
     && if [ -n "${RSYNC_REMOTE:-}" ]; then \
@@ -220,6 +226,8 @@ RUN --mount=type=cache,id=ubuntu-full-tiledb,target=$HOME/.cache \
     && curl --retry 3 --retry-all-errors --retry-delay 3 -Lo - -fsS https://github.com/TileDB-Inc/TileDB/archive/${TILEDB_VERSION}.tar.gz \
         | tar xz -C tiledb --strip-components=1 \
     && cd tiledb \
+    && patch -p0 < /buildscripts/tiledb-filesystem-posix.patch \
+    && patch -p0 < /buildscripts/tiledb-external-blosc-shuffle.patch \
     && patch -p0 < /buildscripts/tiledb-FindLZ4_EP.cmake.patch \
     && patch -p0 < /buildscripts/tiledb-FindOpenSSL_EP.cmake.patch \
     && patch -p1 < /buildscripts/tiledb-cmake-ccache.patch \
@@ -295,7 +303,7 @@ RUN . /buildscripts/bh-set-envvars.sh \
 # Download Oracle InstantClient (proprietary) SDK if WITH_ORACLE=yes is passed
 ARG WITH_ORACLE=
 RUN . /buildscripts/bh-set-envvars.sh \
-  && if test "$(uname -p)" = "x86_64"; then \
+  && if test "$(uname -m)" = "x86_64"; then \
   if echo "$WITH_ORACLE" | grep -Eiq "^(y(es)?|1|true)$" ; then ( \
   curl --retry 3 --retry-all-errors --retry-delay 3 -LO -fsS https://download.oracle.com/otn_software/linux/instantclient/1923000/instantclient-basic-linux.x64-19.23.0.0.0dbru.zip \
   && curl --retry 3 --retry-all-errors --retry-delay 3 -LO -fsS https://download.oracle.com/otn_software/linux/instantclient/1923000/instantclient-sdk-linux.x64-19.23.0.0.0dbru.zip \
@@ -312,7 +320,7 @@ RUN . /buildscripts/bh-set-envvars.sh \
 # Download ECW (proprietary) SDK if WITH_ECW=yes is passed
 ARG WITH_ECW=
 RUN . /buildscripts/bh-set-envvars.sh \
-  && if test "$(uname -p)" = "x86_64"; then \
+  && if test "$(uname -m)" = "x86_64"; then \
   if echo "$WITH_ECW" | grep -Eiq "^(y(es)?|1|true)$" ; then ( \
   curl --retry 3 --retry-all-errors --retry-delay 3 -LO -fsS https://github.com/rouault/libecwj2-3.3-builds/releases/download/v1/install-libecwj2-3.3-ubuntu-20.04.tar.gz \
   && tar xzf install-libecwj2-3.3-ubuntu-20.04.tar.gz \
@@ -326,7 +334,7 @@ RUN . /buildscripts/bh-set-envvars.sh \
 # Download MrSID (proprietary) SDK if WITH_MRSID=yes is passed
 ARG WITH_MRSID=
 RUN . /buildscripts/bh-set-envvars.sh \
-  && if test "$(uname -p)" = "x86_64"; then \
+  && if test "$(uname -m)" = "x86_64"; then \
   if echo "$WITH_MRSID" | grep -Eiq "^(y(es)?|1|true)$" ; then ( \
     curl --retry 3 --retry-all-errors --retry-delay 3 -LO -fsS https://bin.extensis.com/download/developer/MrSID_DSDK-9.5.5.5244-rhel9.x86-64.gcc1131.zip \
     && unzip MrSID_DSDK-9.5.5.5244-rhel9.x86-64.gcc1131.zip \
@@ -423,28 +431,6 @@ RUN --mount=type=cache,id=ubuntu-full-libjxl,target=$HOME/.cache \
     && rm -f /build_thirdparty/lib/${GCC_ARCH}-linux-gnu/libjxl*.a \
     && cd ../.. \
     && rm -rf libjxl
-
-# Install Arrow C++
-ARG ARROW_VERSION=23.0.1-1
-# ARROW_SOVERSION to be updated in the "Build final image" section too
-ARG ARROW_SOVERSION=2300
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    . /buildscripts/bh-set-envvars.sh \
-    && apt-get update -y \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -V ca-certificates lsb-release \
-    && curl --retry 3 --retry-all-errors --retry-delay 3 -LO -fsS https://apache.jfrog.io/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y -V ./apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb \
-    && apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -V libarrow${ARROW_SOVERSION}${APT_ARCH_SUFFIX} \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -V libparquet${ARROW_SOVERSION}${APT_ARCH_SUFFIX} \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -V libarrow-dataset${ARROW_SOVERSION}${APT_ARCH_SUFFIX} \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -V libarrow-dev${APT_ARCH_SUFFIX}=${ARROW_VERSION} \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -V libparquet-dev${APT_ARCH_SUFFIX}=${ARROW_VERSION} \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -V libarrow-acero-dev${APT_ARCH_SUFFIX}=${ARROW_VERSION} \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -V libarrow-dataset-dev${APT_ARCH_SUFFIX}=${ARROW_VERSION} \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends -V libarrow-compute-dev${APT_ARCH_SUFFIX}=${ARROW_VERSION} \
-    && rm apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
 
 # Manually build ADBC packages to have support for BigQuery
 ARG ARROW_ADBC_VERSION=22
@@ -554,38 +540,32 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     # GDAL dependencies
     && apt-get install -y --no-install-recommends \
         bash-completion libopenjp2-7 libcairo2 python3-numpy \
-        libpng16-16 libjpeg-turbo8 libgif7 liblzma5 libgeos3.12.1 libgeos-c1v5 \
-        libxml2 libexpat1 \
-        libxerces-c3.2 libnetcdf-c++4-1 netcdf-bin libpoppler134 libspatialite8 librasterlite2-1 gpsbabel \
-        libhdf4-0-alt libhdf5-103-1 libhdf5-cpp-103-1 poppler-utils libfreexl1 unixodbc mdbtools libwebp7 \
-        liblcms2-2 libpcre3 libcrypto++8 libfyba0 \
+        libpng16-16 libjpeg-turbo8 libgif7 liblzma5 libgeos3.14.1 libgeos-c1v5 \
+        libxml2-16 libexpat1 \
+        libxerces-c3.2 libnetcdf-c++4-1 netcdf-bin libpoppler156 libspatialite8 librasterlite2-1 gpsbabel \
+        libhdf4-0 libhdf5-310 libhdf5-cpp-310 poppler-utils libfreexl1 unixodbc mdbtools libwebp7 \
+        liblcms2-2 libpcre2-8-0 libcrypto++8 libfyba0 \
         libkmlbase1 libkmlconvenience1 libkmldom1 libkmlengine1 libkmlregionator1 libkmlxsd1 \
-        libmysqlclient21 libcfitsio10 \
+        libmariadb3 libcfitsio10 \
         libzstd1 bash bash-completion libpq5 \
-        libarmadillo12 libpython3.12 libopenexr-3-1-30 libheif1 \
+        libarmadillo15 libpython3.14 libopenexr-3-1-30 libheif1 \
         libdeflate0 libblosc1 liblz4-1 \
         libbrotli1 \
         libarchive13 \
         libaec0 \
         libavif16 \
-        libspdlog1.12 libmagic1t64 \
+        libspdlog1.15 libmagic1t64 \
         libmuparser2v5 \
         libtcmalloc-minimal4 \
         python-is-python3 \
         # for validate_geoparquet.py (cf https://github.com/OSGeo/gdal/issues/11953)
         python3-jsonschema \
+        libarrow${ARROW_SOVERSION} \
+        libarrow-acero${ARROW_SOVERSION} \
+        libarrow-dataset${ARROW_SOVERSION} \
+        libparquet${ARROW_SOVERSION} \
     # Install JRE with --no-install-recommends, otherwise it draws default-jre, which draws systemd, which fails to install when running the arm64v8/ubuntu:24.04 image on a 64bit host
-    && apt-get install -y --no-install-recommends openjdk-"$JAVA_VERSION"-jre \
-    # Install Arrow C++
-    && apt-get install -y -V curl ca-certificates lsb-release \
-    && curl --retry 3 --retry-all-errors --retry-delay 3 -LO -fsS https://apache.jfrog.io/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb \
-    && apt-get purge -y curl \
-    && apt-get install -y -V ./apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends -V libarrow${ARROW_SOVERSION} \
-    && apt-get install -y --no-install-recommends -V libparquet${ARROW_SOVERSION} \
-    && apt-get install -y --no-install-recommends -V libarrow-dataset${ARROW_SOVERSION} \
-    && apt-get install -y --no-install-recommends -V libarrow-compute${ARROW_SOVERSION}
+    && apt-get install -y --no-install-recommends openjdk-"$JAVA_VERSION"-jre
 
 # Install libduckdb
 ARG DUCKDB_VERSION=v1.5.1
@@ -594,12 +574,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     export DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     && apt-get install -y --no-install-recommends curl \
-    && if test "$(uname -p)" = "x86_64"; then \
+    && if test "$(uname -m)" = "x86_64"; then \
     curl --retry 3 --retry-all-errors --retry-delay 3 -LO -fsS https://github.com/duckdb/duckdb/releases/download/${DUCKDB_VERSION}/libduckdb-linux-amd64.zip \
     && unzip libduckdb-linux-amd64.zip libduckdb.so \
     && mv libduckdb.so /usr/lib/x86_64-linux-gnu \
     && rm -f libduckdb-linux-amd64.zip; \
-    elif test "$(uname -p)" = "aarch64"; then \
+    elif test "$(uname -m)" = "aarch64"; then \
     curl --retry 3 --retry-all-errors --retry-delay 3 -LO -fsS https://github.com/duckdb/duckdb/releases/download/${DUCKDB_VERSION}/libduckdb-linux-arm64.zip \
     && unzip libduckdb-linux-arm64.zip libduckdb.so \
     && mv libduckdb.so /usr/lib/aarch64-linux-gnu \
@@ -610,7 +590,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 ARG WITH_ORACLE=
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-  if test "$(uname -p)" = "x86_64"; then \
+  if test "$(uname -m)" = "x86_64"; then \
   if echo "$WITH_ORACLE" | grep -Eiq "^(y(es)?|1|true)$" ; then ( \
       export DEBIAN_FRONTEND=noninteractive \
       && apt-get update \

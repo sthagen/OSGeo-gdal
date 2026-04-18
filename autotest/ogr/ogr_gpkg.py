@@ -346,7 +346,7 @@ def test_ogr_gpkg_3(gpkg_ds, tmp_path):
     )
     assert lyr is not None
 
-    assert gpkg_ds.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert gpkg_ds.GetSpatialRef().GetAuthorityCode() == "4326"
 
     lyr = gpkg_ds.CreateLayer("a_layer", options=["SPATIAL_INDEX=NO"])
 
@@ -5328,7 +5328,7 @@ def test_ogr_gpkg_multiple_geom_columns(tmp_vsimem):
     lyr = ds.GetLayerByName("test (pt)")
     assert lyr.GetGeomType() == ogr.wkbPoint
     assert lyr.GetGeometryColumn() == "pt"
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "4326"
     assert lyr.GetLayerDefn().GetFieldCount() == 3
     f = lyr.GetNextFeature()
     assert f.GetFID() == 1
@@ -6047,7 +6047,7 @@ def test_ogr_gpkg_st_transform_no_record_spatial_ref_sys(tmp_vsimem):
         "SELECT ST_Transform(SetSRID(geom, 32631), 32731) FROM test"
     ) as sql_lyr:
         # Fails on a number of configs
-        # assert sql_lyr.GetSpatialRef().GetAuthorityCode(None) == '32731'
+        # assert sql_lyr.GetSpatialRef().GetAuthorityCode() == '32731'
         f = sql_lyr.GetNextFeature()
         assert f.GetGeometryRef().ExportToWkt() == "POINT (500000 10000000)"
         f = None
@@ -7038,7 +7038,7 @@ def test_ogr_gpkg_spatial_view_computed_geom_column(tmp_vsimem, tmp_path):
 
     lyr = ds.GetLayerByName("geom_view")
     assert lyr.GetGeomType() == ogr.wkbMultiPoint25D
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "4326"
     f = lyr.GetNextFeature()
     assert f.GetGeometryRef().ExportToIsoWkt() == "MULTIPOINT Z ((1 2 3))"
     assert lyr.GetExtent() == (1, 1, 2, 2)
@@ -8119,7 +8119,7 @@ def test_ogr_gpkg_alter_geom_field_defn(tmp_vsimem, tmp_path):
     assert lyr.GetGeometryColumn() == "new_geom_name"
     srs = lyr.GetSpatialRef()
     assert srs is not None
-    assert srs.GetAuthorityCode(None) == "4326"
+    assert srs.GetAuthorityCode() == "4326"
     ds = None
 
     ds = ogr.Open(filename, update=1)
@@ -8156,7 +8156,7 @@ def test_ogr_gpkg_alter_geom_field_defn(tmp_vsimem, tmp_path):
     lyr = ds.GetLayer(0)
     srs = lyr.GetSpatialRef()
     assert srs is not None
-    assert srs.GetAuthorityCode(None) == "4326"
+    assert srs.GetAuthorityCode() == "4326"
 
     new_geom_field_defn = ogr.GeomFieldDefn("", ogr.wkbNone)
     other_srs = osr.SpatialReference()
@@ -8174,7 +8174,7 @@ def test_ogr_gpkg_alter_geom_field_defn(tmp_vsimem, tmp_path):
     lyr = ds.GetLayer(0)
     srs = lyr.GetSpatialRef()
     assert srs is not None
-    assert srs.GetAuthorityCode(None) == "4269"
+    assert srs.GetAuthorityCode() == "4269"
 
     new_geom_field_defn = ogr.GeomFieldDefn("", ogr.wkbNone)
     srs = osr.SpatialReference()
@@ -8193,7 +8193,7 @@ def test_ogr_gpkg_alter_geom_field_defn(tmp_vsimem, tmp_path):
     lyr = ds.GetLayer(0)
     srs = lyr.GetSpatialRef()
     assert srs is not None
-    assert srs.GetAuthorityCode(None) == "4269"
+    assert srs.GetAuthorityCode() == "4269"
     assert srs.GetCoordinateEpoch() == 2022
     ds = None
 

@@ -1293,14 +1293,14 @@ def test_ogr_basic_dataset_get_spatial_ref():
 
     ds = gdal.GetDriverByName("MEM").CreateVector("")
     ds.CreateLayer("one", srs=srs)
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "4326"
 
     ds = gdal.GetDriverByName("MEM").CreateVector("")
     lyr = ds.CreateLayer("one", srs=srs)
     geom_field_defn = ogr.GeomFieldDefn("second")
     geom_field_defn.SetSpatialRef(srs)
     lyr.CreateGeomField(geom_field_defn)
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "4326"
 
     ds = gdal.GetDriverByName("MEM").CreateVector("")
     lyr = ds.CreateLayer("one", srs=srs)
@@ -1312,7 +1312,7 @@ def test_ogr_basic_dataset_get_spatial_ref():
     ds = gdal.GetDriverByName("MEM").CreateVector("")
     ds.CreateLayer("one", srs=srs)
     ds.CreateLayer("two", srs=srs)
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "4326"
 
     ds = gdal.GetDriverByName("MEM").CreateVector("")
     ds.CreateLayer("one", srs=srs)

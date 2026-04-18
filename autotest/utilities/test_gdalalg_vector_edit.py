@@ -41,9 +41,9 @@ def test_gdalalg_vector_edit_crs():
 
     out_ds = alg["output"].GetDataset()
     out_lyr = out_ds.GetLayer(0)
-    assert out_lyr.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert out_lyr.GetSpatialRef().GetAuthorityCode() == "4326"
     out_f = out_lyr.GetNextFeature()
-    assert out_f.GetGeometryRef().GetSpatialReference().GetAuthorityCode(None) == "4326"
+    assert out_f.GetGeometryRef().GetSpatialReference().GetAuthorityCode() == "4326"
     assert out_f["foo"] == "bar"
     ogrtest.check_feature_geometry(out_f, "POINT (1 2)")
 

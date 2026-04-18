@@ -1442,7 +1442,7 @@ def test_ogr_openfilegdb_write_feature_dataset_crs(tmp_vsimem):
     lyr = ds.GetLayerByName("inherited_srs")
     srs = lyr.GetSpatialRef()
     assert srs is not None
-    assert srs.GetAuthorityCode(None) == "4326"
+    assert srs.GetAuthorityCode() == "4326"
 
 
 ###############################################################################
@@ -3896,7 +3896,7 @@ def test_ogr_openfilegdb_write_alter_geom_field_defn(tmp_vsimem):
     assert "WKID" in xml
 
     assert lyr.GetGeometryColumn() == "shape_renamed"
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "4326"
 
     # Set SRS to None
     fld_defn = ogr.GeomFieldDefn("shape_renamed", ogr.wkbLineString)
@@ -3953,13 +3953,13 @@ def test_ogr_openfilegdb_write_alter_geom_field_defn(tmp_vsimem):
         == ogr.OGRERR_NONE
     )
     assert lyr.GetSpatialRef() is not None
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4269"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "4269"
     ds = None
 
     ds = ogr.Open(dirname, update=1)
     lyr = ds.GetLayer(0)
     assert lyr.GetSpatialRef() is not None
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4269"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "4269"
 
     sql_lyr = ds.ExecuteSQL("GetLayerDefinition test")
     assert sql_lyr

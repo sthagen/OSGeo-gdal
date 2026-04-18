@@ -1795,7 +1795,7 @@ def test_hdf5_NISAR_level_2_epsg_code():
     assert ds.RasterXSize == 4
     assert ds.RasterYSize == 5
     assert ds.GetGeoTransform() == pytest.approx((5.0, 10.0, 0.0, 550.0, 0.0, -100.0))
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "32611"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "32611"
 
 
 ###############################################################################
@@ -1835,4 +1835,4 @@ def test_hdf5_NISAR_level_2_spatial_ref():
     assert ds.RasterXSize == 4
     assert ds.RasterYSize == 5
     assert ds.GetGeoTransform() == pytest.approx((5.0, 10.0, 0.0, 550.0, 0.0, -100.0))
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "32611"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "32611"

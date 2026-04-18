@@ -171,8 +171,8 @@ static bool COGGetTargetSRS(const char *const *papszOptions,
         oTargetSRS.SetFromUserInput(
             osTargetSRS,
             OGRSpatialReference::SET_FROM_USER_INPUT_LIMITATIONS_get());
-        const char *pszAuthCode = oTargetSRS.GetAuthorityCode(nullptr);
-        const char *pszAuthName = oTargetSRS.GetAuthorityName(nullptr);
+        const char *pszAuthCode = oTargetSRS.GetAuthorityCode();
+        const char *pszAuthName = oTargetSRS.GetAuthorityName();
         if (pszAuthName && pszAuthCode)
         {
             osTargetSRS = pszAuthName;
@@ -222,7 +222,7 @@ static bool COGGetWarpingCharacteristics(
     oTargetSRS.SetFromUserInput(
         osTargetSRS,
         OGRSpatialReference::SET_FROM_USER_INPUT_LIMITATIONS_get());
-    const char *pszAuthCode = oTargetSRS.GetAuthorityCode(nullptr);
+    const char *pszAuthCode = oTargetSRS.GetAuthorityCode();
     const int nEPSGCode = pszAuthCode ? atoi(pszAuthCode) : 0;
 
     // Hack to compensate for GDALSuggestedWarpOutput2() failure (or not
@@ -842,8 +842,8 @@ GDALCOGCreator::Create(const char *pszFilename, GDALDataset *const poSrcDS,
         const auto poSrcSRS = poCurDS->GetSpatialRef();
         if (poSrcSRS)
         {
-            const char *pszAuthName = poSrcSRS->GetAuthorityName(nullptr);
-            const char *pszAuthCode = poSrcSRS->GetAuthorityCode(nullptr);
+            const char *pszAuthName = poSrcSRS->GetAuthorityName();
+            const char *pszAuthCode = poSrcSRS->GetAuthorityCode();
             if (pszAuthName && pszAuthCode)
             {
                 osSrcSRS = pszAuthName;

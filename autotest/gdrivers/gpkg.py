@@ -2385,7 +2385,7 @@ def test_gpkg_26_errors():
         "../gdrivers/data/small_world.tif",
         options="-of GPKG -co TILING_SCHEME=LINZAntarticaMapTileGrid -projwin -180 -50 180 -90",
     )
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "5482"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "5482"
     assert ds.GetGeoTransform() == pytest.approx(
         ((314023.27126670163, 28672, 0.0, 5685976.728733298, 0.0, -28672)), abs=1e-8
     )

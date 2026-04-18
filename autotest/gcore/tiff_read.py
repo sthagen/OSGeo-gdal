@@ -3439,7 +3439,7 @@ def test_tiff_read_arcgis93_geodataxform_gcp():
 def test_tiff_read_arcgis10_geodataxform_gcp_ignored():
 
     ds = gdal.Open("data/gtiff/esri_geodataxform_no_resolutionunit.tif")
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "3857"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "3857"
     assert ds.GetGCPCount() == 0
     assert ds.GetGeoTransform() == pytest.approx(
         (
@@ -5295,8 +5295,8 @@ def test_tiff_warning_get_metadata_item_PIXELTYPE():
 def test_tiff_read_projection_from_esri_xml():
 
     ds = gdal.Open("data/gtiff/projection_from_esri_xml.tif")
-    assert ds.GetSpatialRef().GetAuthorityName(None) == "EPSG"
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "25833"
+    assert ds.GetSpatialRef().GetAuthorityName() == "EPSG"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "25833"
     assert ds.GetGeoTransform() == pytest.approx((250000, 0.2, 0.0, 5887000, 0.0, -0.2))
 
 

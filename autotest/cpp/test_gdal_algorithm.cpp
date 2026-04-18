@@ -5136,6 +5136,171 @@ TEST_F(test_gdal_algorithm, duplicate_values)
     }
 }
 
+TEST_F(test_gdal_algorithm, list_single_valued_dataset_followed_by_positional)
+{
+    // Scenario of https://github.com/OSGeo/gdal/issues/14358
+
+    class MyAlgorithm : public MyAlgorithmWithDummyRun
+    {
+      public:
+        std::vector<GDALArgDatasetValue> m_inputDataset{};
+        GDALArgDatasetValue m_outputDataset{};
+
+        MyAlgorithm()
+        {
+            AddInputDatasetArg(&m_inputDataset, GDAL_OF_RASTER, true)
+                .SetMaxCount(1)
+                .SetAutoOpenDataset(false);
+            AddOutputDatasetArg(&m_outputDataset, GDAL_OF_RASTER, true)
+                .SetDatasetInputFlags(GADV_NAME | GADV_OBJECT);
+        }
+    };
+
+    {
+        MyAlgorithm alg;
+        EXPECT_TRUE(alg.ParseCommandLineArguments(
+            {"--input", "/vsimem/in.tif", "/vsimem/out.tif"}));
+        EXPECT_EQ(alg.m_inputDataset.size(), 1U);
+    }
+
+    {
+        MyAlgorithm alg;
+        EXPECT_TRUE(alg.ParseCommandLineArguments(
+            {"--input=/vsimem/in.tif", "/vsimem/out.tif"}));
+        EXPECT_EQ(alg.m_inputDataset.size(), 1U);
+    }
+
+    {
+        MyAlgorithm alg;
+        EXPECT_TRUE(alg.ParseCommandLineArguments(
+            {"/vsimem/in.tif", "/vsimem/out.tif"}));
+        EXPECT_EQ(alg.m_inputDataset.size(), 1U);
+    }
+
+    {
+        MyAlgorithm alg;
+        EXPECT_TRUE(alg.ParseCommandLineArguments(
+            {"--input", "/vsimem/in.tif", "--output", "/vsimem/out.tif"}));
+        EXPECT_EQ(alg.m_inputDataset.size(), 1U);
+    }
+
+    {
+        MyAlgorithm alg;
+        CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+        EXPECT_FALSE(alg.ParseCommandLineArguments(
+            {"--input", "/vsimem/in.tif", "--input", "not_expected.tif",
+             "/vsimem/out.tif"}));
+        EXPECT_EQ(alg.m_inputDataset.size(), 1U);
+    }
+
+    {
+        MyAlgorithm alg;
+        CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+        EXPECT_FALSE(
+            alg.ParseCommandLineArguments({"--input", "/vsimem/in.tif"}));
+        EXPECT_EQ(alg.m_inputDataset.size(), 1U);
+    }
+}
+
+TEST_F(test_gdal_algorithm, list_single_valued_str_followed_by_positional)
+{
+    // Scenario of https://github.com/OSGeo/gdal/issues/14358
+
+    class MyAlgorithm : public MyAlgorithmWithDummyRun
+    {
+      public:
+        std::vector<std::string> m_a{};
+        int m_b{};
+
+        MyAlgorithm()
+        {
+            AddArg("a", 0, "a", &m_a)
+                .SetPositional()
+                .SetRequired()
+                .SetMaxCount(1);
+            AddArg("b", 0, "b", &m_b).SetPositional().SetRequired();
+        }
+    };
+
+    {
+        MyAlgorithm alg;
+        EXPECT_TRUE(alg.ParseCommandLineArguments({"--a", "str", "1"}));
+        EXPECT_EQ(alg.m_a.size(), 1U);
+    }
+
+    {
+        MyAlgorithm alg;
+        EXPECT_TRUE(alg.ParseCommandLineArguments({"str", "1"}));
+        EXPECT_EQ(alg.m_a.size(), 1U);
+    }
+}
+
+TEST_F(test_gdal_algorithm, list_single_valued_int_followed_by_positional)
+{
+    // Scenario of https://github.com/OSGeo/gdal/issues/14358
+
+    class MyAlgorithm : public MyAlgorithmWithDummyRun
+    {
+      public:
+        std::vector<int> m_a{};
+        int m_b{};
+
+        MyAlgorithm()
+        {
+            AddArg("a", 0, "a", &m_a)
+                .SetPositional()
+                .SetRequired()
+                .SetMaxCount(1);
+            AddArg("b", 0, "b", &m_b).SetPositional().SetRequired();
+        }
+    };
+
+    {
+        MyAlgorithm alg;
+        EXPECT_TRUE(alg.ParseCommandLineArguments({"--a", "2", "1"}));
+        EXPECT_EQ(alg.m_a.size(), 1U);
+    }
+
+    {
+        MyAlgorithm alg;
+        EXPECT_TRUE(alg.ParseCommandLineArguments({"2", "1"}));
+        EXPECT_EQ(alg.m_a.size(), 1U);
+    }
+}
+
+TEST_F(test_gdal_algorithm, list_single_valued_real_followed_by_positional)
+{
+    // Scenario of https://github.com/OSGeo/gdal/issues/14358
+
+    class MyAlgorithm : public MyAlgorithmWithDummyRun
+    {
+      public:
+        std::vector<double> m_a{};
+        int m_b{};
+
+        MyAlgorithm()
+        {
+            AddArg("a", 0, "a", &m_a)
+                .SetPositional()
+                .SetRequired()
+                .SetMaxCount(1);
+            AddArg("b", 0, "b", &m_b).SetPositional().SetRequired();
+        }
+    };
+
+    {
+        MyAlgorithm alg;
+        EXPECT_TRUE(alg.ParseCommandLineArguments({"--a", "2.5", "1"}));
+        EXPECT_EQ(alg.m_a.size(), 1U);
+    }
+
+    {
+        MyAlgorithm alg;
+        EXPECT_TRUE(alg.ParseCommandLineArguments({"2.5", "1"}));
+        EXPECT_EQ(alg.m_a.size(), 1U);
+    }
+}
+
 }  // namespace test_gdal_algorithm
 
 #if defined(__clang__)

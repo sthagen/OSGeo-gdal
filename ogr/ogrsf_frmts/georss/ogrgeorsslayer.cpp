@@ -1472,8 +1472,8 @@ OGRErr OGRGeoRSSLayer::ICreateFeature(OGRFeature *poFeatureIn)
         {
             if (poSRS != nullptr)
             {
-                const char *pszAuthorityName = poSRS->GetAuthorityName(nullptr);
-                const char *pszAuthorityCode = poSRS->GetAuthorityCode(nullptr);
+                const char *pszAuthorityName = poSRS->GetAuthorityName();
+                const char *pszAuthorityCode = poSRS->GetAuthorityCode();
                 if (pszAuthorityName != nullptr &&
                     EQUAL(pszAuthorityName, "EPSG") &&
                     pszAuthorityCode != nullptr)

@@ -293,8 +293,8 @@ def test_avif_geoheif_wkt2():
         [691000.0, 0.1, 0.0, 6090000.0, 0.0, -0.1]
     )
     assert ds.GetSpatialRef() is not None
-    assert ds.GetSpatialRef().GetAuthorityName(None) == "EPSG"
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "28355"
+    assert ds.GetSpatialRef().GetAuthorityName() == "EPSG"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "28355"
     assert ds.GetGCPCount() == 1
     gcp = ds.GetGCPs()[0]
     assert (
@@ -327,8 +327,8 @@ def test_avif_geoheif_uri():
         [691051.2, 0.1, 0.0, 6090000.0, 0.0, -0.1]
     )
     assert ds.GetSpatialRef() is not None
-    assert ds.GetSpatialRef().GetAuthorityName(None) == "EPSG"
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "32755"
+    assert ds.GetSpatialRef().GetAuthorityName() == "EPSG"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "32755"
 
     assert ds.GetGCPCount() == 1
     gcp = ds.GetGCPs()[0]
@@ -358,8 +358,8 @@ def test_avif_geoheif_curie():
     )
     assert ds.GetMetadataItem("TAGS", "DESCRIPTION_en-AU") == "copyright"
     assert ds.GetSpatialRef() is not None
-    assert ds.GetSpatialRef().GetAuthorityName(None) == "EPSG"
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "32755"
+    assert ds.GetSpatialRef().GetAuthorityName() == "EPSG"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "32755"
 
     assert ds.GetGeoTransform() is not None
     assert ds.GetGeoTransform() == pytest.approx(

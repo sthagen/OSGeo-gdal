@@ -168,7 +168,7 @@ def test_ogrtindex_3(ogrtindex_path, tmp_path, src_srs_format, expected_srss):
     assert ds.GetLayer(0).GetFeatureCount() == 2, "did not get expected feature count"
 
     assert (
-        ds.GetLayer(0).GetSpatialRef().GetAuthorityCode(None) == "4326"
+        ds.GetLayer(0).GetSpatialRef().GetAuthorityCode() == "4326"
     ), "did not get expected spatial ref"
 
     expected_wkts = [

@@ -403,8 +403,8 @@ void EmitTextDisplayOfCRS(
     const std::string &osIntroText,
     std::function<void(const std::string &)> printFunction)
 {
-    const char *pszAuthCode = poSRS->GetAuthorityCode(nullptr);
-    const char *pszAuthName = poSRS->GetAuthorityName(nullptr);
+    const char *pszAuthCode = poSRS->GetAuthorityCode();
+    const char *pszAuthName = poSRS->GetAuthorityName();
 
     bool bCRSAlreadyEmitted = false;
     if (pszAuthName && pszAuthCode && osCRSFormat == "AUTO")
@@ -778,8 +778,8 @@ char *GDALInfo(GDALDatasetH hDataset, const GDALInfoOptions *psOptions)
 
         const double dfCoordinateEpoch = poSRS->GetCoordinateEpoch();
 
-        const char *pszAuthCode = poSRS->GetAuthorityCode(nullptr);
-        const char *pszAuthName = poSRS->GetAuthorityName(nullptr);
+        const char *pszAuthCode = poSRS->GetAuthorityCode();
+        const char *pszAuthName = poSRS->GetAuthorityName();
         if (bJson)
         {
             json_object *poWkt = json_object_new_string(osWkt.c_str());

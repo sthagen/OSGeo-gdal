@@ -82,9 +82,10 @@ def check_basic(
     assert vrt_ds.RasterYSize == src_ds.RasterYSize
     assert vrt_ds.RasterCount == src_ds.RasterCount
     assert vrt_ds.GetGeoTransform() == pytest.approx(src_ds.GetGeoTransform())
-    assert vrt_ds.GetSpatialRef().GetAuthorityCode(
-        None
-    ) == src_ds.GetSpatialRef().GetAuthorityCode(None)
+    assert (
+        vrt_ds.GetSpatialRef().GetAuthorityCode()
+        == src_ds.GetSpatialRef().GetAuthorityCode()
+    )
     for iband in range(1, vrt_ds.RasterCount + 1):
         vrt_band = vrt_ds.GetRasterBand(iband)
         src_band = src_ds.GetRasterBand(iband)
@@ -841,7 +842,7 @@ def test_gti_valid_srs(tmp_path):
     del index_ds
 
     ds = gdal.Open(index_filename)
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "4267"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "4267"
 
 
 def test_gti_invalid_band_count(tmp_vsimem):
@@ -2836,7 +2837,23 @@ def test_gti_xml_relative_filename(tmp_vsimem, prefix):
     assert gti_ds.GetRasterBand(1).GetOverview(0).Checksum() == expected_cs_ovr
 
 
-def test_gti_gpkg_relative_filename(tmp_vsimem):
+@pytest.mark.parametrize("prefix", ["", "GTI:"])
+def test_gti_gpkg_relative_filename(tmp_vsimem, prefix):
+
+    index_filename = str(tmp_vsimem / "index.gti.gpkg")
+
+    tile_filename = str(tmp_vsimem / "byte.tif")
+    gdal.Translate(tile_filename, "data/byte.tif")
+
+    src_ds = gdal.Open(tile_filename)
+    index_ds, _ = create_basic_tileindex(index_filename, src_ds)
+    del index_ds
+
+    gti_ds = gdal.Open(prefix + index_filename)
+    assert gti_ds.GetRasterBand(1).Checksum() == 4672
+
+
+def test_gti_gpkg_overview_relative_filename(tmp_vsimem):
 
     index_filename = str(tmp_vsimem / "index.gti.gpkg")
 
@@ -3157,7 +3174,7 @@ def test_gti_stac_geoparquet():
         pytest.skip("cannot open URL")
 
     ds = gdal.Open("GTI:/vsicurl/" + url)
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "26914"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "26914"
     assert ds.GetGeoTransform() == pytest.approx(
         (408231.0, 1.0, 0.0, 3873862.0, 0.0, -1.0), rel=1e-5
     )
@@ -3202,7 +3219,7 @@ def test_gti_stac_geoparquet_sentinel2(filename):
         ds = gdal.Open(f"GTI:data/gti/{filename}")
     assert ds.RasterXSize == 5556
     assert ds.RasterYSize == 5540
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "32612"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "32612"
     assert ds.GetGeoTransform() == pytest.approx(
         (398760.0, 20.0, 0.0, 3900560.0, 0.0, -20.0), rel=1e-5
     )
@@ -3518,7 +3535,7 @@ def test_gti_srs_metadata_spatial_filter(tmp_vsimem):
     del index_ds
 
     ds = gdal.Open(index_filename)
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "3857"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "3857"
 
     assert ds.GetRasterBand(1).Checksum() != 0
 
@@ -3546,7 +3563,7 @@ def test_gti_srs_open_option_spatial_filter(tmp_vsimem):
         index_filename, open_options=["SRS=EPSG:3857", "SRS_BEHAVIOR=REPROJECT"]
     )
     assert ds is not None
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "3857"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "3857"
     assert ds.GetRasterBand(1).Checksum() != 0
 
 
@@ -3584,7 +3601,7 @@ def test_gti_srs_mismatch_no_behavior_warns(tmp_vsimem):
     with gdaltest.error_raised(gdal.CE_Warning, match="SRS_BEHAVIOR"):
         ds = gdal.OpenEx(index_filename, open_options=["SRS=EPSG:3857"])
     assert ds is not None
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "3857"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "3857"
 
 
 ###############################################################################
@@ -3605,7 +3622,7 @@ def test_gti_srs_behavior_override(tmp_vsimem):
             index_filename, open_options=["SRS=EPSG:3857", "SRS_BEHAVIOR=OVERRIDE"]
         )
     assert ds is not None
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "3857"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "3857"
 
 
 ###############################################################################
@@ -3625,4 +3642,4 @@ def test_gti_srs_no_layer_srs_silent(tmp_vsimem):
     with gdaltest.error_raised(gdal.CE_None):
         ds = gdal.OpenEx(index_filename, open_options=["SRS=EPSG:3857"])
     assert ds is not None
-    assert ds.GetSpatialRef().GetAuthorityCode(None) == "3857"
+    assert ds.GetSpatialRef().GetAuthorityCode() == "3857"

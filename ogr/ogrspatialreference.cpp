@@ -1471,7 +1471,7 @@ const char *OGRSpatialReference::GetCelestialBodyName() const
     if (std::fabs(GetSemiMajor(nullptr) - SRS_WGS84_SEMIMAJOR) <=
         0.05 * SRS_WGS84_SEMIMAJOR)
         return "Earth";
-    const char *pszAuthName = GetAuthorityName(nullptr);
+    const char *pszAuthName = GetAuthorityName();
     if (pszAuthName && EQUAL(pszAuthName, "EPSG"))
         return "Earth";
     return nullptr;
@@ -8901,8 +8901,8 @@ char *OGRSpatialReference::GetOGCURN() const
 {
     TAKE_OPTIONAL_LOCK();
 
-    const char *pszAuthName = GetAuthorityName(nullptr);
-    const char *pszAuthCode = GetAuthorityCode(nullptr);
+    const char *pszAuthName = GetAuthorityName();
+    const char *pszAuthCode = GetAuthorityCode();
     if (pszAuthName && pszAuthCode)
         return CPLStrdup(
             CPLSPrintf("urn:ogc:def:crs:%s::%s", pszAuthName, pszAuthCode));
@@ -10370,16 +10370,14 @@ OGRSpatialReference::FindBestMatch(int nMinimumMatchConfidence,
             const char *pszBaseAuthorityCode = nullptr;
             const char *pszBaseName = poBaseGeogCRS->GetName();
             if (adfTOWGS84 == std::vector<double>(7) &&
-                (pszAuthorityName = poSRS->GetAuthorityName(nullptr)) !=
-                    nullptr &&
+                (pszAuthorityName = poSRS->GetAuthorityName()) != nullptr &&
                 EQUAL(pszAuthorityName, "EPSG") &&
-                (pszAuthorityCode = poSRS->GetAuthorityCode(nullptr)) !=
+                (pszAuthorityCode = poSRS->GetAuthorityCode()) != nullptr &&
+                (pszBaseAuthorityName = poBaseGeogCRS->GetAuthorityName()) !=
                     nullptr &&
-                (pszBaseAuthorityName =
-                     poBaseGeogCRS->GetAuthorityName(nullptr)) != nullptr &&
                 EQUAL(pszBaseAuthorityName, "EPSG") &&
-                (pszBaseAuthorityCode =
-                     poBaseGeogCRS->GetAuthorityCode(nullptr)) != nullptr &&
+                (pszBaseAuthorityCode = poBaseGeogCRS->GetAuthorityCode()) !=
+                    nullptr &&
                 (EQUAL(pszBaseAuthorityCode, "4326") ||
                  EQUAL(pszBaseAuthorityCode, "4258") ||
                  // For ETRS89-XXX [...] new CRS added in EPSG 12.033+
@@ -10405,7 +10403,7 @@ OGRSpatialReference::FindBestMatch(int nMinimumMatchConfidence,
             {
                 const char *pszAuthName =
                     OGRSpatialReference::FromHandle(pahSRS[i])
-                        ->GetAuthorityName(nullptr);
+                        ->GetAuthorityName();
                 if (pszAuthName != nullptr &&
                     EQUAL(pszAuthName, pszPreferredAuthority))
                 {

@@ -706,7 +706,7 @@ def test_ogr_esrijson_identify_srs():
     lyr = ds.GetLayer(0)
     sr = lyr.GetSpatialRef()
     assert sr
-    assert sr.GetAuthorityCode(None) == "4326"
+    assert sr.GetAuthorityCode() == "4326"
 
 
 ###############################################################################
@@ -719,7 +719,7 @@ def test_ogr_esrijson_read_CadastralSpecialServices():
     lyr = ds.GetLayer(0)
     sr = lyr.GetSpatialRef()
     assert sr
-    assert sr.GetAuthorityCode(None) == "4326"
+    assert sr.GetAuthorityCode() == "4326"
     assert lyr.GetGeomType() != ogr.wkbNone
     f = lyr.GetNextFeature()
     assert f["landdescription"] == "WA330160N0260E0SN070"

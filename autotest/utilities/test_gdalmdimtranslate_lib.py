@@ -908,7 +908,7 @@ def test_gdalmdimtranslate_array_resample():
     assert dims[2].GetName() == "bands"
     assert dims[2].GetSize() == 2
     assert resampled_ar.GetDataType() == gdal.ExtendedDataType.Create(gdal.GDT_Float32)
-    assert resampled_ar.GetSpatialRef().GetAuthorityCode(None) == "4326"
+    assert resampled_ar.GetSpatialRef().GetAuthorityCode() == "4326"
     assert struct.unpack("f" * (3 * 3 * 2), resampled_ar.Read()) == (
         -9999.0,
         -9999.0,

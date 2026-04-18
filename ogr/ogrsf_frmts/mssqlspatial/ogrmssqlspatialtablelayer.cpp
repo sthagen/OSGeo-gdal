@@ -306,8 +306,8 @@ CPLErr OGRMSSQLSpatialTableLayer::Initialize(const char *pszSchema,
         }
         else
         {
-            const char *pszAuthorityName = poSRS->GetAuthorityName(nullptr);
-            const char *pszAuthorityCode = poSRS->GetAuthorityCode(nullptr);
+            const char *pszAuthorityName = poSRS->GetAuthorityName();
+            const char *pszAuthorityCode = poSRS->GetAuthorityCode();
             if (pszAuthorityName && pszAuthorityCode &&
                 EQUAL(pszAuthorityName, "EPSG"))
             {

@@ -51,7 +51,7 @@ def test_gdalalg_raster_index():
     assert last_pct[0] == 1.0
     ds = alg["output"].GetDataset()
     lyr = ds.GetLayerByName("my_layer")
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "26711"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "26711"
     assert lyr.GetLayerDefn().GetFieldCount() == 1
     assert lyr.GetLayerDefn().GetFieldDefn(0).GetName() == "location"
     assert lyr.GetLayerDefn().GetFieldDefn(0).GetType() == ogr.OFTString
@@ -86,7 +86,7 @@ def test_gdalalg_raster_index_overwrite(tmp_vsimem):
     assert alg.Run()
     ds = alg["output"].GetDataset()
     lyr = ds.GetLayer(0)
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "26711"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "26711"
     assert lyr.GetFeatureCount() == 1
     assert alg.Finalize()
     ds.Close()
@@ -117,7 +117,7 @@ def test_gdalalg_raster_index_overwrite(tmp_vsimem):
     assert alg.Run()
     ds = alg["output"].GetDataset()
     lyr = ds.GetLayer(0)
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "26711"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "26711"
     assert lyr.GetFeatureCount() == 2
     assert alg.Finalize()
     ds.Close()
@@ -129,7 +129,7 @@ def test_gdalalg_raster_index_overwrite(tmp_vsimem):
     assert alg.Run()
     ds = alg["output"].GetDataset()
     lyr = ds.GetLayer(0)
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "26711"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "26711"
     assert lyr.GetFeatureCount() == 1
     assert alg.Finalize()
     ds.Close()
@@ -141,7 +141,7 @@ def test_gdalalg_raster_index_overwrite(tmp_vsimem):
     assert alg.Run()
     ds = alg["output"].GetDataset()
     lyr = ds.GetLayer(0)
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "26711"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "26711"
     assert lyr.GetFeatureCount() == 2
     assert alg.Finalize()
     ds.Close()
@@ -153,7 +153,7 @@ def test_gdalalg_raster_index_overwrite(tmp_vsimem):
     assert alg.Run()
     ds = alg["output"].GetDataset()
     lyr = ds.GetLayer(0)
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "26711"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "26711"
     assert lyr.GetFeatureCount() == 1
     assert alg.Finalize()
     ds.Close()
@@ -227,7 +227,7 @@ def test_gdalalg_raster_index_crs():
     assert alg.Run()
     ds = alg["output"].GetDataset()
     lyr = ds.GetLayer(0)
-    assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4267"
+    assert lyr.GetSpatialRef().GetAuthorityCode() == "4267"
     f = lyr.GetNextFeature()
     assert f["source_crs"] == "EPSG:26711"
     # The polygon is an axis-aligned rectangle computed via GDALWarp(),
@@ -435,7 +435,7 @@ def test_gdalalg_raster_index_stac_geoparquet_base_url(tmp_vsimem):
 
     with ogr.Open(tmp_vsimem / "out.parquet") as ds:
         lyr = ds.GetLayer(0)
-        assert lyr.GetSpatialRef().GetAuthorityCode(None) == "4326"
+        assert lyr.GetSpatialRef().GetAuthorityCode() == "4326"
         f = lyr.GetNextFeature()
         assert f["assets.image.href"] == "http://example.com/byte.tif"
 
