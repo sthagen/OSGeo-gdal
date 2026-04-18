@@ -8199,6 +8199,23 @@ bool GDALAlgorithmArgIsOnlyForCLI(GDALAlgorithmArgH hArg)
 }
 
 /************************************************************************/
+/*             GDALAlgorithmArgIsAvailableInPipelineStep()              */
+/************************************************************************/
+
+/** Return whether the argument is available in a pipeline step.
+ *
+ * If false, it is only available in standalone mode.
+ *
+ * @param hArg Handle to an argument. Must NOT be null.
+ * @since 3.13
+ */
+bool GDALAlgorithmArgIsAvailableInPipelineStep(GDALAlgorithmArgH hArg)
+{
+    VALIDATE_POINTER1(hArg, __func__, false);
+    return hArg->ptr->IsAvailableInPipelineStep();
+}
+
+/************************************************************************/
 /*                      GDALAlgorithmArgIsInput()                       */
 /************************************************************************/
 
