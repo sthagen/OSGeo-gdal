@@ -75,8 +75,8 @@ class GDALVectorClipAlgorithmLayer final : public GDALVectorPipelineOutputLayer
           m_poClipGeom(std::move(poClipGeom)),
           m_eSrcLayerGeomType(oSrcLayer.GetGeomType()),
           m_eFlattenSrcLayerGeomType(wkbFlatten(m_eSrcLayerGeomType)),
-          m_bSrcLayerGeomTypeIsCollection(OGR_GT_IsSubClassOf(
-              m_eFlattenSrcLayerGeomType, wkbGeometryCollection)),
+          m_bSrcLayerGeomTypeIsCollection(CPL_TO_BOOL(OGR_GT_IsSubClassOf(
+              m_eFlattenSrcLayerGeomType, wkbGeometryCollection))),
           m_poFeatureDefn(oSrcLayer.GetLayerDefn()->Clone())
     {
         SetDescription(oSrcLayer.GetDescription());

@@ -671,7 +671,7 @@ std::string OGRParquetWriterLayer::GetGeoMetadata() const
                 bool bHasZ = false;
                 for (const auto eGeomType : m_oSetWrittenGeometryTypes[i])
                 {
-                    bHasZ = OGR_GT_HasZ(eGeomType);
+                    bHasZ = CPL_TO_BOOL(OGR_GT_HasZ(eGeomType));
                     if (bHasZ)
                         break;
                 }

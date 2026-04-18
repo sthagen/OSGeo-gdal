@@ -393,7 +393,8 @@ ISISTiledBand::ISISTiledBand(GDALDataset *poDSIn, VSILFILE *fpVSILIn,
                              GIntBig nXTileOffsetIn, GIntBig nYTileOffsetIn,
                              int bNativeOrderIn)
     : m_fpVSIL(fpVSILIn), m_nXTileOffset(nXTileOffsetIn),
-      m_nYTileOffset(nYTileOffsetIn), m_bNativeOrder(bNativeOrderIn)
+      m_nYTileOffset(nYTileOffsetIn),
+      m_bNativeOrder(CPL_TO_BOOL(bNativeOrderIn))
 {
     poDS = poDSIn;
     nBand = nBandIn;

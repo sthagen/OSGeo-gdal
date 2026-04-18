@@ -727,10 +727,12 @@ void PDSDataset::ParseSRS()
     }
 
     if (!bGotTransform)
-        bGotTransform = GDALReadWorldFile(pszFilename, "psw", m_gt.data());
+        bGotTransform =
+            CPL_TO_BOOL(GDALReadWorldFile(pszFilename, "psw", m_gt.data()));
 
     if (!bGotTransform)
-        bGotTransform = GDALReadWorldFile(pszFilename, "wld", m_gt.data());
+        bGotTransform =
+            CPL_TO_BOOL(GDALReadWorldFile(pszFilename, "wld", m_gt.data()));
 }
 
 /************************************************************************/

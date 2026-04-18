@@ -103,7 +103,7 @@ bool OGRJSONFGHasMeasure(json_object *poObj, bool bUpperLevelMValue)
     {
         json_object *poEnabled =
             CPL_json_object_object_get(pojMeasures, "enabled");
-        bHasM = json_object_get_boolean(poEnabled);
+        bHasM = CPL_TO_BOOL(json_object_get_boolean(poEnabled));
     }
     return bHasM;
 }

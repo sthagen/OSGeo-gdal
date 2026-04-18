@@ -1770,10 +1770,10 @@ CPLErr VRTSourcedRasterBand::ComputeStatistics(int bApproxOK, double *pdfMin,
             /*bAllowMaxValAdjustment = */ false))
     {
         Context sContext;
-        sContext.bApproxOK = bApproxOK;
+        sContext.bApproxOK = CPL_TO_BOOL(bApproxOK);
         sContext.dfNoDataValue = m_dfNoDataValue;
         sContext.bNoDataValueSet = m_bNoDataValueSet;
-        sContext.bHideNoDataValue = m_bHideNoDataValue;
+        sContext.bHideNoDataValue = CPL_TO_BOOL(m_bHideNoDataValue);
         sContext.pfnProgress = pfnProgress;
         sContext.pProgressData = pProgressData;
         sContext.nSources = static_cast<int>(m_papoSources.size());

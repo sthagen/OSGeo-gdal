@@ -342,7 +342,7 @@ static CPLErr BandAffineCombinationProcess(
     const double *CPL_RESTRICT padfSrc = static_cast<const double *>(pInBuffer);
     double *CPL_RESTRICT padfDst = static_cast<double *>(pOutBuffer);
     const bool bDstIntendedDTIsInteger =
-        GDALDataTypeIsInteger(data->m_eIntendedDstDT);
+        CPL_TO_BOOL(GDALDataTypeIsInteger(data->m_eIntendedDstDT));
     const double dfClampMin = data->m_dfClampMin;
     const double dfClampMax = data->m_dfClampMax;
     for (size_t i = 0; i < nElts; ++i)

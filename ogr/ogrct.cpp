@@ -3262,8 +3262,8 @@ bool OGRProjCT::ContainsNorthPole(const double xmin, const double ymin,
     if (!inverseCT)
         return false;
     CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
-    const bool success = inverseCT->TransformWithErrorCodes(
-        1, &pole_x, &pole_y, nullptr, nullptr, nullptr);
+    const bool success = CPL_TO_BOOL(inverseCT->TransformWithErrorCodes(
+        1, &pole_x, &pole_y, nullptr, nullptr, nullptr));
     return success && xmin < pole_x && pole_x < xmax && ymax > pole_y &&
            pole_y > ymin;
 }
@@ -3287,8 +3287,8 @@ bool OGRProjCT::ContainsSouthPole(const double xmin, const double ymin,
     if (!inverseCT)
         return false;
     CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
-    const bool success = inverseCT->TransformWithErrorCodes(
-        1, &pole_x, &pole_y, nullptr, nullptr, nullptr);
+    const bool success = CPL_TO_BOOL(inverseCT->TransformWithErrorCodes(
+        1, &pole_x, &pole_y, nullptr, nullptr, nullptr));
     return success && xmin < pole_x && pole_x < xmax && ymax > pole_y &&
            pole_y > ymin;
 }
@@ -3444,9 +3444,9 @@ int OGRProjCT::TransformBounds(const double xmin, const double ymin,
 
     {
         CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
-        bool success = TransformWithErrorCodes(
+        bool success = CPL_TO_BOOL(TransformWithErrorCodes(
             boundary_len, &x_boundary_array[0], &y_boundary_array[0], nullptr,
-            nullptr, anErrorCodes.data());
+            nullptr, anErrorCodes.data()));
         if (!success)
         {
             for (int i = 0; i < boundary_len; ++i)

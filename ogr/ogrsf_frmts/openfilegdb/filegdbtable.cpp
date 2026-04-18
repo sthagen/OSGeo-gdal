@@ -61,6 +61,11 @@ constexpr GUInt32 EXT_SHAPE_SEGMENT_ELLIPSE = 5;
 namespace OpenFileGDB
 {
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4800) /* implicit conversion from "type" to bool */
+#endif
+
 FileGDBGeomField::~FileGDBGeomField() = default;
 
 FileGDBRasterField::~FileGDBRasterField() = default;
@@ -4422,5 +4427,9 @@ FileGDBOGRGeometryConverter::GetGeometryTypeFromESRI(const char *pszESRIType)
     CPLDebug("OpenFileGDB", "Unhandled geometry type : %s", pszESRIType);
     return wkbUnknown;
 }
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 } /* namespace OpenFileGDB */

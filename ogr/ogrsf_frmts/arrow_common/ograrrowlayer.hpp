@@ -5217,7 +5217,7 @@ inline OGRErr OGRArrowLayer::ISetSpatialFilter(int iGeomField,
             if (FastGetExtent(iGeomField, &sLayerExtent))
             {
                 m_bSpatialFilterIntersectsLayerExtent =
-                    m_sFilterEnvelope.Intersects(sLayerExtent);
+                    CPL_TO_BOOL(m_sFilterEnvelope.Intersects(sLayerExtent));
             }
         }
     }

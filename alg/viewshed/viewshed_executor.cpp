@@ -170,7 +170,7 @@ ViewshedExecutor::ViewshedExecutor(GDALRasterBand &srcBand,
     m_srcBand.GetDataset()->GetGeoTransform(m_gt);
     int hasNoData = false;
     m_noDataValue = m_srcBand.GetNoDataValue(&hasNoData);
-    m_hasNoData = hasNoData;
+    m_hasNoData = CPL_TO_BOOL(hasNoData);
 }
 
 /// Constructor - the viewshed algorithm executor

@@ -336,7 +336,7 @@ MAIN_START(argc, argv)
                 int noData;
                 const auto nNoDataValue =
                     poInputDS->GetRasterBand(1)->GetNoDataValueAsInt64(&noData);
-                sOptions.bSetNoData = noData;
+                sOptions.bSetNoData = CPL_TO_BOOL(noData);
                 if (sOptions.bSetNoData)
                     sOptions.osNoData = CPLSPrintf(
                         CPL_FRMT_GIB, static_cast<GIntBig>(nNoDataValue));
@@ -347,7 +347,7 @@ MAIN_START(argc, argv)
                 const auto nNoDataValue =
                     poInputDS->GetRasterBand(1)->GetNoDataValueAsUInt64(
                         &noData);
-                sOptions.bSetNoData = noData;
+                sOptions.bSetNoData = CPL_TO_BOOL(noData);
                 if (sOptions.bSetNoData)
                     sOptions.osNoData = CPLSPrintf(
                         CPL_FRMT_GUIB, static_cast<GUIntBig>(nNoDataValue));
@@ -357,7 +357,7 @@ MAIN_START(argc, argv)
                 int noData;
                 const double dfNoDataValue =
                     poInputDS->GetRasterBand(1)->GetNoDataValue(&noData);
-                sOptions.bSetNoData = noData;
+                sOptions.bSetNoData = CPL_TO_BOOL(noData);
                 if (sOptions.bSetNoData)
                     sOptions.osNoData = CPLSPrintf("%.18g", dfNoDataValue);
             }

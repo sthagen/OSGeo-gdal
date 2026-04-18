@@ -32,7 +32,9 @@ if (MSVC)
       /wd4245
       /wd4206
       /wd4351
-      /wd4611)
+      /wd4611
+      /w44800   # Enable Implicit conversion from 'type' to bool.
+  )
   set(GDAL_CXX_WARNING_FLAGS ${GDAL_C_WARNING_FLAGS})
   add_compile_options(/EHsc /Zc:__cplusplus)
 

@@ -630,7 +630,7 @@ class OGRPGDataSource final : public GDALDataset
 
     bool HavePostGIS() const
     {
-        return bHavePostGIS;
+        return CPL_TO_BOOL(bHavePostGIS);
     }
 
     int GetUndefinedSRID() const

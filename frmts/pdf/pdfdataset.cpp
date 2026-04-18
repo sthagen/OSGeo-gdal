@@ -303,7 +303,8 @@ class GDALPDFDumper
     GDALPDFDumper(const char *pszFilename, const char *pszDumpFile,
                   int nDepthLimitIn = -1)
         : nDepthLimit(nDepthLimitIn),
-          bDumpParent(CPLGetConfigOption("PDF_DUMP_PARENT", "FALSE"))
+          bDumpParent(
+              CPLTestBool(CPLGetConfigOption("PDF_DUMP_PARENT", "FALSE")))
     {
         if (strcmp(pszDumpFile, "stderr") == 0)
             f = stderr;

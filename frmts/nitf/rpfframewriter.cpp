@@ -3272,7 +3272,8 @@ CADRGCreateCopy(const char *pszFilename, GDALDataset *poSrcDS, int bStrict,
                                 continue;
                             }
                             bFrameFullyInSrcDS =
-                                sExtentNativeCRS.Contains(sFrameExtentInSrcSRS);
+                                CPL_TO_BOOL(sExtentNativeCRS.Contains(
+                                    sFrameExtentInSrcSRS));
                         }
                         else
                         {

@@ -4085,9 +4085,10 @@ bool OGRLayer::FilterWKBGeometry(const GByte *pabyWKB, size_t nWKBSize,
                                  OGREnvelope &sEnvelope) const
 {
     OGRPreparedGeometry *pPreparedFilterGeom = m_pPreparedFilterGeom;
-    bool bRet = FilterWKBGeometry(
-        pabyWKB, nWKBSize, bEnvelopeAlreadySet, sEnvelope, m_poFilterGeom,
-        m_bFilterIsEnvelope, m_sFilterEnvelope, pPreparedFilterGeom);
+    bool bRet =
+        FilterWKBGeometry(pabyWKB, nWKBSize, bEnvelopeAlreadySet, sEnvelope,
+                          m_poFilterGeom, CPL_TO_BOOL(m_bFilterIsEnvelope),
+                          m_sFilterEnvelope, pPreparedFilterGeom);
     const_cast<OGRLayer *>(this)->m_pPreparedFilterGeom = pPreparedFilterGeom;
     return bRet;
 }

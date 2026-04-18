@@ -477,7 +477,7 @@ void VRTSimpleSource::AddSourceFilenameNode(const char *pszVRTPath,
     if (m_bRelativeToVRTOri >= 0)
     {
         osSourceFilename = m_osSourceFileNameOri;
-        bRelativeToVRT = m_bRelativeToVRTOri;
+        bRelativeToVRT = CPL_TO_BOOL(m_bRelativeToVRTOri);
     }
     else if (IsSlowSource(m_osSrcDSName))
     {

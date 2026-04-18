@@ -206,8 +206,8 @@ class GDALVectorCombineOutputLayer final
         for (const OGRGeomFieldDefn *srcGeomDefn : srcDefn->GetGeomFields())
         {
             const auto eSrcGeomType = srcGeomDefn->GetType();
-            const bool bHasZ = OGR_GT_HasZ(eSrcGeomType);
-            const bool bHasM = OGR_GT_HasM(eSrcGeomType);
+            const bool bHasZ = CPL_TO_BOOL(OGR_GT_HasZ(eSrcGeomType));
+            const bool bHasM = CPL_TO_BOOL(OGR_GT_HasM(eSrcGeomType));
 
             OGRwkbGeometryType eDstGeomType =
                 OGR_GT_SetModifier(wkbGeometryCollection, bHasZ, bHasM);
@@ -564,8 +564,8 @@ class GDALVectorCombineOutputLayer final
     {
         OGRGeomFieldDefn *poGeomFieldDefn =
             m_defn->GetGeomFieldDefn(iGeomField);
-        const bool hasZ = OGR_GT_HasZ(poGeomFieldDefn->GetType());
-        const bool hasM = OGR_GT_HasM(poGeomFieldDefn->GetType());
+        const bool hasZ = CPL_TO_BOOL(OGR_GT_HasZ(poGeomFieldDefn->GetType()));
+        const bool hasM = CPL_TO_BOOL(OGR_GT_HasM(poGeomFieldDefn->GetType()));
 
         whileUnsealing(poGeomFieldDefn)
             ->SetType(OGR_GT_SetModifier(wkbGeometryCollection, hasZ, hasM));

@@ -1925,11 +1925,11 @@ class GDALZonalStatsImpl
                 return false;
             }
 
-            const bool bRet = GEOSGridIntersectionFractions_r(
+            const bool bRet = CPL_TO_BOOL(GEOSGridIntersectionFractions_r(
                 m_geosContext, poGeosGeom, oSnappedGeomExtent.MinX,
                 oSnappedGeomExtent.MinY, oSnappedGeomExtent.MaxX,
                 oSnappedGeomExtent.MaxY, nXSize, nYSize,
-                reinterpret_cast<float *>(pabyCoverageBuf));
+                reinterpret_cast<float *>(pabyCoverageBuf)));
             if (!bRet)
             {
                 CPLError(CE_Failure, CPLE_AppDefined,
