@@ -353,6 +353,7 @@ GDALVectorDecoratedDataset::GDALVectorDecoratedDataset(GDALDataset *poSrcDS)
     : m_dummySrcDS(poSrcDS ? nullptr : std::make_unique<DummyDataset>()),
       m_srcDS(poSrcDS ? *poSrcDS : *(m_dummySrcDS.get()))
 {
+    m_srcDS.Reference();
     SetDescription(m_srcDS.GetDescription());
 }
 
@@ -360,7 +361,10 @@ GDALVectorDecoratedDataset::GDALVectorDecoratedDataset(GDALDataset *poSrcDS)
 /*                    ~GDALVectorDecoratedDataset()                     */
 /************************************************************************/
 
-GDALVectorDecoratedDataset::~GDALVectorDecoratedDataset() = default;
+GDALVectorDecoratedDataset::~GDALVectorDecoratedDataset()
+{
+    m_srcDS.ReleaseRef();
+}
 
 /************************************************************************/
 /*                    GDALVectorPipelineOutputLayer                     */
