@@ -35,12 +35,12 @@ GDALVectorSelectAlgorithm::GDALVectorSelectAlgorithm(bool standaloneStep)
               .SetStandaloneStep(standaloneStep)
               .SetOutputLayerNameAvailableInPipelineStep(true))
 {
+    AddActiveLayerArg(&m_activeLayer);
     if (!standaloneStep)
     {
         AddOutputLayerNameArg(/* hiddenForCLI = */ false,
                               /* shortNameOutputLayerAllowed = */ false);
     }
-    AddActiveLayerArg(&m_activeLayer);
     AddArg("fields", 0, _("Fields to select (or exclude if --exclude)"),
            &m_fields)
         .SetDuplicateValuesAllowed(false)
@@ -52,6 +52,25 @@ GDALVectorSelectAlgorithm::GDALVectorSelectAlgorithm(bool standaloneStep)
     AddArg("ignore-missing-fields", 0, _("Ignore missing fields"),
            &m_ignoreMissingFields)
         .SetMutualExclusionGroup("exclude-ignore");
+
+    AddValidationAction(
+        [this]()
+        {
+            if (!m_outputLayerName.empty() && m_activeLayer.empty() &&
+                m_inputDataset.size() == 1)
+            {
+                auto poSrcDS = m_inputDataset[0].GetDatasetRef();
+                if (poSrcDS && poSrcDS->GetLayerCount() > 1)
+                {
+                    ReportError(CE_Failure, CPLE_IllegalArg,
+                                "Argument 'output-layer' cannot be used when "
+                                "the input dataset has multiple layers, unless "
+                                "argument 'active-layer' is specified");
+                    return false;
+                }
+            }
+            return true;
+        });
 }
 
 namespace
