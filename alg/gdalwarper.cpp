@@ -458,13 +458,16 @@ CPLErr GDALWarpNoDataMasker(void *pMaskFuncArg, int nBandCount,
             {
                 eErr = CE_None;
                 bool bAllValid = true;
-                for (int iLine = 0; iLine < nYSize; iLine++)
+                for (size_t iLine = 0; iLine < static_cast<size_t>(nYSize);
+                     iLine++)
                 {
-                    GDALCopyWords((*ppImageData) + nWordSize * iLine * nXSize,
-                                  eType, nWordSize, padfWrk, GDT_CFloat64, 16,
-                                  nXSize);
+                    GDALCopyWords64((*ppImageData) + nWordSize * iLine * nXSize,
+                                    eType, nWordSize, padfWrk, GDT_CFloat64, 16,
+                                    nXSize);
 
-                    for (int iPixel = 0; iPixel < nXSize; ++iPixel)
+                    const size_t iOffsetLine = iLine * nXSize;
+                    for (size_t iPixel = 0;
+                         iPixel < static_cast<size_t>(nXSize); ++iPixel)
                     {
                         if (((bIsNoDataRealNan &&
                               std::isnan(padfWrk[iPixel * 2])) ||
@@ -472,8 +475,7 @@ CPLErr GDALWarpNoDataMasker(void *pMaskFuncArg, int nBandCount,
                               ARE_REAL_EQUAL(padfWrk[iPixel * 2],
                                              padfNoData[0]))))
                         {
-                            size_t iOffset =
-                                iPixel + static_cast<size_t>(iLine) * nXSize;
+                            const size_t iOffset = iOffsetLine + iPixel;
 
                             bAllValid = false;
                             CPLMaskClear(panValidityMask, iOffset);
