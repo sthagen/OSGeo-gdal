@@ -130,6 +130,8 @@ bool GDALRasterCreateAlgorithm::RunStep(GDALPipelineStepRunContext &)
     GDALGeoTransform gt;
     bool bGTValid = false;
 
+    CPLStringList aosCreationOptions(m_creationOptions);
+
     GDALDataset *poSrcDS = m_inputDataset.empty()
                                ? nullptr
                                : m_inputDataset.front().GetDatasetRef();
@@ -173,6 +175,58 @@ bool GDALRasterCreateAlgorithm::RunStep(GDALPipelineStepRunContext &)
                 poSrcDS->GetRasterBand(1)->GetNoDataValue(&bNoData);
             if (bNoData)
                 m_nodata = CPLSPrintf("%.17g", dfNoData);
+        }
+
+        // Replicate tiling of input datasets for a few popular output formats,
+        // when compatible, and when the user hasn't specified creation options
+        // affecting tiling.
+        int nBlockXSize = 0, nBlockYSize = 0;
+        if (m_bandCount > 0)
+            poSrcDS->GetRasterBand(1)->GetBlockSize(&nBlockXSize, &nBlockYSize);
+
+        if (EQUAL(m_format.c_str(), "GTIFF") &&
+            aosCreationOptions.FetchNameValue("TILED") == nullptr &&
+            aosCreationOptions.FetchNameValue("BLOCKXSIZE") == nullptr &&
+            aosCreationOptions.FetchNameValue("BLOCKYSIZE") == nullptr &&
+            m_bandCount > 0)
+        {
+            if (nBlockXSize != poSrcDS->GetRasterXSize() &&
+                (nBlockXSize % 16) == 0 && (nBlockYSize % 16) == 0)
+            {
+                aosCreationOptions.SetNameValue("TILED", "YES");
+                aosCreationOptions.SetNameValue("BLOCKXSIZE",
+                                                CPLSPrintf("%d", nBlockXSize));
+                aosCreationOptions.SetNameValue("BLOCKYSIZE",
+                                                CPLSPrintf("%d", nBlockYSize));
+            }
+        }
+        else if (EQUAL(m_format.c_str(), "COG") &&
+                 aosCreationOptions.FetchNameValue("BLOCKSIZE") == nullptr &&
+                 m_bandCount > 0)
+        {
+            if (nBlockXSize != poSrcDS->GetRasterXSize() &&
+                nBlockXSize == nBlockYSize && nBlockXSize >= 128 &&
+                (nBlockXSize % 16) == 0)
+            {
+                aosCreationOptions.SetNameValue("BLOCKSIZE",
+                                                CPLSPrintf("%d", nBlockXSize));
+            }
+        }
+        else if (EQUAL(m_format.c_str(), "GPKG") &&
+                 aosCreationOptions.FetchNameValue("BLOCKSIZE") == nullptr &&
+                 aosCreationOptions.FetchNameValue("BLOCKXSIZE") == nullptr &&
+                 aosCreationOptions.FetchNameValue("BLOCKYSIZE") == nullptr &&
+                 m_bandCount > 0)
+        {
+            if (nBlockXSize != poSrcDS->GetRasterXSize() &&
+                nBlockXSize >= 256 && nBlockXSize <= 4096 &&
+                nBlockYSize >= 256 && nBlockYSize <= 4096)
+            {
+                aosCreationOptions.SetNameValue("BLOCKXSIZE",
+                                                CPLSPrintf("%d", nBlockXSize));
+                aosCreationOptions.SetNameValue("BLOCKYSIZE",
+                                                CPLSPrintf("%d", nBlockYSize));
+            }
         }
     }
 
@@ -221,13 +275,12 @@ bool GDALRasterCreateAlgorithm::RunStep(GDALPipelineStepRunContext &)
                         poDriver->GetDescription());
             return false;
         }
-        m_creationOptions.push_back("APPEND_SUBDATASET=YES");
+        aosCreationOptions.SetNameValue("APPEND_SUBDATASET", "YES");
     }
 
     auto poRetDS = std::unique_ptr<GDALDataset>(poDriver->Create(
         m_outputDataset.GetName().c_str(), m_size[0], m_size[1], m_bandCount,
-        GDALGetDataTypeByName(m_type.c_str()),
-        CPLStringList(m_creationOptions).List()));
+        GDALGetDataTypeByName(m_type.c_str()), aosCreationOptions.List()));
     if (!poRetDS)
     {
         return false;
