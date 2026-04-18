@@ -2369,7 +2369,7 @@ OGRBoolean OGRGeometry::IsValid(std::string *posReason) const
                     msg.pop_back();
                 }
 
-                *posReason = msg;
+                *posReason = std::move(msg);
             }
         }
         else
