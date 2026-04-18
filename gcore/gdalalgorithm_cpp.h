@@ -1133,6 +1133,24 @@ class CPL_DLL GDALAlgorithmArgDecl final
         m_datasetOutputFlags = flags;
     }
 
+    /** Set whether the argument is available in a pipeline step.
+     *
+     * If false, it is only available in standalone mode.
+     */
+    void SetAvailableInPipelineStep(bool available)
+    {
+        m_availableInPipelineStep = available;
+    }
+
+    /** Return whether the argument is available in a pipeline step.
+     *
+     * If false, it is only available in standalone mode.
+     */
+    bool IsAvailableInPipelineStep() const
+    {
+        return m_availableInPipelineStep;
+    }
+
   private:
     const std::string m_longName;
     const std::string m_shortName;
@@ -1158,6 +1176,7 @@ class CPL_DLL GDALAlgorithmArgDecl final
     bool m_autoOpenDataset = true;
     bool m_userProvided = false;
     bool m_duplicateValuesAllowed = true;
+    bool m_availableInPipelineStep = true;
     std::map<std::string, std::vector<std::string>> m_metadata{};
     std::vector<std::string> m_aliases{};
     std::vector<std::string> m_hiddenAliases{};
@@ -1492,6 +1511,12 @@ class CPL_DLL GDALAlgorithmArg /* non-final */
     inline int GetDatasetOutputFlags() const
     {
         return m_decl.GetDatasetOutputFlags();
+    }
+
+    /** Alias for GDALAlgorithmArgDecl::IsAvailableInPipelineStep() */
+    inline bool IsAvailableInPipelineStep() const
+    {
+        return m_decl.IsAvailableInPipelineStep();
     }
 
     /** Return the value of the argument, which is by decreasing order of priority:
@@ -2185,6 +2210,13 @@ class CPL_DLL GDALInConstructionAlgorithmArg final : public GDALAlgorithmArg
     SetIsCRSArg(bool noneAllowed = false,
                 const std::vector<std::string> &specialValues =
                     std::vector<std::string>());
+
+    /** Alias for GDALAlgorithmArgDecl::SetAvailableInPipelineStep() */
+    GDALInConstructionAlgorithmArg &SetAvailableInPipelineStep(bool available)
+    {
+        m_decl.SetAvailableInPipelineStep(available);
+        return *this;
+    }
 
     /** Alias for GDALAlgorithmArgDecl::SetUserProvided() */
     GDALInConstructionAlgorithmArg &SetUserProvided()

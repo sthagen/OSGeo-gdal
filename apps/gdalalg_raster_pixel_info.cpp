@@ -53,10 +53,12 @@ GDALRasterPixelInfoAlgorithm::GDALRasterPixelInfoAlgorithm(bool standaloneStep)
                            _("Output format (default is 'GeoJSON' if "
                              "'position-dataset' not specified)"))
             .AddMetadataItem(GAAMDI_REQUIRED_CAPABILITIES,
-                             {GDAL_DCAP_VECTOR, GDAL_DCAP_CREATE});
-        AddOpenOptionsArg(&m_openOptions);
+                             {GDAL_DCAP_VECTOR, GDAL_DCAP_CREATE})
+            .SetAvailableInPipelineStep(false);
+        AddOpenOptionsArg(&m_openOptions).SetAvailableInPipelineStep(false);
         AddInputFormatsArg(&m_inputFormats)
-            .AddMetadataItem(GAAMDI_REQUIRED_CAPABILITIES, {GDAL_DCAP_RASTER});
+            .AddMetadataItem(GAAMDI_REQUIRED_CAPABILITIES, {GDAL_DCAP_RASTER})
+            .SetAvailableInPipelineStep(false);
     }
 
     AddInputDatasetArg(&m_inputDataset, GDAL_OF_RASTER)
@@ -88,10 +90,14 @@ GDALRasterPixelInfoAlgorithm::GDALRasterPixelInfoAlgorithm(bool standaloneStep)
         .SetHiddenForCLI(!standaloneStep);
     if (standaloneStep)
     {
-        AddCreationOptionsArg(&m_creationOptions);
-        AddLayerCreationOptionsArg(&m_layerCreationOptions);
-        AddOverwriteArg(&m_overwrite);
-        AddOutputStringArg(&m_output).SetHiddenForCLI();
+        AddCreationOptionsArg(&m_creationOptions)
+            .SetAvailableInPipelineStep(false);
+        AddLayerCreationOptionsArg(&m_layerCreationOptions)
+            .SetAvailableInPipelineStep(false);
+        AddOverwriteArg(&m_overwrite).SetAvailableInPipelineStep(false);
+        AddOutputStringArg(&m_output)
+            .SetHiddenForCLI()
+            .SetAvailableInPipelineStep(false);
     }
 
     AddBandArg(&m_band);
