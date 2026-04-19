@@ -3574,7 +3574,7 @@ void OGRTileDBLayer::InitializeSchemaAndArray()
         for (int i = 0; i < m_poFeatureDefn->GetFieldCount(); i++)
         {
             const OGRFieldDefn *poFieldDefn = m_poFeatureDefn->GetFieldDefn(i);
-            const bool bIsNullable = poFieldDefn->IsNullable();
+            const bool bIsNullable = CPL_TO_BOOL(poFieldDefn->IsNullable());
 
             const auto CreateAttr =
                 [this, poFieldDefn, bIsNullable](tiledb_datatype_t type,

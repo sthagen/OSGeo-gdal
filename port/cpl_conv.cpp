@@ -3755,9 +3755,9 @@ CPLConfigOptionSetter::~CPLConfigOptionSetter()
 bool CPLIsInteractive(FILE *f)
 {
 #ifndef _WIN32
-    return isatty(static_cast<int>(fileno(f)));
+    return CPL_TO_BOOL(isatty(static_cast<int>(fileno(f))));
 #else
-    return _isatty(_fileno(f));
+    return CPL_TO_BOOL(_isatty(_fileno(f)));
 #endif
 }
 

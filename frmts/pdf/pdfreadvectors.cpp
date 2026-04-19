@@ -1902,7 +1902,7 @@ void PDFDataset::ExploreContents(GDALPDFObject *poObj,
             /* FIXME: that logic is too fragile. */
             const char *pszStartParsing = pszBDC;
             const char *pszAfterBDC = pszBDC + 3;
-            int bMatchQ = FALSE;
+            bool bMatchQ = false;
             while (pszAfterBDC[0] == ' ' || pszAfterBDC[0] == '\r' ||
                    pszAfterBDC[0] == '\n')
                 pszAfterBDC++;
@@ -1919,7 +1919,7 @@ void PDFDataset::ExploreContents(GDALPDFObject *poObj,
                      pszLastq[1] == '\n'))
                 {
                     pszStartParsing = pszLastq;
-                    bMatchQ = TRUE;
+                    bMatchQ = true;
                 }
             }
 

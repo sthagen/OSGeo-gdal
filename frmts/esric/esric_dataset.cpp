@@ -652,8 +652,8 @@ GDALDataset *ECDataset::Open(GDALOpenInfo *poOpenInfo)
 GDALDataset *ECDataset::Open(GDALOpenInfo *poOpenInfo,
                              const char *pszDescription)
 {
-    bool ignoreOversizedLods = CSLFetchBoolean(poOpenInfo->papszOpenOptions,
-                                               "IGNORE_OVERSIZED_LODS", FALSE);
+    bool ignoreOversizedLods = CPL_TO_BOOL(CSLFetchBoolean(
+        poOpenInfo->papszOpenOptions, "IGNORE_OVERSIZED_LODS", FALSE));
     if (IdentifyXML(poOpenInfo))
     {
         CPLXMLNode *config = CPLParseXMLFile(poOpenInfo->pszFilename);

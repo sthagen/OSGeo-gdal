@@ -1352,8 +1352,8 @@ GDALDataset *TileDBRasterDataset::OpenInternal(GDALOpenInfo *poOpenInfo,
     const char *pszTimestamp =
         CSLFetchNameValue(poOpenInfo->papszOpenOptions, "TILEDB_TIMESTAMP");
 
-    poDS->bStats =
-        CSLFetchBoolean(poOpenInfo->papszOpenOptions, "STATS", FALSE);
+    poDS->bStats = CPL_TO_BOOL(
+        CSLFetchBoolean(poOpenInfo->papszOpenOptions, "STATS", FALSE));
 
     if (pszConfig != nullptr)
     {
@@ -2162,7 +2162,8 @@ TileDBRasterDataset *TileDBRasterDataset::CreateLL(const char *pszFilename,
         const char *pszBlockYSize =
             CSLFetchNameValue(papszOptions, "BLOCKYSIZE");
         poDS->nBlockYSize = (pszBlockYSize) ? atoi(pszBlockYSize) : 256;
-        poDS->bStats = CSLFetchBoolean(papszOptions, "STATS", FALSE);
+        poDS->bStats =
+            CPL_TO_BOOL(CSLFetchBoolean(papszOptions, "STATS", FALSE));
 
         const char *pszTimestamp =
             CSLFetchNameValue(papszOptions, "TILEDB_TIMESTAMP");

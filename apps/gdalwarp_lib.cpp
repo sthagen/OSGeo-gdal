@@ -4396,7 +4396,7 @@ static GDALDatasetH GDALWarpCreateOutput(
                     oSrcSRS.DemoteTo2D(nullptr) == OGRERR_NONE &&
                     oDstSRS.DemoteTo2D(nullptr) == OGRERR_NONE)
                 {
-                    bIsSameHorizontal = oSrcSRS.IsSame(&oDstSRS);
+                    bIsSameHorizontal = CPL_TO_BOOL(oSrcSRS.IsSame(&oDstSRS));
                 }
             }
             if (bIsSameHorizontal)

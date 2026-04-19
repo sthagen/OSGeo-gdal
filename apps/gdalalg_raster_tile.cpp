@@ -3440,7 +3440,7 @@ bool GDALRasterTileAlgorithm::ValidateOutputFormat(GDALDataType eSrcDT) const
         }
         const bool bUInt16Supported =
             strstr(m_poDstDriver->GetMetadataItem(GDAL_DMD_CREATIONDATATYPES),
-                   "UInt16");
+                   "UInt16") != nullptr;
         if (eSrcDT != GDT_UInt8 && !(eSrcDT == GDT_UInt16 && bUInt16Supported))
         {
             ReportError(

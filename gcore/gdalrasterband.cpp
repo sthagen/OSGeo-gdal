@@ -9065,21 +9065,21 @@ CPLErr GDALRasterBand::ComputeRasterMinMaxLocation(double *pdfMin,
             {
                 std::tie(pos_min, pos_max) = gdal::minmax_element(
                     pData, static_cast<size_t>(nBlockXSize) * nBlockYSize,
-                    eEffectiveDT, sNoDataValues.bGotNoDataValue,
+                    eEffectiveDT, CPL_TO_BOOL(sNoDataValues.bGotNoDataValue),
                     sNoDataValues.dfNoDataValue);
             }
             else if (bNeedsMin)
             {
                 pos_min = gdal::min_element(
                     pData, static_cast<size_t>(nBlockXSize) * nBlockYSize,
-                    eEffectiveDT, sNoDataValues.bGotNoDataValue,
+                    eEffectiveDT, CPL_TO_BOOL(sNoDataValues.bGotNoDataValue),
                     sNoDataValues.dfNoDataValue);
             }
             else if (bNeedsMax)
             {
                 pos_max = gdal::max_element(
                     pData, static_cast<size_t>(nBlockXSize) * nBlockYSize,
-                    eEffectiveDT, sNoDataValues.bGotNoDataValue,
+                    eEffectiveDT, CPL_TO_BOOL(sNoDataValues.bGotNoDataValue),
                     sNoDataValues.dfNoDataValue);
             }
 
