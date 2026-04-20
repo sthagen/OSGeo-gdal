@@ -913,8 +913,16 @@ def test_gdalalg_vector_pipeline_propagate_metadata():
 def test_gdalalg_vector_pipeline_propagate_field_domain():
 
     src_ds = ogr.Open("../ogr/data/gpkg/domains.gpkg")
+
     with gdal.alg.vector.pipeline(
         pipeline="read ../ogr/data/gpkg/domains.gpkg ! edit"
+    ) as alg:
+        ds = alg.Output()
+        assert ds.GetFieldDomainNames() == src_ds.GetFieldDomainNames()
+        assert ds.GetFieldDomain(ds.GetFieldDomainNames()[0]) is not None
+
+    with gdal.alg.vector.pipeline(
+        pipeline="read ../ogr/data/gpkg/domains.gpkg --layer test ! edit"
     ) as alg:
         ds = alg.Output()
         assert ds.GetFieldDomainNames() == src_ds.GetFieldDomainNames()

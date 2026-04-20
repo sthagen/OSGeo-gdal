@@ -40,16 +40,15 @@ GDALVectorReadAlgorithm::GDALVectorReadAlgorithm()
 /** Class used by vector pipeline steps to create an output on-the-fly
  * dataset where they can store on-the-fly layers.
  */
-class GDALVectorPipelineReadOutputDataset final : public GDALDataset
+class GDALVectorPipelineReadOutputDataset final
+    : public GDALVectorDecoratedDataset
 {
-    GDALDataset &m_srcDS;
     std::vector<OGRLayer *> m_layers{};
 
     CPL_DISALLOW_COPY_ASSIGN(GDALVectorPipelineReadOutputDataset)
 
   public:
     explicit GDALVectorPipelineReadOutputDataset(GDALDataset &oSrcDS);
-    ~GDALVectorPipelineReadOutputDataset() override;
 
     void AddLayer(OGRLayer &oSrcLayer);
 
@@ -77,20 +76,9 @@ class GDALVectorPipelineReadOutputDataset final : public GDALDataset
 
 GDALVectorPipelineReadOutputDataset::GDALVectorPipelineReadOutputDataset(
     GDALDataset &srcDS)
-    : m_srcDS(srcDS)
+    : GDALVectorDecoratedDataset(&srcDS)
 {
-    m_srcDS.Reference();
-    SetDescription(m_srcDS.GetDescription());
     poDriver = m_srcDS.GetDriver();
-}
-
-/************************************************************************/
-/*                ~GDALVectorPipelineReadOutputDataset()                */
-/************************************************************************/
-
-GDALVectorPipelineReadOutputDataset::~GDALVectorPipelineReadOutputDataset()
-{
-    m_srcDS.ReleaseRef();
 }
 
 /************************************************************************/
