@@ -885,6 +885,7 @@ GDALRasterCalcAlgorithm::GDALRasterCalcAlgorithm(bool standaloneStep) noexcept
                                           .SetStandaloneStep(standaloneStep)
                                           .SetAddDefaultArguments(false)
                                           .SetAutoOpenInputDatasets(false)
+                                          .SetInputDatasetInputFlags(GADV_NAME)
                                           .SetInputDatasetMetaVar("INPUTS")
                                           .SetInputDatasetMaxCount(INT_MAX))
 {

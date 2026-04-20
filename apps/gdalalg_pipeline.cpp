@@ -93,6 +93,7 @@ void GDALPipelineStepAlgorithm::AddRasterInputArgs(
             openForMixedRasterVector ? (GDAL_OF_RASTER | GDAL_OF_VECTOR)
                                      : GDAL_OF_RASTER,
             false, m_constructorOptions.inputDatasetHelpMsg.c_str())
+            .SetDatasetInputFlags(m_constructorOptions.inputDatasetInputFlags)
             .SetMinCount(m_constructorOptions.inputDatasetRequired ? 1 : 0)
             .SetMaxCount(m_constructorOptions.inputDatasetMaxCount)
             .SetAutoOpenDataset(m_constructorOptions.autoOpenInputDatasets)
@@ -166,6 +167,7 @@ void GDALPipelineStepAlgorithm::AddVectorInputArgs(bool hiddenForCLI)
         AddInputDatasetArg(&m_inputDataset, GDAL_OF_VECTOR, false)
             .SetMinCount(m_constructorOptions.inputDatasetRequired ? 1 : 0)
             .SetMaxCount(m_constructorOptions.inputDatasetMaxCount)
+            .SetDatasetInputFlags(m_constructorOptions.inputDatasetInputFlags)
             .SetAutoOpenDataset(m_constructorOptions.autoOpenInputDatasets)
             .SetHiddenForCLI(hiddenForCLI);
     if (!m_constructorOptions.inputDatasetAlias.empty())

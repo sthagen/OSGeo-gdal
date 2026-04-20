@@ -151,6 +151,7 @@ class GDALPipelineStepAlgorithm /* non final */ : public GDALAlgorithm
         bool addSkipErrorsArgument = true;            // only for vector output
         bool addOutputLayerNameArgument = true;       // only for vector output
         int inputDatasetMaxCount = 1;
+        int inputDatasetInputFlags = GADV_NAME | GADV_OBJECT;
         std::string inputDatasetHelpMsg{};
         std::string inputDatasetAlias{};
         std::string inputDatasetMetaVar = "INPUT";
@@ -190,6 +191,12 @@ class GDALPipelineStepAlgorithm /* non final */ : public GDALAlgorithm
         inline ConstructorOptions &SetInputDatasetMaxCount(int maxCount)
         {
             inputDatasetMaxCount = maxCount;
+            return *this;
+        }
+
+        inline ConstructorOptions &SetInputDatasetInputFlags(int flags)
+        {
+            inputDatasetInputFlags = flags;
             return *this;
         }
 
