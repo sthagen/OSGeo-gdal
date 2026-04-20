@@ -65,16 +65,16 @@ find -L \
     | tee ./test-output.txt
 
 # Check if the tests failed and error out.
-if grep -P '===.*\d+ failed' ./test-output.txt > /dev/null ; then
+if grep -C 3 -P '===.*\d+ failed' ./test-output.txt > /dev/null ; then
     echo 'Tests failed'
     exit 1
-elif grep '==ABORTING' ./test-output.txt; then
+elif grep -C 3 '==ABORTING' ./test-output.txt; then
     echo 'Tests crashed'
     exit 1
-elif grep 'UndefinedBehaviorSanitizer' ./test-output.txt; then
+elif grep -C 3 'UndefinedBehaviorSanitizer' ./test-output.txt; then
     echo 'UndefinedBehavior detected'
     exit 1
-elif grep 'ERROR: LeakSanitizer' ./test-output.txt; then
+elif grep -C 3 'ERROR: LeakSanitizer' ./test-output.txt; then
     echo 'Memory leak detected'
     exit 1
 else
