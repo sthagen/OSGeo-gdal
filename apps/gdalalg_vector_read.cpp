@@ -49,6 +49,7 @@ class GDALVectorPipelineReadOutputDataset final : public GDALDataset
 
   public:
     explicit GDALVectorPipelineReadOutputDataset(GDALDataset &oSrcDS);
+    ~GDALVectorPipelineReadOutputDataset() override;
 
     void AddLayer(OGRLayer &oSrcLayer);
 
@@ -74,8 +75,18 @@ GDALVectorPipelineReadOutputDataset::GDALVectorPipelineReadOutputDataset(
     GDALDataset &srcDS)
     : m_srcDS(srcDS)
 {
+    m_srcDS.Reference();
     SetDescription(m_srcDS.GetDescription());
     poDriver = m_srcDS.GetDriver();
+}
+
+/************************************************************************/
+/*                GDALVectorPipelineReadOutputDataset()                 */
+/************************************************************************/
+
+GDALVectorPipelineReadOutputDataset::~GDALVectorPipelineReadOutputDataset()
+{
+    m_srcDS.ReleaseRef();
 }
 
 /************************************************************************/

@@ -1080,3 +1080,14 @@ def test_gdalalg_vector_pipeline_decorated_ds_take_ref(tmp_vsimem):
     ds = ogr.Open(f"{tmp_vsimem}/out.shp")
     lyr = ds.GetLayer(0)
     assert lyr.GetFeatureCount() == 1
+
+
+def test_gdalalg_vector_pipeline_read_ds_take_ref(tmp_vsimem):
+
+    gdal.alg.vector.pipeline(
+        pipeline=f'read ../ogr/data/poly.shp ! read --layer poly ! sql --sql "select * from poly" ! write {tmp_vsimem}/out.shp'
+    )
+
+    ds = ogr.Open(f"{tmp_vsimem}/out.shp")
+    lyr = ds.GetLayer(0)
+    assert lyr.GetFeatureCount() == 10
