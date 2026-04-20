@@ -81,7 +81,7 @@ GDALVectorPipelineReadOutputDataset::GDALVectorPipelineReadOutputDataset(
 }
 
 /************************************************************************/
-/*                GDALVectorPipelineReadOutputDataset()                 */
+/*                ~GDALVectorPipelineReadOutputDataset()                */
 /************************************************************************/
 
 GDALVectorPipelineReadOutputDataset::~GDALVectorPipelineReadOutputDataset()
