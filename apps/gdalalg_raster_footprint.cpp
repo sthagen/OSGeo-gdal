@@ -38,23 +38,30 @@ GDALRasterFootprintAlgorithm::GDALRasterFootprintAlgorithm(bool standaloneStep)
 
     if (standaloneStep)
     {
-        AddOpenOptionsArg(&m_openOptions);
+        AddOpenOptionsArg(&m_openOptions).SetAvailableInPipelineStep(false);
         AddInputFormatsArg(&m_inputFormats)
-            .AddMetadataItem(GAAMDI_REQUIRED_CAPABILITIES, {GDAL_DCAP_RASTER});
-        AddInputDatasetArg(&m_inputDataset, GDAL_OF_RASTER);
+            .AddMetadataItem(GAAMDI_REQUIRED_CAPABILITIES, {GDAL_DCAP_RASTER})
+            .SetAvailableInPipelineStep(false);
+        AddInputDatasetArg(&m_inputDataset, GDAL_OF_RASTER)
+            .SetAvailableInPipelineStep(false);
 
         AddOutputDatasetArg(&m_outputDataset, GDAL_OF_VECTOR)
-            .SetDatasetInputFlags(GADV_NAME | GADV_OBJECT);
+            .SetDatasetInputFlags(GADV_NAME | GADV_OBJECT)
+            .SetAvailableInPipelineStep(false);
         AddOutputFormatArg(&m_format, /* bStreamAllowed = */ false,
                            /* bGDALGAllowed = */ false)
             .AddMetadataItem(GAAMDI_REQUIRED_CAPABILITIES,
-                             {GDAL_DCAP_VECTOR, GDAL_DCAP_CREATE});
-        AddCreationOptionsArg(&m_creationOptions);
-        AddLayerCreationOptionsArg(&m_layerCreationOptions);
+                             {GDAL_DCAP_VECTOR, GDAL_DCAP_CREATE})
+            .SetAvailableInPipelineStep(false);
+        AddCreationOptionsArg(&m_creationOptions)
+            .SetAvailableInPipelineStep(false);
+        AddLayerCreationOptionsArg(&m_layerCreationOptions)
+            .SetAvailableInPipelineStep(false);
         AddUpdateArg(&m_update)
+            .SetAvailableInPipelineStep(false)
             .SetHidden();  // needed for correct append execution
-        AddAppendLayerArg(&m_appendLayer);
-        AddOverwriteArg(&m_overwrite);
+        AddAppendLayerArg(&m_appendLayer).SetAvailableInPipelineStep(false);
+        AddOverwriteArg(&m_overwrite).SetAvailableInPipelineStep(false);
     }
     else
     {

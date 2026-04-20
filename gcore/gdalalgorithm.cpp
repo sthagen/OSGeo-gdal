@@ -6061,10 +6061,12 @@ void GDALAlgorithm::AddProgressArg()
 {
     AddArg(GDAL_ARG_NAME_QUIET, 'q',
            _("Quiet mode (no progress bar or warning message)"), &m_quiet)
+        .SetAvailableInPipelineStep(false)
         .SetCategory(GAAC_COMMON)
         .AddAction([this]() { m_progressBarRequested = false; });
 
     AddArg("progress", 0, _("Display progress bar"), &m_progressBarRequested)
+        .SetAvailableInPipelineStep(false)
         .SetHidden();
 }
 
@@ -6414,8 +6416,8 @@ GDALAlgorithm::GetUsageForCLI(bool shortUsage,
             maxOptLen = std::max(maxOptLen, userProvidedOpt.size());
 
         const auto OutputArg =
-            [this, maxOptLen, &osRet](const GDALAlgorithmArg *arg,
-                                      const std::string &opt)
+            [this, maxOptLen, &osRet,
+             &usageOptions](const GDALAlgorithmArg *arg, const std::string &opt)
         {
             osRet += "  ";
             osRet += opt;
@@ -6533,6 +6535,12 @@ GDALAlgorithm::GetUsageForCLI(bool shortUsage,
             if (arg->IsRequired())
             {
                 osRet += " [required]";
+            }
+
+            if (!arg->IsAvailableInPipelineStep() &&
+                !usageOptions.isPipelineStep)
+            {
+                osRet += " [not available in pipelines]";
             }
 
             osRet += '\n';
@@ -6755,6 +6763,11 @@ std::string GDALAlgorithm::GetUsageAsJSON() const
                 jArg.Add("metavar", metaVar.substr(1, metaVar.size() - 2));
             else
                 jArg.Add("metavar", metaVar);
+        }
+
+        if (!arg->IsAvailableInPipelineStep())
+        {
+            jArg.Add("available_in_pipeline_step", false);
         }
 
         const auto &choices = arg->GetChoices();
@@ -8183,6 +8196,23 @@ bool GDALAlgorithmArgIsOnlyForCLI(GDALAlgorithmArgH hArg)
 {
     VALIDATE_POINTER1(hArg, __func__, false);
     return hArg->ptr->IsHiddenForAPI();
+}
+
+/************************************************************************/
+/*             GDALAlgorithmArgIsAvailableInPipelineStep()              */
+/************************************************************************/
+
+/** Return whether the argument is available in a pipeline step.
+ *
+ * If false, it is only available in standalone mode.
+ *
+ * @param hArg Handle to an argument. Must NOT be null.
+ * @since 3.13
+ */
+bool GDALAlgorithmArgIsAvailableInPipelineStep(GDALAlgorithmArgH hArg)
+{
+    VALIDATE_POINTER1(hArg, __func__, false);
+    return hArg->ptr->IsAvailableInPipelineStep();
 }
 
 /************************************************************************/

@@ -182,6 +182,10 @@ public:
     return GDALAlgorithmArgIsHiddenForAPI(self);
   }
 
+  bool IsAvailableInPipelineStep() {
+    return GDALAlgorithmArgIsAvailableInPipelineStep(self);
+  }
+
   bool IsInput() {
     return GDALAlgorithmArgIsInput(self);
   }

@@ -4270,7 +4270,8 @@ TEST_F(test_gdal_algorithm, algorithm_c_api)
                 .SetDefault(std::vector<double>{1.5, 2.5});
             AddArg("intlist", 0, "intlist", &m_intlist)
                 .SetDefault(std::vector<int>{1, 2});
-            AddArg("dataset", 0, "dataset", &m_dsValue);
+            AddArg("dataset", 0, "dataset", &m_dsValue)
+                .SetAvailableInPipelineStep(false);
         }
 
         bool
@@ -4437,6 +4438,7 @@ TEST_F(test_gdal_algorithm, algorithm_c_api)
             CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
             EXPECT_EQ(GDALAlgorithmArgGetDefaultAsBoolean(hArg), false);
         }
+        EXPECT_TRUE(GDALAlgorithmArgIsAvailableInPipelineStep(hArg));
         {
             size_t nCount = 0;
             const double *ret =
@@ -4464,6 +4466,7 @@ TEST_F(test_gdal_algorithm, algorithm_c_api)
         EXPECT_EQ(GDALAlgorithmArgGetDatasetInputFlags(hArg),
                   GADV_NAME | GADV_OBJECT);
         EXPECT_EQ(GDALAlgorithmArgGetDatasetOutputFlags(hArg), GADV_OBJECT);
+        EXPECT_FALSE(GDALAlgorithmArgIsAvailableInPipelineStep(hArg));
         GDALArgDatasetValueH hVal = GDALArgDatasetValueCreate();
         GDALArgDatasetValueSetName(hVal, "foo");
 

@@ -186,6 +186,8 @@ bool CPL_DLL GDALAlgorithmArgIsHiddenForCLI(GDALAlgorithmArgH);
 
 bool CPL_DLL GDALAlgorithmArgIsHiddenForAPI(GDALAlgorithmArgH);
 
+bool CPL_DLL GDALAlgorithmArgIsAvailableInPipelineStep(GDALAlgorithmArgH);
+
 #ifndef DOXYGEN_SKIP
 bool CPL_DLL GDALAlgorithmArgIsOnlyForCLI(GDALAlgorithmArgH)
     CPL_WARN_DEPRECATED("Use GDALAlgorithmArgIsHiddenForAPI() instead");
