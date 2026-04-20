@@ -4888,8 +4888,8 @@ int TIFFReadDirectory(TIFF *tif)
                     (void)TIFFFetchNormalTag(tif, dp, TRUE);
                     break;
             } /* -- switch (dp->tdir_tag) -- */
-        }     /* -- if (!dp->tdir_ignore) */
-    }         /* -- for-loop -- */
+        } /* -- if (!dp->tdir_ignore) */
+    } /* -- for-loop -- */
 
     /* Evaluate final IFD data size. */
     CalcFinalIFDdatasizeReading(tif, dircount);
