@@ -2824,7 +2824,7 @@ def test_gti_xml_relative_filename(tmp_vsimem, prefix):
 
     xml_filename = str(tmp_vsimem / "index.xml")
     xml_content = f"""<GDALTileIndexDataset>
-  <IndexDataset>index.gti.gpkg</IndexDataset>
+  <IndexDataset>{prefix}index.gti.gpkg</IndexDataset>
   <Overview>
       <Dataset>{prefix}index2.gti.gpkg</Dataset>
   </Overview>

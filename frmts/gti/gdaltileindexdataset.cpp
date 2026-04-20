@@ -825,14 +825,15 @@ bool GDALTileIndexDataset::Open(GDALOpenInfo *poOpenInfo)
             return false;
         }
 
-        if (!m_osBaseDir.empty() && CPLIsFilenameRelative(pszIndexDataset))
+        osIndexDataset = pszIndexDataset;
+        if (cpl::starts_with(osIndexDataset, GTI_PREFIX))
+            osIndexDataset = osIndexDataset.substr(strlen(GTI_PREFIX));
+
+        if (!m_osBaseDir.empty() &&
+            CPLIsFilenameRelative(osIndexDataset.c_str()))
         {
-            osIndexDataset = CPLFormFilenameSafe(m_osBaseDir.c_str(),
-                                                 pszIndexDataset, nullptr);
-        }
-        else
-        {
-            osIndexDataset = pszIndexDataset;
+            osIndexDataset = CPLFormFilenameSafe(
+                m_osBaseDir.c_str(), osIndexDataset.c_str(), nullptr);
         }
     }
 
