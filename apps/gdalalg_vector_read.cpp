@@ -61,6 +61,10 @@ class GDALVectorPipelineReadOutputDataset final : public GDALDataset
 
     void ResetReading() override;
 
+    OGRLayer *ExecuteSQL(const char *pszStatement, OGRGeometry *poSpatialFilter,
+                         const char *pszDialect) override;
+    void ReleaseResultSet(OGRLayer *poResultsSet) override;
+
     OGRFeature *GetNextFeature(OGRLayer **ppoBelongingLayer,
                                double *pdfProgressPct,
                                GDALProgressFunc pfnProgress,
@@ -135,6 +139,28 @@ int GDALVectorPipelineReadOutputDataset::TestCapability(
 void GDALVectorPipelineReadOutputDataset::ResetReading()
 {
     m_srcDS.ResetReading();
+}
+
+/************************************************************************/
+/*          GDALVectorPipelineReadOutputDataset::ExecuteSQL()           */
+/************************************************************************/
+
+OGRLayer *
+GDALVectorPipelineReadOutputDataset::ExecuteSQL(const char *pszStatement,
+                                                OGRGeometry *poSpatialFilter,
+                                                const char *pszDialect)
+{
+    return m_srcDS.ExecuteSQL(pszStatement, poSpatialFilter, pszDialect);
+}
+
+/************************************************************************/
+/*       GDALVectorPipelineReadOutputDataset::ReleaseResultSet()        */
+/************************************************************************/
+
+void GDALVectorPipelineReadOutputDataset::ReleaseResultSet(
+    OGRLayer *poResultsSet)
+{
+    m_srcDS.ReleaseResultSet(poResultsSet);
 }
 
 /************************************************************************/
