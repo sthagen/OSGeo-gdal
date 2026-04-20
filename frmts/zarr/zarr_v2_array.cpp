@@ -688,6 +688,8 @@ bool ZarrV2Array::LoadBlockData(const uint64_t *blockIndices, bool bUseMutex,
             std::lock_guard<std::mutex> oLock(m_oMutex);
             const auto &oFilter = m_oFiltersArray[i];
             osFilterId = oFilter["id"].ToString();
+            if (osFilterId == "bitround")
+                continue;  // no-op on decoding
             psFilterDecompressor =
                 EQUAL(osFilterId.c_str(), "shuffle")
                     ? ZarrGetShuffleDecompressor()
@@ -972,7 +974,8 @@ bool ZarrV2Array::FlushDirtyBlock() const
     for (const auto &oFilter : m_oFiltersArray)
     {
         const auto osFilterId = oFilter["id"].ToString();
-        if (osFilterId == "quantize" || osFilterId == "fixedscaleoffset")
+        if (osFilterId == "quantize" || osFilterId == "fixedscaleoffset" ||
+            osFilterId == "bitround")
         {
             CPLError(CE_Failure, CPLE_NotSupported,
                      "%s filter not supported for writing", osFilterId.c_str());
@@ -2031,7 +2034,8 @@ ZarrV2Group::LoadArray(const std::string &osArrayName,
             }
             if (!EQUAL(osFilterId.c_str(), "shuffle") &&
                 !EQUAL(osFilterId.c_str(), "quantize") &&
-                !EQUAL(osFilterId.c_str(), "fixedscaleoffset"))
+                !EQUAL(osFilterId.c_str(), "fixedscaleoffset") &&
+                !EQUAL(osFilterId.c_str(), "bitround"))
             {
                 const auto psFilterCompressor =
                     CPLGetCompressor(osFilterId.c_str());
