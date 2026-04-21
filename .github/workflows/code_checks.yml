@@ -208,7 +208,7 @@ jobs:
     - name: Check cmakelist
       run: find . -name CMakeLists.txt |xargs cmake-format --check
 
-  validate_xml:
+  validate_xml_or_json:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -219,13 +219,20 @@ jobs:
       - name: Install requirements
         run: |
           sudo apt update
-          sudo apt install -y libxml2-utils
+          sudo apt install -y libxml2-utils python3-jsonschema
 
       - name: Run xmllint checks
         run: |
           xmllint --schema ./frmts/nitf/data/nitf_spec.xsd ./frmts/nitf/data/nitf_spec.xml --noout
           xmllint --schema ./ogr/ogrsf_frmts/vdv/data/vdv452.xsd ./ogr/ogrsf_frmts/vdv/data/vdv452.xml --noout
           xmllint --schema ./ogr/ogrsf_frmts/gmlas/data/gmlasconf.xsd ./ogr/ogrsf_frmts/gmlas/data/gmlasconf.xml --noout
+
+      - name: Validate JSON schemas
+        run: |
+          for i in `find . -name "*.schema.json"`; do \
+            echo $i; \
+            python3 -c "from jsonschema import Draft7Validator; import json; schema = json.load(open('$i')); Draft7Validator.check_schema(schema)"; \
+          done
 
   check-config-options:
     runs-on: ubuntu-latest
