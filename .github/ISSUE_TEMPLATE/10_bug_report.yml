@@ -15,6 +15,7 @@ body:
       value: |
 
         - [ ] I'm using LLM/AI-suggested procedures. See our [policy about AI tool use](https://gdal.org/community/ai_tool_policy.html). Use of AI tools *must* be indicated.
+        - [ ] This ticket has been (mostly) written by myself (human), and is aimed at being read by humans. We *do* not accept AI generated wall-of-text.
 
   - type: textarea
     id: what
