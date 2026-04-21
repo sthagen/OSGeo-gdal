@@ -3148,11 +3148,13 @@ bool GDALAlgorithm::ValidateArguments()
     // The method may emit several errors if several constraints are not met.
     bool ret = true;
     std::map<std::string, std::string> mutualExclusionGroupUsed;
+    std::map<std::string, std::vector<std::string>> mutualDependencyGroupUsed;
     for (auto &arg : m_args)
     {
-        // Check mutually exclusive arguments
+        // Check mutually exclusive/dependent arguments
         if (arg->IsExplicitlySet())
         {
+
             const auto &mutualExclusionGroup = arg->GetMutualExclusionGroup();
             if (!mutualExclusionGroup.empty())
             {
@@ -3170,6 +3172,45 @@ bool GDALAlgorithm::ValidateArguments()
                 {
                     mutualExclusionGroupUsed[mutualExclusionGroup] =
                         arg->GetName();
+                }
+            }
+
+            const auto &mutualDependencyGroup = arg->GetMutualDependencyGroup();
+            if (!mutualDependencyGroup.empty())
+            {
+                if (mutualDependencyGroupUsed.find(mutualDependencyGroup) ==
+                    mutualDependencyGroupUsed.end())
+                {
+                    mutualDependencyGroupUsed[mutualDependencyGroup] = {
+                        arg->GetName()};
+                }
+                else
+                {
+                    mutualDependencyGroupUsed[mutualDependencyGroup].push_back(
+                        arg->GetName());
+                }
+            }
+
+            // Check direct dependencies
+            for (const auto &dependency : arg->GetDirectDependencies())
+            {
+                auto depArg = GetArg(dependency);
+                if (!depArg)
+                {
+                    ret = false;
+                    ReportError(CE_Failure, CPLE_AppDefined,
+                                "Argument '%s' depends on argument '%s' that "
+                                "is not defined.",
+                                arg->GetName().c_str(), dependency.c_str());
+                }
+                else if (!depArg->IsExplicitlySet())
+                {
+                    ret = false;
+                    ReportError(CE_Failure, CPLE_AppDefined,
+                                "Argument '%s' depends on argument '%s' that "
+                                "has not been specified.",
+                                arg->GetName().c_str(),
+                                depArg->GetName().c_str());
                 }
             }
         }
@@ -3285,6 +3326,50 @@ bool GDALAlgorithm::ValidateArguments()
         {
             ret = false;
         }
+    }
+
+    // Check mutual dependency groups
+    std::vector<std::string> processedGroups;
+    // Loop through group map and check there are not required args in the group that are not set
+    for (const auto &[groupName, argNames] : mutualDependencyGroupUsed)
+    {
+        if (std::find(processedGroups.begin(), processedGroups.end(),
+                      groupName) != processedGroups.end())
+            continue;
+        std::vector<std::string> missingArgs;
+        for (auto &arg : m_args)
+        {
+            const auto &mutualDependencyGroup = arg->GetMutualDependencyGroup();
+            if (mutualDependencyGroup == groupName &&
+                std::find(argNames.begin(), argNames.end(), arg->GetName()) ==
+                    argNames.end())
+            {
+                missingArgs.push_back(arg->GetName());
+            }
+        }
+        if (!missingArgs.empty())
+        {
+            ret = false;
+            std::string missingArgsStr;
+            for (const auto &missingArg : missingArgs)
+            {
+                if (!missingArgsStr.empty())
+                    missingArgsStr += ", ";
+                missingArgsStr += missingArg;
+            }
+            std::string givenArgsStr;
+            for (const auto &givenArg : argNames)
+            {
+                if (!givenArgsStr.empty())
+                    givenArgsStr += ", ";
+                givenArgsStr += givenArg;
+            }
+            ReportError(CE_Failure, CPLE_AppDefined,
+                        "Argument(s) '%s' require(s) that the following "
+                        "argument(s) are also specified: %s.",
+                        givenArgsStr.c_str(), missingArgsStr.c_str());
+        }
+        processedGroups.push_back(groupName);
     }
 
     for (const auto &f : m_validationActions)
@@ -6573,6 +6658,48 @@ GDALAlgorithm::GetUsageForCLI(bool shortUsage,
                     osRet += '\n';
                 }
             }
+
+            // Check dependency
+            std::string dependencyArgs;
+
+            for (const auto &dependencyArgumentName :
+                 GetArgDependencies(arg->GetName()))
+            {
+                const auto otherArg{GetArg(dependencyArgumentName)};
+                if (otherArg != nullptr)
+                {
+                    if (otherArg->IsHidden() || otherArg->IsHiddenForCLI() ||
+                        otherArg == arg)
+                    {
+                        continue;
+                    }
+
+                    if (!dependencyArgs.empty())
+                    {
+                        dependencyArgs += ", ";
+                    }
+
+                    dependencyArgs += "--";
+                    dependencyArgs += otherArg->GetName();
+                }
+                else
+                {
+                    CPLError(CE_Warning, CPLE_AppDefined,
+                             "Argument '%s' depends on unknown argument '%s'",
+                             arg->GetName().c_str(),
+                             dependencyArgumentName.c_str());
+                }
+            }
+
+            if (!dependencyArgs.empty())
+            {
+                osRet += "  ";
+                osRet += "  ";
+                osRet.append(maxOptLen, ' ');
+                osRet += "Depends on ";
+                osRet += dependencyArgs;
+                osRet += '\n';
+            }
         };
 
         if (!m_positionalArgs.empty())
@@ -6747,7 +6874,7 @@ std::string GDALAlgorithm::GetUsageAsJSON() const
         oRoot.Add("user_provided_arguments_allowed", true);
     }
 
-    const auto ProcessArg = [](const GDALAlgorithmArg *arg)
+    const auto ProcessArg = [this](const GDALAlgorithmArg *arg)
     {
         CPLJSONObject jArg;
         jArg.Add("name", arg->GetName());
@@ -6888,6 +7015,26 @@ std::string GDALAlgorithm::GetUsageAsJSON() const
             jArg.Add("min_count", arg->GetMinCount());
             jArg.Add("max_count", arg->GetMaxCount());
         }
+
+        // Process dependencies
+        const auto &mutualDependencyGroup = arg->GetMutualDependencyGroup();
+        if (!mutualDependencyGroup.empty())
+        {
+            jArg.Add("mutual_dependency_group", mutualDependencyGroup);
+        }
+
+        CPLJSONArray jDependencies;
+        for (const auto &dependencyArgumentName :
+             GetArgDependencies(arg->GetName()))
+        {
+            jDependencies.Add(dependencyArgumentName);
+        }
+
+        if (jDependencies.Size() > 0)
+        {
+            jArg.Add("depends_on", jDependencies);
+        }
+
         jArg.Add("category", arg->GetCategory());
 
         if (arg->GetType() == GAAT_DATASET ||
@@ -7605,6 +7752,28 @@ GDALAlgorithmArgH GDALAlgorithmGetArgNonConst(GDALAlgorithmH hAlg,
     if (!arg)
         return nullptr;
     return std::make_unique<GDALAlgorithmArgHS>(arg).release();
+}
+
+/************************************************************************/
+/*                  GDALAlgorithmGetArgDependencies()                   */
+/************************************************************************/
+
+/** Return the list of argument names the specified argument depends on.
+ *
+ *  This includes both regular dependencies and mutual dependencies.
+ *
+ * @param hAlg Handle to an algorithm. Must NOT be null.
+ * @param pszArgName Argument name. Must NOT be null.
+ * @return a NULL terminated list of names, which must be destroyed with
+ * CSLDestroy()
+ * @since 3.11
+ */
+char **GDALAlgorithmGetArgDependencies(GDALAlgorithmH hAlg,
+                                       const char *pszArgName)
+{
+    VALIDATE_POINTER1(hAlg, __func__, nullptr);
+    VALIDATE_POINTER1(pszArgName, __func__, nullptr);
+    return CPLStringList(hAlg->ptr->GetArgDependencies(pszArgName)).StealList();
 }
 
 /************************************************************************/
@@ -8344,6 +8513,49 @@ const char *GDALAlgorithmArgGetMutualExclusionGroup(GDALAlgorithmArgH hArg)
 {
     VALIDATE_POINTER1(hArg, __func__, nullptr);
     return hArg->ptr->GetMutualExclusionGroup().c_str();
+}
+
+/************************************************************************/
+/*              GDALAlgorithmArgGetMutualDependencyGroup()              */
+/************************************************************************/
+
+/** Return the name of the mutual dependency group to which this argument
+ * belongs to.
+ *
+ * Or empty string if it does not belong to any dependency group.
+ *
+ * @param hArg Handle to an argument. Must NOT be null.
+ * @return string whose lifetime is bound to hArg and which must not
+ * be freed.
+ * @since 3.13
+ */
+const char *GDALAlgorithmArgGetMutualDependencyGroup(GDALAlgorithmArgH hArg)
+{
+    VALIDATE_POINTER1(hArg, __func__, nullptr);
+    return hArg->ptr->GetMutualDependencyGroup().c_str();
+}
+
+/************************************************************************/
+/*               GDALAlgorithmArgGetDirectDependencies()                */
+/************************************************************************/
+
+/** Return the list of names of arguments that this argument depends on.
+ *
+ *  This is not necessarily a symmetric relationship.
+ *  If argument A depends on argument B, it doesn't mean that B depends on A.
+ *  Mutual dependency groups are a special case of dependencies,
+ *  where all arguments of the group depend on each other and are not
+ *  returned by this method.
+ *
+ * @param hArg Handle to an argument. Must NOT be null.
+ * @return a NULL terminated list of names, which must be destroyed with
+ * CSLDestroy()
+ * @since 3.13
+ */
+char **GDALAlgorithmArgGetDirectDependencies(GDALAlgorithmArgH hArg)
+{
+    VALIDATE_POINTER1(hArg, __func__, nullptr);
+    return CPLStringList(hArg->ptr->GetDirectDependencies()).StealList();
 }
 
 /************************************************************************/

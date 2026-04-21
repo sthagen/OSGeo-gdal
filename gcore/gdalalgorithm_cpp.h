@@ -721,6 +721,35 @@ class CPL_DLL GDALAlgorithmArgDecl final
         return *this;
     }
 
+    /** Set the name of the mutual dependency group to which this argument
+     *  belongs to.
+     *  If at least one argument of the group is specified, all other arguments
+     *  will be required.
+     *  An argument can only belong to a single group.
+     */
+    GDALAlgorithmArgDecl &SetMutualDependencyGroup(const std::string &group)
+    {
+        m_mutualDependencyGroup = group;
+        return *this;
+    }
+
+    /** Returns the mutual dependency group name, or empty string if it doesn't belong to any group. */
+    inline const std::string &GetMutualDependencyGroup() const
+    {
+        return m_mutualDependencyGroup;
+    }
+
+    /**
+     * Adds a direct dependency on another argument, meaning that if this argument is specified,
+     * the other argument must be specified too.
+     * Note that the dependency is not mutual. If argument A depends on argument B, it doesn't mean that B depends on A.
+     */
+    GDALAlgorithmArgDecl &AddDirectDependency(const std::string &otherArgName)
+    {
+        m_directDependencies.push_back(otherArgName);
+        return *this;
+    }
+
     /** Set user-defined metadata item.
      */
     GDALAlgorithmArgDecl &
@@ -999,6 +1028,21 @@ class CPL_DLL GDALAlgorithmArgDecl final
         return m_mutualExclusionGroup;
     }
 
+    /** Return the list of names of arguments that this argument directly depends on.
+     *
+     *  If argument A depends on argument B, it doesn't necessarily mean that B depends on A.
+     *
+     *  Mutual dependency groups are a special case of dependencies,
+     *  where all arguments of the group depend on each other and are not
+     *  returned by this method.
+     *
+     *  See also GetMutualDependencyGroup() and AddDirectDependency() methods.
+     */
+    inline const std::vector<std::string> &GetDirectDependencies() const
+    {
+        return m_directDependencies;
+    }
+
     /** Return if this (string) argument accepts the \@filename syntax to
      * mean that the content of the specified file should be used as the
      * value of the argument.
@@ -1159,6 +1203,7 @@ class CPL_DLL GDALAlgorithmArgDecl final
     std::string m_category = GAAC_BASE;
     std::string m_metaVar{};
     std::string m_mutualExclusionGroup{};
+    std::string m_mutualDependencyGroup{};
     int m_minCount = 0;
     int m_maxCount = 0;
     bool m_required = false;
@@ -1180,6 +1225,7 @@ class CPL_DLL GDALAlgorithmArgDecl final
     std::map<std::string, std::vector<std::string>> m_metadata{};
     std::vector<std::string> m_aliases{};
     std::vector<std::string> m_hiddenAliases{};
+    std::vector<std::string> m_directDependencies{};
     std::vector<char> m_shortNameAliases{};
     std::vector<std::string> m_choices{};
     std::vector<std::string> m_hiddenChoices{};
@@ -1461,6 +1507,18 @@ class CPL_DLL GDALAlgorithmArg /* non-final */
     inline const std::string &GetMutualExclusionGroup() const
     {
         return m_decl.GetMutualExclusionGroup();
+    }
+
+    /** Alias for GDALAlgorithmArgDecl::GetMutualDependencyGroup() */
+    inline const std::string &GetMutualDependencyGroup() const
+    {
+        return m_decl.GetMutualDependencyGroup();
+    }
+
+    /** Alias for GDALAlgorithmArgDecl::GetDirectDependencies() */
+    inline const std::vector<std::string> &GetDirectDependencies() const
+    {
+        return m_decl.GetDirectDependencies();
     }
 
     /** Alias for GDALAlgorithmArgDecl::GetMetadata() */
@@ -2138,6 +2196,22 @@ class CPL_DLL GDALInConstructionAlgorithmArg final : public GDALAlgorithmArg
         return *this;
     }
 
+    /** Alias for GDALAlgorithmArgDecl::SetMutualDependencyGroup() */
+    GDALInConstructionAlgorithmArg &
+    SetMutualDependencyGroup(const std::string &group)
+    {
+        m_decl.SetMutualDependencyGroup(group);
+        return *this;
+    }
+
+    /** Add a direct (not mutual) dependency from an argument */
+    GDALInConstructionAlgorithmArg &
+    AddDirectDependency(const GDALAlgorithmArg &otherArg)
+    {
+        m_decl.AddDirectDependency(otherArg.GetName());
+        return *this;
+    }
+
     /** Alias for GDALAlgorithmArgDecl::AddMetadataItem() */
     GDALInConstructionAlgorithmArg &
     AddMetadataItem(const std::string &name,
@@ -2475,6 +2549,33 @@ class CPL_DLL GDALAlgorithmRegistry
             return m_dummyArg;
         }
         return *alg;
+    }
+
+    /** Return a possibly empty list of names the specified argument
+     *  depends on, this includes both direct and mutual dependencies */
+    std::vector<std::string> GetArgDependencies(const std::string &osName) const
+    {
+        const auto arg = GetArg(osName, false);
+        if (!arg)
+        {
+            ReportError(CE_Failure, CPLE_AppDefined,
+                        "Argument '%s' does not exist", osName.c_str());
+            return {};
+        }
+        std::vector<std::string> dependencies = arg->GetDirectDependencies();
+        if (const auto mutualDependencyGroup = arg->GetMutualDependencyGroup();
+            !mutualDependencyGroup.empty())
+        {
+            for (const auto &otherArg : m_args)
+            {
+                if (otherArg.get() == arg ||
+                    mutualDependencyGroup.compare(
+                        otherArg->GetMutualDependencyGroup()) != 0)
+                    continue;
+                dependencies.push_back(otherArg->GetName());
+            }
+        }
+        return dependencies;
     }
 
     /** Set the calling path to this algorithm.
