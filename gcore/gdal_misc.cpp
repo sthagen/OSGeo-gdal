@@ -2531,14 +2531,15 @@ int GDALReadTabFile2(const char *pszBaseFilename, double *padfGeoTransform,
  * in a different order than in a geotransform array.
  *
  * <ul>
- * <li> geotransform[1] : width of pixel
- * <li> geotransform[4] : rotational coefficient, zero for north up images.
- * <li> geotransform[2] : rotational coefficient, zero for north up images.
- * <li> geotransform[5] : height of pixel (but negative)
+ * <li> geotransform[1] : width of pixel</li>
+ * <li> geotransform[4] : rotational coefficient, zero for north up images.</li>
+ * <li> geotransform[2] : rotational coefficient, zero for north up images.</li>
+ * <li> geotransform[5] : height of pixel (but negative)</li>
  * <li> geotransform[0] + 0.5 * geotransform[1] + 0.5 * geotransform[2] : x
- * offset to center of top left pixel. <li> geotransform[3] + 0.5 *
+ * offset to center of top left pixel.</li>
+ * <li> geotransform[3] + 0.5 *
  * geotransform[4] + 0.5 * geotransform[5] : y offset to center of top left
- * pixel.
+ * pixel.</li>
  * </ul>
  *
  * @param pszFilename the world file name.
@@ -2624,14 +2625,15 @@ int CPL_STDCALL GDALLoadWorldFile(const char *pszFilename,
  * in a different order than in a geotransform array.
  *
  * <ul>
- * <li> geotransform[1] : width of pixel
- * <li> geotransform[4] : rotational coefficient, zero for north up images.
- * <li> geotransform[2] : rotational coefficient, zero for north up images.
- * <li> geotransform[5] : height of pixel (but negative)
+ * <li> geotransform[1] : width of pixel</li>
+ * <li> geotransform[4] : rotational coefficient, zero for north up images.</li>
+ * <li> geotransform[2] : rotational coefficient, zero for north up images.</li>
+ * <li> geotransform[5] : height of pixel (but negative)</li>
  * <li> geotransform[0] + 0.5 * geotransform[1] + 0.5 * geotransform[2] : x
- * offset to center of top left pixel. <li> geotransform[3] + 0.5 *
+ * offset to center of top left pixel.</li>
+ * <li> geotransform[3] + 0.5 *
  * geotransform[4] + 0.5 * geotransform[5] : y offset to center of top left
- * pixel.
+ * pixel.</li>
  * </ul>
  *
  * @param pszBaseFilename the target raster file.
@@ -2799,14 +2801,15 @@ int GDALReadWorldFile2(const char *pszBaseFilename, const char *pszExtension,
  * in a different order than in a geotransform array.
  *
  * <ul>
- * <li> geotransform[1] : width of pixel
- * <li> geotransform[4] : rotational coefficient, zero for north up images.
- * <li> geotransform[2] : rotational coefficient, zero for north up images.
- * <li> geotransform[5] : height of pixel (but negative)
+ * <li> geotransform[1] : width of pixel</li>
+ * <li> geotransform[4] : rotational coefficient, zero for north up images.</li>
+ * <li> geotransform[2] : rotational coefficient, zero for north up images.</li>
+ * <li> geotransform[5] : height of pixel (but negative)</li>
  * <li> geotransform[0] + 0.5 * geotransform[1] + 0.5 * geotransform[2] : x
- * offset to center of top left pixel. <li> geotransform[3] + 0.5 *
+ * offset to center of top left pixel.</li>
+ * <li> geotransform[3] + 0.5 *
  * geotransform[4] + 0.5 * geotransform[5] : y offset to center of top left
- * pixel.
+ * pixel.</li>
  * </ul>
  *
  * @param pszBaseFilename the target raster file.
@@ -2831,7 +2834,7 @@ int CPL_STDCALL GDALWriteWorldFile(const char *pszBaseFilename,
     /* -------------------------------------------------------------------- */
     CPLString osTFWText;
 
-    osTFWText.Printf("%.10f\n%.10f\n%.10f\n%.10f\n%.10f\n%.10f\n",
+    osTFWText.Printf("%.15f\n%.15f\n%.15f\n%.15f\n%.15f\n%.15f\n",
                      padfGeoTransform[1], padfGeoTransform[4],
                      padfGeoTransform[2], padfGeoTransform[5],
                      padfGeoTransform[0] + 0.5 * padfGeoTransform[1] +
