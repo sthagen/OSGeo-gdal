@@ -3730,6 +3730,20 @@ def test_zarr_update_with_filters(tmp_vsimem):
     assert ar.Read() == array.array("i", [10 - i for i in range(10)])
 
 
+@gdaltest.enable_exceptions()
+def test_zarr_read_zarr_v2_filter_bitround(tmp_vsimem):
+
+    ds = gdal.Open("data/zarr/bitround0.zarr")
+    assert ds.GetRasterBand(1).Checksum() == 4672
+
+    gdal.alg.vsi.copy(
+        source="data/zarr/bitround0.zarr", destination=tmp_vsimem, recursive=True
+    )
+    with pytest.raises(Exception, match="bitround filter not supported for writing"):
+        with gdal.Open(tmp_vsimem / "bitround0.zarr", gdal.GA_Update) as ds:
+            ds.GetRasterBand(1).Fill(1)
+
+
 def test_zarr_create_with_filter(tmp_vsimem):
 
     tst = gdaltest.GDALTest(

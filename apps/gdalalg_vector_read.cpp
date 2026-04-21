@@ -40,9 +40,9 @@ GDALVectorReadAlgorithm::GDALVectorReadAlgorithm()
 /** Class used by vector pipeline steps to create an output on-the-fly
  * dataset where they can store on-the-fly layers.
  */
-class GDALVectorPipelineReadOutputDataset final : public GDALDataset
+class GDALVectorPipelineReadOutputDataset final
+    : public GDALVectorDecoratedDataset
 {
-    GDALDataset &m_srcDS;
     std::vector<OGRLayer *> m_layers{};
 
     CPL_DISALLOW_COPY_ASSIGN(GDALVectorPipelineReadOutputDataset)
@@ -60,6 +60,10 @@ class GDALVectorPipelineReadOutputDataset final : public GDALDataset
 
     void ResetReading() override;
 
+    OGRLayer *ExecuteSQL(const char *pszStatement, OGRGeometry *poSpatialFilter,
+                         const char *pszDialect) override;
+    void ReleaseResultSet(OGRLayer *poResultsSet) override;
+
     OGRFeature *GetNextFeature(OGRLayer **ppoBelongingLayer,
                                double *pdfProgressPct,
                                GDALProgressFunc pfnProgress,
@@ -72,9 +76,8 @@ class GDALVectorPipelineReadOutputDataset final : public GDALDataset
 
 GDALVectorPipelineReadOutputDataset::GDALVectorPipelineReadOutputDataset(
     GDALDataset &srcDS)
-    : m_srcDS(srcDS)
+    : GDALVectorDecoratedDataset(&srcDS)
 {
-    SetDescription(m_srcDS.GetDescription());
     poDriver = m_srcDS.GetDriver();
 }
 
@@ -124,6 +127,28 @@ int GDALVectorPipelineReadOutputDataset::TestCapability(
 void GDALVectorPipelineReadOutputDataset::ResetReading()
 {
     m_srcDS.ResetReading();
+}
+
+/************************************************************************/
+/*          GDALVectorPipelineReadOutputDataset::ExecuteSQL()           */
+/************************************************************************/
+
+OGRLayer *
+GDALVectorPipelineReadOutputDataset::ExecuteSQL(const char *pszStatement,
+                                                OGRGeometry *poSpatialFilter,
+                                                const char *pszDialect)
+{
+    return m_srcDS.ExecuteSQL(pszStatement, poSpatialFilter, pszDialect);
+}
+
+/************************************************************************/
+/*       GDALVectorPipelineReadOutputDataset::ReleaseResultSet()        */
+/************************************************************************/
+
+void GDALVectorPipelineReadOutputDataset::ReleaseResultSet(
+    OGRLayer *poResultsSet)
+{
+    m_srcDS.ReleaseResultSet(poResultsSet);
 }
 
 /************************************************************************/

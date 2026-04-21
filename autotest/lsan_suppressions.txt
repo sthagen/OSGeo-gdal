@@ -10,6 +10,7 @@ leak:*/libduckdb.so*
 leak:*duckdb::Allocator::DefaultAllocate*
 leak:SDcreate
 leak:HXsetdir
+leak:HAregister_atom
 leak:FcConfigSubstituteWithPat
 # For: test_ogrsf -ro ADBC:autotest/ogr/data/parquet/partitioned_flat/*.parquet
 leak:sqlite3MemMalloc

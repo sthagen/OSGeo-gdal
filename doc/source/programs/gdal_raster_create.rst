@@ -91,6 +91,11 @@ Program-Specific Options
     :option:`--crs`, :option:`--bbox` and :option:`--nodata`.
     Note that the pixel values will *not* be copied.
 
+    Since GDAL 3.13, if the input dataset is tiled, and for output formats
+    ``GTiff``, ``COG`` and ``GPKG``, its tile dimensions are replicated to
+    the output file, when they are compatible of its capabilities, and if the
+    user hasn't specified any creation option related to tiling.
+
 .. option:: --metadata <KEY>=<VALUE>
 
     Adds a metadata item, at the dataset level.

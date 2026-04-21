@@ -220,3 +220,41 @@ def test_error_message_leak():
                 out_filename,
             ],
         )
+
+
+def test_gdalalg_vector_edit_pipeline_output_layer():
+
+    with gdal.alg.vector.pipeline(
+        pipeline="read ../ogr/data/poly.shp ! edit --output-layer foo"
+    ) as alg:
+        ds = alg.Output()
+        lyr = ds.GetLayer(0)
+        assert lyr.GetDescription() == "foo"
+        assert lyr.GetLayerDefn().GetName() == "foo"
+
+
+def test_gdalalg_vector_edit_pipeline_output_layer_multiple_input_layers():
+
+    src_ds = gdal.GetDriverByName("MEM").Create("", 0, 0, 0, gdal.GDT_Unknown)
+    src_ds.CreateLayer("a")
+    src_ds.CreateLayer("b")
+
+    with pytest.raises(
+        Exception,
+        match="Argument 'output-layer' cannot be used when the input dataset has multiple layers, unless argument 'active-layer' is specified",
+    ):
+        gdal.alg.vector.pipeline(
+            input=src_ds, pipeline="read ! edit --output-layer foo"
+        )
+
+    with gdal.alg.vector.pipeline(
+        input=src_ds, pipeline="read ! edit --active-layer a --output-layer foo"
+    ) as alg:
+        ds = alg.Output()
+        lyr = ds.GetLayer(0)
+        assert lyr.GetDescription() == "foo"
+        assert lyr.GetLayerDefn().GetName() == "foo"
+
+        lyr = ds.GetLayer(1)
+        assert lyr.GetDescription() == "b"
+        assert lyr.GetLayerDefn().GetName() == "b"

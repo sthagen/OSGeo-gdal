@@ -85,19 +85,24 @@ void GDALPipelineStepAlgorithm::AddRasterInputArgs(
             openForMixedRasterVector
                 ? std::vector<std::string>{GDAL_DCAP_RASTER, GDAL_DCAP_VECTOR}
                 : std::vector<std::string>{GDAL_DCAP_RASTER})
-        .SetHiddenForCLI(hiddenForCLI);
-    AddOpenOptionsArg(&m_openOptions).SetHiddenForCLI(hiddenForCLI);
+        .SetHiddenForCLI(hiddenForCLI)
+        .SetAvailableInPipelineStep(false);
+    AddOpenOptionsArg(&m_openOptions)
+        .SetHiddenForCLI(hiddenForCLI)
+        .SetAvailableInPipelineStep(false);
     auto &arg =
         AddInputDatasetArg(
             &m_inputDataset,
             openForMixedRasterVector ? (GDAL_OF_RASTER | GDAL_OF_VECTOR)
                                      : GDAL_OF_RASTER,
             false, m_constructorOptions.inputDatasetHelpMsg.c_str())
+            .SetDatasetInputFlags(m_constructorOptions.inputDatasetInputFlags)
             .SetMinCount(m_constructorOptions.inputDatasetRequired ? 1 : 0)
             .SetMaxCount(m_constructorOptions.inputDatasetMaxCount)
             .SetAutoOpenDataset(m_constructorOptions.autoOpenInputDatasets)
             .SetMetaVar(m_constructorOptions.inputDatasetMetaVar)
-            .SetHiddenForCLI(hiddenForCLI);
+            .SetHiddenForCLI(hiddenForCLI)
+            .SetAvailableInPipelineStep(false);
     if (m_constructorOptions.inputDatasetPositional && !hiddenForCLI)
         arg.SetPositional();
     if (m_constructorOptions.inputDatasetRequired && !hiddenForCLI)
@@ -119,23 +124,29 @@ void GDALPipelineStepAlgorithm::AddRasterOutputArgs(bool hiddenForCLI)
                   GAAMDI_REQUIRED_CAPABILITIES,
                   {GDAL_DCAP_RASTER,
                    m_constructorOptions.outputFormatCreateCapability.c_str()})
-              .SetHiddenForCLI(hiddenForCLI));
+              .SetHiddenForCLI(hiddenForCLI))
+             .SetAvailableInPipelineStep(false);
     AddOutputDatasetArg(&m_outputDataset, GDAL_OF_RASTER,
                         /* positionalAndRequired = */ !hiddenForCLI,
                         m_constructorOptions.outputDatasetHelpMsg.c_str())
         .SetHiddenForCLI(hiddenForCLI)
-        .SetDatasetInputFlags(GADV_NAME | GADV_OBJECT);
-    AddCreationOptionsArg(&m_creationOptions).SetHiddenForCLI(hiddenForCLI);
+        .SetDatasetInputFlags(GADV_NAME | GADV_OBJECT)
+        .SetAvailableInPipelineStep(false);
+    AddCreationOptionsArg(&m_creationOptions)
+        .SetHiddenForCLI(hiddenForCLI)
+        .SetAvailableInPipelineStep(false);
     constexpr const char *MUTUAL_EXCLUSION_GROUP_OVERWRITE_APPEND =
         "overwrite-append";
     AddOverwriteArg(&m_overwrite)
         .SetHiddenForCLI(hiddenForCLI)
-        .SetMutualExclusionGroup(MUTUAL_EXCLUSION_GROUP_OVERWRITE_APPEND);
+        .SetMutualExclusionGroup(MUTUAL_EXCLUSION_GROUP_OVERWRITE_APPEND)
+        .SetAvailableInPipelineStep(false);
     AddArg(GDAL_ARG_NAME_APPEND, 0,
            _("Append as a subdataset to existing output"), &m_appendRaster)
         .SetDefault(false)
         .SetHiddenForCLI(hiddenForCLI)
-        .SetMutualExclusionGroup(MUTUAL_EXCLUSION_GROUP_OVERWRITE_APPEND);
+        .SetMutualExclusionGroup(MUTUAL_EXCLUSION_GROUP_OVERWRITE_APPEND)
+        .SetAvailableInPipelineStep(false);
 }
 
 /************************************************************************/
@@ -160,14 +171,19 @@ void GDALPipelineStepAlgorithm::AddVectorInputArgs(bool hiddenForCLI)
 {
     AddInputFormatsArg(&m_inputFormats)
         .AddMetadataItem(GAAMDI_REQUIRED_CAPABILITIES, {GDAL_DCAP_VECTOR})
-        .SetHiddenForCLI(hiddenForCLI);
-    AddOpenOptionsArg(&m_openOptions).SetHiddenForCLI(hiddenForCLI);
+        .SetHiddenForCLI(hiddenForCLI)
+        .SetAvailableInPipelineStep(false);
+    AddOpenOptionsArg(&m_openOptions)
+        .SetHiddenForCLI(hiddenForCLI)
+        .SetAvailableInPipelineStep(false);
     auto &datasetArg =
         AddInputDatasetArg(&m_inputDataset, GDAL_OF_VECTOR, false)
             .SetMinCount(m_constructorOptions.inputDatasetRequired ? 1 : 0)
             .SetMaxCount(m_constructorOptions.inputDatasetMaxCount)
+            .SetDatasetInputFlags(m_constructorOptions.inputDatasetInputFlags)
             .SetAutoOpenDataset(m_constructorOptions.autoOpenInputDatasets)
-            .SetHiddenForCLI(hiddenForCLI);
+            .SetHiddenForCLI(hiddenForCLI)
+            .SetAvailableInPipelineStep(false);
     if (!m_constructorOptions.inputDatasetAlias.empty())
         datasetArg.AddAlias(m_constructorOptions.inputDatasetAlias);
     if (!m_constructorOptions.inputDatasetMetaVar.empty())
@@ -181,7 +197,8 @@ void GDALPipelineStepAlgorithm::AddVectorInputArgs(bool hiddenForCLI)
         auto &layerArg = AddArg(GDAL_ARG_NAME_INPUT_LAYER, 'l',
                                 _("Input layer name(s)"), &m_inputLayerNames)
                              .AddAlias("layer")
-                             .SetHiddenForCLI(hiddenForCLI);
+                             .SetHiddenForCLI(hiddenForCLI)
+                             .SetAvailableInPipelineStep(false);
         SetAutoCompleteFunctionForLayerName(layerArg, datasetArg);
     }
 }
@@ -197,30 +214,43 @@ void GDALPipelineStepAlgorithm::AddVectorOutputArgs(
                        /* bGDALGAllowed = */ true)
         .AddMetadataItem(GAAMDI_REQUIRED_CAPABILITIES,
                          {GDAL_DCAP_VECTOR, GDAL_DCAP_CREATE})
-        .SetHiddenForCLI(hiddenForCLI);
-    AddOutputOpenOptionsArg(&m_outputOpenOptions).SetHiddenForCLI(hiddenForCLI);
+        .SetHiddenForCLI(hiddenForCLI)
+        .SetAvailableInPipelineStep(false);
+    AddOutputOpenOptionsArg(&m_outputOpenOptions)
+        .SetHiddenForCLI(hiddenForCLI)
+        .SetAvailableInPipelineStep(false);
     auto &outputDatasetArg =
         AddOutputDatasetArg(&m_outputDataset, GDAL_OF_VECTOR,
                             /* positionalAndRequired = */ false)
             .SetHiddenForCLI(hiddenForCLI)
-            .SetDatasetInputFlags(GADV_NAME | GADV_OBJECT);
+            .SetDatasetInputFlags(GADV_NAME | GADV_OBJECT)
+            .SetAvailableInPipelineStep(false);
     if (!hiddenForCLI)
         outputDatasetArg.SetPositional();
     if (!hiddenForCLI && m_constructorOptions.outputDatasetRequired)
         outputDatasetArg.SetRequired();
 
-    AddCreationOptionsArg(&m_creationOptions).SetHiddenForCLI(hiddenForCLI);
+    AddCreationOptionsArg(&m_creationOptions)
+        .SetHiddenForCLI(hiddenForCLI)
+        .SetAvailableInPipelineStep(false);
     AddLayerCreationOptionsArg(&m_layerCreationOptions)
-        .SetHiddenForCLI(hiddenForCLI);
-    AddOverwriteArg(&m_overwrite).SetHiddenForCLI(hiddenForCLI);
+        .SetHiddenForCLI(hiddenForCLI)
+        .SetAvailableInPipelineStep(false);
+    AddOverwriteArg(&m_overwrite)
+        .SetHiddenForCLI(hiddenForCLI)
+        .SetAvailableInPipelineStep(false);
     GDALInConstructionAlgorithmArg *updateArg = nullptr;
     if (m_constructorOptions.addUpdateArgument)
     {
-        updateArg = &AddUpdateArg(&m_update).SetHiddenForCLI(hiddenForCLI);
+        updateArg = &AddUpdateArg(&m_update)
+                         .SetHiddenForCLI(hiddenForCLI)
+                         .SetAvailableInPipelineStep(false);
     }
     if (m_constructorOptions.addOverwriteLayerArgument)
     {
-        AddOverwriteLayerArg(&m_overwriteLayer).SetHiddenForCLI(hiddenForCLI);
+        AddOverwriteLayerArg(&m_overwriteLayer)
+            .SetHiddenForCLI(hiddenForCLI)
+            .SetAvailableInPipelineStep(false);
     }
     constexpr const char *MUTUAL_EXCLUSION_GROUP_APPEND_UPSERT =
         "append-upsert";
@@ -228,13 +258,16 @@ void GDALPipelineStepAlgorithm::AddVectorOutputArgs(
     {
         AddAppendLayerArg(&m_appendLayer)
             .SetHiddenForCLI(hiddenForCLI)
-            .SetMutualExclusionGroup(MUTUAL_EXCLUSION_GROUP_APPEND_UPSERT);
+            .SetMutualExclusionGroup(MUTUAL_EXCLUSION_GROUP_APPEND_UPSERT)
+            .SetAvailableInPipelineStep(false);
     }
     if (m_constructorOptions.addUpsertArgument)
     {
         AddArg("upsert", 0, _("Upsert features (implies 'append')"), &m_upsert)
             .SetHiddenForCLI(hiddenForCLI)
             .SetMutualExclusionGroup(MUTUAL_EXCLUSION_GROUP_APPEND_UPSERT)
+
+            .SetAvailableInPipelineStep(false)
             .AddAction(
                 [updateArg, this]()
                 {
@@ -251,13 +284,15 @@ void GDALPipelineStepAlgorithm::AddVectorOutputArgs(
     {
         AddArg("skip-errors", 0, _("Skip errors when writing features"),
                &m_skipErrors)
-            .AddHiddenAlias("skip-failures");  // For ogr2ogr nostalgic people
+            .AddHiddenAlias("skip-failures")  // For ogr2ogr nostalgic people
+            .SetAvailableInPipelineStep(false);
     }
     if (m_constructorOptions.addNoCreateEmptyLayersArgument)
     {
         AddArg("no-create-empty-layers", 0,
                _("Avoid creating layers to which no features will be written"),
-               &m_noCreateEmptyLayers);
+               &m_noCreateEmptyLayers)
+            .SetAvailableInPipelineStep(false);
     }
 }
 
@@ -272,7 +307,9 @@ void GDALPipelineStepAlgorithm::AddOutputLayerNameArg(
            _("Output layer name"),
            &m_outputLayerName)
         .AddHiddenAlias("nln")  // For ogr2ogr nostalgic people
-        .SetHiddenForCLI(hiddenForCLI);
+        .SetHiddenForCLI(hiddenForCLI)
+        .SetAvailableInPipelineStep(
+            m_constructorOptions.outputLayerNameAvailableInPipelineStep);
 }
 
 /************************************************************************/

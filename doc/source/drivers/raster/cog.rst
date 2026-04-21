@@ -751,6 +751,21 @@ Examples
 
         $ gdal_translate world.tif world_webmerc_cog.tif -of COG -co TILING_SCHEME=GoogleMapsCompatible -co COMPRESS=JPEG
 
+.. example::
+   :title: Create a blank GeoTIFF from an existing file
+
+   Use :co:`SPARSE_OK` to create an empty file with the same georeferencing and tiling as the input,
+   without physically writing zero-filled tiles to disk. In this example, an input of size ``7640 × 8133``
+   produces a ~4 KB file instead of ~242 MB.
+
+   Note sparse GeoTIFF files are not widely supported by non-GDAL software.
+
+   .. code-block:: bash
+
+      $ gdal raster create --like in.tif out.tif --of COG \
+          --co SPARSE_OK=ON \
+          --overwrite
+
 See Also
 --------
 

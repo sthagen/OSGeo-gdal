@@ -913,8 +913,16 @@ def test_gdalalg_vector_pipeline_propagate_metadata():
 def test_gdalalg_vector_pipeline_propagate_field_domain():
 
     src_ds = ogr.Open("../ogr/data/gpkg/domains.gpkg")
+
     with gdal.alg.vector.pipeline(
         pipeline="read ../ogr/data/gpkg/domains.gpkg ! edit"
+    ) as alg:
+        ds = alg.Output()
+        assert ds.GetFieldDomainNames() == src_ds.GetFieldDomainNames()
+        assert ds.GetFieldDomain(ds.GetFieldDomainNames()[0]) is not None
+
+    with gdal.alg.vector.pipeline(
+        pipeline="read ../ogr/data/gpkg/domains.gpkg --layer test ! edit"
     ) as alg:
         ds = alg.Output()
         assert ds.GetFieldDomainNames() == src_ds.GetFieldDomainNames()
@@ -1080,3 +1088,29 @@ def test_gdalalg_vector_pipeline_decorated_ds_take_ref(tmp_vsimem):
     ds = ogr.Open(f"{tmp_vsimem}/out.shp")
     lyr = ds.GetLayer(0)
     assert lyr.GetFeatureCount() == 1
+
+
+def test_gdalalg_vector_pipeline_read_ds_take_ref(tmp_vsimem):
+
+    gdal.alg.vector.pipeline(
+        pipeline=f'read ../ogr/data/poly.shp --layer poly ! sql --sql "select * from poly" ! write {tmp_vsimem}/out.shp'
+    )
+
+    ds = ogr.Open(f"{tmp_vsimem}/out.shp")
+    lyr = ds.GetLayer(0)
+    assert lyr.GetFeatureCount() == 10
+
+
+@pytest.mark.require_driver("GPKG")
+def test_gdalalg_vector_pipeline_read_execute_sql(tmp_vsimem):
+
+    tmp_filename = tmp_vsimem / "tmp.gpkg"
+    gdal.alg.vector.convert(input="../ogr/data/poly.shp", output=tmp_filename)
+
+    gdal.alg.vector.pipeline(
+        pipeline=f'read {tmp_filename} --layer poly ! sql --sql "select * from poly group by eas_id" ! write {tmp_vsimem}/out.shp'
+    )
+
+    ds = ogr.Open(f"{tmp_vsimem}/out.shp")
+    lyr = ds.GetLayer(0)
+    assert lyr.GetFeatureCount() == 10

@@ -1031,7 +1031,7 @@ VSIAzureBlobHandleHelper::GetCurlHeaders(const std::string &osVerb,
                     VSIMkdir(osCacheDir.c_str(), 0755);
                 const std::string osCloudCheck = CPLFormFilenameSafe(
                     osCacheDir.c_str(), "cloud_check_ms.txt", nullptr);
-                // Sideral day, why not? "Aim for the stars, expect dust"
+                // Sidereal day, why not? "Aim for the stars, expect dust"
                 constexpr int ONE_DAY_IN_SECS = 86164;
                 if (VSIStatL(osCloudCheck.c_str(), &sStat) == 0 &&
                     sStat.st_mtime + ONE_DAY_IN_SECS >= time(nullptr))
