@@ -125,6 +125,7 @@ init
 input
 input-crs
 input-field
+input-field-type
 input-format
 input-layer
 input-max
@@ -314,7 +315,6 @@ spatial-extent-adjustment
 spectral
 split-multipolygons
 sql
-src-field-type
 start-angle
 stat
 stats

@@ -34,14 +34,16 @@ GDALVectorSetFieldTypeAlgorithm::GDALVectorSetFieldTypeAlgorithm(
                              .SetMutualExclusionGroup("name-or-type");
     SetAutoCompleteFunctionForFieldName(fieldNameArg, layerArg, m_inputDataset);
     AddFieldTypeSubtypeArg(&m_srcFieldType, &m_srcFieldSubType,
-                           &m_srcFieldTypeSubTypeStr, "src-field-type",
+                           &m_srcFieldTypeSubTypeStr, "input-field-type",
                            _("Source field type or subtype"))
+        .AddHiddenAlias("src-field-type")
         .SetRequired()
         .SetMutualExclusionGroup("name-or-type");
     AddFieldTypeSubtypeArg(&m_newFieldType, &m_newFieldSubType,
                            &m_newFieldTypeSubTypeStr, std::string(),
                            _("Target field type or subtype"))
-        .AddAlias("dst-field-type")
+        .AddHiddenAlias("dst-field-type")
+        .AddAlias("output-field-type")
         .SetRequired();
     AddValidationAction(
         [this] { return m_inputDataset.empty() || GlobalValidation(); });
