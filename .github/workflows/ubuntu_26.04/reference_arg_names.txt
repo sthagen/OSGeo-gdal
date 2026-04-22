@@ -70,7 +70,6 @@ dim
 distance
 distance-units
 drivers
-dst-crs
 dst-max
 dst-min
 dst-nodata
@@ -312,7 +311,6 @@ spatial-extent-adjustment
 spectral
 split-multipolygons
 sql
-src-crs
 src-field-type
 src-max
 src-min
