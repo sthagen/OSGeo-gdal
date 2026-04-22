@@ -130,6 +130,7 @@ input-crs
 input-field
 input-format
 input-layer
+input-nodata
 input-prefix
 interval
 invert
@@ -230,6 +231,7 @@ output-crs
 output-data-type
 output-format
 output-layer
+output-nodata
 output-open-option
 output-string
 overlay
