@@ -240,7 +240,7 @@ def test_gdalalg_raster_footprint_srcnodata():
     alg["input"] = src_ds
     alg["output"] = ""
     alg["output-format"] = "MEM"
-    alg["src-nodata"] = 255
+    alg["input-nodata"] = 255
     assert alg.Run()
     ds = alg["output"].GetDataset()
     lyr = ds.GetLayer(0)

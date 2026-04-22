@@ -97,6 +97,16 @@ Program-Specific Options
     or otherwise in georeferenced units of the source raster.
     This option is applied before the reprojection implied by :option:`--output-crs`.
 
+.. option:: --input-nodata <value>
+
+    Set nodata values for input bands (different values can be supplied for each band).
+    If a single value is specified, it applies to all selected bands.
+    If more than one value is supplied, there should be as many values as the number
+    of selected bands, and all values should be quoted to keep them
+    together as a single operating system argument.
+    If the option is not specified, the intrinsic mask band of each selected
+    bands will be used.
+
 .. option:: --location-field <field_name>
 
     Specifies the name of the field in the resulting vector dataset where the
@@ -140,7 +150,7 @@ Program-Specific Options
    To specify which overview level of source file must be used, when overviews
    are available on the source raster. By default the full resolution level is
    used. The index is 0-based, that is 0 means the first overview level.
-   This option is mutually exclusive with :option:`--src-nodata`.
+   This option is mutually exclusive with :option:`--input-nodata`.
 
 .. option:: --simplify-tolerance <value>
 
@@ -155,16 +165,6 @@ Program-Specific Options
 
     When specified, multipolygons are split as several features each with one
     single polygon.
-
-.. option:: --src-nodata <value>
-
-    Set nodata values for input bands (different values can be supplied for each band).
-    If a single value is specified, it applies to all selected bands.
-    If more than one value is supplied, there should be as many values as the number
-    of selected bands, and all values should be quoted to keep them
-    together as a single operating system argument.
-    If the option is not specified, the intrinsic mask band of each selected
-    bands will be used.
 
 Standard Options
 ----------------

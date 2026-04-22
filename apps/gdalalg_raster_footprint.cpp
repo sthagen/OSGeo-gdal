@@ -84,10 +84,11 @@ GDALRasterFootprintAlgorithm::GDALRasterFootprintAlgorithm(bool standaloneStep)
            &m_overview)
         .SetMutualExclusionGroup("overview-srcnodata")
         .SetMinValueIncluded(0);
-    AddArg("src-nodata", 0, _("Set nodata values for input bands."),
+    AddArg("input-nodata", 0, _("Set nodata values for input bands."),
            &m_srcNoData)
         .SetMinCount(1)
         .SetRepeatedArgAllowed(false)
+        .AddHiddenAlias("src-nodata")
         .SetMutualExclusionGroup("overview-srcnodata");
     AddArg("coordinate-system", 0, _("Target coordinate system"),
            &m_coordinateSystem)
