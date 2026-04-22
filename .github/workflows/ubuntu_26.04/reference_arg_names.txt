@@ -72,7 +72,6 @@ distance-units
 drivers
 dst-max
 dst-min
-dst-nodata
 elevation-name
 enable-sozip
 end-angle
@@ -316,7 +315,6 @@ sql
 src-field-type
 src-max
 src-min
-src-nodata
 start-angle
 stat
 stats
