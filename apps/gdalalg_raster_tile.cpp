@@ -258,7 +258,8 @@ GDALRasterTileAlgorithm::GDALRasterTileAlgorithm(bool standaloneStep)
            &m_noalpha)
         .SetMutualExclusionGroup("alpha");
     auto &dstNoDataArg =
-        AddArg("dst-nodata", 0, _("Destination nodata value"), &m_dstNoData);
+        AddArg("output-nodata", 0, _("Output nodata value"), &m_dstNoData)
+            .AddHiddenAlias("dst-nodata");
     AddArg("skip-blank", 0, _("Do not generate blank tiles"), &m_skipBlank);
 
     {
@@ -376,7 +377,7 @@ GDALRasterTileAlgorithm::GDALRasterTileAlgorithm(bool standaloneStep)
             {
                 ReportError(
                     CE_Failure, CPLE_IllegalArg,
-                    "'add-alpha' and 'dst-nodata' are mutually exclusive");
+                    "'add-alpha' and 'output-nodata' are mutually exclusive");
                 return false;
             }
 
