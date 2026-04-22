@@ -244,5 +244,5 @@ Examples
           make-point \
             --x max_center_x \
             --y max_center_y \
-            --dst-crs EPSG:4326 ! \
+            --output-crs EPSG:4326 ! \
           write out.geojson
