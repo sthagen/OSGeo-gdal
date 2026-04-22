@@ -37,6 +37,7 @@ GDALVectorCreateAlgorithm::GDALVectorCreateAlgorithm(bool standaloneStep)
 
               // For --like input template
               .SetAutoOpenInputDatasets(true)
+              .SetInputDatasetHelpMsg(_("Template vector dataset"))
               .SetInputDatasetAlias("like")
               .SetInputDatasetRequired(false)
               .SetInputDatasetPositional(false)
