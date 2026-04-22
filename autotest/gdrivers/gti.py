@@ -3508,7 +3508,7 @@ def test_gti_band_interleave(tmp_vsimem):
     gdal.alg.driver.gti.create(
         input="data/small_world.tif",
         output=tmp_vsimem / "out.gti.gpkg",
-        dst_crs="+proj=longlat +ellps=WGS84",
+        output_crs="+proj=longlat +ellps=WGS84",
     )
 
     src_ds = gdal.Open("data/small_world.tif")
@@ -3542,7 +3542,7 @@ def test_gti_band_interleave_rgba(tmp_vsimem):
     gdal.alg.driver.gti.create(
         input=tmp_vsimem / "in.tif",
         output=tmp_vsimem / "out.gti.gpkg",
-        dst_crs="+proj=longlat +ellps=WGS84",
+        output_crs="+proj=longlat +ellps=WGS84",
     )
 
     src_ds = gdal.Open(tmp_vsimem / "in.tif")
