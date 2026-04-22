@@ -101,16 +101,18 @@ GDALRasterReprojectAlgorithm::GDALRasterReprojectAlgorithm(bool standaloneStep)
            &m_targetAlignedPixels)
         .AddHiddenAlias("tap")
         .SetCategory(GAAC_ADVANCED);
-    AddArg("src-nodata", 0,
+    AddArg("input-nodata", 0,
            _("Set nodata values for input bands ('None' to unset)."),
            &m_srcNoData)
         .SetMinCount(1)
+        .AddHiddenAlias("src-nodata")
         .SetRepeatedArgAllowed(false)
         .SetCategory(GAAC_ADVANCED);
-    AddArg("dst-nodata", 0,
+    AddArg("output-nodata", 0,
            _("Set nodata values for output bands ('None' to unset)."),
            &m_dstNoData)
         .SetMinCount(1)
+        .AddHiddenAlias("dst-nodata")
         .SetRepeatedArgAllowed(false)
         .SetCategory(GAAC_ADVANCED);
     AddArg("add-alpha", 0,

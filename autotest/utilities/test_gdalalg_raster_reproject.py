@@ -66,7 +66,7 @@ def test_gdalalg_raster_reproject_through_pipeline(tmp_vsimem):
     assert gdal.Run(
         "raster",
         "pipeline",
-        pipeline=f"read ../gcore/data/byte.tif ! reproject --src-crs=EPSG:32611 --dst-crs=EPSG:4326 ! write {out_filename} --co COMPRESS=LZW",
+        pipeline=f"read ../gcore/data/byte.tif ! reproject --input-crs=EPSG:32611 --output-crs=EPSG:4326 ! write {out_filename} --co COMPRESS=LZW",
         progress=my_progress,
     )
     assert last_pct[0] == 1.0
