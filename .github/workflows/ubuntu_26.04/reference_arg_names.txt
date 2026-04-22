@@ -70,8 +70,6 @@ dim
 distance
 distance-units
 drivers
-dst-max
-dst-min
 elevation-name
 enable-sozip
 end-angle
@@ -129,6 +127,8 @@ input-crs
 input-field
 input-format
 input-layer
+input-max
+input-min
 input-nodata
 input-prefix
 interval
@@ -230,6 +230,8 @@ output-crs
 output-data-type
 output-format
 output-layer
+output-max
+output-min
 output-nodata
 output-open-option
 output-string
@@ -313,8 +315,6 @@ spectral
 split-multipolygons
 sql
 src-field-type
-src-max
-src-min
 start-angle
 stat
 stats

@@ -569,34 +569,39 @@ def test_algorithm_mutual_dependencies(tmp_path):
     ):
         alg.Run()
 
+
+def test_algorithm_mutual_dependency_group(tmp_path):
+
+    reg = gdal.GetGlobalAlgorithmRegistry()
+
     # Check mutual dependency group
     alg = reg["raster"]["scale"]
 
     usage = json.loads(alg.GetUsageAsJSON())
-    src_min = [a for a in usage["input_arguments"] if a["name"] == "src-min"][0]
-    src_max = [a for a in usage["input_arguments"] if a["name"] == "src-max"][0]
-    dst_min = [a for a in usage["input_arguments"] if a["name"] == "dst-min"][0]
-    dst_max = [a for a in usage["input_arguments"] if a["name"] == "dst-max"][0]
+    src_min = [a for a in usage["input_arguments"] if a["name"] == "input-min"][0]
+    src_max = [a for a in usage["input_arguments"] if a["name"] == "input-max"][0]
+    dst_min = [a for a in usage["input_arguments"] if a["name"] == "output-min"][0]
+    dst_max = [a for a in usage["input_arguments"] if a["name"] == "output-max"][0]
 
-    assert src_min["mutual_dependency_group"] == "src-max-min"
-    assert src_max["mutual_dependency_group"] == "src-max-min"
-    assert dst_min["mutual_dependency_group"] == "dst-max-min"
-    assert dst_max["mutual_dependency_group"] == "dst-max-min"
+    assert src_min["mutual_dependency_group"] == "input-max-min"
+    assert src_max["mutual_dependency_group"] == "input-max-min"
+    assert dst_min["mutual_dependency_group"] == "output-max-min"
+    assert dst_max["mutual_dependency_group"] == "output-max-min"
 
-    src_min_arg = alg.GetArg("src-min")
-    src_max_arg = alg.GetArg("src-max")
-    dst_min_arg = alg.GetArg("dst-min")
-    dst_max_arg = alg.GetArg("dst-max")
+    src_min_arg = alg.GetArg("input-min")
+    src_max_arg = alg.GetArg("input-max")
+    dst_min_arg = alg.GetArg("output-min")
+    dst_max_arg = alg.GetArg("output-max")
 
-    assert src_min_arg.GetMutualDependencyGroup() == "src-max-min"
-    assert src_max_arg.GetMutualDependencyGroup() == "src-max-min"
-    assert dst_min_arg.GetMutualDependencyGroup() == "dst-max-min"
-    assert dst_max_arg.GetMutualDependencyGroup() == "dst-max-min"
+    assert src_min_arg.GetMutualDependencyGroup() == "input-max-min"
+    assert src_max_arg.GetMutualDependencyGroup() == "input-max-min"
+    assert dst_min_arg.GetMutualDependencyGroup() == "output-max-min"
+    assert dst_max_arg.GetMutualDependencyGroup() == "output-max-min"
 
-    assert src_min["depends_on"] == ["src-max"]
-    assert src_max["depends_on"] == ["src-min"]
-    assert dst_min["depends_on"] == ["dst-max"]
-    assert dst_max["depends_on"] == ["dst-min"]
+    assert src_min["depends_on"] == ["input-max"]
+    assert src_max["depends_on"] == ["input-min"]
+    assert dst_min["depends_on"] == ["output-max"]
+    assert dst_max["depends_on"] == ["output-min"]
 
     # This does not include mutual dependencies
     assert src_min_arg.GetDirectDependencies() is None
@@ -605,26 +610,26 @@ def test_algorithm_mutual_dependencies(tmp_path):
     assert dst_max_arg.GetDirectDependencies() is None
 
     # This includes both direct and mutual dependencies
-    assert alg.GetArgDependencies("src-max") == ["src-min"]
-    assert alg.GetArgDependencies("src-min") == ["src-max"]
-    assert alg.GetArgDependencies("dst-min") == ["dst-max"]
-    assert alg.GetArgDependencies("dst-max") == ["dst-min"]
+    assert alg.GetArgDependencies("input-max") == ["input-min"]
+    assert alg.GetArgDependencies("input-min") == ["input-max"]
+    assert alg.GetArgDependencies("output-min") == ["output-max"]
+    assert alg.GetArgDependencies("output-max") == ["output-min"]
 
-    alg["src-min"] = 1
+    alg["input-min"] = 1
     alg["output"] = str(tmp_path / "out.tif")
     alg["input"] = "data/byte.tif"
     with pytest.raises(
         RuntimeError,
-        match=r"Argument\(s\) 'src-min' require\(s\) that the following argument\(s\) are also specified: src-max.",
+        match=r"Argument\(s\) 'input-min' require\(s\) that the following argument\(s\) are also specified: input-max.",
     ):
         alg.Run()
 
     alg = reg["raster"]["scale"]
-    alg["src-max"] = 10
+    alg["input-max"] = 10
     alg["input"] = "data/byte.tif"
     alg["output"] = str(tmp_path / "out.tif")
     with pytest.raises(
         RuntimeError,
-        match=r"Argument\(s\) 'src-max' require\(s\) that the following argument\(s\) are also specified: src-min.",
+        match=r"Argument\(s\) 'input-max' require\(s\) that the following argument\(s\) are also specified: input-min.",
     ):
         alg.Run()

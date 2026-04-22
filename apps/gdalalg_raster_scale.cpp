@@ -34,19 +34,25 @@ GDALRasterScaleAlgorithm::GDALRasterScaleAlgorithm(bool standaloneStep)
     AddOutputDataTypeArg(&m_type);
     AddBandArg(&m_band,
                _("Select band to restrict the scaling (1-based index)"));
-    AddArg("src-min", 0, _("Minimum value of the source range"), &m_srcMin)
-        .SetMutualDependencyGroup("src-max-min");
-    AddArg("src-max", 0, _("Maximum value of the source range"), &m_srcMax)
-        .SetMutualDependencyGroup("src-max-min");
-    AddArg("dst-min", 0, _("Minimum value of the destination range"), &m_dstMin)
-        .SetMutualDependencyGroup("dst-max-min");
-    AddArg("dst-max", 0, _("Maximum value of the destination range"), &m_dstMax)
-        .SetMutualDependencyGroup("dst-max-min");
+    AddArg("input-min", 0, _("Minimum value of the source range"), &m_srcMin)
+        .SetMutualDependencyGroup("input-max-min")
+        .AddHiddenAlias("src-min");
+    AddArg("input-max", 0, _("Maximum value of the source range"), &m_srcMax)
+        .SetMutualDependencyGroup("input-max-min")
+        .AddHiddenAlias("src-max");
+    AddArg("output-min", 0, _("Minimum value of the destination range"),
+           &m_dstMin)
+        .SetMutualDependencyGroup("output-max-min")
+        .AddHiddenAlias("dst-min");
+    AddArg("output-max", 0, _("Maximum value of the destination range"),
+           &m_dstMax)
+        .SetMutualDependencyGroup("output-max-min")
+        .AddHiddenAlias("dst-max");
     AddArg("exponent", 0,
            _("Exponent to apply non-linear scaling with a power function"),
            &m_exponent);
-    AddArg("no-clip", 0, _("Do not clip input values to [srcmin, srcmax]"),
-           &m_noClip);
+    AddArg("no-clip", 0,
+           _("Do not clip input values to [innput-min, input-max]"), &m_noClip);
 }
 
 /************************************************************************/
