@@ -1656,7 +1656,7 @@ int64_t FileGDBTable::GetAndSelectNextNonEmptyRow(int64_t iRow)
 /*                             SelectRow()                              */
 /************************************************************************/
 
-bool FileGDBTable::SelectRow(int64_t iRow)
+bool FileGDBTable::SelectRow(int64_t iRow, bool bWarnOnlyOnDeletedRows)
 {
     const int errorRetValue = FALSE;
     returnErrorAndCleanupIf(iRow < 0 || iRow >= m_nTotalRecordCount,
@@ -1685,8 +1685,22 @@ bool FileGDBTable::SelectRow(int64_t iRow)
 
         if (m_nRowBlobLength > 0)
         {
-            /* CPLDebug("OpenFileGDB", "nRowBlobLength = %u", nRowBlobLength);
-             */
+#ifdef DEBUG_VERBOSE
+            CPLDebug("OpenFileGDB",
+                     "%s: iRow = %" PRId64 ", m_nRowBlobLength = %u",
+                     m_osFilename.c_str(), iRow, m_nRowBlobLength);
+#endif
+            if ((m_nRowBlobLength >> 31) != 0)
+            {
+                CPLError(
+                    bWarnOnlyOnDeletedRows ? CE_Warning : CE_Failure,
+                    CPLE_AppDefined,
+                    "Feature %" PRId64
+                    " of %s appears to be deleted, but index is out of sync",
+                    iRow + 1, m_osFilename.c_str());
+                m_nCurRow = -1;
+                return false;
+            }
             returnErrorAndCleanupIf(
                 m_nRowBlobLength <
                         static_cast<GUInt32>(m_nNullableFieldsSizeInBytes) ||
