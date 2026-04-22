@@ -52,12 +52,6 @@
 #define UNUSED_IF_NO_GEOS
 #endif
 
-#ifdef HAVE_GEOS
-constexpr bool HAVE_GEOS_BOOL = true;
-#else
-constexpr bool HAVE_GEOS_BOOL = false;
-#endif
-
 /************************************************************************/
 /*                           createFromWkb()                            */
 /************************************************************************/
@@ -1898,7 +1892,7 @@ std::unique_ptr<OGRGeometry> OGRGeometryFactory::organizePolygons(
         sPolyEx.poCurvePolygon.reset(
             apoPolygons[i].release()->toCurvePolygon());
 
-        if constexpr (HAVE_GEOS_BOOL)
+#ifdef HAVE_GEOS
         {
             // This method may be called with ESRI geometries whose validity
             // rules are different from OGC ones. So do a cheap test to detect
@@ -1925,14 +1919,26 @@ std::unique_ptr<OGRGeometry> OGRGeometryFactory::organizePolygons(
                 }
             }
 
-            bool bInvalid = false;
+            bool bSelfTouchingRingFormingHole = false;
             if (bLikelySimpleFeaturesInvalid)
             {
                 CPLErrorStateBackuper oErrorBackuper(CPLQuietErrorHandler);
-                bInvalid = !sPolyEx.poCurvePolygon->IsValid();
+                auto geosContext = OGRGeometry::createGEOSContext();
+                GEOSGeometry *poGeosGeom =
+                    sPolyEx.poCurvePolygon->exportToGEOS(geosContext);
+                if (poGeosGeom)
+                {
+                    bSelfTouchingRingFormingHole =
+                        (GEOSisValidDetail_r(
+                             geosContext, poGeosGeom,
+                             GEOSVALID_ALLOW_SELFTOUCHING_RING_FORMING_HOLE,
+                             nullptr, nullptr) == 1);
+                    GEOSGeom_destroy_r(geosContext, poGeosGeom);
+                }
+                finishGEOS_r(geosContext);
             }
 
-            if (bInvalid)
+            if (bSelfTouchingRingFormingHole)
             {
                 // Make it a valid one and insert all new rings in apoPolygons[]
                 auto poValid = std::unique_ptr<OGRGeometry>(
@@ -2024,6 +2030,7 @@ std::unique_ptr<OGRGeometry> OGRGeometryFactory::organizePolygons(
                 }
             }
         }
+#endif
 
         sPolyEx.poCurvePolygon->getEnvelope(&sPolyEx.sEnvelope);
         sGlobalEnvelope.Merge(sPolyEx.sEnvelope);
