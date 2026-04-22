@@ -38,7 +38,7 @@ Post-vectorization geometric operations are applied in the following order:
 
 * optional splitting (:option:`--split-multipolygons`)
 * optional densification (:option:`--densify-distance`)
-* optional reprojection (:option:`--dst-crs`)
+* optional reprojection (:option:`--output-crs`)
 * optional filtering by minimum ring area (:option:`--min-ring-area`)
 * optional application of convex hull (:option:`--convex-hull`)
 * optional simplification (:option:`--simplify-tolerance`)
@@ -81,7 +81,7 @@ Program-Specific Options
 
     Target coordinate system. By default if the input dataset is georeferenced,
     ``georeferenced`` is implied, that is the footprint geometry will be expressed
-    as coordinates in the CRS of the raster (or the one specified with :option:`--dst-crs`).
+    as coordinates in the CRS of the raster (or the one specified with :option:`--output-crs`).
     If specifying ``pixel``, the coordinates of the footprint geometry are
     column and line indices.
 
@@ -95,16 +95,7 @@ Program-Specific Options
     consecutive points of the output geometry.
     The unit of the distance is in pixels if :option:`--coordinate-system` equals ``pixel``,
     or otherwise in georeferenced units of the source raster.
-    This option is applied before the reprojection implied by :option:`--dst-crs`.
-
-.. option:: --dst-crs <CRS_DEF>
-
-    Target CRS of the output file.  The <CRS_DEF> may be any of
-    the usual GDAL/OGR forms, complete WKT, PROJ.4, EPSG:n or a file containing
-    the WKT.
-    Specifying this option implies ``--coordinate-system=georeferenced``.
-    The footprint is reprojected from the CRS of the source raster to the
-    specified CRS.
+    This option is applied before the reprojection implied by :option:`--output-crs`.
 
 .. option:: --location-field <field_name>
 
@@ -124,12 +115,21 @@ Program-Specific Options
     Minimum value for the area of a ring
     The unit of the area is in square pixels if :option:`--coordinate-system` equals ``pixel``,
     or otherwise in georeferenced units of the target vector dataset.
-    This option is applied after the reprojection implied by :option:`--dst-crs`
+    This option is applied after the reprojection implied by :option:`--output-crs`
 
 .. option:: --no-location-field
 
     Turns off the writing of the path of the input dataset as a field in the
     output vector dataset.
+
+.. option:: --output-crs <CRS_DEF>
+
+    Target CRS of the output file.  The <CRS_DEF> may be any of
+    the usual GDAL/OGR forms, complete WKT, PROJ.4, EPSG:n or a file containing
+    the WKT.
+    Specifying this option implies ``--coordinate-system=georeferenced``.
+    The footprint is reprojected from the CRS of the source raster to the
+    specified CRS.
 
 .. option:: --output-layer <OUTPUT-LAYER>
 
@@ -149,7 +149,7 @@ Program-Specific Options
     :cpp:func:`OGRGeometry::Simplify` method.
     The unit of the distance is in pixels if :option:`--coordinate-system` equals ``pixel``,
     or otherwise in georeferenced units of the target vector dataset.
-    This option is applied after the reprojection implied by :option:`--dst-crs`.
+    This option is applied after the reprojection implied by :option:`--output-crs`.
 
 .. option:: --split-multipolygons
 

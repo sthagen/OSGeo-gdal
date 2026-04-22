@@ -322,7 +322,7 @@ def test_gdalalg_raster_dst_crs():
     alg["input"] = "../gcore/data/byte.tif"
     alg["output"] = ""
     alg["output-format"] = "MEM"
-    alg["dst-crs"] = "EPSG:4267"
+    alg["output-crs"] = "EPSG:4267"
     assert alg.Run()
     ds = alg["output"].GetDataset()
     lyr = ds.GetLayer(0)
