@@ -79,8 +79,8 @@ def test_gdalalg_vector_reproject_active_layer():
 
     assert alg.ParseCommandLineArguments(
         [
-            "--src-crs=EPSG:4326",
-            "--dst-crs=EPSG:32631",
+            "--input-crs=EPSG:4326",
+            "--output-crs=EPSG:32631",
             "--of",
             "MEM",
             "--output",
