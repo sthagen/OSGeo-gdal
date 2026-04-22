@@ -414,12 +414,10 @@ def test_gdalalg_raster_create_copy_override_crs():
 
 def test_gdalalg_raster_create_copy_override_bbox():
 
-    alg = get_alg()
-    alg["output"] = ""
-    alg["output-format"] = "MEM"
-    alg["input"] = get_ref_ds()
-    alg["bbox"] = [1, 47, 2, 48]
-    assert alg.Run()
+    # Also test using 'like' alias of 'input' argument
+    alg = gdal.alg.raster.create(
+        output="", output_format="MEM", like=get_ref_ds(), bbox=[1, 47, 2, 48]
+    )
     ds = alg["output"].GetDataset()
     assert ds.GetGeoTransform() == (1.0, 0.5, 0.0, 48.0, 0.0, -0.25)
 
