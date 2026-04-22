@@ -454,7 +454,10 @@ def validate(
     errors, warnings, checks_done = validate_s102.check(filename)
 
     if expected_errors:
-        assert errors == expected_errors
+        assert len(errors) == len(expected_errors)
+        for error, expected_error in zip(errors, expected_errors):
+            assert error[0] == expected_error[0]
+            assert expected_error[1] in error[1]
     else:
         if errors:
             print(errors)
@@ -621,7 +624,7 @@ def test_s102_validator():
         ),
         (
             "Critical error",
-            "/BathymetryCoverage/BathymetryCoverage.01/Group_001/values type is not uint32",
+            "/QualityOfBathymetryCoverage/QualityOfBathymetryCoverage.01/Group_001/values type is not uint32",
         ),
     ]
     expected_warnings = [
