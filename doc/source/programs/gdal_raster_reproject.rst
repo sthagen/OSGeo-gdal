@@ -82,16 +82,9 @@ Program-Specific Options
 
     .. include:: options/srs_def_gdalwarp.rst
 
-    This must not be confused with :option:`--dst-crs` which is the target SRS of the output
+    This must not be confused with :option:`--output-crs` which is the target SRS of the output
     dataset. :option:`--bbox-crs` is a convenience e.g. when knowing the output coordinates in a
     geodetic long/lat SRS, but still wanting a result in a projected coordinate system.
-
-.. option:: -d, --dst-crs <SRC-CRS>
-
-    Set destination spatial reference. If not specified the SRS found in the input
-    dataset will be used.
-
-    .. include:: options/srs_def_gdalwarp.rst
 
 .. option:: --dst-nodata <DSTNODATA>
 
@@ -108,7 +101,7 @@ Program-Specific Options
 
     Name of GDAL input dataset that serves as a template for default values of
     options :option:`--size`, :option:`--resolution`
-    :option:`--dst-crs` and :option:`--bbox`
+    :option:`--output-crs` and :option:`--bbox`
     Note that the pixel values will *not* be copied, and that spatial registration of the
     template dataset through mechanisms such as GCP, RPC or geolocation array is
     ignored.
@@ -126,6 +119,20 @@ Program-Specific Options
 
     Number of jobs to run at once.
     Default: number of CPUs detected.
+
+.. option:: --input-crs, -s <INPUT-CRS>
+
+    Set input spatial reference. If not specified the SRS found in the input
+    dataset will be used.
+
+    .. include:: options/srs_def_gdalwarp.rst
+
+.. option:: --output-crs, -d, <OUTPUT-CRS>
+
+    Set output spatial reference. If not specified the SRS found in the input
+    dataset will be used.
+
+    .. include:: options/srs_def_gdalwarp.rst
 
 .. include:: gdal_options/warp_resampling.rst
 
@@ -149,13 +156,6 @@ Program-Specific Options
     the other dimension will be guessed from the computed resolution.
 
     Mutually exclusive with :option:`--resolution`.
-
-.. option:: -s, --src-crs <SRC-CRS>
-
-    Set source spatial reference. If not specified the SRS found in the input
-    dataset will be used.
-
-    .. include:: options/srs_def_gdalwarp.rst
 
 .. option:: --src-nodata <SRCNODATA>
 
@@ -333,7 +333,7 @@ Examples
 
    .. code-block:: bash
 
-        $ gdal raster reproject --dst-crs=EPSG:32632 in.tif out.tif --overwrite
+        $ gdal raster reproject --output-crs=EPSG:32632 in.tif out.tif --overwrite
 
 .. example::
    :title: Converting a raster that uses an embedded CRS without a known identifier
@@ -346,4 +346,4 @@ Examples
 
    .. code-block:: bash
 
-        $ gdal raster reproject --creation-option "PROFILE=BASELINE" --dst-crs=ESRI:54052 input.tif output.tif --overwrite
+        $ gdal raster reproject --creation-option "PROFILE=BASELINE" --output-crs=ESRI:54052 input.tif output.tif --overwrite

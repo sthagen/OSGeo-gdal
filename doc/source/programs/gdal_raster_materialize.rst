@@ -65,7 +65,7 @@ Examples
 
    .. code-block:: bash
 
-        $ gdal pipeline ! read in.tif ! reproject --dst-crs=EPSG:32632 ! \
+        $ gdal pipeline ! read in.tif ! reproject --output-crs=EPSG:32632 ! \
                         ! materialize ! contour --interval=10 ! write out.gpkg --overwrite
 
 

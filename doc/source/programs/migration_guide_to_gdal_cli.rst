@@ -41,7 +41,7 @@ Raster commands
 
     ==>
 
-    gdal raster reproject --dst-crs=EPSG:4326 --co=TILED=YES,COMPRESS=DEFLATE --overwrite in.tif out.tif
+    gdal raster reproject --output-crs=EPSG:4326 --co=TILED=YES,COMPRESS=DEFLATE --overwrite in.tif out.tif
 
 
 * Update existing out.tif with content of in.tif using cubic interpolation

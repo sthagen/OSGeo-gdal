@@ -73,6 +73,9 @@ constexpr const char *GAAMDI_EXTRA_FORMATS = "extra_formats";
 /** Name of the argument for an input dataset. */
 constexpr const char *GDAL_ARG_NAME_INPUT = "input";
 
+/** Name of the argument for an input CRS. */
+constexpr const char *GDAL_ARG_NAME_INPUT_CRS = "input-crs";
+
 /** Name of the argument for the input format. */
 constexpr const char *GDAL_ARG_NAME_INPUT_FORMAT = "input-format";
 
@@ -88,8 +91,11 @@ constexpr const char *GDAL_ARG_NAME_OUTPUT = "output";
 /** Name of the argument for an output string. */
 constexpr const char *GDAL_ARG_NAME_OUTPUT_STRING = "output-string";
 
-/** Name of the boolean argument to request outtputing directly on stdout. */
+/** Name of the boolean argument to request outputting directly on stdout. */
 constexpr const char *GDAL_ARG_NAME_STDOUT = "stdout";
+
+/** Name of the argument for an output CRS. */
+constexpr const char *GDAL_ARG_NAME_OUTPUT_CRS = "output-crs";
 
 /** Name of the argument for an output format. */
 constexpr const char *GDAL_ARG_NAME_OUTPUT_FORMAT = "output-format";
