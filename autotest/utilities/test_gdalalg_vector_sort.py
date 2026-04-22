@@ -199,7 +199,7 @@ def test_gdalalg_vector_sort_invalid_method(alg):
         alg["method"] = "does_not_exist"
 
 
-@pytest.mark.parametrize("geometry_field", ("", "swapped_geom"))
+@pytest.mark.parametrize("geometry_field", (None, "", "swapped_geom"))
 def test_gdalalg_vector_sort_multiple_geom_fields(alg, geometry_field):
 
     poly_ds = gdal.OpenEx("../ogr/data/poly.shp", gdal.OF_VECTOR)
@@ -225,22 +225,25 @@ def test_gdalalg_vector_sort_multiple_geom_fields(alg, geometry_field):
     alg["output"] = ""
     alg["output-format"] = "stream"
 
-    with pytest.raises(Exception, match="Specified geometry field .* does not exist"):
-        alg.Run()
-
-    alg["geometry-field"] = geometry_field
-
-    assert alg.Run()
-
-    dst_ds = alg.Output()
-    dst_lyr = dst_ds.GetLayer(0)
-
-    f = dst_lyr.GetNextFeature()
-
-    if geometry_field == "swapped_geom":
-        assert f["EAS_ID"] == 158
+    if geometry_field is None:
+        with pytest.raises(
+            Exception, match="Specified geometry field .* does not exist"
+        ):
+            alg.Run()
     else:
-        assert f["EAS_ID"] == 173
+        alg["geometry-field"] = geometry_field
+
+        assert alg.Run()
+
+        dst_ds = alg.Output()
+        dst_lyr = dst_ds.GetLayer(0)
+
+        f = dst_lyr.GetNextFeature()
+
+        if geometry_field == "swapped_geom":
+            assert f["EAS_ID"] == 158
+        else:
+            assert f["EAS_ID"] == 173
 
 
 @pytest.mark.require_driver("GDALG")

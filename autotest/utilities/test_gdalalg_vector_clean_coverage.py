@@ -150,7 +150,8 @@ def test_gdalalg_vector_clean_coverage_bad_snapping_distance(alg, tol):
         alg["snapping-distance"] = tol
 
 
-def test_gdalalg_vector_clean_coverage_active_layer(alg, circles):
+@pytest.mark.parametrize("active_layer", ["bad", "poly2"])
+def test_gdalalg_vector_clean_coverage_active_layer(alg, circles, active_layer):
 
     src_ds = gdal.GetDriverByName("MEM").CreateVector("")
 
@@ -160,27 +161,28 @@ def test_gdalalg_vector_clean_coverage_active_layer(alg, circles):
     alg["input"] = src_ds
     alg["output"] = ""
     alg["output-format"] = "stream"
-    alg["active-layer"] = "bad"
+    alg["active-layer"] = active_layer
 
-    with pytest.raises(RuntimeError, match="layer .* was not found"):
-        alg.Run()
+    if active_layer == "bad":
+        with pytest.raises(RuntimeError, match="layer .* was not found"):
+            alg.Run()
 
-    alg["active-layer"] = "poly2"
-    assert alg.Run()
+    else:
+        assert alg.Run()
 
-    dst_ds = alg["output"].GetDataset()
+        dst_ds = alg["output"].GetDataset()
 
-    assert dst_ds.GetLayerCount() == 2
+        assert dst_ds.GetLayerCount() == 2
 
-    dst_lyr1 = dst_ds.GetLayer(0)
-    dst_lyr2 = dst_ds.GetLayer(1)
-    areas1 = [f.GetGeometryRef().GetArea() for f in dst_lyr1]
-    areas2 = [f.GetGeometryRef().GetArea() for f in dst_lyr2]
+        dst_lyr1 = dst_ds.GetLayer(0)
+        dst_lyr2 = dst_ds.GetLayer(1)
+        areas1 = [f.GetGeometryRef().GetArea() for f in dst_lyr1]
+        areas2 = [f.GetGeometryRef().GetArea() for f in dst_lyr2]
 
-    # overlaps removed in layer 2, so total area is less
-    assert sum(areas1) > sum(areas2)
+        # overlaps removed in layer 2, so total area is less
+        assert sum(areas1) > sum(areas2)
 
-    assert alg.Finalize()
+        assert alg.Finalize()
 
 
 @pytest.mark.parametrize(

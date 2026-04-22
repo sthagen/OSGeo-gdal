@@ -181,7 +181,7 @@ def test_gdalalg_vector_pipeline_input_through_api_run_twice(tmp_vsimem):
     pipeline["pipeline"] = f"read ! write {out_filename}"
     assert pipeline.Run()
     with pytest.raises(
-        Exception, match=r"pipeline: Step nr 0 \(read\) has already an output dataset"
+        Exception, match="can be called only once per algorithm instance"
     ):
         pipeline.Run()
 

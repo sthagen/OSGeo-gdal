@@ -2649,6 +2649,8 @@ class CPL_DLL GDALAlgorithmRegistry
 
     /** Execute the algorithm, starting with ValidateArguments() and then
      * calling RunImpl().
+     *
+     * This method must be called at most once per instance.
      */
     bool Run(GDALProgressFunc pfnProgress = nullptr,
              void *pProgressData = nullptr);
@@ -2829,6 +2831,9 @@ class CPL_DLL GDALAlgorithmRegistry
 
     /** Whether this algorithm should be hidden (but can be instantiated if name known) */
     bool m_hidden = false;
+
+    /** Whether the Run() method has already been invoked */
+    bool m_alreadyRun = false;
 
     /** Map a dataset name to its object (used for nested pipelines) */
     std::map<std::string, GDALDataset *> m_oMapDatasetNameToDataset{};

@@ -514,6 +514,7 @@ bool GDALVectorConcatAlgorithm::RunImpl(GDALProgressFunc pfnProgress,
                   EQUAL(m_format.c_str(), "stream"));
 
         m_standaloneStep = false;
+        m_alreadyRun = false;
         bool ret = Run(pfnProgress, pProgressData);
         m_standaloneStep = true;
         if (ret)
