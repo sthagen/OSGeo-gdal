@@ -439,7 +439,7 @@ bool GDALAlgorithmArg::Set(double value)
 
 static bool CheckCanSetDatasetObject(const GDALAlgorithmArg *arg)
 {
-    if (arg->GetDatasetInputFlags() == GADV_NAME &&
+    if (arg->IsOutput() && arg->GetDatasetInputFlags() == GADV_NAME &&
         arg->GetDatasetOutputFlags() == GADV_OBJECT)
     {
         CPLError(
@@ -452,8 +452,8 @@ static bool CheckCanSetDatasetObject(const GDALAlgorithmArg *arg)
     else if ((arg->GetDatasetInputFlags() & GADV_OBJECT) == 0)
     {
         CPLError(CE_Failure, CPLE_AppDefined,
-                 "A dataset cannot be set as an input argument of '%s'.",
-                 arg->GetName().c_str());
+                 "Dataset%s '%s' must be provided by name, not as object.",
+                 arg->GetMaxCount() > 1 ? "s" : "", arg->GetName().c_str());
         return false;
     }
 
@@ -2756,6 +2756,12 @@ bool GDALAlgorithm::ProcessDatasetArg(GDALAlgorithmArg *arg,
         arg->GetName() == GDAL_ARG_NAME_INPUT && outputArg &&
         !outputArg->IsExplicitlySet() && !outputArg->IsRequired() && update &&
         !overwrite;
+
+    // Used for nested pipelines
+    const auto oIterDatasetNameToDataset =
+        val.IsNameSet() ? m_oMapDatasetNameToDataset.find(val.GetName())
+                        : m_oMapDatasetNameToDataset.end();
+
     if (!val.GetDatasetRef() && !val.IsNameSet())
     {
         ReportError(CE_Failure, CPLE_AppDefined,
@@ -2773,7 +2779,9 @@ bool GDALAlgorithm::ProcessDatasetArg(GDALAlgorithmArg *arg,
     {
         return true;
     }
-    else if (!val.GetDatasetRef() && arg->AutoOpenDataset() &&
+    else if (!val.GetDatasetRef() &&
+             (arg->AutoOpenDataset() ||
+              oIterDatasetNameToDataset != m_oMapDatasetNameToDataset.end()) &&
              (!arg->IsOutput() || (arg == outputArg && update && !overwrite) ||
               onlyInputSpecifiedInUpdateAndOutputNotRequired))
     {
@@ -2868,7 +2876,6 @@ bool GDALAlgorithm::ProcessDatasetArg(GDALAlgorithmArg *arg,
             }
         }
 
-        auto oIter = m_oMapDatasetNameToDataset.find(osDatasetName.c_str());
         GDALDataset *poDS;
         {
             // The PostGISRaster may emit an error message, that is not
@@ -2882,8 +2889,8 @@ bool GDALAlgorithm::ProcessDatasetArg(GDALAlgorithmArg *arg,
             }
 
             CPL_IGNORE_RET_VAL(poBackuper);
-            poDS = oIter != m_oMapDatasetNameToDataset.end()
-                       ? oIter->second
+            poDS = oIterDatasetNameToDataset != m_oMapDatasetNameToDataset.end()
+                       ? oIterDatasetNameToDataset->second
                        : GDALDataset::Open(osDatasetName.c_str(), flags,
                                            aosAllowedDrivers.List(),
                                            aosOpenOptions.List());
@@ -2902,12 +2909,12 @@ bool GDALAlgorithm::ProcessDatasetArg(GDALAlgorithmArg *arg,
 
         if (poDS)
         {
-            if (oIter != m_oMapDatasetNameToDataset.end())
+            if (oIterDatasetNameToDataset != m_oMapDatasetNameToDataset.end())
             {
                 if (arg->GetType() == GAAT_DATASET)
                     arg->Get<GDALArgDatasetValue>().Set(poDS->GetDescription());
                 poDS->Reference();
-                m_oMapDatasetNameToDataset.erase(oIter);
+                m_oMapDatasetNameToDataset.erase(oIterDatasetNameToDataset);
             }
 
             // A bit of a hack for situations like 'gdal raster clip --like "PG:..."'
@@ -3148,11 +3155,13 @@ bool GDALAlgorithm::ValidateArguments()
     // The method may emit several errors if several constraints are not met.
     bool ret = true;
     std::map<std::string, std::string> mutualExclusionGroupUsed;
+    std::map<std::string, std::vector<std::string>> mutualDependencyGroupUsed;
     for (auto &arg : m_args)
     {
-        // Check mutually exclusive arguments
+        // Check mutually exclusive/dependent arguments
         if (arg->IsExplicitlySet())
         {
+
             const auto &mutualExclusionGroup = arg->GetMutualExclusionGroup();
             if (!mutualExclusionGroup.empty())
             {
@@ -3170,6 +3179,45 @@ bool GDALAlgorithm::ValidateArguments()
                 {
                     mutualExclusionGroupUsed[mutualExclusionGroup] =
                         arg->GetName();
+                }
+            }
+
+            const auto &mutualDependencyGroup = arg->GetMutualDependencyGroup();
+            if (!mutualDependencyGroup.empty())
+            {
+                if (mutualDependencyGroupUsed.find(mutualDependencyGroup) ==
+                    mutualDependencyGroupUsed.end())
+                {
+                    mutualDependencyGroupUsed[mutualDependencyGroup] = {
+                        arg->GetName()};
+                }
+                else
+                {
+                    mutualDependencyGroupUsed[mutualDependencyGroup].push_back(
+                        arg->GetName());
+                }
+            }
+
+            // Check direct dependencies
+            for (const auto &dependency : arg->GetDirectDependencies())
+            {
+                auto depArg = GetArg(dependency);
+                if (!depArg)
+                {
+                    ret = false;
+                    ReportError(CE_Failure, CPLE_AppDefined,
+                                "Argument '%s' depends on argument '%s' that "
+                                "is not defined.",
+                                arg->GetName().c_str(), dependency.c_str());
+                }
+                else if (!depArg->IsExplicitlySet())
+                {
+                    ret = false;
+                    ReportError(CE_Failure, CPLE_AppDefined,
+                                "Argument '%s' depends on argument '%s' that "
+                                "has not been specified.",
+                                arg->GetName().c_str(),
+                                depArg->GetName().c_str());
                 }
             }
         }
@@ -3209,8 +3257,7 @@ bool GDALAlgorithm::ValidateArguments()
                 ret = false;
         }
 
-        if (arg->IsExplicitlySet() && arg->GetType() == GAAT_DATASET_LIST &&
-            arg->AutoOpenDataset())
+        if (arg->IsExplicitlySet() && arg->GetType() == GAAT_DATASET_LIST)
         {
             auto &listVal = arg->Get<std::vector<GDALArgDatasetValue>>();
             if (listVal.size() == 1)
@@ -3222,60 +3269,76 @@ bool GDALAlgorithm::ValidateArguments()
             {
                 for (auto &val : listVal)
                 {
-                    if (!val.GetDatasetRef() && val.GetName().empty())
+                    if (val.GetDatasetRef())
+                    {
+                        if (!CheckCanSetDatasetObject(arg.get()))
+                        {
+                            ret = false;
+                        }
+                        continue;
+                    }
+
+                    if (val.GetName().empty())
                     {
                         ReportError(CE_Failure, CPLE_AppDefined,
                                     "Argument '%s' has no dataset object or "
                                     "dataset name.",
                                     arg->GetName().c_str());
                         ret = false;
+                        continue;
                     }
-                    else if (!val.GetDatasetRef())
+
+                    auto oIter = m_oMapDatasetNameToDataset.find(val.GetName());
+                    if (oIter != m_oMapDatasetNameToDataset.end())
                     {
-                        int flags =
-                            arg->GetDatasetType() | GDAL_OF_VERBOSE_ERROR;
+                        auto poDS = oIter->second;
+                        val.SetDatasetOpenedByAlgorithm();
+                        val.Set(poDS);
+                        m_oMapDatasetNameToDataset.erase(oIter);
+                        continue;
+                    }
 
-                        CPLStringList aosOpenOptions;
-                        CPLStringList aosAllowedDrivers;
-                        if (arg->GetName() == GDAL_ARG_NAME_INPUT)
+                    if (!arg->AutoOpenDataset())
+                        continue;
+
+                    int flags = arg->GetDatasetType() | GDAL_OF_VERBOSE_ERROR;
+
+                    CPLStringList aosOpenOptions;
+                    CPLStringList aosAllowedDrivers;
+                    if (arg->GetName() == GDAL_ARG_NAME_INPUT)
+                    {
+                        const auto ooArg = GetArg(GDAL_ARG_NAME_OPEN_OPTION);
+                        if (ooArg && ooArg->GetType() == GAAT_STRING_LIST)
                         {
-                            const auto ooArg =
-                                GetArg(GDAL_ARG_NAME_OPEN_OPTION);
-                            if (ooArg && ooArg->GetType() == GAAT_STRING_LIST)
-                            {
-                                aosOpenOptions = CPLStringList(
-                                    ooArg->Get<std::vector<std::string>>());
-                            }
-
-                            const auto ifArg =
-                                GetArg(GDAL_ARG_NAME_INPUT_FORMAT);
-                            if (ifArg && ifArg->GetType() == GAAT_STRING_LIST)
-                            {
-                                aosAllowedDrivers = CPLStringList(
-                                    ifArg->Get<std::vector<std::string>>());
-                            }
-
-                            const auto updateArg = GetArg(GDAL_ARG_NAME_UPDATE);
-                            if (updateArg &&
-                                updateArg->GetType() == GAAT_BOOLEAN &&
-                                updateArg->Get<bool>())
-                            {
-                                flags |= GDAL_OF_UPDATE;
-                            }
+                            aosOpenOptions = CPLStringList(
+                                ooArg->Get<std::vector<std::string>>());
                         }
 
-                        auto poDS = std::unique_ptr<GDALDataset>(
-                            GDALDataset::Open(val.GetName().c_str(), flags,
-                                              aosAllowedDrivers.List(),
-                                              aosOpenOptions.List()));
-                        if (poDS)
+                        const auto ifArg = GetArg(GDAL_ARG_NAME_INPUT_FORMAT);
+                        if (ifArg && ifArg->GetType() == GAAT_STRING_LIST)
                         {
-                            val.Set(std::move(poDS));
+                            aosAllowedDrivers = CPLStringList(
+                                ifArg->Get<std::vector<std::string>>());
                         }
-                        else
+
+                        const auto updateArg = GetArg(GDAL_ARG_NAME_UPDATE);
+                        if (updateArg && updateArg->GetType() == GAAT_BOOLEAN &&
+                            updateArg->Get<bool>())
                         {
-                            ret = false;
+                            flags |= GDAL_OF_UPDATE;
                         }
+                    }
+
+                    auto poDS = std::unique_ptr<GDALDataset>(GDALDataset::Open(
+                        val.GetName().c_str(), flags, aosAllowedDrivers.List(),
+                        aosOpenOptions.List()));
+                    if (poDS)
+                    {
+                        val.Set(std::move(poDS));
+                    }
+                    else
+                    {
+                        ret = false;
                     }
                 }
             }
@@ -3285,6 +3348,50 @@ bool GDALAlgorithm::ValidateArguments()
         {
             ret = false;
         }
+    }
+
+    // Check mutual dependency groups
+    std::vector<std::string> processedGroups;
+    // Loop through group map and check there are not required args in the group that are not set
+    for (const auto &[groupName, argNames] : mutualDependencyGroupUsed)
+    {
+        if (std::find(processedGroups.begin(), processedGroups.end(),
+                      groupName) != processedGroups.end())
+            continue;
+        std::vector<std::string> missingArgs;
+        for (auto &arg : m_args)
+        {
+            const auto &mutualDependencyGroup = arg->GetMutualDependencyGroup();
+            if (mutualDependencyGroup == groupName &&
+                std::find(argNames.begin(), argNames.end(), arg->GetName()) ==
+                    argNames.end())
+            {
+                missingArgs.push_back(arg->GetName());
+            }
+        }
+        if (!missingArgs.empty())
+        {
+            ret = false;
+            std::string missingArgsStr;
+            for (const auto &missingArg : missingArgs)
+            {
+                if (!missingArgsStr.empty())
+                    missingArgsStr += ", ";
+                missingArgsStr += missingArg;
+            }
+            std::string givenArgsStr;
+            for (const auto &givenArg : argNames)
+            {
+                if (!givenArgsStr.empty())
+                    givenArgsStr += ", ";
+                givenArgsStr += givenArg;
+            }
+            ReportError(CE_Failure, CPLE_AppDefined,
+                        "Argument(s) '%s' require(s) that the following "
+                        "argument(s) are also specified: %s.",
+                        givenArgsStr.c_str(), missingArgsStr.c_str());
+        }
+        processedGroups.push_back(groupName);
     }
 
     for (const auto &f : m_validationActions)
@@ -6444,7 +6551,8 @@ GDALAlgorithm::GetUsageForCLI(bool shortUsage,
             if (arg->GetType() == GAAT_DATASET ||
                 arg->GetType() == GAAT_DATASET_LIST)
             {
-                if (arg->GetDatasetInputFlags() == GADV_NAME &&
+                if (arg->IsOutput() &&
+                    arg->GetDatasetInputFlags() == GADV_NAME &&
                     arg->GetDatasetOutputFlags() == GADV_OBJECT)
                 {
                     osRet += " (created by algorithm)";
@@ -6572,6 +6680,48 @@ GDALAlgorithm::GetUsageForCLI(bool shortUsage,
                     osRet += otherArgs;
                     osRet += '\n';
                 }
+            }
+
+            // Check dependency
+            std::string dependencyArgs;
+
+            for (const auto &dependencyArgumentName :
+                 GetArgDependencies(arg->GetName()))
+            {
+                const auto otherArg{GetArg(dependencyArgumentName)};
+                if (otherArg != nullptr)
+                {
+                    if (otherArg->IsHidden() || otherArg->IsHiddenForCLI() ||
+                        otherArg == arg)
+                    {
+                        continue;
+                    }
+
+                    if (!dependencyArgs.empty())
+                    {
+                        dependencyArgs += ", ";
+                    }
+
+                    dependencyArgs += "--";
+                    dependencyArgs += otherArg->GetName();
+                }
+                else
+                {
+                    CPLError(CE_Warning, CPLE_AppDefined,
+                             "Argument '%s' depends on unknown argument '%s'",
+                             arg->GetName().c_str(),
+                             dependencyArgumentName.c_str());
+                }
+            }
+
+            if (!dependencyArgs.empty())
+            {
+                osRet += "  ";
+                osRet += "  ";
+                osRet.append(maxOptLen, ' ');
+                osRet += "Depends on ";
+                osRet += dependencyArgs;
+                osRet += '\n';
             }
         };
 
@@ -6747,7 +6897,7 @@ std::string GDALAlgorithm::GetUsageAsJSON() const
         oRoot.Add("user_provided_arguments_allowed", true);
     }
 
-    const auto ProcessArg = [](const GDALAlgorithmArg *arg)
+    const auto ProcessArg = [this](const GDALAlgorithmArg *arg)
     {
         CPLJSONObject jArg;
         jArg.Add("name", arg->GetName());
@@ -6888,6 +7038,26 @@ std::string GDALAlgorithm::GetUsageAsJSON() const
             jArg.Add("min_count", arg->GetMinCount());
             jArg.Add("max_count", arg->GetMaxCount());
         }
+
+        // Process dependencies
+        const auto &mutualDependencyGroup = arg->GetMutualDependencyGroup();
+        if (!mutualDependencyGroup.empty())
+        {
+            jArg.Add("mutual_dependency_group", mutualDependencyGroup);
+        }
+
+        CPLJSONArray jDependencies;
+        for (const auto &dependencyArgumentName :
+             GetArgDependencies(arg->GetName()))
+        {
+            jDependencies.Add(dependencyArgumentName);
+        }
+
+        if (jDependencies.Size() > 0)
+        {
+            jArg.Add("depends_on", jDependencies);
+        }
+
         jArg.Add("category", arg->GetCategory());
 
         if (arg->GetType() == GAAT_DATASET ||
@@ -7605,6 +7775,28 @@ GDALAlgorithmArgH GDALAlgorithmGetArgNonConst(GDALAlgorithmH hAlg,
     if (!arg)
         return nullptr;
     return std::make_unique<GDALAlgorithmArgHS>(arg).release();
+}
+
+/************************************************************************/
+/*                  GDALAlgorithmGetArgDependencies()                   */
+/************************************************************************/
+
+/** Return the list of argument names the specified argument depends on.
+ *
+ *  This includes both regular dependencies and mutual dependencies.
+ *
+ * @param hAlg Handle to an algorithm. Must NOT be null.
+ * @param pszArgName Argument name. Must NOT be null.
+ * @return a NULL terminated list of names, which must be destroyed with
+ * CSLDestroy()
+ * @since 3.11
+ */
+char **GDALAlgorithmGetArgDependencies(GDALAlgorithmH hAlg,
+                                       const char *pszArgName)
+{
+    VALIDATE_POINTER1(hAlg, __func__, nullptr);
+    VALIDATE_POINTER1(pszArgName, __func__, nullptr);
+    return CPLStringList(hAlg->ptr->GetArgDependencies(pszArgName)).StealList();
 }
 
 /************************************************************************/
@@ -8344,6 +8536,49 @@ const char *GDALAlgorithmArgGetMutualExclusionGroup(GDALAlgorithmArgH hArg)
 {
     VALIDATE_POINTER1(hArg, __func__, nullptr);
     return hArg->ptr->GetMutualExclusionGroup().c_str();
+}
+
+/************************************************************************/
+/*              GDALAlgorithmArgGetMutualDependencyGroup()              */
+/************************************************************************/
+
+/** Return the name of the mutual dependency group to which this argument
+ * belongs to.
+ *
+ * Or empty string if it does not belong to any dependency group.
+ *
+ * @param hArg Handle to an argument. Must NOT be null.
+ * @return string whose lifetime is bound to hArg and which must not
+ * be freed.
+ * @since 3.13
+ */
+const char *GDALAlgorithmArgGetMutualDependencyGroup(GDALAlgorithmArgH hArg)
+{
+    VALIDATE_POINTER1(hArg, __func__, nullptr);
+    return hArg->ptr->GetMutualDependencyGroup().c_str();
+}
+
+/************************************************************************/
+/*               GDALAlgorithmArgGetDirectDependencies()                */
+/************************************************************************/
+
+/** Return the list of names of arguments that this argument depends on.
+ *
+ *  This is not necessarily a symmetric relationship.
+ *  If argument A depends on argument B, it doesn't mean that B depends on A.
+ *  Mutual dependency groups are a special case of dependencies,
+ *  where all arguments of the group depend on each other and are not
+ *  returned by this method.
+ *
+ * @param hArg Handle to an argument. Must NOT be null.
+ * @return a NULL terminated list of names, which must be destroyed with
+ * CSLDestroy()
+ * @since 3.13
+ */
+char **GDALAlgorithmArgGetDirectDependencies(GDALAlgorithmArgH hArg)
+{
+    VALIDATE_POINTER1(hArg, __func__, nullptr);
+    return CPLStringList(hArg->ptr->GetDirectDependencies()).StealList();
 }
 
 /************************************************************************/

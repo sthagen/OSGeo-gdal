@@ -155,8 +155,8 @@ The following open options are supported:
 
       Should multipoint soundings be split
       into many single point sounding features. Multipoint geometries are
-      gnot well handle by many formats, so it can be convenient to split
-      gsingle sounding features with many points into many single point
+      not well handle by many formats, so it can be convenient to split
+      single sounding features with many points into many single point
       features.
 
 -  .. oo:: ADD_SOUNDG_DEPTH

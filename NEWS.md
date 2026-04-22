@@ -1,6 +1,6 @@
 # GDAL/OGR 3.13.0dev *preliminary* Release Notes
 
-up to commit 465956dd5786c78ce582049ef575ffffdee4aebf (April 15th 2026)
+up to commit 4678d1ca474c0a066c1a6418ff30d97e8b0a90bc (April 22th 2026)
 
 GDAL 3.13.0 is a feature release
 These notes include changes since GDAL 3.12.0, but not already included in a
@@ -116,6 +116,8 @@ See [MIGRATION_GUIDE.TXT](https://github.com/OSGeo/gdal/blob/release/3.13/MIGRAT
 * GDALWarpResolveWorkingDataType(): do not default to UInt8 before looking at
   data type bands (#14063)
 * gdalwarp: make INIT_DEST=NO_DATA without nodata a failure (#12210)
+* GDALWarpNoDataMasker(): avoid potential int32 overflow on very large work
+  buffers
 * los: remove redundant IsAboveTerrain call to halve I/O
 * GDALIsLineOfSightVisible(): treat point exactly on surface as visible
 
@@ -167,6 +169,11 @@ See [MIGRATION_GUIDE.TXT](https://github.com/OSGeo/gdal/blob/release/3.13/MIGRAT
 * GDALAlgorithm: make --overwrite failures verbose
 * Add GDALAlgorithmArg::SetMaxCharCount()
 * Add GDALAlgorithmArg::SetDuplicateValuesAllowed()
+* GDALAlgorithm::ParseCommandLineArguments(): fix for list-type of argument
+  with max count = 1 (#14358)
+* Add GDALAlgorithmArgIsAvailableInPipelineStep() C API
+* Add GDALAlgorithmGetArgDependencies(), GDALAlgorithmArgGetMutualDependencyGroup()
+  and GDALAlgorithmArgGetDirectDependencies() (#14402)
 * GDALGeoTransform: Add Init and ToString methods
 * Add GDALGetNumThreads()
 * Add GDALGetColorInterpretationList()
@@ -178,6 +185,7 @@ See [MIGRATION_GUIDE.TXT](https://github.com/OSGeo/gdal/blob/release/3.13/MIGRAT
 * Multidim GDALDatasetFromArray RasterIO: read directly from MDArray when
   dataset is pixel interleaved
 * Remove new lines from error messages and typo fixes (#14174)
+* GDALWriteWorldFile(): increase precision to 15 decimal places
 
 ### Raster utilities
 
@@ -201,11 +209,13 @@ See [MIGRATION_GUIDE.TXT](https://github.com/OSGeo/gdal/blob/release/3.13/MIGRAT
 * gdal raster calc: properly handle inputs with no geotransform
 * gdal raster calc: when writing to VRT, set relativeToVrt=1 for sources when
   relevant (#14169)
+* gdal raster calc: declare 'input' as GADV_NAME only
 * gdal raster color-map: detect UTF-16 encoded text color map files (#13661)
 * gdal raster color-map: make it work better with pipelines (#13740)
 * gdal raster contour/polygonize: expose --output-layer for pipeline mode
 * gdal raster create: enable use in pipelines
 * gdal raster create: make sure the like argument is not positional (#14056)
+* gdal raster create: replicate --like tiling when possible
 * gdal raster edit: add --color-interpretation (#13841)
 * gdal raster edit: add missing --oo option in standalone mode (#14107)
 * gdal raster edit: add --scale and --offset (#14213)
@@ -227,6 +237,10 @@ See [MIGRATION_GUIDE.TXT](https://github.com/OSGeo/gdal/blob/release/3.13/MIGRAT
   green, blue, alpha, nir, etc
 * gdal raster select: add --exclude to exclude band(s) specified with --band,
   similarly to vector select (#14098)
+* gdal raster zonal stats: handle --output-layer (#14371)
+* gdal raster zonal-stats: fix alloc of buffers for cell center coords (#14371)
+* gdal raster zonal-stats: accept --include-field ALL and NONE
+* gdal raster zonal-stats: add --include-geom (#14371)
 * rasterize: calculate one size from the other and the input extent if one of
   the size values is 0 (#13424)
 * gdaldem_lib: enable Neon optimizations
@@ -293,6 +307,8 @@ GTI driver:
  * add SRS_BEHAVIOR=OVERRIDE/REPROJECT option (#14304)
  * make relative filenames in XML or .gti.gpkg relative to the main file (#14344)
  * adjusments to overview handling (#14345, #14346)
+ * fix issue when opening GTI:some.gti.gpkg that contains relative paths
+ * make it tolerant to 'GTI:' prefix filenames in <IndexDataset>
 
 GTiff driver:
  * read potential ENVI .hdr sidecar file to set band wavelength/FWHM/bad band
@@ -430,6 +446,7 @@ Zarr driver:
  * V2: add more extensive support for CRS retrieval of EOPF Zarr Sample Service
    datasets
  * V2: add support for fixedscaledoffset filter with astype=f4
+ * V2: add read-only (=no-op) support for 'bitround' filter
  * probe zarr.json v3 before v2 files in OpenRootGroup()
  * auto-parallel chunk decompression in IRead
  * enable IAdviseRead for all bands in multi-band reads
@@ -462,6 +479,11 @@ Zarr driver:
 * Add GDAL_DCAP_MULTIPLE_VECTOR_LAYERS_IN_DIRECTORY and set it for shapefile,
   mapinfo, CSV, FlatGeoBuf and MiramonVector
 * Add OGRFeatureDefnRefCountedPtr and OGRSpatialReferenceRefCountedPtr classes
+* OGRSpatialReference::GetAuthorityName()/GetAuthorityCode(): add default
+  nullptr value for pszTarget argument
+* Add optional std::string* parameter to OGRGeometry::IsValid() to set the
+  invalidity reason
+* Add OGR_G_GetInvalidityReason() and map it to SWIG
 
 ### Vector utilities
 
@@ -472,9 +494,11 @@ Zarr driver:
 * gdal vector check-geometry: set output layer type to MultiPoint (#13844)
 * gdal vector check-geometry: support --include-field ALL
 * gdal vector clip: error out if clip geometry becomes invalid on reprojection
+* gdal vector edit: add --output-layer in pipeline mode too (#14389)
 * gdal vector filter: add --update-extent (#13519)
 * gdal vector info: emit short form for CRS if possible, and add a
   --crs-format=AUTO|WKT2|PROJJSON, only for --format=text
+* gdal vector info: propagate source driver when --layer is specified
 * Remove 'gdal vector geom XXXX' deprecated in GDAL 3.12 in favor of direct
   'gdal vector XXXX'
 * gdal vector info: fix so it can be used in a pipeline
@@ -485,9 +509,17 @@ Zarr driver:
 * gdal vector partition: automatically generate the '_metadata' index of
   Parquet partitioned datasets
 * gdal vector pipeline: add --no-create-empty-layers argument (#13921)
+* gdal vector pipeline: fix missing ref taking on source dataset in
+  GDALVectorDecoratedDataset (#14388)
+* gdal vector pipeline read --layer: make sure ExecuteSQL() forwards to the
+  source dataset
+* gdal vector pipeline: make read derive from GDALVectorDecoratedDataset so it
+  can get field domains and relationships
 * gdal vector rasterize: improve error message when invalid options paired with
   --update (#13771)
 * gdal vector select: expose --output-layer for pipeline mode
+* gdal vector select: check that output-layer is only specified if a single
+  input layer is matched
 * gdal vector sql: fix --overwrite-layer (#13516)
 * gdal vector check-coverage/clean-coverage/simplify-coverage/sort: add
   progress report
@@ -527,6 +559,9 @@ GeoJSONSeq driver:
 
 GeoParquet driver:
  * add a COVERING_BBOX_NAME layer creation option (#13370)
+
+GML driver:
+ * geometry export: fix exporting a CompoundCRS with a known code
 
 GPKG driver:
  * use Spatialite EnableGpkgMode() instead of EnableAmphibiousGpkgMode() to
