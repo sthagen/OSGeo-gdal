@@ -3248,14 +3248,7 @@ def test_ogr_shape_73(tmp_vsimem):
     lyr = ds.GetLayer(0)
     feat = lyr.GetNextFeature()
     got_geom = feat.GetGeometryRef()
-    if ogrtest.have_geos():
-        assert got_geom.ExportToWkt() in (
-            "POLYGON ((0 0,0 10,10 10,10 0,0 0),(4 3,5 1,4 2,4 3),(6 2,5 1,6 3,6 2))",
-            "POLYGON ((0 0,0 10,10 10,10 0,0 0),(5 1,4 2,4 3,5 1),(5 1,6 3,6 2,5 1))",  # GEOS 3.15
-        )
-        assert got_geom.IsValid()
-    else:
-        assert got_geom.ExportToWkt() == geom.ExportToWkt()
+    assert got_geom.ExportToWkt() == geom.ExportToWkt()
     ds = None
 
 
