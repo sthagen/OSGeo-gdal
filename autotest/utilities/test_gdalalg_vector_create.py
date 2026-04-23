@@ -426,7 +426,6 @@ def test_gdalalg_vector_create_aspatial_layer(tmp_vsimem):
 def test_gdalalg_vector_create_layer_names(
     tmp_vsimem, input_names, output_name, expected_names
 ):
-    alg = get_create_alg()
 
     in_file = str(tmp_vsimem / "test_layer_names_in.gpkg")
     out_file = str(tmp_vsimem / "test_layer_names_out.gpkg")
@@ -440,6 +439,7 @@ def test_gdalalg_vector_create_layer_names(
 
     # Create 3 layers layer_1, layer_2, layer_3
     for i in range(3):
+        alg = get_create_alg()
         alg["output"] = in_file
         alg["update"] = i > 0
         alg["field"] = ["test_field:String"]
@@ -468,7 +468,6 @@ def test_gdalalg_vector_create_layer_names(
     else:
         with pytest.raises(RuntimeError, match=expected_names):
             alg.Run()
-        return
 
 
 @pytest.mark.require_driver("GPKG")

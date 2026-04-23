@@ -4217,6 +4217,13 @@ TEST_F(test_gdal_algorithm, subalgorithms)
         EXPECT_TRUE(alg.ValidateArguments());
         EXPECT_TRUE(alg.Run());
         EXPECT_TRUE(hasRun);
+        {
+            CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+            EXPECT_FALSE(alg.Run());
+            EXPECT_STREQ(
+                CPLGetLastErrorMsg(),
+                "subalg: Run() can be called only once per algorithm instance");
+        }
         EXPECT_TRUE(alg.Finalize());
         alg.GetUsageForCLI(false);
     }

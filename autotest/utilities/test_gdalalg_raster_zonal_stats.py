@@ -611,7 +611,7 @@ def test_gdalalg_raster_zonal_stats_output_format_detection(
     assert out_ds.GetDriver().GetName() == "CSV"
 
 
-@pytest.mark.parametrize("include_field", ["ALL", "NONE", ["PRFEDEA", "EAS_ID"]])
+@pytest.mark.parametrize("include_field", [None, "ALL", "NONE", ["PRFEDEA", "EAS_ID"]])
 def test_gdalalg_raster_zonal_stats_polygon_zones_include_fields(
     zonal, strategy, polyrast, include_field
 ):
@@ -624,33 +624,34 @@ def test_gdalalg_raster_zonal_stats_polygon_zones_include_fields(
     zonal["include-field"] = "does_not_exist"
     zonal["zones"] = "../ogr/data/poly.shp"
 
-    with pytest.raises(Exception, match="Field .* not found"):
-        zonal.Run()
-
-    zonal["include-field"] = include_field
-
-    if include_field == "ALL":
-        expected_fields = ["AREA", "EAS_ID", "PRFEDEA", "sum"]
-    elif include_field == "NONE":
-        expected_fields = ["sum"]
+    if include_field is None:
+        with pytest.raises(Exception, match="Field .* not found"):
+            zonal.Run()
     else:
-        expected_fields = ["PRFEDEA", "EAS_ID", "sum"]
+        zonal["include-field"] = include_field
 
-    assert zonal.Run()
+        if include_field == "ALL":
+            expected_fields = ["AREA", "EAS_ID", "PRFEDEA", "sum"]
+        elif include_field == "NONE":
+            expected_fields = ["sum"]
+        else:
+            expected_fields = ["PRFEDEA", "EAS_ID", "sum"]
 
-    out_ds = zonal.Output()
+        assert zonal.Run()
 
-    f = out_ds.GetLayer(0).GetNextFeature()
+        out_ds = zonal.Output()
 
-    assert field_names(f) == expected_fields
+        f = out_ds.GetLayer(0).GetNextFeature()
 
-    if "PRFEDEA" in expected_fields:
-        assert f["PRFEDEA"] == "35043411"
-    if "EAS_ID" in expected_fields:
-        assert f["EAS_ID"] == 168
-    if "AREA" in expected_fields:
-        assert f["AREA"] == 215229.266
-    assert f["sum"] == 369.0
+        assert field_names(f) == expected_fields
+
+        if "PRFEDEA" in expected_fields:
+            assert f["PRFEDEA"] == "35043411"
+        if "EAS_ID" in expected_fields:
+            assert f["EAS_ID"] == 168
+        if "AREA" in expected_fields:
+            assert f["AREA"] == 215229.266
+        assert f["sum"] == 369.0
 
 
 def test_gdalalg_raster_zonal_stats_polygon_zones_include_geom(

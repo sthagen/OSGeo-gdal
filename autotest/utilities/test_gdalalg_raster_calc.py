@@ -516,7 +516,8 @@ def test_gdalalg_raster_calc_different_band_counts(calc, tmp_vsimem):
         assert np.all(dst.ReadAsArray() == (1 + 2 + 3 + 4 + 5))
 
 
-def test_gdalalg_calc_different_resolutions(calc, tmp_vsimem):
+@pytest.mark.parametrize("no_check_extent", [True, False])
+def test_gdalalg_calc_different_resolutions(calc, tmp_vsimem, no_check_extent):
 
     gdaltest.importorskip_gdal_array()
     np = pytest.importorskip("numpy")
@@ -538,22 +539,23 @@ def test_gdalalg_calc_different_resolutions(calc, tmp_vsimem):
     calc["input"] = [f"A={inputs[0]}", f"B={inputs[1]}", f"C={inputs[2]}"]
     calc["calc"] = ["A + B + C"]
     calc["output"] = outfile
+    calc["no-check-extent"] = no_check_extent
+    if no_check_extent:
+        with pytest.raises(Exception, match="Inputs do not have the same dimensions"):
+            calc.Run()
+    else:
 
-    calc["no-check-extent"] = True
-    with pytest.raises(Exception, match="Inputs do not have the same dimensions"):
-        calc.Run()
-    calc["no-check-extent"] = False
+        assert calc.Run()
 
-    assert calc.Run()
+        with gdal.Open(outfile) as ds:
+            assert ds.RasterXSize == xmax / functools.reduce(math.gcd, resolutions)
+            assert ds.RasterYSize == ymax / functools.reduce(math.gcd, resolutions)
 
-    with gdal.Open(outfile) as ds:
-        assert ds.RasterXSize == xmax / functools.reduce(math.gcd, resolutions)
-        assert ds.RasterYSize == ymax / functools.reduce(math.gcd, resolutions)
-
-        assert np.all(ds.ReadAsArray() == sum(resolutions))
+            assert np.all(ds.ReadAsArray() == sum(resolutions))
 
 
-def test_gdalalg_raster_calc_error_extent_mismatch(calc, tmp_vsimem):
+@pytest.mark.parametrize("no_check_extent", [True, False])
+def test_gdalalg_raster_calc_error_extent_mismatch(calc, tmp_vsimem, no_check_extent):
 
     input_1 = tmp_vsimem / "in1.tif"
     input_2 = tmp_vsimem / "in2.tif"
@@ -567,15 +569,15 @@ def test_gdalalg_raster_calc_error_extent_mismatch(calc, tmp_vsimem):
     calc["input"] = [f"A={input_1}", f"B={input_2}"]
     calc["output"] = outfile
     calc["calc"] = ["A+B"]
+    calc["no-check-extent"] = no_check_extent
+    if not no_check_extent:
+        with pytest.raises(Exception, match="extents are inconsistent"):
+            calc.Run()
+    else:
+        assert calc.Run()
 
-    with pytest.raises(Exception, match="extents are inconsistent"):
-        calc.Run()
-
-    calc["no-check-extent"] = True
-    assert calc.Run()
-
-    with gdal.Open(input_1) as src, gdal.Open(outfile) as dst:
-        assert src.GetGeoTransform() == dst.GetGeoTransform()
+        with gdal.Open(input_1) as src, gdal.Open(outfile) as dst:
+            assert src.GetGeoTransform() == dst.GetGeoTransform()
 
 
 def test_gdalalg_raster_calc_error_extent_within_tolerance(calc, tmp_vsimem):
@@ -618,7 +620,8 @@ def test_gdalalg_raster_calc_error_extent_within_tolerance(calc, tmp_vsimem):
         assert src.GetGeoTransform() == dst.GetGeoTransform()
 
 
-def test_gdalalg_raster_calc_error_crs_mismatch(calc, tmp_vsimem):
+@pytest.mark.parametrize("no_check_srs", [True, False])
+def test_gdalalg_raster_calc_error_crs_mismatch(calc, tmp_vsimem, no_check_srs):
 
     input_1 = tmp_vsimem / "in1.tif"
     input_2 = tmp_vsimem / "in2.tif"
@@ -632,19 +635,25 @@ def test_gdalalg_raster_calc_error_crs_mismatch(calc, tmp_vsimem):
     calc["input"] = [f"B={input_1}", f"A={input_2}"]
     calc["output"] = outfile
     calc["calc"] = ["A+B"]
+    calc["no-check-srs"] = no_check_srs
 
-    with pytest.raises(Exception, match="spatial reference systems are inconsistent"):
-        calc.Run()
+    if not no_check_srs:
+        with pytest.raises(
+            Exception, match="spatial reference systems are inconsistent"
+        ):
+            calc.Run()
+    else:
+        assert calc.Run()
 
-    calc["no-check-srs"] = True
-    assert calc.Run()
-
-    with gdal.Open(input_1) as src, gdal.Open(outfile) as dst:
-        assert src.GetSpatialRef().IsSame(dst.GetSpatialRef())
+        with gdal.Open(input_1) as src, gdal.Open(outfile) as dst:
+            assert src.GetSpatialRef().IsSame(dst.GetSpatialRef())
 
 
 @pytest.mark.parametrize("bands", [(2, 3), (2, 4)])
-def test_gdalalg_raster_calc_error_band_count_mismatch(calc, tmp_vsimem, bands):
+@pytest.mark.parametrize("formula", ["A+B", "A+B[1]"])
+def test_gdalalg_raster_calc_error_band_count_mismatch(
+    calc, tmp_vsimem, bands, formula
+):
 
     input_1 = tmp_vsimem / "in1.tif"
     input_2 = tmp_vsimem / "in2.tif"
@@ -655,13 +664,12 @@ def test_gdalalg_raster_calc_error_band_count_mismatch(calc, tmp_vsimem, bands):
 
     calc["input"] = [f"A={input_1}", f"B={input_2}"]
     calc["output"] = outfile
-    calc["calc"] = ["A+B"]
-
-    with pytest.raises(Exception, match="incompatible numbers of bands"):
-        calc.Run()
-
-    calc["calc"] = ["A+B[1]"]
-    assert calc.Run()
+    calc["calc"] = formula
+    if formula == "A+B":
+        with pytest.raises(Exception, match="incompatible numbers of bands"):
+            calc.Run()
+    else:
+        assert calc.Run()
 
 
 @pytest.mark.parametrize(

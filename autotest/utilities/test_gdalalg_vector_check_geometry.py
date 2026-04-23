@@ -504,6 +504,7 @@ def test_gdalalg_vector_check_geometry_no_geometry_field(alg):
     dst_ds = alg["output"].GetDataset()
     assert dst_ds.GetLayerCount() == 0
 
+    alg = gdal.GetGlobalAlgorithmRegistry()["vector"]["check-geometry"]
     alg["input"] = ds
     alg["output"] = ""
     alg["output-format"] = "stream"

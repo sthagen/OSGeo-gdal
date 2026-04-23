@@ -345,6 +345,8 @@ True
 
 Convenience method that calls :py:meth:`ParseCommandLineArguments`, :py:meth:`Run`, and :py:meth:`Finalize`.
 
+This method must be called at most once per instance.
+
 Parameters
 ----------
 args : list

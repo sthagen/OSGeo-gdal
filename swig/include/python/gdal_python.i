@@ -6188,6 +6188,8 @@ def Run(*alg, arguments={}, progress=None, **kwargs):
        context manager.  An exception will be raised if the algorithm fails,
        even if :py:meth:`osgeo.gdal.UseExceptions()` has not been called.
 
+       This method must be called at most once per instance.
+
        Parameters
        ----------
        alg : str, list[str], tuple[str] or Algorithm
