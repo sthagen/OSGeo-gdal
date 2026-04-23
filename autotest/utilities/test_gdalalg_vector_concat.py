@@ -122,7 +122,7 @@ def test_gdalalg_vector_concat_dst_crs():
     alg["input"] = [ds1, ds2]
     alg["output"] = ""
     alg["output-format"] = "MEM"
-    alg["dst-crs"] = "EPSG:4326"
+    alg["output-crs"] = "EPSG:4326"
     assert alg.Run()
     ds = alg["output"].GetDataset()
     lyr = ds.GetLayerByName("test")
@@ -156,7 +156,7 @@ def test_gdalalg_vector_concat_dst_crs():
     alg["input"] = [ds3]
     alg["output"] = ""
     alg["output-format"] = "MEM"
-    alg["dst-crs"] = "EPSG:4326"
+    alg["output-crs"] = "EPSG:4326"
     with pytest.raises(
         Exception, match="concat: Layer 'test' of '' has no spatial reference system"
     ):
@@ -166,7 +166,7 @@ def test_gdalalg_vector_concat_dst_crs():
     alg["input"] = [ds3]
     alg["output"] = ""
     alg["output-format"] = "MEM"
-    alg["src-crs"] = "EPSG:32631"
+    alg["input-crs"] = "EPSG:32631"
     alg["dst-crs"] = "EPSG:4326"
     assert alg.Run()
     ds = alg["output"].GetDataset()

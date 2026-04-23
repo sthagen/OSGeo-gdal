@@ -84,16 +84,18 @@ GDALRasterFootprintAlgorithm::GDALRasterFootprintAlgorithm(bool standaloneStep)
            &m_overview)
         .SetMutualExclusionGroup("overview-srcnodata")
         .SetMinValueIncluded(0);
-    AddArg("src-nodata", 0, _("Set nodata values for input bands."),
+    AddArg("input-nodata", 0, _("Set nodata values for input bands."),
            &m_srcNoData)
         .SetMinCount(1)
         .SetRepeatedArgAllowed(false)
+        .AddHiddenAlias("src-nodata")
         .SetMutualExclusionGroup("overview-srcnodata");
     AddArg("coordinate-system", 0, _("Target coordinate system"),
            &m_coordinateSystem)
         .SetChoices("georeferenced", "pixel");
-    AddArg("dst-crs", 0, _("Destination CRS"), &m_dstCrs)
+    AddArg(GDAL_ARG_NAME_OUTPUT_CRS, 0, _("Output CRS"), &m_dstCrs)
         .SetIsCRSArg()
+        .AddHiddenAlias("dst-crs")
         .AddHiddenAlias("t_srs");
     AddArg("split-multipolygons", 0,
            _("Whether to split multipolygons as several features each with one "

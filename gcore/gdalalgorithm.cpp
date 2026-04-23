@@ -1649,7 +1649,7 @@ GDALInConstructionAlgorithmArg &GDALInConstructionAlgorithmArg::SetIsCRSArg(
             bool bIsRaster = false;
             OGREnvelope sDatasetLongLatEnv;
             std::string osCelestialBodyName;
-            if (GetName() == "dst-crs")
+            if (GetName() == GDAL_ARG_NAME_OUTPUT_CRS)
             {
                 auto inputArg = m_owner->GetArg(GDAL_ARG_NAME_INPUT);
                 if (inputArg && inputArg->GetType() == GAAT_DATASET_LIST)

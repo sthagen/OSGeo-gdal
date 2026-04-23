@@ -132,7 +132,7 @@ def test_gdalalg_vector_index_new_file_dst_crs(tmp_vsimem):
         "index",
         input=tmp_vsimem / "dst_crs.shp",
         output_format="MEM",
-        dst_crs="EPSG:4326",
+        output_crs="EPSG:4326",
     ) as alg:
         ds = alg.Output()
         lyr = ds.GetLayer(0)

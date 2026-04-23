@@ -32,12 +32,14 @@ GDALVectorReprojectAlgorithm::GDALVectorReprojectAlgorithm(bool standaloneStep)
                                       standaloneStep)
 {
     AddActiveLayerArg(&m_activeLayer);
-    AddArg("src-crs", 's', _("Source CRS"), &m_srsCrs)
+    AddArg(GDAL_ARG_NAME_INPUT_CRS, 's', _("Input CRS"), &m_srcCrs)
         .SetIsCRSArg()
+        .AddHiddenAlias("src-crs")
         .AddHiddenAlias("s_srs");
-    AddArg("dst-crs", 'd', _("Destination CRS"), &m_dstCrs)
+    AddArg(GDAL_ARG_NAME_OUTPUT_CRS, 'd', _("Output CRS"), &m_dstCrs)
         .SetIsCRSArg()
         .SetRequired()
+        .AddHiddenAlias("dst-crs")
         .AddHiddenAlias("t_srs");
 }
 
@@ -54,10 +56,10 @@ bool GDALVectorReprojectAlgorithm::RunStep(GDALPipelineStepRunContext &)
     CPLAssert(!m_outputDataset.GetDatasetRef());
 
     std::unique_ptr<OGRSpatialReference> poSrcCRS;
-    if (!m_srsCrs.empty())
+    if (!m_srcCrs.empty())
     {
         poSrcCRS = std::make_unique<OGRSpatialReference>();
-        poSrcCRS->SetFromUserInput(m_srsCrs.c_str());
+        poSrcCRS->SetFromUserInput(m_srcCrs.c_str());
         poSrcCRS->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
     }
 

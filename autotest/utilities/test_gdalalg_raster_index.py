@@ -222,7 +222,7 @@ def test_gdalalg_raster_index_crs():
     alg["output"] = ""
     alg["output-format"] = "MEM"
     alg["output-layer"] = "out"
-    alg["dst-crs"] = "EPSG:4267"
+    alg["output-crs"] = "EPSG:4267"
     alg["source-crs-field-name"] = "source_crs"
     assert alg.Run()
     ds = alg["output"].GetDataset()
@@ -247,7 +247,7 @@ def test_gdalalg_raster_index_error():
     alg["output"] = ""
     alg["output-format"] = "MEM"
     alg["output-layer"] = "out"
-    alg["dst-crs"] = "EPSG:4267"
+    alg["output-crs"] = "EPSG:4267"
     with pytest.raises(Exception, match="Unable to open /i/do/not/exist"):
         alg.Run()
 
@@ -518,11 +518,11 @@ def test_gdalalg_raster_index_stac_geoparquet_error_not_epsg_4326(tmp_vsimem):
 
     with pytest.raises(
         Exception,
-        match="STAC-GeoParquet profile is only compatible with --dst-crs=EPSG:4326",
+        match="STAC-GeoParquet profile is only compatible with --output-crs=EPSG:4326",
     ):
         gdal.alg.raster.index(
             input="../gcore/data/byte.tif",
             output=tmp_vsimem / "out.parquet",
             profile="STAC-GeoParquet",
-            dst_crs="EPSG:3857",
+            output_crs="EPSG:3857",
         )

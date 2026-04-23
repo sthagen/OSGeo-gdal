@@ -34,18 +34,19 @@ This command can also be used as a step of :ref:`gdal_vector_pipeline`.
 Program-Specific Options
 ------------------------
 
-.. option:: -d, --dst-crs <SRC-CRS>
+.. option:: --input-crs, -s, <INPUT-CRS>
 
-    Set destination spatial reference.
-
-    .. include:: gdal_options/srs_def_gdal_raster_reproject.rst
-
-.. option:: -s, --src-crs <SRC-CRS>
-
-    Set source spatial reference. If not specified the SRS found in the input
+    Override input spatial reference. If not specified the SRS found in the input
     dataset will be used.
 
     .. include:: gdal_options/srs_def_gdal_raster_reproject.rst
+
+.. option:: --output-crs, -d <OUTPUT-CRS>
+
+    Set output spatial reference.
+
+    .. include:: gdal_options/srs_def_gdal_raster_reproject.rst
+
 
 Standard Options
 ----------------
@@ -97,7 +98,7 @@ Examples
 
    .. code-block:: bash
 
-        $ gdal vector reproject --dst-crs=EPSG:32632 in.gpkg out.gpkg --overwrite
+        $ gdal vector reproject --output-crs=EPSG:32632 in.gpkg out.gpkg --overwrite
 
 .. example::
    :id: gdal-vector-reproject-crs
@@ -110,20 +111,20 @@ Examples
 
         # OGC CRS URI
         $ gdal vector reproject \
-            --dst-crs="http://www.opengis.net/def/crs/EPSG/0/3857" \
+            --output-crs="http://www.opengis.net/def/crs/EPSG/0/3857" \
             natural_earth_vector.gpkg --layer=ne_10m_populated_places \
             places.json --overwrite
 
         # OGC CRS URN
         $ gdal vector reproject \
-            --dst-crs="urn:ogc:def:crs:EPSG::3857" \
+            --output-crs="urn:ogc:def:crs:EPSG::3857" \
             natural_earth_vector.gpkg --layer=ne_10m_populated_places \
             places.json --overwrite
 
         # PROJ string (legacy format)
         $ PROJ4="+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +nadgrids=@null +wktext +no_defs +type=crs"
         $ gdal vector reproject \
-            --dst-crs="$PROJ4" \
+            --output-crs="$PROJ4" \
             natural_earth_vector.gpkg --layer=ne_10m_populated_places \
             places.json --overwrite
 
@@ -145,7 +146,7 @@ Examples
    .. code-block:: bash
 
         $ gdal vector reproject \
-            --dst-crs=EPSG:3857 \
+            --output-crs=EPSG:3857 \
             --config OGR_ENABLE_PARTIAL_REPROJECTION=TRUE \
             natural_earth_vector.gpkg --layer=ne_10m_time_zones \
             ne_10m_time_zones.json \

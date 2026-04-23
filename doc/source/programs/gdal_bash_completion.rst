@@ -101,7 +101,7 @@ Examples of completion
 
    .. code-block:: console
 
-        $ gdal raster reproject --dst-crs EPSG:432<TAB>
+        $ gdal raster reproject --output-crs EPSG:432<TAB>
         ==>
         4322 -- WGS 72                  4324 -- WGS 72BE                4326 -- WGS 84                  4327 -- WGS 84 (geographic 3D)  4328 -- WGS 84 (geocentric)     4329 -- WGS 84 (3D)
 
