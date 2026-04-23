@@ -728,6 +728,10 @@ def _WarnIfUserHasNotSpecifiedIfUsingExceptions():
             self._SetFieldBinary(fld_index, value)
             return
 
+        if hasattr(value, 'tolist'):
+            self._SetField2(fld_index, value.tolist())
+            return
+
         try:
             self.SetField(fld_index, value)
         except:
