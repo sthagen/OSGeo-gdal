@@ -1183,7 +1183,7 @@ EHgetid(int32 fid, int32 vgid, const char *objectname, intn code,
 		    /* Get ID and name */
 		    /* --------------- */
 		    id = Vattach(fid, *(refs + i), access);
-		    Vgetname(id, name);
+		    VgetnameSafe(id, name, sizeof(name));
 
 		    /* If name equals desired object name get ID */
 		    /* ----------------------------------------- */
@@ -2022,7 +2022,7 @@ EHinquire(const char *filename, const char *type, char *objectlist, int32 * strb
 	/* Get Vgroup ID, name, and class */
 	/* ------------------------------ */
 	vGrpID = Vattach(HDFfid, vgRef, "r");
-	Vgetname(vGrpID, name);
+	VgetnameSafe(vGrpID, name, sizeof(name));
 	Vgetclass(vGrpID, class);
 
 

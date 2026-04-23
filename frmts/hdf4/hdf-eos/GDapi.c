@@ -378,7 +378,7 @@ GDattach(int32 fid, const char *gridname)
 		/* Get name and class of Vgroup */
 		/* ---------------------------- */
 		vgid[0] = Vattach(HDFfid, vgRef, "r");
-		Vgetname(vgid[0], name);
+		VgetnameSafe(vgid[0], name, sizeof(name));
 		Vgetclass(vgid[0], class);
 
 
@@ -703,7 +703,7 @@ GDdiminfo(int32 gridID, const char *dimname)
 	   free(utlstr);
 	   return -1;
 	}
-	Vgetname(GDXGrid[gID].IDTable, gridname);
+	VgetnameSafe(GDXGrid[gID].IDTable, gridname, sizeof(gridname));
 
 
 	/* Get pointers to "Dimension" section within SM */
@@ -833,7 +833,7 @@ GDgridinfo(int32 gridID, int32 * xdimsize, int32 * ydimsize,
 	   free(utlstr);
 	   return -1;
 	}
-	Vgetname(GDXGrid[gID].IDTable, gridname);
+	VgetnameSafe(GDXGrid[gID].IDTable, gridname, sizeof(gridname));
 
 
 	/* Get pointers to grid structure section within SM */
@@ -1034,7 +1034,7 @@ GDprojinfo(int32 gridID, int32 * projcode, int32 * zonecode,
 	   return -1;
 	}
 
-	Vgetname(GDXGrid[gID].IDTable, gridname);
+	VgetnameSafe(GDXGrid[gID].IDTable, gridname, sizeof(gridname));
 
 
 	/* Get pointers to grid structure section within SM */
@@ -1274,7 +1274,7 @@ GDorigininfo(int32 gridID, int32 * origincode)
 	   return -1;
 	}
 
-	Vgetname(GDXGrid[gID].IDTable, gridname);
+	VgetnameSafe(GDXGrid[gID].IDTable, gridname, sizeof(gridname));
 
 
 	/* Get pointers to grid structure section within SM */
@@ -1397,7 +1397,7 @@ GDpixreginfo(int32 gridID, int32 * pixregcode)
 	   return -1;
 	}
 
-	Vgetname(GDXGrid[gID].IDTable, gridname);
+	VgetnameSafe(GDXGrid[gID].IDTable, gridname, sizeof(gridname));
 
 	/* Get pointers to grid structure section within SM */
 	metabuf = (char *) EHmetagroup(sdInterfaceID, gridname, "g",
@@ -1506,7 +1506,7 @@ GDcompinfo(int32 gridID, const char *fieldname, int32 * compcode, intn compparm[
 		free(utlstr);
 		return -1;
 	}
-	Vgetname(GDXGrid[gID].IDTable, gridname);
+	VgetnameSafe(GDXGrid[gID].IDTable, gridname, sizeof(gridname));
 
 	/* Get pointers to "DataField" section within SM */
 	metabuf = (char *) EHmetagroup(sdInterfaceID, gridname, "g",
@@ -1710,7 +1710,7 @@ GDfieldinfo(int32 gridID, const char *fieldname, int32 * rank, int32 dims[],
 	    free(utlstr);
 	    return -1;
     }
-	Vgetname(GDXGrid[gID].IDTable, gridname);
+	VgetnameSafe(GDXGrid[gID].IDTable, gridname, sizeof(gridname));
 
 	metabuf = (char *) EHmetagroup(sdInterfaceID, gridname, "g",
 				       "DataField", metaptrs);
@@ -1939,7 +1939,7 @@ GDSDfldsrch(int32 gridID, int32 sdInterfaceID, const char *fieldname,
 	    {
 		/* Get grid name */
 		/* ------------- */
-		Vgetname(GDXGrid[gID].IDTable, gridname);
+		VgetnameSafe(GDXGrid[gID].IDTable, gridname, sizeof(gridname));
 
 
 		/* Get pointers to "MergedFields" section within SM */
@@ -2726,7 +2726,7 @@ GDinqdims(int32 gridID, char *dimnames, int32 dims[])
 	       free(utlstr);
 	       return -1;
 	    }
-	    Vgetname(GDXGrid[gID].IDTable, gridname);
+	    VgetnameSafe(GDXGrid[gID].IDTable, gridname, sizeof(gridname));
 
 
 	    /* Get pointers to "Dimension" section within SM */
@@ -2888,7 +2888,7 @@ GDinqfields(int32 gridID, char *fieldlist, int32 rank[],
 	       free(utlstr);
 	       return -1;
 	    }
-	    Vgetname(GDXGrid[gID].IDTable, gridname);
+	    VgetnameSafe(GDXGrid[gID].IDTable, gridname, sizeof(gridname));
 
 
 	    /* Get pointers to "DataField" section within SM */
@@ -3080,7 +3080,7 @@ GDnentries(int32 gridID, int32 entrycode, int32 * strbufsize)
 	   return -1;
 	}
 
-	Vgetname(GDXGrid[gID].IDTable, gridname);
+	VgetnameSafe(GDXGrid[gID].IDTable, gridname, sizeof(gridname));
 
 	/* Zero out string buffer size */
 	*strbufsize = 0;
@@ -3379,7 +3379,7 @@ GDdetach(int32 gridID)
 	{
 	   return -1;
 	}
-	Vgetname(GDXGrid[gID].IDTable, gridname);
+	VgetnameSafe(GDXGrid[gID].IDTable, gridname, sizeof(gridname));
 
 
 	/* "Detach" from previously attached SDSs */
