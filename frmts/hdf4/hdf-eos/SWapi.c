@@ -2773,10 +2773,11 @@ SWnentries(int32 swathID, int32 entrycode, int32 * strbufsize)
                          * Get all string values Don't count quotes
                          */
                         EHgetmetavalue(metaptrs, &valName[i][0], utlstr);
-                        if( utlstr[0] == '"' && utlstr[strlen(utlstr)-1] == '"' )
-                            *strbufsize += (int32)strlen(utlstr) - 2;
+                        const size_t len = strlen(utlstr);
+                        if( len >= 2 && utlstr[0] == '"' && utlstr[len-1] == '"' )
+                            *strbufsize += (int32)len - 2;
                         else
-                            *strbufsize += (int32)strlen(utlstr);
+                            *strbufsize += (int32)len;
                     }
                     /* Increment number of entries */
                     nEntries++;
