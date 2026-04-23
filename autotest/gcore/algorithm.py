@@ -491,8 +491,10 @@ def test_gdal_alg_module(tmp_vsimem):
        filename: str
            File or directory name
        output_format: Optional[str]=None
+           Aliases: format
            Output format
        long_listing: Optional[bool]=None
+           Aliases: long
            Use a long listing format
        recursive: Optional[bool]=None
            List subdirectories recursively
