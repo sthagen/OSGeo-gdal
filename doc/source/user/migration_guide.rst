@@ -43,12 +43,11 @@ From GDAL 3.12 to GDAL 3.13
     ``char **`` to use ``CSLConstList`` instead. Such change is compatible with
     earlier GDAL versions.
 
-- Changes impacting Python users:
+- GDAL CLI changes:
 
-  * Several command-line arguments in the unified GDAL CLI were renamed from a 
-    --src/--dst pattern to an --input/--output pattern. The old argument names 
-    are still accepted by the CLI but are not recognized by the gdal.alg Python 
-    interface. 
+  * Several command-line arguments in the unified GDAL CLI were renamed from a
+    --src/--dst pattern to an --input/--output pattern. The old argument names
+    are still accepted by command line tools, C, C++ and Python API.
 
 - Behavior changes:
 

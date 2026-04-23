@@ -522,6 +522,11 @@ def test_gdal_alg_module(tmp_vsimem):
 
     assert gdal.alg.vsi.list(filename=tmp_vsimem).Output() == ["a"]
 
+    with pytest.raises(
+        Exception, match="'i-do-not-exist' is not a valid argument of 'list'"
+    ):
+        gdal.alg.vsi.list(filename="foo", i_do_not_exist=True)
+
 
 ###############################################################################
 # Test gdal algorithm with mutual dependencies between arguments
