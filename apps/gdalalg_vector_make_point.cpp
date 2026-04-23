@@ -37,7 +37,9 @@ GDALVectorMakePointAlgorithm::GDALVectorMakePointAlgorithm(bool standaloneStep)
            &m_zField);
     AddArg("m", 0, _("Optional field from which M coordinate should be read"),
            &m_mField);
-    AddArg("dst-crs", 0, _("Destination CRS"), &m_dstCrs).SetIsCRSArg();
+    AddArg(GDAL_ARG_NAME_OUTPUT_CRS, 0, _("Output CRS"), &m_dstCrs)
+        .AddHiddenAlias("dst-crs")
+        .SetIsCRSArg();
 }
 
 namespace

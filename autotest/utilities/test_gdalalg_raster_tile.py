@@ -1302,9 +1302,9 @@ def test_gdalalg_raster_tile_addalpha_dstnodata_exclusive(tmp_vsimem):
     alg["input"] = "../gcore/data/byte.tif"
     alg["output"] = tmp_vsimem
     alg["add-alpha"] = True
-    alg["dst-nodata"] = 0
+    alg["output-nodata"] = 0
     with pytest.raises(
-        Exception, match="'add-alpha' and 'dst-nodata' are mutually exclusive"
+        Exception, match="'add-alpha' and 'output-nodata' are mutually exclusive"
     ):
         alg.Run()
 

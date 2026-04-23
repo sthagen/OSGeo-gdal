@@ -103,13 +103,15 @@ GDALRasterMosaicStackCommonAlgorithm::GDALRasterMosaicStackCommonAlgorithm(
                           _("Round target extent to target resolution"),
                           &m_targetAlignedPixels)
                        .AddHiddenAlias("tap");
-    AddArg("src-nodata", 0, _("Set nodata values for input bands."),
+    AddArg("input-nodata", 0, _("Set nodata values for input bands."),
            &m_srcNoData)
         .SetMinCount(1)
+        .AddHiddenAlias("src-nodata")
         .SetRepeatedArgAllowed(false);
-    AddArg("dst-nodata", 0,
+    AddArg("output-nodata", 0,
            _("Set nodata values at the destination band level."), &m_dstNoData)
         .SetMinCount(1)
+        .AddHiddenAlias("dst-nodata")
         .SetRepeatedArgAllowed(false);
     AddArg("hide-nodata", 0,
            _("Makes the destination band not report the NoData."),
@@ -300,6 +302,7 @@ bool GDALRasterMosaicStackCommonAlgorithm::RunImpl(GDALProgressFunc pfnProgress,
                   EQUAL(m_format.c_str(), "stream"));
 
         m_standaloneStep = false;
+        m_alreadyRun = false;
         bool ret = Run(pfnProgress, pProgressData);
         m_standaloneStep = true;
         if (ret)

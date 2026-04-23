@@ -148,7 +148,7 @@ Let's imagine we have a :file:`raster_reproject.gdalg.json` with the following c
 
     {
         "type": "gdal_streamed_alg",
-        "command_line": "gdal pipeline ! read in.tif ! reproject --dst-crs=EPSG:4326 ! edit --metadata=CHANGES=reprojected"
+        "command_line": "gdal pipeline ! read in.tif ! reproject --output-crs=EPSG:4326 ! edit --metadata=CHANGES=reprojected"
     }
 
 It is possible to run it with the following command line, overriding the
@@ -178,7 +178,7 @@ For example, given:
 
     {
         "type": "gdal_streamed_alg",
-        "command_line": "gdal pipeline ! read in.tif ! edit --metadata=before=value ! reproject --dst-crs=EPSG:4326 ! edit --metadata=CHANGES=reprojected"
+        "command_line": "gdal pipeline ! read in.tif ! edit --metadata=before=value ! reproject --output-crs=EPSG:4326 ! edit --metadata=CHANGES=reprojected"
     }
 
 the following command line may be used:
@@ -358,14 +358,14 @@ Examples
 
    .. code-block:: bash
 
-        $ gdal pipeline ! read in.gpkg ! rasterize --size 1000,1000 ! reproject --dst-crs EPSG:4326 ! write out.tif --overwrite
+        $ gdal pipeline ! read in.gpkg ! rasterize --size 1000,1000 ! reproject --output-crs EPSG:4326 ! write out.tif --overwrite
 
 .. example::
    :title: Use an existing pipeline that rasterizes and reprojects, but change its input file and target CRS, and specify the output file
 
    .. code-block:: bash
 
-        $ gdal pipeline raster_reproject.gdalg.json --input=my.gpkg --output=out.tif --dst-crs=EPSG:32631
+        $ gdal pipeline raster_reproject.gdalg.json --input=my.gpkg --output=out.tif --output-crs=EPSG:32631
 
 .. example::
    :title: Buffer a line dataset to create a new polygon dataset

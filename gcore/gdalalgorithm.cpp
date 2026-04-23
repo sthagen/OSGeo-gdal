@@ -1649,7 +1649,7 @@ GDALInConstructionAlgorithmArg &GDALInConstructionAlgorithmArg::SetIsCRSArg(
             bool bIsRaster = false;
             OGREnvelope sDatasetLongLatEnv;
             std::string osCelestialBodyName;
-            if (GetName() == "dst-crs")
+            if (GetName() == GDAL_ARG_NAME_OUTPUT_CRS)
             {
                 auto inputArg = m_owner->GetArg(GDAL_ARG_NAME_INPUT);
                 if (inputArg && inputArg->GetType() == GAAT_DATASET_LIST)
@@ -6209,6 +6209,14 @@ bool GDALAlgorithm::Run(GDALProgressFunc pfnProgress, void *pProgressData)
     if (!ValidateArguments())
         return false;
 
+    if (m_alreadyRun)
+    {
+        ReportError(CE_Failure, CPLE_AppDefined,
+                    "Run() can be called only once per algorithm instance");
+        return false;
+    }
+    m_alreadyRun = true;
+
     switch (ProcessGDALGOutput())
     {
         case ProcessGDALGOutputRet::GDALG_ERROR:
@@ -7650,6 +7658,8 @@ GDALAlgorithmH GDALAlgorithmGetActualAlgorithm(GDALAlgorithmH hAlg)
 
 /** Execute the algorithm, starting with ValidateArguments() and then
  * calling RunImpl().
+ *
+ * This function must be called at most once per instance.
  *
  * @param hAlg Handle to an algorithm. Must NOT be null.
  * @param pfnProgress Progress callback. May be null.

@@ -25,7 +25,7 @@ Description
 Program-Specific Options
 ------------------------
 
-.. option:: --dst-crs <CRS>
+.. option:: --output-crs <CRS>
 
    Optional coordinate reference system to assign to the created points.
    The coordinate reference systems that can be passed are anything supported by the

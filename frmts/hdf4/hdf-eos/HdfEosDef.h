@@ -204,7 +204,7 @@ int32 EHattrcat(int32, int32, char *, int32 *);
 int32 EHinquire(const char *, const char *, char *, int32 *);
 intn EHclose(int32);
 
-
+int32 VgetnameSafe(int32 vkey, char *vgname, size_t vgnamesize);
 
 #ifdef __cplusplus
 }

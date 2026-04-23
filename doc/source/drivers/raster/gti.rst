@@ -415,10 +415,10 @@ mentioned in the previous section.
             <Dataset>other.gti.gpkg</Dataset>
             <Layer>other_layer</Layer>                 <!-- optional -->
             <OpenOptions>                              <!-- optional -->
-                <OOI key="XMIN">2</OOI>
-                <OOI key="YMIN">49</OOI>
-                <OOI key="XMAX">3</OOI>
-                <OOI key="YMAX">50</OOI>
+                <OOI key="MINX">2</OOI>
+                <OOI key="MINY">49</OOI>
+                <OOI key="MAXX">3</OOI>
+                <OOI key="MAXY">50</OOI>
             </OpenOptions>
         </Overview>
 
@@ -683,10 +683,10 @@ needed, one ``<Overview>`` element per level must be specified.
             <Dataset>other.gti.gpkg</Dataset>
             <Layer>other_layer</Layer>
             <OpenOptions>
-                <OOI key="XMIN">2</OOI>
-                <OOI key="YMIN">49</OOI>
-                <OOI key="XMAX">3</OOI>
-                <OOI key="YMAX">50</OOI>
+                <OOI key="MINX">2</OOI>
+                <OOI key="MINY">49</OOI>
+                <OOI key="MAXX">3</OOI>
+                <OOI key="MAXY">50</OOI>
             </OpenOptions>
         </Overview>
 
@@ -763,7 +763,7 @@ an integer index (starting at 0 since GDAL 3.9.2, starting at 1 in previous vers
         # of the main GTI dataset (assuming such extent is 2,49,3,50).
         OVERVIEW_4_DATASET=other.gti.gpkg
         OVERVIEW_4_LAYER=layer
-        OVERVIEW_4_OPEN_OPTIONS=XMIN=2,YMIN=49,XMAX=3,YMAX=50
+        OVERVIEW_4_OPEN_OPTIONS=MINX=2,MINY=49,MAXX=3,MAXY=50
 
 
 Multi-threading optimizations

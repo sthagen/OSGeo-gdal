@@ -75,12 +75,14 @@ GDALVectorConcatAlgorithm::GDALVectorConcatAlgorithm(bool bStandalone)
            &m_fieldStrategy)
         .SetChoices("union", "intersection")
         .SetDefault(m_fieldStrategy);
-    AddArg("src-crs", 's', _("Source CRS"), &m_srsCrs)
+    AddArg("input-crs", 's', _("Input CRS"), &m_srsCrs)
         .SetIsCRSArg()
-        .AddHiddenAlias("s_srs");
-    AddArg("dst-crs", 'd', _("Destination CRS"), &m_dstCrs)
+        .AddHiddenAlias("s_srs")
+        .AddHiddenAlias("src-crs");
+    AddArg("output-crs", 'd', _("Output CRS"), &m_dstCrs)
         .SetIsCRSArg()
-        .AddHiddenAlias("t_srs");
+        .AddHiddenAlias("t_srs")
+        .AddHiddenAlias("dst-crs");
 }
 
 GDALVectorConcatAlgorithm::~GDALVectorConcatAlgorithm() = default;
@@ -514,6 +516,7 @@ bool GDALVectorConcatAlgorithm::RunImpl(GDALProgressFunc pfnProgress,
                   EQUAL(m_format.c_str(), "stream"));
 
         m_standaloneStep = false;
+        m_alreadyRun = false;
         bool ret = Run(pfnProgress, pProgressData);
         m_standaloneStep = true;
         if (ret)

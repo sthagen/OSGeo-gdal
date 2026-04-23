@@ -29,15 +29,18 @@
 
 GDALRasterCreateAlgorithm::GDALRasterCreateAlgorithm(
     bool standaloneStep) noexcept
-    : GDALRasterPipelineStepAlgorithm(NAME, DESCRIPTION, HELP_URL,
-                                      ConstructorOptions()
-                                          .SetStandaloneStep(standaloneStep)
-                                          .SetAddDefaultArguments(false)
-                                          .SetAutoOpenInputDatasets(true)
-                                          .SetInputDatasetAlias("like")
-                                          .SetInputDatasetRequired(false)
-                                          .SetInputDatasetPositional(false)
-                                          .SetInputDatasetMaxCount(1))
+    : GDALRasterPipelineStepAlgorithm(
+          NAME, DESCRIPTION, HELP_URL,
+          ConstructorOptions()
+              .SetStandaloneStep(standaloneStep)
+              .SetAddDefaultArguments(false)
+              .SetAutoOpenInputDatasets(true)
+              .SetInputDatasetHelpMsg("Template raster dataset")
+              .SetInputDatasetAlias("like")
+              .SetInputDatasetMetaVar("TEMPLATE-DATASET")
+              .SetInputDatasetRequired(false)
+              .SetInputDatasetPositional(false)
+              .SetInputDatasetMaxCount(1))
 {
     AddRasterInputArgs(false, false);
     if (standaloneStep)

@@ -35,9 +35,10 @@ GDALRasterReprojectAlgorithm::GDALRasterReprojectAlgorithm(bool standaloneStep)
                                       standaloneStep)
 {
 
-    AddArg("src-crs", 's', _("Source CRS"), &m_srsCrs)
+    AddArg(GDAL_ARG_NAME_INPUT_CRS, 's', _("Input CRS"), &m_srcCrs)
         .SetIsCRSArg()
-        .AddHiddenAlias("s_srs");
+        .AddHiddenAlias("s_srs")
+        .AddHiddenAlias("src-crs");
 
     AddArg("like", 0,
            _("Dataset to use as a template for target bounds, CRS, size and "
@@ -45,9 +46,10 @@ GDALRasterReprojectAlgorithm::GDALRasterReprojectAlgorithm(bool standaloneStep)
            &m_likeDataset, GDAL_OF_RASTER)
         .SetMetaVar("DATASET");
 
-    AddArg("dst-crs", 'd', _("Destination CRS"), &m_dstCrs)
+    AddArg(GDAL_ARG_NAME_OUTPUT_CRS, 'd', _("Output CRS"), &m_dstCrs)
         .SetIsCRSArg()
-        .AddHiddenAlias("t_srs");
+        .AddHiddenAlias("t_srs")
+        .AddHiddenAlias("dst-crs");
 
     GDALRasterReprojectUtils::AddResamplingArg(this, m_resampling);
 
@@ -99,16 +101,18 @@ GDALRasterReprojectAlgorithm::GDALRasterReprojectAlgorithm(bool standaloneStep)
            &m_targetAlignedPixels)
         .AddHiddenAlias("tap")
         .SetCategory(GAAC_ADVANCED);
-    AddArg("src-nodata", 0,
+    AddArg("input-nodata", 0,
            _("Set nodata values for input bands ('None' to unset)."),
            &m_srcNoData)
         .SetMinCount(1)
+        .AddHiddenAlias("src-nodata")
         .SetRepeatedArgAllowed(false)
         .SetCategory(GAAC_ADVANCED);
-    AddArg("dst-nodata", 0,
+    AddArg("output-nodata", 0,
            _("Set nodata values for output bands ('None' to unset)."),
            &m_dstNoData)
         .SetMinCount(1)
+        .AddHiddenAlias("dst-nodata")
         .SetRepeatedArgAllowed(false)
         .SetCategory(GAAC_ADVANCED);
     AddArg("add-alpha", 0,
@@ -304,10 +308,10 @@ bool GDALRasterReprojectAlgorithm::RunStep(GDALPipelineStepRunContext &ctxt)
         aosOptions.AddString("-of");
         aosOptions.AddString("VRT");
     }
-    if (!m_srsCrs.empty())
+    if (!m_srcCrs.empty())
     {
         aosOptions.AddString("-s_srs");
-        aosOptions.AddString(m_srsCrs.c_str());
+        aosOptions.AddString(m_srcCrs.c_str());
     }
     if (!m_dstCrs.empty())
     {

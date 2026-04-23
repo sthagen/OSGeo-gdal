@@ -37,10 +37,10 @@ def test_gdalalg_raster_reproject(tmp_vsimem):
         return True
 
     alg = get_reproject_alg()
-    alg["src-crs"] = "EPSG:32611"
+    alg["input-crs"] = "EPSG:32611"
     srs = osr.SpatialReference()
     srs.ImportFromEPSG(4326)
-    alg["dst-crs"] = srs
+    alg["output-crs"] = srs
     alg["input"] = "../gcore/data/byte.tif"
     alg["output"] = out_filename
     alg["creation-option"] = {"COMPRESS": "LZW"}
@@ -66,7 +66,7 @@ def test_gdalalg_raster_reproject_through_pipeline(tmp_vsimem):
     assert gdal.Run(
         "raster",
         "pipeline",
-        pipeline=f"read ../gcore/data/byte.tif ! reproject --src-crs=EPSG:32611 --dst-crs=EPSG:4326 ! write {out_filename} --co COMPRESS=LZW",
+        pipeline=f"read ../gcore/data/byte.tif ! reproject --input-crs=EPSG:32611 --output-crs=EPSG:4326 ! write {out_filename} --co COMPRESS=LZW",
         progress=my_progress,
     )
     assert last_pct[0] == 1.0
@@ -269,16 +269,18 @@ def test_gdalalg_raster_reproject_both_num_threads_and_warp_option(tmp_vsimem):
         )
 
 
-def test_gdalalg_raster_reproject_complete_dst_crs():
+def test_gdalalg_raster_reproject_complete_output_crs():
     import gdaltest
     import test_cli_utilities
 
     gdal_path = test_cli_utilities.get_gdal_path()
     if gdal_path is None:
         pytest.skip("gdal binary missing")
+
     out = gdaltest.runexternal(
-        f"{gdal_path} completion gdal raster reproject ../gcore/data/byte.tif --dst-crs=EPSG:"
+        f"{gdal_path} completion gdal raster reproject ../gcore/data/byte.tif --output-crs=EPSG:"
     )
+
     assert "4326\\ --" in out
     assert "2193\\ --" not in out  # NZGD2000
 

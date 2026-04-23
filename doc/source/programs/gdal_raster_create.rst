@@ -84,7 +84,7 @@ Program-Specific Options
 
     Note that the spatial extent is also left unchanged.
 
-.. option:: --like, --like <DATASET>
+.. option:: -i, --like, --input <TEMPLATE-DATASET>
 
     Name of GDAL input dataset that serves as a template for default values of
     options :option:`--size`, :option:`--band-count`, :option:`--datatype`,

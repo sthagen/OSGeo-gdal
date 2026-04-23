@@ -17,6 +17,7 @@ this permission notice appear in supporting documentation.
 
 #include "cpl_port.h"
 #include <errno.h>
+#include <limits.h>
 #include "mfhdf.h"
 #include "HdfEosDef.h"
 
@@ -194,7 +195,7 @@ EHopen(const char *filename, intn access)
 
 		    /* Setup structural metadata */
 		    /* ------------------------- */
-		    metabuf = (char *) calloc(32000, 1);
+		    metabuf = (char *) calloc(UTLSTRSIZE, 1);
 		    if(metabuf == NULL)
 		    {
 			HEpush(DFE_NOSPACE,"EHopen", __FILE__, __LINE__);
@@ -212,7 +213,7 @@ EHopen(const char *filename, intn access)
 		    /* Write Structural metadata */
 		    /* ------------------------- */
 		    SDsetattr(sdInterfaceID, "StructMetadata.0",
-			      DFNT_CHAR8, 32000, metabuf);
+			      DFNT_CHAR8, UTLSTRSIZE, metabuf);
 		    free(metabuf);
 		} else
 		{
@@ -290,7 +291,7 @@ EHopen(const char *filename, intn access)
 		       /* --------------------------------------------- */
 		       if (attrIndex == -1)
 		       {
-			  metabuf = (char *) calloc(32000, 1);
+			  metabuf = (char *) calloc(UTLSTRSIZE, 1);
 			  if(metabuf == NULL)
 			  {
 			      HEpush(DFE_NOSPACE,"EHopen", __FILE__, __LINE__);
@@ -306,7 +307,7 @@ EHopen(const char *filename, intn access)
 			  strcat(metabuf, "END\n");
 
 			  SDsetattr(sdInterfaceID, "StructMetadata.0",
-				  DFNT_CHAR8, 32000, metabuf);
+				  DFNT_CHAR8, UTLSTRSIZE, metabuf);
 			  free(metabuf);
 		       }
                     } else
@@ -1182,7 +1183,7 @@ EHgetid(int32 fid, int32 vgid, const char *objectname, intn code,
 		    /* Get ID and name */
 		    /* --------------- */
 		    id = Vattach(fid, *(refs + i), access);
-		    Vgetname(id, name);
+		    VgetnameSafe(id, name, sizeof(name));
 
 		    /* If name equals desired object name get ID */
 		    /* ----------------------------------------- */
@@ -1482,7 +1483,7 @@ EHmetagroup(int32 sdInterfaceID, const char *structname, const char *structcode,
     intn            i;		/* Loop index */
 
     int32           attrIndex;	/* Structural metadata attribute index */
-    int32           nmeta;	/* Number of 32000 byte metadata sections */
+    int32           nmeta;	/* Number of UTLSTRSIZE byte metadata sections */
     int32           metalen;	/* Length of structural metadata */
 
     char           *metabuf;	/* Pointer (handle) to structural metadata */
@@ -1524,10 +1525,16 @@ EHmetagroup(int32 sdInterfaceID, const char *structname, const char *structcode,
 	}
     }
 
+    if (nmeta > INT_MAX / UTLSTRSIZE )
+    {
+        HEpush(DFE_NOSPACE,"EHEHmetagroup", __FILE__, __LINE__);
 
-    /* Allocate space for metadata (in units of 32000 bytes) */
+        return( NULL);
+    }
+
+    /* Allocate space for metadata (in units of UTLSTRSIZE bytes) */
     /* ----------------------------------------------------- */
-    metabuf = (char *) calloc(32000 * nmeta, 1);
+    metabuf = (char *) calloc(UTLSTRSIZE * nmeta, 1);
 
     if(metabuf == NULL)
     {
@@ -2015,7 +2022,7 @@ EHinquire(const char *filename, const char *type, char *objectlist, int32 * strb
 	/* Get Vgroup ID, name, and class */
 	/* ------------------------------ */
 	vGrpID = Vattach(HDFfid, vgRef, "r");
-	Vgetname(vGrpID, name);
+	VgetnameSafe(vGrpID, name, sizeof(name));
 	Vgetclass(vGrpID, class);
 
 

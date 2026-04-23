@@ -86,7 +86,7 @@ Program-Specific Options
 
     Create polygons instead of lines.
 
-.. option:: --src-nodata <SRCNODATA>
+.. option:: --input-nodata <INPUT-NODATA>
 
     Input pixel value to treat as 'nodata'.
 

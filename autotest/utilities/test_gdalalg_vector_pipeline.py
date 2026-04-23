@@ -181,7 +181,7 @@ def test_gdalalg_vector_pipeline_input_through_api_run_twice(tmp_vsimem):
     pipeline["pipeline"] = f"read ! write {out_filename}"
     assert pipeline.Run()
     with pytest.raises(
-        Exception, match=r"pipeline: Step nr 0 \(read\) has already an output dataset"
+        Exception, match="can be called only once per algorithm instance"
     ):
         pipeline.Run()
 
@@ -711,7 +711,7 @@ def test_gdalalg_vector_pipeline_reproject_no_arg(tmp_vsimem):
     pipeline = get_pipeline_alg()
     with pytest.raises(
         Exception,
-        match="reproject: Required argument 'dst-crs' has not been specified",
+        match="reproject: Required argument 'output-crs' has not been specified",
     ):
         pipeline.ParseRunAndFinalize(
             [
@@ -733,7 +733,7 @@ def test_gdalalg_vector_pipeline_reproject_invalid_src_crs(tmp_vsimem):
     pipeline = get_pipeline_alg()
     with pytest.raises(
         Exception,
-        match="reproject: Invalid value for 'src-crs' argument",
+        match="reproject: Invalid value for 'input-crs' argument",
     ):
         pipeline.ParseRunAndFinalize(
             [
@@ -741,8 +741,8 @@ def test_gdalalg_vector_pipeline_reproject_invalid_src_crs(tmp_vsimem):
                 "../ogr/data/poly.shp",
                 "!",
                 "reproject",
-                "--src-crs=invalid",
-                "--dst-crs=EPSG:4326",
+                "--input-crs=invalid",
+                "--output-crs=EPSG:4326",
                 "!",
                 "write",
                 out_filename,
@@ -757,7 +757,7 @@ def test_gdalalg_vector_pipeline_reproject_invalid_dst_crs(tmp_vsimem):
     pipeline = get_pipeline_alg()
     with pytest.raises(
         Exception,
-        match="reproject: Invalid value for 'dst-crs' argument",
+        match="reproject: Invalid value for 'output-crs' argument",
     ):
         pipeline.ParseRunAndFinalize(
             [
@@ -765,7 +765,7 @@ def test_gdalalg_vector_pipeline_reproject_invalid_dst_crs(tmp_vsimem):
                 "../ogr/data/poly.shp",
                 "!",
                 "reproject",
-                "--dst-crs=invalid",
+                "--output-crs=invalid",
                 "!",
                 "write",
                 out_filename,

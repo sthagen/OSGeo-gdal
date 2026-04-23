@@ -133,10 +133,11 @@ GDALRasterViewshedAlgorithm::GDALRasterViewshedAlgorithm(bool standaloneStep)
              "specified by the observer location and the maximum distance"),
            &m_opts.outOfRangeVal)
         .SetDefault(m_opts.outOfRangeVal);
-    AddArg("dst-nodata", 0,
+    AddArg("output-nodata", 0,
            _("The value to be set for the cells in the output raster that have "
              "no data."),
            &m_opts.nodataVal)
+        .AddHiddenAlias("dst-nodata")
         .SetMinValueIncluded(0)
         .SetMaxValueIncluded(255);
     AddArg("observer-spacing", 0, _("Cell Spacing between observers"),
