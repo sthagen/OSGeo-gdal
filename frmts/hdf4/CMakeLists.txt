@@ -7,6 +7,7 @@ set(_SOURCES
     hdf-eos/GDapi.c
     hdf-eos/gctp_wrap.c
     hdf-eos/SWapi.c
+    hdf-eos/helper.c
     hdf4compat.h
     hdf4dataset.h
     hdf4dataset.cpp
