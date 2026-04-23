@@ -18,6 +18,7 @@
 #include <string.h>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -698,10 +699,12 @@ bool OGROpenFileGDBDataSource::OpenFileGDBv10(
         oMapPathToFeatureDataset;
 
     // First pass to collect FeatureDatasets
+    std::set<int> oSetBrokenRos;
     for (int i = 0; i < oTable.GetTotalRecordCount(); i++)
     {
-        if (!oTable.SelectRow(i))
+        if (!oTable.SelectRow(i, /* bWarnOnlyOnDeletedRows = */ true))
         {
+            oSetBrokenRos.insert(i);
             if (oTable.HasGotError())
                 break;
             continue;
@@ -780,6 +783,9 @@ bool OGROpenFileGDBDataSource::OpenFileGDBv10(
     bool bRet = true;
     for (int i = 0; i < oTable.GetTotalRecordCount(); i++)
     {
+        if (cpl::contains(oSetBrokenRos, i))
+            continue;
+
         if (!oTable.SelectRow(i))
         {
             if (oTable.HasGotError())
