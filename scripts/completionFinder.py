@@ -306,7 +306,7 @@ def main(argv):
     )
     of.write("""
 
-if [ "${SHELL:-}" = "/usr/bin/bash" -a "${OS:-}" = "Windows_NT" ]; then
+if test "${SHELL:-}" = "/usr/bin/bash" -a "${OS:-}" = "Windows_NT"; then
   # For msys2
   CURRENT_SHELL="bash"
 elif ! ps -p $$ >/dev/null 2>/dev/null; then
