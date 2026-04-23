@@ -86,10 +86,7 @@ def _generate_gdal_alg_methods():
                             continue
 
                         sanitized_names = []
-                        for name in names:
-                            if args:
-                                args += ", "
-                                kwargs += ", "
+                        for idx, name in enumerate(names):
 
                             arg_name_sanitized = name.replace('-', '_')
                             if arg_name_sanitized[0:1].isdigit():
@@ -98,18 +95,23 @@ def _generate_gdal_alg_methods():
                             assert arg_name_sanitized.isidentifier()
                             sanitized_names.append(arg_name_sanitized)
 
-                            args += arg_name_sanitized
-                            type_hint = _get_type_hint(arg, for_input=True)
-                            if not is_required:
-                                type_hint = f"Optional[{type_hint}]=None"
-                                args += f": {type_hint}"
-                            else:
-                                if len(names) > 1:
-                                    args += f": Optional[{type_hint}]=None"
-                                else:
-                                    args += f": {type_hint}"
+                            if idx == 0:
+                                if args:
+                                    args += ", "
+                                    kwargs += ", "
 
-                            kwargs += f'"{arg_name_sanitized}": {arg_name_sanitized}'
+                                args += arg_name_sanitized
+                                type_hint = _get_type_hint(arg, for_input=True)
+                                if not is_required:
+                                    type_hint = f"Optional[{type_hint}]=None"
+                                    args += f": {type_hint}"
+                                else:
+                                    if len(names) > 1:
+                                        args += f": Optional[{type_hint}]=None"
+                                    else:
+                                        args += f": {type_hint}"
+
+                                kwargs += f'"{arg_name_sanitized}": {arg_name_sanitized}'
 
                         parameters += "       "
                         parameters += sanitized_names[0]
@@ -166,10 +168,11 @@ def _generate_gdal_alg_methods():
 
 
             func_code = f"""
-def {name_sanitized}({args}):
-    kwargs = {kwargs}
-    kwargs = {{k: v for k, v in kwargs.items() if v is not None}}
-    return gdal.Run({new_path}, **kwargs)
+def {name_sanitized}({args}, **kwargs):
+    new_kwargs = {kwargs}
+    new_kwargs = {{k: v for k, v in new_kwargs.items() if v is not None}}
+    new_kwargs.update(kwargs)
+    return gdal.Run({new_path}, **new_kwargs)
 """
             func_globals = copy.copy(parent_module.__dict__)
             extra = {"gdal": gdal_module, "os": os, "List": List, "Union": Union, "Optional": Optional, "Callable": Callable}
