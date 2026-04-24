@@ -3866,10 +3866,8 @@ def test_gpkg_wkt2(version):
 
 
 @pytest.mark.slow()
+@pytest.mark.require_64bit()
 def test_gpkg_50000_25000_uint16():
-
-    if sys.maxsize < 2**32:
-        pytest.skip("Test not available on 32 bit")
 
     ds = gdal.Open(
         "/vsizip/data/gpkg/50000_25000_uint16.gpkg.zip/50000_25000_uint16.gpkg"
@@ -3896,10 +3894,8 @@ def test_gpkg_50000_25000_uint16():
 
 
 @pytest.mark.slow()
+@pytest.mark.require_64bit()
 def test_gpkg_50000_50000_uint16():
-
-    if sys.maxsize < 2**32:
-        pytest.skip("Test not available on 32 bit")
 
     ds = gdal.Open(
         "/vsizip/data/gpkg/50000_50000_uint16.gpkg.zip/50000_50000_uint16.gpkg"

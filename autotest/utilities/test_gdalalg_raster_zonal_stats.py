@@ -12,7 +12,6 @@
 ###############################################################################
 
 import math
-import sys
 
 import gdaltest
 import ogrtest
@@ -761,7 +760,7 @@ def test_gdalalg_raster_zonal_stats_polygon_zones_invalid_chunk_size(zonal):
         zonal["chunk-size"] = "512"
 
 
-@pytest.mark.skipif(sys.maxsize <= 1 << 32, reason="only works on 64 bit")
+@pytest.mark.require_64bit()
 def test_gdalalg_raster_zonal_stats_polygon_zones_large_chunk_size(zonal):
 
     zonal["input"] = "../gcore/data/byte.tif"

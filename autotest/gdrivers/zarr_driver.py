@@ -4533,10 +4533,8 @@ def test_zarr_read_nczar_repeated_array_names(tmp_vsimem):
         assert rg.GetGroupNames() == ["g"]
 
 
+@pytest.mark.require_64bit()
 def test_zarr_read_test_overflow_in_AllocateWorkingBuffers_due_to_fortran(tmp_vsimem):
-
-    if sys.maxsize < (1 << 32):
-        pytest.skip()
 
     gdal.Mkdir(tmp_vsimem / "test.zarr", 0)
 
@@ -4561,12 +4559,10 @@ def test_zarr_read_test_overflow_in_AllocateWorkingBuffers_due_to_fortran(tmp_vs
         assert ar.Read(count=[1, 1]) is None
 
 
+@pytest.mark.require_64bit()
 def test_zarr_read_test_overflow_in_AllocateWorkingBuffers_due_to_type_change(
     tmp_vsimem,
 ):
-
-    if sys.maxsize < (1 << 32):
-        pytest.skip()
 
     gdal.Mkdir(tmp_vsimem / "test.zarr", 0)
 
