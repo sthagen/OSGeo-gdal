@@ -438,10 +438,8 @@ def test_vrtwarp_read_vrt_of_warped_vrt():
 
 
 @pytest.mark.slow()
+@pytest.mark.require_64bit()
 def test_vrtwarp_read_blocks_larger_than_2_gigapixels():
-
-    if sys.maxsize < 2**32:
-        pytest.skip("Test not available on 32 bit")
 
     import psutil
 

@@ -846,10 +846,8 @@ def test_gdal_EscapeString():
     assert gdal.EscapeString("a\rb", gdal.CPLES_CSV) == '"a\rb"'
 
 
+@pytest.mark.require_32bit()
 def test_gdal_EscapeString_errors():
-
-    if sys.maxsize > 2**32:
-        pytest.skip("Test not available on 64 bit")
 
     try:
         # Allocation will be < 4 GB, but will fail being > 2 GB

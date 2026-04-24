@@ -3431,10 +3431,8 @@ def test_netcdf_open_empty_double_attr():
 
 
 @pytest.mark.slow()
+@pytest.mark.require_64bit()
 def test_netcdf_huge_block_size(tmp_path):
-
-    if sys.maxsize < 2**32:
-        pytest.skip("Test not available on 32 bit")
 
     import psutil
 
