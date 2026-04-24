@@ -1455,7 +1455,7 @@ void SAR_CEOSDataset::ScanForMetadata()
         coeffs.clear();
         for (int i = 0; i < 25; ++i)
         {
-            GetCeosField(record, 1025 + i * 20, "A20", szField);
+            GetCeosField(record, 1525 + i * 20, "A20", szField);
             CPLString osField(szField);
             osField.Trim();
             if (!coeffs.empty())

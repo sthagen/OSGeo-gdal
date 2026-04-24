@@ -2538,7 +2538,7 @@ def test_mem_md_resize_dim_wrong_too_big_allocation_before_malloc():
         assert v.Resize([1 << 63]) == gdal.CE_Failure
 
 
-@pytest.mark.skipif(sys.maxsize < 2**32, reason="only on 64bit")
+@pytest.mark.require_64bit()
 def test_mem_md_resize_dim_wrong_too_big_allocation_at_malloc():
 
     drv = gdal.GetDriverByName("MEM")

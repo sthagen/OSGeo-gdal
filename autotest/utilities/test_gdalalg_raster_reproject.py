@@ -451,3 +451,15 @@ def test_rotated(tmp_vsimem):
             "Dataset provided with --like has a geotransform with rotation. Ignoring it"
             in msgs[0]
         )
+
+
+def test_gdalalg_raster_reproject_hidden_alias_dst_crs():
+
+    with gdal.alg.raster.reproject(
+        input="../gcore/data/byte.tif",
+        output="",
+        output_format="MEM",
+        dst_crs="EPSG:4326",
+    ) as alg:
+        ds = alg.Output()
+        assert ds.GetSpatialRef().GetAuthorityCode() == "4326"
