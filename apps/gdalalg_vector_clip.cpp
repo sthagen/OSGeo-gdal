@@ -236,7 +236,7 @@ bool GDALVectorClipAlgorithm::RunStep(GDALPipelineStepRunContext &)
             return false;
         }
 
-        if (m_activeLayer.empty() ||
+        if ((m_activeLayer.empty() && poSrcLayer->GetGeomType() != wkbNone) ||
             m_activeLayer == poSrcLayer->GetDescription())
         {
             const OGRSpatialReference *clipSRS =
