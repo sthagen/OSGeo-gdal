@@ -2043,6 +2043,14 @@ std::unique_ptr<OGRGeometry> OGRGeometryFactory::organizePolygons(
                     cpl::down_cast<const OGRCurvePolygon *>(
                         sPolyEx.poCurvePolygon.get())
                         ->CurvePolyToPoly());
+
+                // Above CurvePolyToPoly() can fail on non-closed rings
+                if (sPolyEx.poPolygonForTest == nullptr ||
+                    sPolyEx.poPolygonForTest->IsEmpty())
+                {
+                    apoPolygons[i].reset();
+                    continue;
+                }
             }
             else if (bHasCurves)
             {
