@@ -2352,3 +2352,43 @@ End
     assert b"TestRepeated2 = 1 <m>\n    TestRepeated2 = 2 <cm>\n" in data
     assert b"TestRepeated3 = (1, 2)\n    TestRepeated3 = 3\n" in data
     assert b"TestRepeated4 = (1 <m>, 2)\n    TestRepeated4 = 3\n" in data
+
+
+def test_isis_keyword_with_slash(tmp_vsimem):
+    gdal.FileFromMemBuffer(
+        tmp_vsimem / "in.lbl",
+        """Object = IsisCube
+  Object = Core
+    StartByte = 1
+    Format = BandSequential
+    Group = Dimensions
+      Samples = 1
+      Lines   = 1
+      Bands   = 1
+    End_Group
+    Group = Pixels
+      Type       = UnsignedByte
+      ByteOrder  = Lsb
+      Base       = 0.0
+      Multiplier = 1.0
+    End_Group
+  End_Object
+
+  Group = Test
+    Test/with/slash:and:colon = 1
+  End_Group
+
+End_Object
+
+End
+""",
+    )
+
+    gdal.FileFromMemBuffer(tmp_vsimem / "in.bin", b"\x01")
+
+    with gdal.Open(tmp_vsimem / "in.lbl") as ds:
+        j = json.loads(ds.GetMetadata("json:ISIS3")[0])
+        assert j["IsisCube"]["Test"] == {
+            "_type": "group",
+            "Test/with/slash:and:colon": 1,
+        }

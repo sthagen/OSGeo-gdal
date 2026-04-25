@@ -948,6 +948,26 @@ CPLJSONObject CPLJSONObject::GetObj(const std::string &osName) const
 }
 
 /**
+ * Get value by key (without splitting on /).
+ * @param  osName Key name.
+ * @return         Json object.
+ * @since 3.13
+ *
+ */
+CPLJSONObject CPLJSONObject::GetObjNoSplitName(const std::string &osName) const
+{
+    json_object *poVal = nullptr;
+
+    // Typically for keys that contain / character
+    if (json_object_object_get_ex(TO_JSONOBJ(GetInternalHandle()),
+                                  osName.c_str(), &poVal))
+    {
+        return CPLJSONObject(osName, poVal);
+    }
+    return CPLJSONObject(INVALID_OBJ_KEY, nullptr);
+}
+
+/**
  * Get value by key.
  * @param  osName Key name.
  * @return         Json object.
