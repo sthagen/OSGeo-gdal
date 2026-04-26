@@ -231,3 +231,17 @@ def test_gdalalg_vector_clean_coverage_test_ogrsf(tmp_path):
     assert "INFO" in ret
     assert "ERROR" not in ret
     assert "FAILURE" not in ret
+
+
+def test_gdalalg_vector_clean_coverage_on_aspatial_layer():
+
+    src_ds = gdal.GetDriverByName("MEM").Create("", 0, 0, 0, gdal.GDT_Unknown)
+    src_lyr = src_ds.CreateLayer("the_layer", geom_type=ogr.wkbNone)
+    src_lyr.CreateFeature(ogr.Feature(src_lyr.GetLayerDefn()))
+
+    with gdal.alg.vector.clean_coverage(
+        input=src_ds, output="", output_format="MEM"
+    ) as alg:
+        ds = alg.Output()
+        lyr = ds.GetLayer(0)
+        assert lyr.GetFeatureCount() == 1

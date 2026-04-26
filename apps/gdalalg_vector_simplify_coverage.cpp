@@ -137,7 +137,7 @@ bool GDALVectorSimplifyCoverageAlgorithm::RunStep(
 
     for (auto &&poSrcLayer : poSrcDS->GetLayers())
     {
-        if (m_activeLayer.empty() ||
+        if ((m_activeLayer.empty() && poSrcLayer->GetGeomType() != wkbNone) ||
             m_activeLayer == poSrcLayer->GetDescription())
         {
             progressHelper.AddProcessedLayer(*poSrcLayer);
@@ -148,7 +148,7 @@ bool GDALVectorSimplifyCoverageAlgorithm::RunStep(
         }
     }
 
-    if (!progressHelper.HasProcessedLayers())
+    if (!m_activeLayer.empty() && !progressHelper.HasProcessedLayers())
     {
         ReportError(CE_Failure, CPLE_AppDefined,
                     "Specified layer '%s' was not found",

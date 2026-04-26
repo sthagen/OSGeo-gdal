@@ -943,24 +943,29 @@ CPLErr OGRSQLiteDataSource::Close(GDALProgressFunc, void *)
             for (auto &poLayer : m_apoInvisibleLayers)
                 poLayer->ResetReading();
 
-            // Create spatial indices in a transaction for faster execution
-            if (hDB)
-                SoftStartTransaction();
-            for (auto &poLayer : m_apoLayers)
+            if (!IsMarkedSuppressOnClose())
             {
-                if (poLayer->IsTableLayer())
+                // Create spatial indices in a transaction for faster execution
+                if (hDB)
+                    SoftStartTransaction();
+                for (auto &poLayer : m_apoLayers)
                 {
-                    OGRSQLiteTableLayer *poTableLayer =
-                        cpl::down_cast<OGRSQLiteTableLayer *>(poLayer.get());
-                    poTableLayer->RunDeferredCreationIfNecessary();
-                    poTableLayer->CreateSpatialIndexIfNecessary();
+                    if (poLayer->IsTableLayer())
+                    {
+                        OGRSQLiteTableLayer *poTableLayer =
+                            cpl::down_cast<OGRSQLiteTableLayer *>(
+                                poLayer.get());
+                        poTableLayer->RunDeferredCreationIfNecessary();
+                        poTableLayer->CreateSpatialIndexIfNecessary();
+                    }
                 }
+                if (hDB)
+                    SoftCommitTransaction();
             }
-            if (hDB)
-                SoftCommitTransaction();
         }
 
-        SaveStatistics();
+        if (!IsMarkedSuppressOnClose())
+            SaveStatistics();
 
         m_apoLayers.clear();
         m_apoInvisibleLayers.clear();

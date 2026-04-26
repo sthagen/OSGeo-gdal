@@ -11501,3 +11501,21 @@ def test_ogr_gpkg_algorithm_driver_gpkg_validate():
 
     with pytest.raises(Exception, match="Validation failed"):
         gdal.alg.driver.gpkg.validate(dataset="data/gpkg/poly_non_conformant.gpkg")
+
+
+###############################################################################
+
+
+def test_ogr_gpkg_spatialite_after_create(tmp_vsimem):
+
+    ds = ogr.GetDriverByName("GPKG").CreateVector(tmp_vsimem / "test.gpkg")
+    lyr = ds.CreateLayer("test")
+    f = ogr.Feature(lyr.GetLayerDefn())
+    f.SetGeometry(ogr.CreateGeometryFromWkt("POINT (0 0)"))
+    lyr.CreateFeature(f)
+    if not _has_spatialite_4_3_or_later(ds):
+        pytest.skip("Spatialite not available")
+
+    with ds.ExecuteSQL("SELECT ST_Buffer(geom, 1) FROM test") as sql_lyr:
+        f = sql_lyr.GetNextFeature()
+        assert f.GetGeometryRef() is not None

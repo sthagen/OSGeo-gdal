@@ -257,6 +257,7 @@ bool GDALMaterializeVectorAlgorithm::RunStep(GDALPipelineStepRunContext &ctxt)
         aosOptions.AddString("-dsco");
         aosOptions.AddString(co.c_str());
     }
+    CPLStringList aosReopenOpenOptions;
     if (EQUAL(m_format.c_str(), "SQLite"))
     {
         const char *pszCOList =
@@ -268,6 +269,7 @@ bool GDALMaterializeVectorAlgorithm::RunStep(GDALPipelineStepRunContext &ctxt)
             aosOptions.AddString("-dsco");
             aosOptions.AddString("SPATIALITE=YES");
         }
+        aosReopenOpenOptions.AddString("LIST_ALL_TABLES=YES");
     }
     for (const auto &co : m_layerCreationOptions)
     {
@@ -309,7 +311,7 @@ bool GDALMaterializeVectorAlgorithm::RunStep(GDALPipelineStepRunContext &ctxt)
                                                           nullptr};
                 poOutDS.reset(GDALDataset::Open(
                     filename.c_str(), GDAL_OF_VECTOR | GDAL_OF_VERBOSE_ERROR,
-                    apszAllowedDrivers));
+                    apszAllowedDrivers, aosReopenOpenOptions.List()));
                 ok = poOutDS != nullptr;
             }
         }
