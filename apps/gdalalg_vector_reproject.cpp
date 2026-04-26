@@ -78,7 +78,8 @@ bool GDALVectorReprojectAlgorithm::RunStep(GDALPipelineStepRunContext &)
         ret = (poSrcLayer != nullptr);
         if (ret)
         {
-            if (m_activeLayer.empty() ||
+            if ((m_activeLayer.empty() &&
+                 poSrcLayer->GetGeomType() != wkbNone) ||
                 m_activeLayer == poSrcLayer->GetDescription())
             {
                 const OGRSpatialReference *poSrcLayerCRS;
