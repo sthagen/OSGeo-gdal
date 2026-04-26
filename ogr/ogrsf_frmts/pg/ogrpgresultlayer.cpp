@@ -294,6 +294,11 @@ OGRErr OGRPGResultLayer::ISetSpatialFilter(int iGeomField,
 
 {
     m_iGeomFieldFilter = iGeomField;
+    if (iGeomField == 0 && poGeomIn == nullptr &&
+        GetLayerDefn()->GetGeomFieldCount() == 0)
+    {
+        return OGRERR_NONE;
+    }
 
     OGRPGGeomFieldDefn *poGeomFieldDefn =
         poFeatureDefn->GetGeomFieldDefn(m_iGeomFieldFilter);
