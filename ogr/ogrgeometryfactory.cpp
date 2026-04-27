@@ -2106,6 +2106,8 @@ std::unique_ptr<OGRGeometry> OGRGeometryFactory::organizePolygons(
 
         asPolyEx.push_back(std::move(sPolyEx));
     }
+    if (asPolyEx.empty())
+        return std::make_unique<OGRPolygon>();
 
     // If we are in ONLY_CCW mode and that we have found that there is only one
     // outer ring, then it is pretty easy : we can assume that all other rings
