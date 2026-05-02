@@ -43,7 +43,9 @@ class GDALRasterEditAlgorithm /* non final */
 
     GDALArgDatasetValue m_dataset{};  // standalone mode only
     bool m_readOnly = false;          // standalone mode only
+    int m_band = 0;
     std::string m_overrideCrs{};
+    std::string m_colorMap{};
     std::vector<double> m_bbox{};
     std::vector<std::string> m_metadata{};
     std::vector<std::string> m_unsetMetadata{};
@@ -56,6 +58,7 @@ class GDALRasterEditAlgorithm /* non final */
     bool m_stats = false;        // standalone mode only
     bool m_approxStats = false;  // standalone mode only
     bool m_hist = false;         // standalone mode only
+    bool m_unsetColorTable = false;
 };
 
 /************************************************************************/

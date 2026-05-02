@@ -826,3 +826,63 @@ def test_gdalalg_raster_edit_offset():
         match="Invalid band number '4' in '4=3'",
     ):
         gdal.alg.raster.edit(dataset=ds, offset=[1, "4=3"])
+
+
+def test_gdalalg_raster_edit_colormap(tmp_vsimem):
+
+    ds = gdal.GetDriverByName("MEM").Create("", 1, 1, 3)
+
+    gdal.alg.raster.edit(dataset=ds, color_map="../gcore/data/empty1bit.tif")
+
+    assert ds.GetRasterBand(1).GetColorTable().GetCount() == 2
+    assert ds.GetRasterBand(1).GetColorInterpretation() == gdal.GCI_PaletteIndex
+
+    gdal.alg.raster.edit(dataset=ds, unset_color_table=True)
+
+    assert ds.GetRasterBand(1).GetColorTable() is None
+    assert ds.GetRasterBand(1).GetColorInterpretation() == gdal.GCI_Undefined
+
+    with gdal.VSIFile(tmp_vsimem / "ct.txt", "wb") as f:
+        f.write(b"1 2 3 4\n")
+
+    gdal.alg.raster.edit(dataset=ds, color_map=tmp_vsimem / "ct.txt")
+
+    assert ds.GetRasterBand(1).GetColorTable().GetCount() == 2
+    assert ds.GetRasterBand(1).GetColorTable().GetColorEntry(1) == (2, 3, 4, 255)
+
+    if gdal.GetDriverByName("netCDF"):
+        with pytest.raises(
+            Exception, match="../gdrivers/data/netcdf/complex.nc has no raster band"
+        ):
+            gdal.alg.raster.edit(
+                dataset=ds, color_map="../gdrivers/data/netcdf/complex.nc"
+            )
+
+    with pytest.raises(Exception, match="../gcore/data/byte.tif has no color table"):
+        gdal.alg.raster.edit(dataset=ds, color_map="../gcore/data/byte.tif")
+
+    with pytest.raises(
+        Exception, match="test_gdalalg_raster_edit.py has no color table"
+    ):
+        gdal.alg.raster.edit(dataset=ds, color_map="test_gdalalg_raster_edit.py")
+
+    with gdal.VSIFile(tmp_vsimem / "ct.txt", "wb") as f:
+        f.write(b"1.5 2 3 4\n")
+
+    with pytest.raises(
+        Exception,
+        match="Value 1.500000 of color map is not compatible of an integer index",
+    ):
+        gdal.alg.raster.edit(dataset=ds, color_map=tmp_vsimem / "ct.txt")
+
+    with pytest.raises(Exception, match="Band 1 is not valid"):
+        gdal.alg.raster.edit(
+            dataset=gdal.GetDriverByName("MEM").Create("", 1, 1, 0),
+            color_map="../gcore/data/empty1bit.tif",
+        )
+
+    with pytest.raises(Exception, match="Band 1 is not valid"):
+        gdal.alg.raster.edit(
+            dataset=gdal.GetDriverByName("MEM").Create("", 1, 1, 0),
+            unset_color_table=True,
+        )

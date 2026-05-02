@@ -336,6 +336,7 @@ transform-option
 transformer-option
 tree
 unit
+unset-color-table
 unset-fid
 unset-layer-metadata
 unset-metadata

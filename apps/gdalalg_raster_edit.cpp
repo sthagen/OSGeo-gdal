@@ -69,6 +69,8 @@ GDALRasterEditAlgorithm::GDALRasterEditAlgorithm(bool standaloneStep)
         AddRasterHiddenInputDatasetArg();
     }
 
+    AddBandArg(&m_band, _("Active band (1-based index)"));
+
     AddArg("crs", 0, _("Override CRS (without reprojection)"), &m_overrideCrs)
         .AddHiddenAlias("a_srs")
         .AddHiddenAlias("srs")
@@ -107,6 +109,10 @@ GDALRasterEditAlgorithm::GDALRasterEditAlgorithm(bool standaloneStep)
                 }
                 return ret;
             });
+
+    AddArg("color-map", 0, _("Color map filename"), &m_colorMap)
+        .SetMutualExclusionGroup("color-table")
+        .AddHiddenAlias("color-table");
 
     const auto ValidationActionScaleOffset =
         [this](const char *argName, const std::vector<std::string> &values)
@@ -160,6 +166,11 @@ GDALRasterEditAlgorithm::GDALRasterEditAlgorithm(bool standaloneStep)
                                 { return ParseAndValidateKeyValue(arg); });
         arg.AddHiddenAlias("mo");
     }
+
+    AddArg("unset-color-table", 0,
+           _("Unset color table on 1st band or the one specified with --band"),
+           &m_unsetColorTable)
+        .SetMutualExclusionGroup("color-table");
 
     AddArg("unset-metadata", 0, _("Remove dataset metadata item(s)"),
            &m_unsetMetadata)
@@ -418,6 +429,111 @@ bool GDALRasterEditAlgorithm::RunStep(GDALPipelineStepRunContext &ctxt)
                 else
                     poDS->GetRasterBand(i + 1)->SetNoDataValue(
                         CPLAtof(m_nodata.c_str()));
+            }
+        }
+
+        if (!m_colorMap.empty())
+        {
+            std::unique_ptr<GDALDataset> poAuxDS;
+            {
+                CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
+                poAuxDS = std::unique_ptr<GDALDataset>(
+                    GDALDataset::Open(m_colorMap.c_str(), GDAL_OF_RASTER));
+            }
+            if (m_band == 0)
+                m_band = 1;
+            if (poDS->GetRasterCount() < m_band)
+            {
+                ReportError(CE_Failure, CPLE_AppDefined,
+                            "Band %d is not valid for %s", m_band,
+                            poDS->GetDescription());
+                return false;
+            }
+            if (poAuxDS)
+            {
+                if (poAuxDS->GetRasterCount() == 0)
+                {
+                    ReportError(CE_Failure, CPLE_AppDefined,
+                                "%s has no raster band", m_colorMap.c_str());
+                    return false;
+                }
+                const auto poCT = poAuxDS->GetRasterBand(1)->GetColorTable();
+                if (!poCT)
+                {
+                    ReportError(CE_Failure, CPLE_AppDefined,
+                                "%s has no color table", m_colorMap.c_str());
+                    return false;
+                }
+                if (poDS->GetRasterBand(m_band)->SetColorTable(poCT) != CE_None)
+                {
+                    return false;
+                }
+                if (m_colorInterpretation.empty())
+                {
+                    poDS->GetRasterBand(m_band)->SetColorInterpretation(
+                        GCI_PaletteIndex);
+                }
+            }
+            else
+            {
+                std::vector<GDALColorAssociation> asColors =
+                    GDALLoadTextColorMap(m_colorMap.c_str(),
+                                         poDS->GetRasterBand(m_band));
+                if (asColors.empty())
+                {
+                    ReportError(CE_Failure, CPLE_AppDefined,
+                                "%s has no color table", m_colorMap.c_str());
+                    return false;
+                }
+                GDALColorTable oCT;
+                for (const auto &sColor : asColors)
+                {
+                    if (!(sColor.dfVal >= 0 && sColor.dfVal < 65536 &&
+                          static_cast<int>(sColor.dfVal) == sColor.dfVal))
+                    {
+                        ReportError(CE_Failure, CPLE_AppDefined,
+                                    "Value %f of color map is not compatible "
+                                    "of an integer index",
+                                    sColor.dfVal);
+                        return false;
+                    }
+                    GDALColorEntry entry;
+                    entry.c1 = static_cast<short>(sColor.nR);
+                    entry.c2 = static_cast<short>(sColor.nG);
+                    entry.c3 = static_cast<short>(sColor.nB);
+                    entry.c4 = static_cast<short>(sColor.nA);
+                    oCT.SetColorEntry(static_cast<int>(sColor.dfVal), &entry);
+                }
+                if (poDS->GetRasterBand(m_band)->SetColorTable(&oCT) != CE_None)
+                {
+                    return false;
+                }
+                if (m_colorInterpretation.empty())
+                {
+                    poDS->GetRasterBand(m_band)->SetColorInterpretation(
+                        GCI_PaletteIndex);
+                }
+            }
+        }
+        else if (m_unsetColorTable)
+        {
+            if (m_band == 0)
+                m_band = 1;
+            if (poDS->GetRasterCount() < m_band)
+            {
+                ReportError(CE_Failure, CPLE_AppDefined,
+                            "Band %d is not valid for %s", m_band,
+                            poDS->GetDescription());
+                return false;
+            }
+            if (poDS->GetRasterBand(m_band)->SetColorTable(nullptr) != CE_None)
+            {
+                return false;
+            }
+            if (m_colorInterpretation.empty())
+            {
+                poDS->GetRasterBand(m_band)->SetColorInterpretation(
+                    GCI_Undefined);
             }
         }
 
