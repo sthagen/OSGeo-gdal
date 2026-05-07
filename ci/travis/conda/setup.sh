@@ -35,4 +35,10 @@ EOL
 # shellcheck disable=SC2016
 yq -y -s '.[0] as $base | .[1] as $patch | ($base * $patch) | .source = $patch.source' recipe/recipe.yaml recipe/recipe_clobber.yaml > recipe/recipe_patched.yaml
 
+# Update installation messages of plugins to reflect the appropriate channel
+sed "s/-c conda-forge/-c gdal-master/" < recipe/build_core.sh >  recipe/build_core.sh.new
+mv recipe/build_core.sh.new  recipe/build_core.sh
+sed "s/-c conda-forge/-c gdal-master/" < recipe/build_core.bat > recipe/build_core.bat.new
+mv recipe/build_core.bat.new  recipe/build_core.bat
+
 ls recipe

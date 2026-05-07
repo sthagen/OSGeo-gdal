@@ -324,7 +324,7 @@ bool GDALEEDAIRasterBand::DecodeNPYArray(const GByte *pabyData, int nDataLen,
             size_t nOffsetBand =
                 10 + nHeaderLen +
                 (static_cast<size_t>(iYBlock) * nBlockYSize * nReqXSize +
-                 iXBlock * nBlockXSize) *
+                 static_cast<size_t>(iXBlock) * nBlockXSize) *
                     nTotalDataTypeSize;
 
             for (int i = 1; i <= poGDS->GetRasterCount(); i++)

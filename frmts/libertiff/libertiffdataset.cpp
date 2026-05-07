@@ -1860,7 +1860,8 @@ bool LIBERTIFFDataset::ReadBlock(GByte *pabyBlockData, int nBlockXOff,
                          iX < static_cast<size_t>(nBlockActualXSize); ++iX)
                     {
                         memcpy(pabyDst + iX * nPixelSpace,
-                               pabySrc + iX * nBands, nBands * nBufTypeSize);
+                               pabySrc + iX * nBands,
+                               cpl::fits_on<int>(nBands * nBufTypeSize));
                     }
                 }
             }

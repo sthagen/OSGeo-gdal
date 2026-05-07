@@ -2164,7 +2164,7 @@ def error_raised(type, match=""):
     else:
         assert any(
             [err["level"] == type and match in err["message"] for err in errors]
-        ), f'Did not receive an error of type {err_levels[type]} matching "{match}. Received: {received}'
+        ), f'Did not receive an error of type {err_levels[type]} matching "{match}". Received: {received}'
 
 
 ###############################################################################
@@ -2179,11 +2179,15 @@ def gdal_has_vrt_expression_dialect(dialect):
 ###############################################################################
 
 
-def importorskip_gdal_array():
+def importorskip(lib):
     pytest_version = [int(x) for x in pytest.__version__.split(".")]
     if pytest_version >= [8, 2, 0]:
-        return pytest.importorskip("osgeo.gdal_array", exc_type=ImportError)
-    return pytest.importorskip("osgeo.gdal_array")
+        return pytest.importorskip(lib, exc_type=ImportError)
+    return pytest.importorskip(lib)
+
+
+def importorskip_gdal_array():
+    return importorskip("osgeo.gdal_array")
 
 
 ###############################################################################

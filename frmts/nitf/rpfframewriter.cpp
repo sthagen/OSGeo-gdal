@@ -1469,7 +1469,7 @@ static bool Perform_CADRG_VQ_Compression(
     CPLAssert(nVQImgWidth > 0);
     CPLAssert(nVQImgHeight > 0);
     CPLAssert(nVQImgWidth < INT_MAX / nVQImgHeight);
-    VQImage.resize(nVQImgHeight * nVQImgWidth);
+    VQImage.resize(cpl::fits_on<int>(nVQImgHeight * nVQImgWidth));
 
     // Collect all the occurrences of 4x4 pixel values into a map indexed by them
     std::map<Vector<ColorTableBased4x4Pixels>, Occurrences> vectorMap;
@@ -2818,9 +2818,9 @@ CADRGCreateCopy(const char *pszFilename, GDALDataset *poSrcDS, int bStrict,
             std::vector<GByte> abyData;
             try
             {
-                abyData.resize(poSrcDS->GetRasterCount() *
-                               poSrcDS->GetRasterXSize() *
-                               poSrcDS->GetRasterYSize());
+                abyData.resize(cpl::fits_on<int>(poSrcDS->GetRasterCount() *
+                                                 poSrcDS->GetRasterXSize() *
+                                                 poSrcDS->GetRasterYSize()));
             }
             catch (const std::exception &)
             {
@@ -2828,14 +2828,15 @@ CADRGCreateCopy(const char *pszFilename, GDALDataset *poSrcDS, int bStrict,
                          "Out of memory when allocating temporary buffer");
                 return false;
             }
-            if (poSrcDS->RasterIO(
-                    GF_Read, 0, 0, poSrcDS->GetRasterXSize(),
-                    poSrcDS->GetRasterYSize(), abyData.data(),
-                    poSrcDS->GetRasterXSize(), poSrcDS->GetRasterYSize(),
-                    GDT_UInt8, poSrcDS->GetRasterCount(), nullptr,
-                    poSrcDS->GetRasterCount(),
-                    poSrcDS->GetRasterXSize() * poSrcDS->GetRasterCount(), 1,
-                    nullptr) != CE_None)
+            if (poSrcDS->RasterIO(GF_Read, 0, 0, poSrcDS->GetRasterXSize(),
+                                  poSrcDS->GetRasterYSize(), abyData.data(),
+                                  poSrcDS->GetRasterXSize(),
+                                  poSrcDS->GetRasterYSize(), GDT_UInt8,
+                                  poSrcDS->GetRasterCount(), nullptr,
+                                  poSrcDS->GetRasterCount(),
+                                  cpl::fits_on<int>(poSrcDS->GetRasterXSize() *
+                                                    poSrcDS->GetRasterCount()),
+                                  1, nullptr) != CE_None)
             {
                 return false;
             }

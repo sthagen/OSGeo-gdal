@@ -3224,8 +3224,8 @@ CPLErr HFARasterBand::WriteNamedRAT(const char * /*pszName*/,
                 poColumn->SetStringField("dataType", "string");
                 poColumn->SetIntField("maxNumChars", nMaxNumChars);
 
-                char *pachColData = static_cast<char *>(
-                    VSI_MALLOC_VERBOSE(nRowCount * nMaxNumChars));
+                char *pachColData = static_cast<char *>(VSI_MALLOC_VERBOSE(
+                    static_cast<size_t>(nRowCount) * nMaxNumChars));
                 if (!pachColData)
                     return CE_Failure;
                 for (int i = 0; i < nRowCount; i++)

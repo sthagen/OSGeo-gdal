@@ -1608,7 +1608,8 @@ bool S104Creator::CopyValues(GDALDataset *poSrcDS, GDALProgressFunc pfnProgress,
             if (bRet)
             {
                 size_t nOffset = 0;
-                for (int i = 0; i < nReqCountY * nReqCountX; i++)
+                for (size_t i = 0;
+                     i < static_cast<size_t>(nReqCountY) * nReqCountX; i++)
                 {
                     {
                         float fVal = afValues[i * nComponents];

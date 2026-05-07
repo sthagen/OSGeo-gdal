@@ -771,18 +771,16 @@ static CPLErr ProcessLayer(OGRLayerH hSrcLayer, bool bSRSIsSet,
     if (papszTO != nullptr)
     {
         GDALDataset *poDS = GDALDataset::FromHandle(hDstDS);
-        char **papszTransformerOptions = CSLDuplicate(papszTO);
+        CPLStringList aosTransformerOptions(CSLDuplicate(papszTO));
         GDALGeoTransform gt;
         if (poDS->GetGeoTransform(gt) != CE_None && poDS->GetGCPCount() == 0 &&
             poDS->GetMetadata("RPC") == nullptr)
         {
-            papszTransformerOptions = CSLSetNameValue(
-                papszTransformerOptions, "DST_METHOD", "NO_GEOTRANSFORM");
+            aosTransformerOptions.SetNameValue("DST_METHOD", "NO_GEOTRANSFORM");
         }
 
         pTransformArg = GDALCreateGenImgProjTransformer2(
-            nullptr, hDstDS, papszTransformerOptions);
-        CSLDestroy(papszTransformerOptions);
+            nullptr, hDstDS, aosTransformerOptions.List());
 
         pfnTransformer = GDALGenImgProjTransform;
         if (pTransformArg == nullptr)
