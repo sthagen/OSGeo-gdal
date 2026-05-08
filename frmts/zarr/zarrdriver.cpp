@@ -1258,17 +1258,16 @@ GDALDataset *ZarrDataset::Create(const char *pszName, int nXSize, int nYSize,
     {
         VSIStatBufL sStat;
         const bool bExists = VSIStatL(pszName, &sStat) == 0;
-        const bool bIsFile = bExists && !VSI_ISDIR(sStat.st_mode);
-        const bool bIsDirectory =
-            !bIsFile && ((bExists && VSI_ISDIR(sStat.st_mode)) ||
-                         !CPLStringList(VSIReadDirEx(pszName, 1)).empty());
-        if (bIsFile || bIsDirectory || bExists)
+        const char *pszObjType = nullptr;
+        if (bExists && !VSI_ISDIR(sStat.st_mode))
+            pszObjType = "File";
+        else if ((bExists /* && VSI_ISDIR(sStat.st_mode)*/) ||
+                 !CPLStringList(VSIReadDirEx(pszName, 1)).empty())
+            pszObjType = "Directory";
+        if (pszObjType)
         {
             CPLError(CE_Failure, CPLE_FileIO, "%s %s already exists.",
-                     bIsFile        ? "File"
-                     : bIsDirectory ? "Directory"
-                                    : "Object",
-                     pszName);
+                     pszObjType, pszName);
             return nullptr;
         }
 
