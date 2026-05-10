@@ -23,7 +23,8 @@
 /* static */ std::string
 OGRS101Reader::LaunderCRSName(const OGRSpatialReference &oSRS)
 {
-    return CPLString(oSRS.GetName())
+    const char *pszSRSName = oSRS.GetName();
+    return CPLString(pszSRSName ? pszSRSName : "(null)")
         .replaceAll("WGS 84 + ", "")
         .replaceAll(" depth", "");
 }

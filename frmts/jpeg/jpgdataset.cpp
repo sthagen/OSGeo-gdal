@@ -2439,10 +2439,17 @@ CPLErr JPGDataset::StartDecompress()
                          "Invalid sampling factor(s)");
                 return CE_Failure;
             }
-            const int nWidthSubsampled = cpl::div_round_up(
+            const unsigned nWidthSubsampled = cpl::div_round_up(
                 compptr->width_in_blocks, compptr->h_samp_factor);
-            const int nHeightSubsampled = cpl::div_round_up(
+            const unsigned nHeightSubsampled = cpl::div_round_up(
                 compptr->height_in_blocks, compptr->v_samp_factor);
+            if (nHeightSubsampled > 0 &&
+                nWidthSubsampled >
+                    std::numeric_limits<uint64_t>::max() / nHeightSubsampled)
+            {
+                CPLError(CE_Failure, CPLE_AppDefined, "Corrupted image");
+                return CE_Failure;
+            }
             const uint64_t nTmp =
                 static_cast<uint64_t>(nWidthSubsampled) * nHeightSubsampled;
             if (nTmp > std::numeric_limits<uint64_t>::max() / sizeof(JBLOCK) ||

@@ -149,6 +149,7 @@ png_read_sig(png_structrp png_ptr, png_inforp info_ptr)
  *
  * Copied from libpng 1.7.
  */
+GDAL_LIBPNG_NOSANITIZE_UNSIGNED_INT_OVERFLOW
 static int
 check_chunk_name(png_uint_32 name)
 {

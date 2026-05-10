@@ -38,3 +38,15 @@ index cebe7af1f8..7bcd19643a 100644
                             &error);
     if (!error) *addend0_and_result = result;
     return error;
+diff --git a/frmts/png/libpng/pngrutil.c b/frmts/png/libpng/pngrutil.c
+index ac8440a1e3..28ca4f757d 100644
+--- a/frmts/png/libpng/pngrutil.c
++++ b/frmts/png/libpng/pngrutil.c
+@@ -149,6 +149,7 @@ png_read_sig(png_structrp png_ptr, png_inforp info_ptr)
+  *
+  * Copied from libpng 1.7.
+  */
++GDAL_LIBPNG_NOSANITIZE_UNSIGNED_INT_OVERFLOW
+ static int
+ check_chunk_name(png_uint_32 name)
+ {
