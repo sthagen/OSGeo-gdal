@@ -209,6 +209,8 @@ with FlushCache()), those uncompressed tiles are definitely transferred
 to the MBTiles file with the appropriate compression. All of this is
 transparent to the user of GDAL API/utilities
 
+.. _mbtiles_tile_formats:
+
 Tile formats
 ~~~~~~~~~~~~
 
@@ -338,7 +340,7 @@ The following creation options are available:
 
          Whether to write the bounds 'metadata' item.
 
-   -  .. oo:: ELEVATION_TYPE
+   -  .. co:: ELEVATION_TYPE
          :choices: '', 'terrain-rgb'
          :default: ''
 

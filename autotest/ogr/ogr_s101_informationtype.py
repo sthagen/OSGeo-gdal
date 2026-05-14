@@ -138,9 +138,9 @@ def test_ogr_s101_read_information_type_with_inas():
         "recordVersion": 1,
         "informationType": "SpatialQuality",
         "text": None,
-        "infoAssociationRecordId": None,
-        "infoAssociationCode": None,
-        "infoAssociationRoleCode": None,
+        "infoAssociationRecordId": 1,
+        "infoAssociationCode": "SpatialAssociation",
+        "infoAssociationRoleCode": "defines",
         "association_text": None,
     }
 
@@ -150,9 +150,9 @@ def test_ogr_s101_read_information_type_with_inas():
         "recordVersion": 1,
         "informationType": "SpatialQuality",
         "text": None,
-        "infoAssociationRecordId": None,
-        "infoAssociationCode": None,
-        "infoAssociationRoleCode": None,
+        "infoAssociationRecordId": 1,
+        "infoAssociationCode": "SpatialAssociation",
+        "infoAssociationRoleCode": "defines",
         "association_text": "INAS only",
     }
 
@@ -162,9 +162,9 @@ def test_ogr_s101_read_information_type_with_inas():
         "recordVersion": 1,
         "informationType": "SpatialQuality",
         "text": "ATTR",
-        "infoAssociationRecordId": None,
-        "infoAssociationCode": None,
-        "infoAssociationRoleCode": None,
+        "infoAssociationRecordId": 1,
+        "infoAssociationCode": "SpatialAssociation",
+        "infoAssociationRoleCode": "defines",
         "association_text": "INAS",
     }
 
@@ -581,4 +581,54 @@ def test_ogr_s101_read_information_type_alter_enumerated_value(tmp_path):
         "lightSector.sectorInformation[1].text": "my text",
         "lightSector.sectorInformation[2].text": "mon texte",
         "lightSector.colour": [1, 987654],
+    }
+
+
+###############################################################################
+# Test Date field
+
+
+def test_ogr_s101_read_information_type_date_field():
+
+    with gdaltest.error_raised(gdal.CE_None):
+        ds = ogr.Open("data/s101/information_type_date.000")
+
+    lyr = ds.GetLayerByName("informationType")
+    f = lyr.GetNextFeature()
+    assert f.ExportToJson(as_object=True) == {
+        "type": "Feature",
+        "geometry": None,
+        "properties": {
+            "recordId": 1,
+            "recordVersion": 1,
+            "informationType": "ContactDetails",
+            "fixedDateRange.dateStart": "2026/01/01",
+            "fixedDateRange.dateEnd": "2026/12/31",
+        },
+        "id": 1,
+    }
+
+
+###############################################################################
+# Test Time field
+
+
+def test_ogr_s101_read_information_type_time_field():
+
+    with gdaltest.error_raised(gdal.CE_None):
+        ds = ogr.Open("data/s101/information_type_time.000")
+
+    lyr = ds.GetLayerByName("informationType")
+    f = lyr.GetNextFeature()
+    assert f.ExportToJson(as_object=True) == {
+        "type": "Feature",
+        "geometry": None,
+        "properties": {
+            "recordId": 1,
+            "recordVersion": 1,
+            "informationType": "ServiceHours",
+            "fixedDateRange.timeIntervalsByDayOfWeek.timeOfDayStart": "12:34:56",
+            "fixedDateRange.timeIntervalsByDayOfWeek.timeOfDayEnd": "23:45:12",
+        },
+        "id": 1,
     }

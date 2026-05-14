@@ -143,6 +143,7 @@ Raster drivers
    pds
    pds4
    plmosaic
+   pmtiles
    png
    pnm
    postgisraster

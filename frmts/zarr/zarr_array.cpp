@@ -227,6 +227,7 @@ ZarrArray::ZarrArray(
       m_bUseOptimizedCodePaths(CPLTestBool(
           CPLGetConfigOption("GDAL_ZARR_USE_OPTIMIZED_CODE_PATHS", "YES")))
 {
+    m_oCRSAttribute.Deinit();
 }
 
 /************************************************************************/
@@ -259,6 +260,9 @@ CPLJSONObject ZarrArray::SerializeSpecialAttributes()
         EQUAL(m_aosCreationOptions.FetchNameValueDef(
                   "GEOREFERENCING_CONVENTION", "GDAL"),
               "SPATIAL_PROJ");
+
+    if (m_oCRSAttribute.IsValid() && bUseSpatialProjConventions)
+        oAttrs.Add(CRS_ATTRIBUTE_NAME, m_oCRSAttribute);
 
     const auto ExportToWkt2AndPROJJSON = [this](CPLJSONObject &oContainer,
                                                 const char *pszWKT2AttrName,
@@ -604,13 +608,13 @@ void ZarrArray::DeallocateDecodedBlockData()
     if (!m_abyDecodedBlockData.empty())
     {
         const size_t nDTSize = m_oType.GetSize();
-        GByte *pDst = &m_abyDecodedBlockData[0];
         const size_t nValues = m_abyDecodedBlockData.size() / nDTSize;
         for (const auto &elt : m_aoDtypeElts)
         {
             if (elt.nativeType == DtypeElt::NativeType::STRING_ASCII ||
                 elt.nativeType == DtypeElt::NativeType::STRING_UNICODE)
             {
+                GByte *pDst = &m_abyDecodedBlockData[0];
                 for (size_t i = 0; i < nValues; i++, pDst += nDTSize)
                 {
                     char *ptr;
@@ -2530,6 +2534,7 @@ bool ZarrArray::SetSpatialRef(const OGRSpatialReference *poSRS)
     {
         return GDALPamMDArray::SetSpatialRef(poSRS);
     }
+    m_oCRSAttribute.Deinit();
     m_poSRS.reset();
     if (poSRS)
         m_poSRS.reset(poSRS->Clone());
@@ -3404,6 +3409,7 @@ void ZarrArray::SetAttributes(const std::shared_ptr<ZarrGroupBase> &poGroup,
                             SET_FROM_USER_INPUT_LIMITATIONS_get()) ==
                     OGRERR_NONE)
                 {
+                    m_oCRSAttribute = crs;
                     oAttributes.Delete(CRS_ATTRIBUTE_NAME);
                     break;
                 }

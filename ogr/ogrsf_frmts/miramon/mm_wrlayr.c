@@ -6104,14 +6104,16 @@ int MMCreateMMDB(struct MiraMonVectLayerInfo *hMiraMonLayer,
             {
                 // We need to preserve the final given name to write
                 // metadata with the modified new name.
-                strcpy(hMiraMonLayer->pLayerDB->pFields[nIFieldLayer]
-                           .pszFieldModifName,
-                       pBD_XP->pField[nIField].FieldName);
+                CPLStrlcpy(hMiraMonLayer->pLayerDB->pFields[nIFieldLayer]
+                               .pszFieldModifName,
+                           pBD_XP->pField[nIField].FieldName,
+                           MM_MAX_LON_FIELD_NAME_DBF);
 
-                strcpy(
+                CPLStrlcpy(
                     hMiraMonLayer->pLayerDB->pFields[nIFieldLayer]
                         .pszFieldModifDescription,
-                    pBD_XP->pField[nIField].FieldDescription[MM_DEF_LANGUAGE]);
+                    pBD_XP->pField[nIField].FieldDescription[MM_DEF_LANGUAGE],
+                    MM_MAX_LON_DESCRIPCIO_CAMP_DBF);
 
                 // In this case we are going to use also the modified description in metadata
                 switch (hMiraMonLayer->nMMLanguage)

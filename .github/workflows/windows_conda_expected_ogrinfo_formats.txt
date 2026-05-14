@@ -73,7 +73,7 @@ Supported Formats: (ro:read-only, rw:read-write, +:write from scratch, u:update,
   Parquet -vector- (rw+uv): (Geo)Parquet (*.parquet)
   Arrow -vector- (rw+v): (Geo)Arrow IPC File Format / Stream (*.arrow, *.feather, *.arrows, *.ipc)
   GTFS -vector- (rov): General Transit Feed Specification (*.zip)
-  PMTiles -vector- (rw+v): ProtoMap Tiles (*.pmtiles)
+  PMTiles -raster,vector- (rw+v): ProtoMap Tiles (*.pmtiles)
   JSONFG -vector- (rw+v): OGC Features and Geometries JSON (*.json)
   MiraMonVector -vector- (rw+v): MiraMon Vectors (.pol, .arc, .pnt) (*.pol, *.arc, *.pnt)
   ADBC -vector- (ro): Arrow Database Connectivity

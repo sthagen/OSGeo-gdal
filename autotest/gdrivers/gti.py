@@ -3691,3 +3691,71 @@ def test_gti_srs_no_layer_srs_silent(tmp_vsimem):
         ds = gdal.OpenEx(index_filename, open_options=["SRS=EPSG:3857"])
     assert ds is not None
     assert ds.GetSpatialRef().GetAuthorityCode() == "3857"
+
+
+###############################################################################
+
+
+@pytest.mark.parametrize("tile_band_count", [1, 2, 3, 4])
+@pytest.mark.parametrize("gti_band_count", [1, 2, 3, 4])
+def test_gti_band_count_adjustment(tmp_vsimem, tile_band_count, gti_band_count):
+
+    index_filename = str(tmp_vsimem / "index.gti.gpkg")
+
+    with gdal.GetDriverByName("GTiff").Create(
+        tmp_vsimem / "src.tif", 1, 1, tile_band_count
+    ) as src_ds:
+        src_ds.SetGeoTransform([2, 1, 0, 49, 0, -1])
+        src_ds.GetRasterBand(1).Fill(1)
+        if tile_band_count == 2:
+            src_ds.GetRasterBand(2).Fill(127)
+        elif tile_band_count >= 3:
+            if gti_band_count >= 3:
+                src_ds.GetRasterBand(2).Fill(2)
+                src_ds.GetRasterBand(3).Fill(3)
+            else:
+                src_ds.GetRasterBand(2).Fill(1)
+                src_ds.GetRasterBand(3).Fill(1)
+            if tile_band_count == 4:
+                src_ds.GetRasterBand(4).Fill(127)
+
+    src_ds = gdal.Open(tmp_vsimem / "src.tif")
+    index_ds, lyr = create_basic_tileindex(index_filename, src_ds, lyr_srs=None)
+    lyr.SetMetadataItem("BAND_COUNT", str(tile_band_count))
+    lyr.SetMetadataItem("MINX", "2")
+    lyr.SetMetadataItem("MINY", "48")
+    lyr.SetMetadataItem("MAXX", "3")
+    lyr.SetMetadataItem("MAXY", "49")
+    lyr.SetMetadataItem("RESX", "1")
+    lyr.SetMetadataItem("RESY", "1")
+    lyr.SetMetadataItem(
+        "COLOR_INTERPRETATION",
+        (
+            "gray"
+            if tile_band_count == 1
+            else (
+                "gray,alpha"
+                if tile_band_count == 2
+                else (
+                    "red,green,blue" if tile_band_count == 3 else "red,green,blue,alpha"
+                )
+            )
+        ),
+    )
+    del index_ds
+
+    ds = gdal.Open(index_filename)
+    assert ds.RasterCount == tile_band_count
+    assert ds.GetRasterBand(1).ReadRaster() == b"\x01"
+    expected_alpha = b"\x7f" if tile_band_count in (2, 4) else b"\xff"
+    if tile_band_count == 2:
+        assert ds.GetRasterBand(2).ReadRaster() == expected_alpha
+    elif tile_band_count >= 3:
+        if gti_band_count >= 3:
+            assert ds.GetRasterBand(2).ReadRaster() == b"\x02"
+            assert ds.GetRasterBand(3).ReadRaster() == b"\x03"
+        else:
+            assert ds.GetRasterBand(2).ReadRaster() == b"\x01"
+            assert ds.GetRasterBand(3).ReadRaster() == b"\x01"
+        if tile_band_count == 4:
+            assert ds.GetRasterBand(4).ReadRaster() == expected_alpha

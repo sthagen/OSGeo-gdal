@@ -1672,3 +1672,30 @@ CPLErr GDALMDArrayBuildOverviews(GDALMDArrayH hArray, const char *pszResampling,
                                             panOverviewList, pfnProgress,
                                             pProgressData, papszOptions);
 }
+
+/************************************************************************/
+/*                    GDALMDArrayGuessGeoTransform()                    */
+/************************************************************************/
+
+/** \brief Returns whether 2 specified dimensions form a geotransform.
+ *
+ * This is the same as the C++ method GDALMDArray::GuessGeoTransform().
+ *
+ * @since GDAL 3.14
+ */
+bool GDALMDArrayGuessGeoTransform(GDALMDArrayH hArray, size_t nDimX,
+                                  size_t nDimY, bool bPixelIsPoint,
+                                  double padfGeoTransform[6])
+{
+    VALIDATE_POINTER1(hArray, __func__, false);
+
+    const auto dimCount = hArray->m_poImpl->GetDimensionCount();
+    if (nDimX >= dimCount || nDimY >= dimCount)
+    {
+        CPLError(CE_Failure, CPLE_IllegalArg, "Dimension index out of range");
+        return false;
+    }
+    // we allow nDimX and nDimY to be equal, harmless if not meaningful
+    return hArray->m_poImpl->GuessGeoTransform(nDimX, nDimY, bPixelIsPoint,
+                                               padfGeoTransform);
+}

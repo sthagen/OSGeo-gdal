@@ -29,6 +29,7 @@
 
 #include "zlib.h"
 #include "ogrlibjsonutils.h"
+#include "mbtiles.h"
 
 #include <math.h>
 #include <algorithm>
@@ -3703,22 +3704,6 @@ void GDALRegister_MBTiles()
     poDriver->SetMetadataItem(GDAL_DMD_EXTENSION, "mbtiles");
     poDriver->SetMetadataItem(GDAL_DMD_CREATIONDATATYPES, "Byte");
 
-#define COMPRESSION_OPTIONS                                                    \
-    "  <Option name='TILE_FORMAT' scope='raster' type='string-select' "        \
-    "description='Format to use to create tiles' default='PNG'>"               \
-    "    <Value>PNG</Value>"                                                   \
-    "    <Value>PNG8</Value>"                                                  \
-    "    <Value>JPEG</Value>"                                                  \
-    "    <Value>WEBP</Value>"                                                  \
-    "  </Option>"                                                              \
-    "  <Option name='QUALITY' scope='raster' type='int' min='1' max='100' "    \
-    "description='Quality for JPEG and WEBP tiles' default='75'/>"             \
-    "  <Option name='ZLEVEL' scope='raster' type='int' min='1' max='9' "       \
-    "description='DEFLATE compression level for PNG tiles' default='6'/>"      \
-    "  <Option name='DITHER' scope='raster' type='boolean' "                   \
-    "description='Whether to apply Floyd-Steinberg dithering (for "            \
-    "TILE_FORMAT=PNG8)' default='NO'/>"
-
     poDriver->SetMetadataItem(
         GDAL_DMD_OPENOPTIONLIST,
         "<OpenOptionList>"
@@ -3743,7 +3728,7 @@ void GDALRegister_MBTiles()
         "description='Maximum Y of area of interest'/>"
         "  <Option name='USE_BOUNDS' scope='raster,vector' type='boolean' "
         "description='Whether to use the bounds metadata, when available, to "
-        "determine the AOI' default='YES'/>" COMPRESSION_OPTIONS
+        "determine the AOI' default='YES'/>" MBTILES_COMPRESSION_OPTIONS
         "  <Option name='CLIP' scope='vector' type='boolean' "
         "description='Whether to clip geometries to tile extent' "
         "default='YES'/>"
@@ -3758,53 +3743,7 @@ void GDALRegister_MBTiles()
 
     poDriver->SetMetadataItem(
         GDAL_DMD_CREATIONOPTIONLIST,
-        "<CreationOptionList>"
-        "  <Option name='NAME' scope='raster,vector' type='string' "
-        "description='Tileset name'/>"
-        "  <Option name='DESCRIPTION' scope='raster,vector' type='string' "
-        "description='A description of the layer'/>"
-        "  <Option name='TYPE' scope='raster,vector' type='string-select' "
-        "description='Layer type' default='overlay'>"
-        "    <Value>overlay</Value>"
-        "    <Value>baselayer</Value>"
-        "  </Option>"
-        "  <Option name='ELEVATION_TYPE' scope='raster' type='string-select' "
-        "description='Type of elevation encoding' default=''>"
-        "    <Value></Value>"
-        "    <Value>terrain-rgb</Value>"
-        "  </Option>"
-        "  <Option name='VERSION' scope='raster' type='string' "
-        "description='The version of the tileset, as a plain number' "
-        "default='1.1'/>"
-        "  <Option name='BLOCKSIZE' scope='raster' type='int' "
-        "description='Block size in pixels' default='256' min='64' "
-        "max='8192'/>" COMPRESSION_OPTIONS
-        "  <Option name='ZOOM_LEVEL_STRATEGY' scope='raster' "
-        "type='string-select' description='Strategy to determine zoom level.' "
-        "default='AUTO'>"
-        "    <Value>AUTO</Value>"
-        "    <Value>LOWER</Value>"
-        "    <Value>UPPER</Value>"
-        "  </Option>"
-        "  <Option name='RESAMPLING' scope='raster' type='string-select' "
-        "description='Resampling algorithm.' default='BILINEAR'>"
-        "    <Value>NEAREST</Value>"
-        "    <Value>BILINEAR</Value>"
-        "    <Value>CUBIC</Value>"
-        "    <Value>CUBICSPLINE</Value>"
-        "    <Value>LANCZOS</Value>"
-        "    <Value>MODE</Value>"
-        "    <Value>AVERAGE</Value>"
-        "  </Option>"
-        "  <Option name='WRITE_BOUNDS' scope='raster' type='boolean' "
-        "description='Whether to write the bounds metadata' default='YES'/>"
-        "  <Option name='WRITE_MINMAXZOOM' scope='raster' type='boolean' "
-        "description='Whether to write the minzoom and maxzoom metadata' "
-        "default='YES'/>"
-        "  <Option name='BOUNDS' scope='raster,vector' type='string' "
-        "description='Override default value for bounds metadata item'/>"
-        "  <Option name='CENTER' scope='raster,vector' type='string' "
-        "description='Override default value for center metadata item'/>"
+        "<CreationOptionList>" MBTILES_RASTER_CREATION_OPTIONS
 #ifdef HAVE_MVT_WRITE_SUPPORT
         MVT_MBTILES_COMMON_DSCO
 #endif

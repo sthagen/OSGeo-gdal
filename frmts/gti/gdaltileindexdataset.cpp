@@ -246,6 +246,9 @@ class GDALTileIndexDataset final : public GDALPamDataset
     //! Whether the GTI XML has been modified (by SetMetadata/SetMetadataItem)
     bool m_bXMLModified = false;
 
+    //! Allowed raster drivers
+    CPLStringList m_aosAllowedRasterDrivers{};
+
     //! Unique string (without the process) for this tile index. Passed to
     //! GDALProxyPoolDataset to ensure that sources are unique for a given owner
     const std::string m_osUniqueHandle;
@@ -704,37 +707,148 @@ static std::string GetAbsoluteFileName(const char *pszTileName,
 }
 
 /************************************************************************/
-/*                   GTIDoPaletteExpansionIfNeeded()                    */
+/*                           IsGrayOrGrayA()                            */
 /************************************************************************/
 
-//! Do palette -> RGB(A) expansion
-static bool
-GTIDoPaletteExpansionIfNeeded(std::shared_ptr<GDALDataset> &poTileDS,
-                              int nBandCount)
+static bool IsGrayOrGrayA(GDALDataset *poDS)
 {
-    bool bRet = true;
+    return (poDS->GetRasterCount() == 1 &&
+            poDS->GetRasterBand(1)->GetRasterDataType() == GDT_Byte) ||
+           (poDS->GetRasterCount() == 2 &&
+            poDS->GetRasterBand(2)->GetColorInterpretation() == GCI_AlphaBand);
+}
+
+/************************************************************************/
+/*                            IsRGBOrRGBA()                             */
+/************************************************************************/
+
+static bool IsRGBOrRGBA(GDALDataset *poDS)
+{
+    return poDS->GetRasterCount() >= 3 && poDS->GetRasterCount() <= 4 &&
+           poDS->GetRasterBand(1)->GetColorInterpretation() == GCI_RedBand &&
+           poDS->GetRasterBand(2)->GetColorInterpretation() == GCI_GreenBand &&
+           poDS->GetRasterBand(3)->GetColorInterpretation() == GCI_BlueBand &&
+           (poDS->GetRasterCount() == 3 ||
+            poDS->GetRasterBand(4)->GetColorInterpretation() == GCI_AlphaBand);
+}
+
+/************************************************************************/
+/*                         GTIAdjustBandCount()                         */
+/************************************************************************/
+
+// Do palette -> RGB(A) expansion, G(A)/RGB(A) -> G(A)/RGB(A)
+
+static bool GTIAdjustBandCount(std::shared_ptr<GDALDataset> &poTileDS,
+                               int nBandCount, GDALDataset *poGTIDS)
+{
+    if (nBandCount == poTileDS->GetRasterCount())
+        return true;
+
+    CPLStringList aosOptions;
+
     if (poTileDS->GetRasterCount() == 1 &&
         (nBandCount == 3 || nBandCount == 4) &&
         poTileDS->GetRasterBand(1)->GetColorTable() != nullptr)
     {
-
-        CPLStringList aosOptions;
         aosOptions.AddString("-of");
         aosOptions.AddString("VRT");
 
         aosOptions.AddString("-expand");
         aosOptions.AddString(nBandCount == 3 ? "rgb" : "rgba");
-
-        GDALTranslateOptions *psOptions =
-            GDALTranslateOptionsNew(aosOptions.List(), nullptr);
-        int bUsageError = false;
-        auto poRGBDS = std::unique_ptr<GDALDataset>(GDALDataset::FromHandle(
-            GDALTranslate("", GDALDataset::ToHandle(poTileDS.get()), psOptions,
-                          &bUsageError)));
-        GDALTranslateOptionsFree(psOptions);
-        bRet = poRGBDS != nullptr;
-        poTileDS = std::move(poRGBDS);
     }
+
+    // G(A) -> G(A)
+    else if (IsGrayOrGrayA(poTileDS.get()) && poGTIDS && IsGrayOrGrayA(poGTIDS))
+    {
+        aosOptions.AddString("-of");
+        aosOptions.AddString("VRT");
+
+        aosOptions.AddString("-b");
+        aosOptions.AddString("1");
+
+        if (nBandCount == 2)
+        {
+            aosOptions.AddString("-b");
+            aosOptions.AddString("mask");
+        }
+    }
+
+    // G(A) -> RGB(A)
+    else if (IsGrayOrGrayA(poTileDS.get()) && poGTIDS && IsRGBOrRGBA(poGTIDS))
+    {
+        aosOptions.AddString("-of");
+        aosOptions.AddString("VRT");
+
+        aosOptions.AddString("-b");
+        aosOptions.AddString("1");
+
+        aosOptions.AddString("-b");
+        aosOptions.AddString("1");
+
+        aosOptions.AddString("-b");
+        aosOptions.AddString("1");
+
+        if (nBandCount == 4)
+        {
+            aosOptions.AddString("-b");
+            aosOptions.AddString("mask");
+        }
+    }
+
+    // RGB(A) -> RGB(A)
+    else if (IsRGBOrRGBA(poTileDS.get()) && poGTIDS && IsRGBOrRGBA(poGTIDS))
+    {
+        aosOptions.AddString("-of");
+        aosOptions.AddString("VRT");
+
+        aosOptions.AddString("-b");
+        aosOptions.AddString("1");
+
+        aosOptions.AddString("-b");
+        aosOptions.AddString("2");
+
+        aosOptions.AddString("-b");
+        aosOptions.AddString("3");
+
+        if (nBandCount == 4)
+        {
+            aosOptions.AddString("-b");
+            aosOptions.AddString("mask");
+        }
+    }
+
+    // GrGrGr(A) -> G(A)
+    else if (IsRGBOrRGBA(poTileDS.get()) && poGTIDS && IsGrayOrGrayA(poGTIDS))
+    {
+        aosOptions.AddString("-of");
+        aosOptions.AddString("VRT");
+
+        // We assume that the R,G,B channels actually contain the same value
+        // i.e. a gray scale image expanded as R,G,B
+        aosOptions.AddString("-b");
+        aosOptions.AddString("1");
+
+        if (nBandCount == 2)
+        {
+            aosOptions.AddString("-b");
+            aosOptions.AddString("mask");
+        }
+    }
+
+    else
+    {
+        return true;
+    }
+
+    GDALTranslateOptions *psOptions =
+        GDALTranslateOptionsNew(aosOptions.List(), nullptr);
+    int bUsageError = false;
+    auto poNewTileDS = std::unique_ptr<GDALDataset>(GDALDataset::FromHandle(
+        GDALTranslate("", GDALDataset::ToHandle(poTileDS.get()), psOptions,
+                      &bUsageError)));
+    GDALTranslateOptionsFree(psOptions);
+    const bool bRet = poNewTileDS != nullptr;
+    poTileDS = std::move(poNewTileDS);
     return bRet;
 }
 
@@ -745,6 +859,11 @@ GTIDoPaletteExpansionIfNeeded(std::shared_ptr<GDALDataset> &poTileDS,
 bool GDALTileIndexDataset::Open(GDALOpenInfo *poOpenInfo)
 {
     eAccess = poOpenInfo->eAccess;
+
+    m_aosAllowedRasterDrivers = CPLStringList(
+        CSLTokenizeString2(CSLFetchNameValueDef(poOpenInfo->papszOpenOptions,
+                                                "ALLOWED_RASTER_DRIVERS", ""),
+                           ",", 0));
 
     CPLXMLNode *psRoot = nullptr;
     std::string osIndexDataset(poOpenInfo->pszFilename);
@@ -1635,7 +1754,8 @@ bool GDALTileIndexDataset::Open(GDALOpenInfo *poOpenInfo)
 
         auto poTileDS = std::shared_ptr<GDALDataset>(
             GDALDataset::Open(pszTileName,
-                              GDAL_OF_RASTER | GDAL_OF_VERBOSE_ERROR),
+                              GDAL_OF_RASTER | GDAL_OF_VERBOSE_ERROR,
+                              m_aosAllowedRasterDrivers.List()),
             GDALDatasetUniquePtrReleaser());
         if (!poTileDS)
         {
@@ -1643,7 +1763,7 @@ bool GDALTileIndexDataset::Open(GDALOpenInfo *poOpenInfo)
         }
 
         // do palette -> RGB(A) expansion if needed
-        if (!GTIDoPaletteExpansionIfNeeded(poTileDS, nBandCount))
+        if (!GTIAdjustBandCount(poTileDS, nBandCount, nullptr))
             return false;
 
         const int nTileBandCount = poTileDS->GetRasterCount();
@@ -3015,7 +3135,8 @@ void GDALTileIndexDataset::LoadOverviews()
                                       ? osResolvedDSName.c_str()
                                       : GetDescription(),
                                   GDAL_OF_RASTER | GDAL_OF_VERBOSE_ERROR,
-                                  nullptr, aosNewOpenOptions.List(), nullptr));
+                                  m_aosAllowedRasterDrivers.List(),
+                                  aosNewOpenOptions.List(), nullptr));
 
             // Make it possible to use the Factor option on a GeoTIFF for
             // example and translate it to an overview level.
@@ -3108,8 +3229,8 @@ void GDALTileIndexDataset::LoadOverviews()
                                         ? osResolvedDSName.c_str()
                                         : GetDescription(),
                                     GDAL_OF_RASTER | GDAL_OF_VERBOSE_ERROR,
-                                    nullptr, aosNewOpenOptions.List(),
-                                    nullptr));
+                                    m_aosAllowedRasterDrivers.List(),
+                                    aosNewOpenOptions.List(), nullptr));
                             if (poOvrOfOvrDS &&
                                 poOvrOfOvrDS->GetRasterCount() ==
                                     GetRasterCount() &&
@@ -3834,7 +3955,8 @@ bool GDALTileIndexDataset::GetSourceDesc(const std::string &osTileName,
         poTileDS = std::shared_ptr<GDALDataset>(
             GDALProxyPoolDataset::Create(
                 osTileName.c_str(), nullptr, GA_ReadOnly,
-                /* bShared = */ true, m_osUniqueHandle.c_str()),
+                /* bShared = */ true, m_osUniqueHandle.c_str(),
+                m_aosAllowedRasterDrivers.List()),
             GDALDatasetUniquePtrReleaser());
         if (!poTileDS)
         {
@@ -3851,7 +3973,7 @@ bool GDALTileIndexDataset::GetSourceDesc(const std::string &osTileName,
         }
 
         // do palette -> RGB(A) expansion if needed
-        if (!GTIDoPaletteExpansionIfNeeded(poTileDS, nBands))
+        if (!GTIAdjustBandCount(poTileDS, nBands, this))
             return false;
 
         bool bWarpVRT = false;
@@ -4029,7 +4151,42 @@ bool GDALTileIndexDataset::GetSourceDesc(const std::string &osTileName,
     }
 
     GDALGeoTransform gtTile;
-    if (poTileDS->GetGeoTransform(gtTile) != CE_None)
+    bool bHasGT = poTileDS->GetGeoTransform(gtTile) == CE_None;
+
+    // A bit of a hack to synthetize the geotransform of a PMTiles .png/.jpg/.webp
+    // from the /vsipmtiles/my.pmtiles/{z}/{x}/{y}.ext filename, using GoogleMaps
+    // tiling scheme.
+    if (!bHasGT && cpl::starts_with(osTileName, "/vsipmtiles/") &&
+        poTileDS->GetRasterXSize() > 0 && poTileDS->GetRasterYSize() > 0)
+    {
+        constexpr double SPHERICAL_RADIUS = 6378137.0;
+        constexpr double MAX_GM =
+            SPHERICAL_RADIUS * M_PI;  // 20037508.342789244
+        const auto nPos = CPLString(osTileName).ifind(".pmtiles/");
+        if (nPos != std::string::npos)
+        {
+            const char *pszPMTiles =
+                osTileName.c_str() + nPos + strlen(".pmtiles/");
+            const CPLStringList aosTokens(
+                CSLTokenizeString2(pszPMTiles, "/", 0));
+            if (aosTokens.size() == 3)
+            {
+                const unsigned nZ = atoi(aosTokens[0]);
+                const unsigned nX = atoi(aosTokens[1]);
+                const unsigned nY = atoi(aosTokens[2]);
+                if (nZ <= 31)
+                {
+                    bHasGT = true;
+                    const double dfTileDim = 2 * MAX_GM / (1U << nZ);
+                    gtTile.xorig = -MAX_GM + nX * dfTileDim;
+                    gtTile.xscale = dfTileDim / poTileDS->GetRasterXSize();
+                    gtTile.yorig = MAX_GM - nY * dfTileDim;
+                    gtTile.yscale = -dfTileDim / poTileDS->GetRasterYSize();
+                }
+            }
+        }
+    }
+    if (!bHasGT)
     {
         CPLError(CE_Failure, CPLE_AppDefined, "%s lacks geotransform",
                  osTileName.c_str());
@@ -5716,6 +5873,8 @@ void GDALRegister_GTI()
         "  <Option name='WARPING_MEMORY_SIZE' type='string' description="
         "'Set the amount of memory that the warp API is allowed to use for "
         "caching' default='64MB'/>"
+        "  <Option name='ALLOWED_RASTER_DRIVERS' type='string' description="
+        "'Comma-separated list of allowed raster driver names'/>"
         "</OpenOptionList>");
 
 #ifdef GDAL_ENABLE_ALGORITHMS

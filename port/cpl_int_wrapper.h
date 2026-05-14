@@ -18,9 +18,9 @@ namespace cpl
 {
 /** Strongly typed wrapper around an integer data type.
  *
- * Template parameter is typically a tag structure (``struct MyTag{};``)
+ * Template parameter TagType is typically a tag structure (``struct MyTag{};``)
  */
-template <class T, typename IntType = int> class IntWrapper
+template <class TagType, typename IntType = int> class IntWrapper
 {
     IntType m_value;
 

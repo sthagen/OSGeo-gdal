@@ -213,6 +213,13 @@ GDALRasterTileAlgorithm::GDALRasterTileAlgorithm(bool standaloneStep)
 
     AddArg("min-zoom", 0, _("Minimum zoom level"), &m_minZoomLevel)
         .SetMinValueIncluded(0);
+
+    // Only used by PMTiles driver for now
+    AddArg("min-zoom-single-tile", 0,
+           _("Determine minimum zoom level to produce a single tile"),
+           &m_minZoomLevelSingleTile)
+        .SetHidden();
+
     AddArg("max-zoom", 0, _("Maximum zoom level"), &m_maxZoomLevel)
         .SetMinValueIncluded(0);
 
@@ -4824,8 +4831,6 @@ bool GDALRasterTileAlgorithm::RunStep(GDALPipelineStepRunContext &ctxt)
                 m_maxZoomLevel--;
         }
     }
-    if (m_minZoomLevel < 0)
-        m_minZoomLevel = m_maxZoomLevel;
 
     auto tileMatrix = tileMatrixList[m_maxZoomLevel];
     int nMinTileX = 0;
@@ -4926,6 +4931,17 @@ bool GDALRasterTileAlgorithm::RunStep(GDALPipelineStepRunContext &ctxt)
                nMinTileY * tileMatrix.mResY * tileMatrix.mTileHeight;
     dstGT[4] = 0;
     dstGT[5] = -tileMatrix.mResY;
+
+    if (m_minZoomLevelSingleTile)
+    {
+        const int nMaxDim = std::max(nXSize, nYSize);
+        const int nOvrCount = static_cast<int>(
+            std::ceil(std::max(0.0, std::log2(static_cast<double>(nMaxDim) /
+                                              tileMatrix.mTileWidth))));
+        m_minZoomLevel = std::max(0, m_maxZoomLevel - nOvrCount);
+    }
+    else if (m_minZoomLevel < 0)
+        m_minZoomLevel = m_maxZoomLevel;
 
     /* -------------------------------------------------------------------- */
     /*      Setup warp options.                                             */

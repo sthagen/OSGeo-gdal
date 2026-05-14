@@ -464,7 +464,8 @@ static bool CheckCanSetDatasetObject(const GDALAlgorithmArg *arg)
 
 bool GDALAlgorithmArg::Set(GDALDataset *ds)
 {
-    if (m_decl.GetType() != GAAT_DATASET)
+    if (m_decl.GetType() != GAAT_DATASET &&
+        m_decl.GetType() != GAAT_DATASET_LIST)
     {
         CPLError(CE_Failure, CPLE_AppDefined,
                  "Calling Set(GDALDataset*, bool) on argument '%s' of type %s "
@@ -475,8 +476,18 @@ bool GDALAlgorithmArg::Set(GDALDataset *ds)
     if (!CheckCanSetDatasetObject(this))
         return false;
     m_explicitlySet = true;
-    auto &val = *std::get<GDALArgDatasetValue *>(m_value);
-    val.Set(ds);
+    if (m_decl.GetType() == GAAT_DATASET)
+    {
+        auto &val = *std::get<GDALArgDatasetValue *>(m_value);
+        val.Set(ds);
+    }
+    else
+    {
+        CPLAssert(m_decl.GetType() == GAAT_DATASET_LIST);
+        auto &val = *std::get<std::vector<GDALArgDatasetValue> *>(m_value);
+        val.resize(1);
+        val[0].Set(ds);
+    }
     return RunAllActions();
 }
 
