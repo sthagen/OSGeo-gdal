@@ -35,6 +35,8 @@ bool OGRS101Reader::CreateCurveFeatureDefn()
                 OGRSpatialReferenceRefCountedPtr::makeClone(&oSRSIter->second)
                     .get());
         }
+        m_poFeatureDefnCurve->GetGeomFieldDefn(0)->SetCoordinatePrecision(
+            m_coordinatePrecision);
         {
             OGRFieldDefn oFieldDefn(OGR_FIELD_NAME_RECORD_ID, OFTInteger);
             m_poFeatureDefnCurve->AddFieldDefn(&oFieldDefn);
@@ -279,16 +281,14 @@ bool OGRS101Reader::ProcessUpdateRecordCurve(const DDFRecord *poUpdateRecord,
 {
     const auto poIDField = poUpdateRecord->GetField(0);
     CPLAssert(poIDField);
-    const char *pszIDFieldName = poIDField->GetFieldDefn()->GetName();
-    CPLAssert(pszIDFieldName);
 
     // Record name
     const RecordName nRCNM =
-        poUpdateRecord->GetIntSubfield(pszIDFieldName, 0, RCNM_SUBFIELD, 0);
+        poUpdateRecord->GetIntSubfield(poIDField, RCNM_SUBFIELD, 0);
 
     // Record identifier
     const int nRCID =
-        poUpdateRecord->GetIntSubfield(pszIDFieldName, 0, RCID_SUBFIELD, 0);
+        poUpdateRecord->GetIntSubfield(poIDField, RCID_SUBFIELD, 0);
 
     const auto poUpdatePTASField = poUpdateRecord->FindField(PTAS_FIELD);
     if (poUpdatePTASField)

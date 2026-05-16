@@ -2711,44 +2711,15 @@ GDALWarpDirect(const char *pszDest, GDALDatasetH hDstDS, int nSrcCount,
 
             if (dfTargetRatio > 1.0)
             {
-                // Note: keep this logic for overview selection in sync between
-                // gdalwarp_lib.cpp and rasterio.cpp
                 const char *pszOversampligThreshold = CPLGetConfigOption(
                     "GDALWARP_OVERSAMPLING_THRESHOLD", nullptr);
                 const double dfOversamplingThreshold =
                     pszOversampligThreshold ? CPLAtof(pszOversampligThreshold)
                                             : 1.0;
 
-                int iBestOvr = -1;
-                double dfBestRatio = 0;
-                for (int iOvr = -1; iOvr < nOvCount; iOvr++)
-                {
-                    const double dfOvrRatio =
-                        iOvr < 0
-                            ? 1.0
-                            : static_cast<double>(poSrcDS->GetRasterXSize()) /
-                                  poSrcDS->GetRasterBand(1)
-                                      ->GetOverview(iOvr)
-                                      ->GetXSize();
-
-                    // Is it nearly the requested factor and better (lower) than
-                    // the current best factor?
-                    // Use an epsilon because of numerical instability.
-                    constexpr double EPSILON = 1e-1;
-                    if (dfOvrRatio >=
-                            dfTargetRatio * dfOversamplingThreshold + EPSILON ||
-                        dfOvrRatio <= dfBestRatio)
-                    {
-                        continue;
-                    }
-
-                    iBestOvr = iOvr;
-                    dfBestRatio = dfOvrRatio;
-                    if (std::abs(dfTargetRatio - dfOvrRatio) < EPSILON)
-                    {
-                        break;
-                    }
-                }
+                const int iBestOvr = GDALBandGetBestOverviewLevel(
+                    poSrcDS->GetRasterBand(1), dfTargetRatio,
+                    dfOversamplingThreshold);
                 const int iOvr =
                     iBestOvr + (psOptions->nOvLevel - OVR_LEVEL_AUTO);
                 if (iOvr >= 0)
@@ -4385,32 +4356,27 @@ static GDALDatasetH GDALWarpCreateOutput(
                         double adf3Y[3] = {adfY[0], adfY[nValues / 2],
                                            adfY[nValues - 1]};
                         double adf3Z[3] = {0};
-                        if (GDALGenImgProjTransform(
-                                hUniqueTransformArg.get(), TRUE, 3, &adf3X[0],
-                                &adf3Y[0], &adf3Z[0], &abSuccess[0]))
+                        GDALGenImgProjTransform(hUniqueTransformArg.get(), TRUE,
+                                                3, &adf3X[0], &adf3Y[0],
+                                                &adf3Z[0], &abSuccess[0]);
+                        for (int i = 0; i < 3; ++i)
                         {
-                            for (int i = 0; i < 3; ++i)
+                            if (abSuccess[i] && funcIsOK(adf3X[i], adf3Y[i]))
                             {
-                                if (abSuccess[i] &&
-                                    funcIsOK(adf3X[i], adf3Y[i]))
-                                {
-                                    return false;
-                                }
+                                return false;
                             }
                         }
                     }
 
                     // Do on full border to confirm
-                    if (GDALGenImgProjTransform(hUniqueTransformArg.get(), TRUE,
-                                                nValues, &adfX[0], &adfY[0],
-                                                &adfZ[0], &abSuccess[0]))
+                    GDALGenImgProjTransform(hUniqueTransformArg.get(), TRUE,
+                                            nValues, &adfX[0], &adfY[0],
+                                            &adfZ[0], &abSuccess[0]);
+                    for (int i = 0; i < nValues; ++i)
                     {
-                        for (int i = 0; i < nValues; ++i)
+                        if (abSuccess[i] && funcIsOK(adfX[i], adfY[i]))
                         {
-                            if (abSuccess[i] && funcIsOK(adfX[i], adfY[i]))
-                            {
-                                return false;
-                            }
+                            return false;
                         }
                     }
 

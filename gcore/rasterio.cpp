@@ -1256,14 +1256,10 @@ CPLErr GDALRasterBand::RasterIOResampled(
         int nFullResYChunk = 0;
         while (true)
         {
-            nFullResXChunk =
-                3 + static_cast<int>(nDstBlockXSize * dfXRatioDstToSrc);
-            nFullResYChunk =
-                3 + static_cast<int>(nDstBlockYSize * dfYRatioDstToSrc);
-            if (nFullResXChunk > nRasterXSize)
-                nFullResXChunk = nRasterXSize;
-            if (nFullResYChunk > nRasterYSize)
-                nFullResYChunk = nRasterYSize;
+            nFullResXChunk = static_cast<int>(std::min<double>(
+                3 + nDstBlockXSize * dfXRatioDstToSrc, nRasterXSize));
+            nFullResYChunk = static_cast<int>(std::min<double>(
+                3 + nDstBlockYSize * dfYRatioDstToSrc, nRasterYSize));
             if ((nDstBlockXSize == 1 && nDstBlockYSize == 1) ||
                 (static_cast<GIntBig>(nFullResXChunk) * nFullResYChunk <=
                  1024 * 1024))
@@ -1281,21 +1277,18 @@ CPLErr GDALRasterBand::RasterIOResampled(
                 nDstBlockYSize /= 2;
         }
 
-        int nOvrXFactor = static_cast<int>(0.5 + dfXRatioDstToSrc);
-        int nOvrYFactor = static_cast<int>(0.5 + dfYRatioDstToSrc);
-        if (nOvrXFactor == 0)
-            nOvrXFactor = 1;
-        if (nOvrYFactor == 0)
-            nOvrYFactor = 1;
-        int nFullResXSizeQueried =
-            nFullResXChunk + 2 * nKernelRadius * nOvrXFactor;
-        int nFullResYSizeQueried =
-            nFullResYChunk + 2 * nKernelRadius * nOvrYFactor;
-
-        if (nFullResXSizeQueried > nRasterXSize)
-            nFullResXSizeQueried = nRasterXSize;
-        if (nFullResYSizeQueried > nRasterYSize)
-            nFullResYSizeQueried = nRasterYSize;
+        const int nOvrXFactor =
+            std::max(1, static_cast<int>(0.5 + dfXRatioDstToSrc));
+        const int nOvrYFactor =
+            std::max(1, static_cast<int>(0.5 + dfYRatioDstToSrc));
+        const int nFullResXSizeQueried = static_cast<int>(
+            std::min<int64_t>(nFullResXChunk + static_cast<int64_t>(2) *
+                                                   nKernelRadius * nOvrXFactor,
+                              nRasterXSize));
+        const int nFullResYSizeQueried = static_cast<int>(
+            std::min<int64_t>(nFullResYChunk + static_cast<int64_t>(2) *
+                                                   nKernelRadius * nOvrYFactor,
+                              nRasterYSize));
 
         void *pChunk =
             VSI_MALLOC3_VERBOSE(GDALGetDataTypeSizeBytes(eWrkDataType),
@@ -1321,12 +1314,12 @@ CPLErr GDALRasterBand::RasterIOResampled(
             return CE_Failure;
         }
 
-        const int nTotalBlocks = DIV_ROUND_UP(nBufXSize, nDstBlockXSize) *
-                                 DIV_ROUND_UP(nBufYSize, nDstBlockYSize);
-        int nBlocksDone = 0;
+        const int64_t nTotalBlocks =
+            static_cast<int64_t>(cpl::div_round_up(nBufXSize, nDstBlockXSize)) *
+            cpl::div_round_up(nBufYSize, nDstBlockYSize);
+        int64_t nBlocksDone = 0;
 
-        int nDstYOff;
-        for (nDstYOff = 0; nDstYOff < nBufYSize && eErr == CE_None;
+        for (int nDstYOff = 0; nDstYOff < nBufYSize && eErr == CE_None;
              nDstYOff += nDstBlockYSize)
         {
             int nDstYCount;
@@ -1490,8 +1483,10 @@ CPLErr GDALRasterBand::RasterIOResampled(
 
                 nBlocksDone++;
                 if (eErr == CE_None && psExtraArg->pfnProgress != nullptr &&
-                    !psExtraArg->pfnProgress(1.0 * nBlocksDone / nTotalBlocks,
-                                             "", psExtraArg->pProgressData))
+                    !psExtraArg->pfnProgress(
+                        static_cast<double>(nBlocksDone) /
+                            static_cast<double>(nTotalBlocks),
+                        "", psExtraArg->pProgressData))
                 {
                     eErr = CE_Failure;
                 }
@@ -1723,14 +1718,10 @@ CPLErr GDALDataset::RasterIOResampled(
         int nFullResXChunk, nFullResYChunk;
         while (true)
         {
-            nFullResXChunk =
-                3 + static_cast<int>(nDstBlockXSize * dfXRatioDstToSrc);
-            nFullResYChunk =
-                3 + static_cast<int>(nDstBlockYSize * dfYRatioDstToSrc);
-            if (nFullResXChunk > nRasterXSize)
-                nFullResXChunk = nRasterXSize;
-            if (nFullResYChunk > nRasterYSize)
-                nFullResYChunk = nRasterYSize;
+            nFullResXChunk = static_cast<int>(std::min<double>(
+                3 + nDstBlockXSize * dfXRatioDstToSrc, nRasterXSize));
+            nFullResYChunk = static_cast<int>(std::min<double>(
+                3 + nDstBlockYSize * dfYRatioDstToSrc, nRasterYSize));
             if ((nDstBlockXSize == 1 && nDstBlockYSize == 1) ||
                 (static_cast<GIntBig>(nFullResXChunk) * nFullResYChunk <=
                  1024 * 1024))
@@ -1748,19 +1739,17 @@ CPLErr GDALDataset::RasterIOResampled(
                 nDstBlockYSize /= 2;
         }
 
-        int nOvrFactor = std::max(static_cast<int>(0.5 + dfXRatioDstToSrc),
-                                  static_cast<int>(0.5 + dfYRatioDstToSrc));
-        if (nOvrFactor == 0)
-            nOvrFactor = 1;
-        int nFullResXSizeQueried =
-            nFullResXChunk + 2 * nKernelRadius * nOvrFactor;
-        int nFullResYSizeQueried =
-            nFullResYChunk + 2 * nKernelRadius * nOvrFactor;
-
-        if (nFullResXSizeQueried > nRasterXSize)
-            nFullResXSizeQueried = nRasterXSize;
-        if (nFullResYSizeQueried > nRasterYSize)
-            nFullResYSizeQueried = nRasterYSize;
+        const int nOvrFactor =
+            std::max(1, std::max(static_cast<int>(0.5 + dfXRatioDstToSrc),
+                                 static_cast<int>(0.5 + dfYRatioDstToSrc)));
+        const int nFullResXSizeQueried = static_cast<int>(
+            std::min<int64_t>(nFullResXChunk + static_cast<int64_t>(2) *
+                                                   nKernelRadius * nOvrFactor,
+                              nRasterXSize));
+        const int nFullResYSizeQueried = static_cast<int>(
+            std::min<int64_t>(nFullResYChunk + static_cast<int64_t>(2) *
+                                                   nKernelRadius * nOvrFactor,
+                              nRasterYSize));
 
         void *pChunk = VSI_MALLOC3_VERBOSE(
             cpl::fits_on<int>(GDALGetDataTypeSizeBytes(eWrkDataType) *
@@ -1785,12 +1774,12 @@ CPLErr GDALDataset::RasterIOResampled(
             return CE_Failure;
         }
 
-        const int nTotalBlocks = DIV_ROUND_UP(nBufXSize, nDstBlockXSize) *
-                                 DIV_ROUND_UP(nBufYSize, nDstBlockYSize);
-        int nBlocksDone = 0;
+        const int64_t nTotalBlocks =
+            static_cast<int64_t>(cpl::div_round_up(nBufXSize, nDstBlockXSize)) *
+            cpl::div_round_up(nBufYSize, nDstBlockYSize);
+        int64_t nBlocksDone = 0;
 
-        int nDstYOff;
-        for (nDstYOff = 0; nDstYOff < nBufYSize && eErr == CE_None;
+        for (int nDstYOff = 0; nDstYOff < nBufYSize && eErr == CE_None;
              nDstYOff += nDstBlockYSize)
         {
             int nDstYCount;
@@ -2000,8 +1989,10 @@ CPLErr GDALDataset::RasterIOResampled(
 
                 nBlocksDone++;
                 if (eErr == CE_None && psExtraArg->pfnProgress != nullptr &&
-                    !psExtraArg->pfnProgress(1.0 * nBlocksDone / nTotalBlocks,
-                                             "", psExtraArg->pProgressData))
+                    !psExtraArg->pfnProgress(
+                        static_cast<double>(nBlocksDone) /
+                            static_cast<double>(nTotalBlocks),
+                        "", psExtraArg->pProgressData))
                 {
                     eErr = CE_Failure;
                 }
@@ -4442,6 +4433,69 @@ void GDALCopyBits(const GByte *pabySrcData, int nSrcOffset, int nSrcStep,
 }
 
 /************************************************************************/
+/*                    GDALBandGetBestOverviewLevel()                    */
+/************************************************************************/
+
+int GDALBandGetBestOverviewLevel(GDALRasterBand *poBand,
+                                 double dfTargetDownsamplingRatio,
+                                 double dfOversamplingThreshold)
+{
+    int iBestOvr = -1;
+    double dfBestRatio = 0;
+    const int nOvCount = poBand->GetOverviewCount();
+    constexpr double EPSILON = 1e-1;
+    for (int iOvr = -1; iOvr < nOvCount; iOvr++)
+    {
+        double dfOvrRatio = 1.0;
+        GDALRasterBand *poOvrBand = nullptr;
+        if (iOvr >= 0)
+        {
+            poOvrBand = poBand->GetOverview(iOvr);
+            if (poOvrBand == nullptr ||
+                poOvrBand->GetXSize() > poBand->GetXSize() ||
+                poOvrBand->GetYSize() > poBand->GetYSize())
+            {
+                continue;
+            }
+            dfOvrRatio = std::min(static_cast<double>(poBand->GetXSize()) /
+                                      poOvrBand->GetXSize(),
+                                  static_cast<double>(poBand->GetYSize()) /
+                                      poOvrBand->GetYSize());
+        }
+
+        // Is it nearly the requested factor and better (lower) than
+        // the current best factor?
+        // Use an epsilon because of numerical instability.
+        if (dfOvrRatio >=
+                dfTargetDownsamplingRatio * dfOversamplingThreshold + EPSILON ||
+            dfOvrRatio <= dfBestRatio)
+        {
+            continue;
+        }
+
+        if (poOvrBand)
+        {
+            // Ignore AVERAGE_BIT2GRAYSCALE overviews.
+            const char *pszResampling =
+                poOvrBand->GetMetadataItem("RESAMPLING");
+            if (pszResampling != nullptr &&
+                STARTS_WITH_CI(pszResampling, "AVERAGE_BIT2"))
+            {
+                continue;
+            }
+        }
+
+        iBestOvr = iOvr;
+        dfBestRatio = dfOvrRatio;
+        if (std::abs(dfTargetDownsamplingRatio - dfOvrRatio) < EPSILON)
+        {
+            break;
+        }
+    }
+    return iBestOvr;
+}
+
+/************************************************************************/
 /*                    GDALGetBestOverviewLevel()                        */
 /*                                                                      */
 /* Returns the best overview level to satisfy the query or -1 if none   */
@@ -4482,74 +4536,26 @@ int GDALBandGetBestOverviewLevel2(GDALRasterBand *poBand, int &nXOff,
     /*      downsampled) that is still less than (or only a little more)    */
     /*      downsampled than the request.                                   */
     /* -------------------------------------------------------------------- */
-    const int nOverviewCount = poBand->GetOverviewCount();
-    GDALRasterBand *poBestOverview = nullptr;
-    double dfBestDownsamplingFactor = 0;
-    int nBestOverviewLevel = -1;
 
     const char *pszOversampligThreshold =
         CPLGetConfigOption("GDAL_OVERVIEW_OVERSAMPLING_THRESHOLD", nullptr);
 
-    // Note: keep this logic for overview selection in sync between
-    // gdalwarp_lib.cpp and rasterio.cpp
     // Cf https://github.com/OSGeo/gdal/pull/9040#issuecomment-1898524693
     const double dfOversamplingThreshold =
         pszOversampligThreshold ? CPLAtof(pszOversampligThreshold)
         : psExtraArg && psExtraArg->eResampleAlg != GRIORA_NearestNeighbour
             ? 1.0
             : 1.2;
-    for (int iOverview = 0; iOverview < nOverviewCount; iOverview++)
-    {
-        GDALRasterBand *poOverview = poBand->GetOverview(iOverview);
-        if (poOverview == nullptr ||
-            poOverview->GetXSize() > poBand->GetXSize() ||
-            poOverview->GetYSize() > poBand->GetYSize())
-        {
-            continue;
-        }
-
-        // Compute downsampling factor of this overview
-        const double dfDownsamplingFactor = std::min(
-            poBand->GetXSize() / static_cast<double>(poOverview->GetXSize()),
-            poBand->GetYSize() / static_cast<double>(poOverview->GetYSize()));
-
-        // Is it nearly the requested factor and better (lower) than
-        // the current best factor?
-        // Use an epsilon because of numerical instability.
-        constexpr double EPSILON = 1e-1;
-        if (dfDownsamplingFactor >=
-                dfDesiredDownsamplingFactor * dfOversamplingThreshold +
-                    EPSILON ||
-            dfDownsamplingFactor <= dfBestDownsamplingFactor)
-        {
-            continue;
-        }
-
-        // Ignore AVERAGE_BIT2GRAYSCALE overviews for RasterIO purposes.
-        const char *pszResampling = poOverview->GetMetadataItem("RESAMPLING");
-
-        if (pszResampling != nullptr &&
-            STARTS_WITH_CI(pszResampling, "AVERAGE_BIT2"))
-            continue;
-
-        // OK, this is our new best overview.
-        poBestOverview = poOverview;
-        nBestOverviewLevel = iOverview;
-        dfBestDownsamplingFactor = dfDownsamplingFactor;
-
-        if (std::abs(dfDesiredDownsamplingFactor - dfDownsamplingFactor) <
-            EPSILON)
-        {
-            break;
-        }
-    }
+    const int iBestOvrLevel = GDALBandGetBestOverviewLevel(
+        poBand, dfDesiredDownsamplingFactor, dfOversamplingThreshold);
 
     /* -------------------------------------------------------------------- */
     /*      If we didn't find an overview that helps us, just return        */
     /*      indicating failure and the full resolution image will be used.  */
     /* -------------------------------------------------------------------- */
-    if (nBestOverviewLevel < 0)
+    if (iBestOvrLevel < 0)
         return -1;
+    const GDALRasterBand *poBestOverview = poBand->GetOverview(iBestOvrLevel);
 
     /* -------------------------------------------------------------------- */
     /*      Recompute the source window in terms of the selected            */
@@ -4597,7 +4603,7 @@ int GDALBandGetBestOverviewLevel2(GDALRasterBand *poBand, int &nXOff,
     nXSize = nOXSize;
     nYSize = nOYSize;
 
-    return nBestOverviewLevel;
+    return iBestOvrLevel;
 }
 
 /************************************************************************/
