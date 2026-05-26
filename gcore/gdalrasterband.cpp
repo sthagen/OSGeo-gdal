@@ -9983,7 +9983,8 @@ bool GDALRasterBand::HasConflictingMaskSources(
     const bool bHasBinaryMaskBand =
         ((const_cast<GDALRasterBand *>(this)->GetMaskFlags() &
           (GMF_ALL_VALID | GMF_NODATA | GMF_ALPHA)) == 0) &&
-        (!bHasExternalMask || poDS->oOvManager.GetMaskBand(nBand) != this);
+        (!bHasExternalMask ||
+         (poDS && poDS->oOvManager.GetMaskBand(nBand) != this));
     const bool bHasNoData = HasNoData();
     const bool bHasNODATA_VALUES =
         poDS && poDS->GetMetadataItem("NODATA_VALUES");
@@ -12194,6 +12195,53 @@ static GDALComputedRasterBand ThrowIfNotMuparser()
 #endif
 
 /************************************************************************/
+/*                         CreateComputedBand()                         */
+/************************************************************************/
+
+static GDALComputedRasterBand
+CreateComputedBand(GDALComputedRasterBand::Operation op,
+                   const GDALRasterBand &bandA, const GDALRasterBand &bandB)
+{
+#ifndef HAVE_MUPARSER
+    (void)op;
+    (void)bandA;
+    (void)bandB;
+    return ThrowIfNotMuparser();
+#else
+    GDALRasterBand::ThrowIfNotSameDimensions(bandA, bandB);
+    return GDALComputedRasterBand(op, bandA, bandB);
+#endif
+}
+
+static GDALComputedRasterBand
+CreateComputedBand(GDALComputedRasterBand::Operation op,
+                   const GDALRasterBand &band, double constant)
+{
+#ifndef HAVE_MUPARSER
+    (void)op;
+    (void)band;
+    (void)constant;
+    return ThrowIfNotMuparser();
+#else
+    return GDALComputedRasterBand(op, band, constant);
+#endif
+}
+
+static GDALComputedRasterBand
+CreateComputedBand(GDALComputedRasterBand::Operation op, double constant,
+                   const GDALRasterBand &band)
+{
+#ifndef HAVE_MUPARSER
+    (void)op;
+    (void)constant;
+    (void)band;
+    return ThrowIfNotMuparser();
+#else
+    return GDALComputedRasterBand(op, constant, band);
+#endif
+}
+
+/************************************************************************/
 /*                             operator>()                              */
 /************************************************************************/
 
@@ -12208,14 +12256,8 @@ static GDALComputedRasterBand ThrowIfNotMuparser()
 GDALComputedRasterBand
 GDALRasterBand::operator>(const GDALRasterBand &other) const
 {
-#ifndef HAVE_MUPARSER
-    (void)other;
-    return ThrowIfNotMuparser();
-#else
-    ThrowIfNotSameDimensions(*this, other);
-    return GDALComputedRasterBand(GDALComputedRasterBand::Operation::OP_GT,
-                                  *this, other);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_GT, *this,
+                              other);
 }
 
 /************************************************************************/
@@ -12232,13 +12274,8 @@ GDALRasterBand::operator>(const GDALRasterBand &other) const
  */
 GDALComputedRasterBand GDALRasterBand::operator>(double constant) const
 {
-#ifndef HAVE_MUPARSER
-    (void)constant;
-    return ThrowIfNotMuparser();
-#else
-    return GDALComputedRasterBand(GDALComputedRasterBand::Operation::OP_GT,
-                                  *this, constant);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_GT, *this,
+                              constant);
 }
 
 /************************************************************************/
@@ -12255,14 +12292,8 @@ GDALComputedRasterBand GDALRasterBand::operator>(double constant) const
  */
 GDALComputedRasterBand operator>(double constant, const GDALRasterBand &other)
 {
-#ifndef HAVE_MUPARSER
-    (void)constant;
-    (void)other;
-    return ThrowIfNotMuparser();
-#else
-    return GDALComputedRasterBand(GDALComputedRasterBand::Operation::OP_GT,
-                                  constant, other);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_GT,
+                              constant, other);
 }
 
 /************************************************************************/
@@ -12280,14 +12311,8 @@ GDALComputedRasterBand operator>(double constant, const GDALRasterBand &other)
 GDALComputedRasterBand
 GDALRasterBand::operator>=(const GDALRasterBand &other) const
 {
-#ifndef HAVE_MUPARSER
-    (void)other;
-    return ThrowIfNotMuparser();
-#else
-    ThrowIfNotSameDimensions(*this, other);
-    return GDALComputedRasterBand(GDALComputedRasterBand::Operation::OP_GE,
-                                  *this, other);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_GE, *this,
+                              other);
 }
 
 /************************************************************************/
@@ -12304,13 +12329,8 @@ GDALRasterBand::operator>=(const GDALRasterBand &other) const
  */
 GDALComputedRasterBand GDALRasterBand::operator>=(double constant) const
 {
-#ifndef HAVE_MUPARSER
-    (void)constant;
-    return ThrowIfNotMuparser();
-#else
-    return GDALComputedRasterBand(GDALComputedRasterBand::Operation::OP_GE,
-                                  *this, constant);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_GE, *this,
+                              constant);
 }
 
 /************************************************************************/
@@ -12327,14 +12347,8 @@ GDALComputedRasterBand GDALRasterBand::operator>=(double constant) const
  */
 GDALComputedRasterBand operator>=(double constant, const GDALRasterBand &other)
 {
-#ifndef HAVE_MUPARSER
-    (void)constant;
-    (void)other;
-    return ThrowIfNotMuparser();
-#else
-    return GDALComputedRasterBand(GDALComputedRasterBand::Operation::OP_GE,
-                                  constant, other);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_GE,
+                              constant, other);
 }
 
 /************************************************************************/
@@ -12352,14 +12366,8 @@ GDALComputedRasterBand operator>=(double constant, const GDALRasterBand &other)
 GDALComputedRasterBand
 GDALRasterBand::operator<(const GDALRasterBand &other) const
 {
-#ifndef HAVE_MUPARSER
-    (void)other;
-    return ThrowIfNotMuparser();
-#else
-    ThrowIfNotSameDimensions(*this, other);
-    return GDALComputedRasterBand(GDALComputedRasterBand::Operation::OP_LT,
-                                  *this, other);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_LT, *this,
+                              other);
 }
 
 /************************************************************************/
@@ -12376,13 +12384,8 @@ GDALRasterBand::operator<(const GDALRasterBand &other) const
  */
 GDALComputedRasterBand GDALRasterBand::operator<(double constant) const
 {
-#ifndef HAVE_MUPARSER
-    (void)constant;
-    return ThrowIfNotMuparser();
-#else
-    return GDALComputedRasterBand(GDALComputedRasterBand::Operation::OP_LT,
-                                  *this, constant);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_LT, *this,
+                              constant);
 }
 
 /************************************************************************/
@@ -12399,14 +12402,8 @@ GDALComputedRasterBand GDALRasterBand::operator<(double constant) const
  */
 GDALComputedRasterBand operator<(double constant, const GDALRasterBand &other)
 {
-#ifndef HAVE_MUPARSER
-    (void)constant;
-    (void)other;
-    return ThrowIfNotMuparser();
-#else
-    return GDALComputedRasterBand(GDALComputedRasterBand::Operation::OP_LT,
-                                  constant, other);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_LT,
+                              constant, other);
 }
 
 /************************************************************************/
@@ -12424,14 +12421,8 @@ GDALComputedRasterBand operator<(double constant, const GDALRasterBand &other)
 GDALComputedRasterBand
 GDALRasterBand::operator<=(const GDALRasterBand &other) const
 {
-#ifndef HAVE_MUPARSER
-    (void)other;
-    return ThrowIfNotMuparser();
-#else
-    ThrowIfNotSameDimensions(*this, other);
-    return GDALComputedRasterBand(GDALComputedRasterBand::Operation::OP_LE,
-                                  *this, other);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_LE, *this,
+                              other);
 }
 
 /************************************************************************/
@@ -12448,13 +12439,8 @@ GDALRasterBand::operator<=(const GDALRasterBand &other) const
  */
 GDALComputedRasterBand GDALRasterBand::operator<=(double constant) const
 {
-#ifndef HAVE_MUPARSER
-    (void)constant;
-    return ThrowIfNotMuparser();
-#else
-    return GDALComputedRasterBand(GDALComputedRasterBand::Operation::OP_LE,
-                                  *this, constant);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_LE, *this,
+                              constant);
 }
 
 /************************************************************************/
@@ -12471,14 +12457,8 @@ GDALComputedRasterBand GDALRasterBand::operator<=(double constant) const
  */
 GDALComputedRasterBand operator<=(double constant, const GDALRasterBand &other)
 {
-#ifndef HAVE_MUPARSER
-    (void)constant;
-    (void)other;
-    return ThrowIfNotMuparser();
-#else
-    return GDALComputedRasterBand(GDALComputedRasterBand::Operation::OP_LE,
-                                  constant, other);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_LE,
+                              constant, other);
 }
 
 /************************************************************************/
@@ -12496,14 +12476,8 @@ GDALComputedRasterBand operator<=(double constant, const GDALRasterBand &other)
 GDALComputedRasterBand
 GDALRasterBand::operator==(const GDALRasterBand &other) const
 {
-#ifndef HAVE_MUPARSER
-    (void)other;
-    return ThrowIfNotMuparser();
-#else
-    ThrowIfNotSameDimensions(*this, other);
-    return GDALComputedRasterBand(GDALComputedRasterBand::Operation::OP_EQ,
-                                  *this, other);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_EQ, *this,
+                              other);
 }
 
 /************************************************************************/
@@ -12520,13 +12494,8 @@ GDALRasterBand::operator==(const GDALRasterBand &other) const
  */
 GDALComputedRasterBand GDALRasterBand::operator==(double constant) const
 {
-#ifndef HAVE_MUPARSER
-    (void)constant;
-    return ThrowIfNotMuparser();
-#else
-    return GDALComputedRasterBand(GDALComputedRasterBand::Operation::OP_EQ,
-                                  *this, constant);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_EQ, *this,
+                              constant);
 }
 
 /************************************************************************/
@@ -12543,14 +12512,8 @@ GDALComputedRasterBand GDALRasterBand::operator==(double constant) const
  */
 GDALComputedRasterBand operator==(double constant, const GDALRasterBand &other)
 {
-#ifndef HAVE_MUPARSER
-    (void)constant;
-    (void)other;
-    return ThrowIfNotMuparser();
-#else
-    return GDALComputedRasterBand(GDALComputedRasterBand::Operation::OP_EQ,
-                                  constant, other);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_EQ,
+                              constant, other);
 }
 
 /************************************************************************/
@@ -12568,14 +12531,8 @@ GDALComputedRasterBand operator==(double constant, const GDALRasterBand &other)
 GDALComputedRasterBand
 GDALRasterBand::operator!=(const GDALRasterBand &other) const
 {
-#ifndef HAVE_MUPARSER
-    (void)other;
-    return ThrowIfNotMuparser();
-#else
-    ThrowIfNotSameDimensions(*this, other);
-    return GDALComputedRasterBand(GDALComputedRasterBand::Operation::OP_NE,
-                                  *this, other);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_NE, *this,
+                              other);
 }
 
 /************************************************************************/
@@ -12592,13 +12549,8 @@ GDALRasterBand::operator!=(const GDALRasterBand &other) const
  */
 GDALComputedRasterBand GDALRasterBand::operator!=(double constant) const
 {
-#ifndef HAVE_MUPARSER
-    (void)constant;
-    return ThrowIfNotMuparser();
-#else
-    return GDALComputedRasterBand(GDALComputedRasterBand::Operation::OP_NE,
-                                  *this, constant);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_NE, *this,
+                              constant);
 }
 
 /************************************************************************/
@@ -12615,14 +12567,8 @@ GDALComputedRasterBand GDALRasterBand::operator!=(double constant) const
  */
 GDALComputedRasterBand operator!=(double constant, const GDALRasterBand &other)
 {
-#ifndef HAVE_MUPARSER
-    (void)constant;
-    (void)other;
-    return ThrowIfNotMuparser();
-#else
-    return GDALComputedRasterBand(GDALComputedRasterBand::Operation::OP_NE,
-                                  constant, other);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_NE,
+                              constant, other);
 }
 
 #if defined(__GNUC__)
@@ -12645,14 +12591,8 @@ GDALComputedRasterBand operator!=(double constant, const GDALRasterBand &other)
 GDALComputedRasterBand
 GDALRasterBand::operator&&(const GDALRasterBand &other) const
 {
-#ifndef HAVE_MUPARSER
-    (void)other;
-    return ThrowIfNotMuparser();
-#else
-    ThrowIfNotSameDimensions(*this, other);
-    return GDALComputedRasterBand(
-        GDALComputedRasterBand::Operation::OP_LOGICAL_AND, *this, other);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_LOGICAL_AND,
+                              *this, other);
 }
 
 /************************************************************************/
@@ -12669,13 +12609,8 @@ GDALRasterBand::operator&&(const GDALRasterBand &other) const
  */
 GDALComputedRasterBand GDALRasterBand::operator&&(bool constant) const
 {
-#ifndef HAVE_MUPARSER
-    (void)constant;
-    return ThrowIfNotMuparser();
-#else
-    return GDALComputedRasterBand(
-        GDALComputedRasterBand::Operation::OP_LOGICAL_AND, *this, constant);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_LOGICAL_AND,
+                              *this, constant);
 }
 
 /************************************************************************/
@@ -12692,14 +12627,8 @@ GDALComputedRasterBand GDALRasterBand::operator&&(bool constant) const
  */
 GDALComputedRasterBand operator&&(bool constant, const GDALRasterBand &other)
 {
-#ifndef HAVE_MUPARSER
-    (void)constant;
-    (void)other;
-    return ThrowIfNotMuparser();
-#else
-    return GDALComputedRasterBand(
-        GDALComputedRasterBand::Operation::OP_LOGICAL_AND, constant, other);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_LOGICAL_AND,
+                              constant, other);
 }
 
 /************************************************************************/
@@ -12717,14 +12646,8 @@ GDALComputedRasterBand operator&&(bool constant, const GDALRasterBand &other)
 GDALComputedRasterBand
 GDALRasterBand::operator||(const GDALRasterBand &other) const
 {
-#ifndef HAVE_MUPARSER
-    (void)other;
-    return ThrowIfNotMuparser();
-#else
-    ThrowIfNotSameDimensions(*this, other);
-    return GDALComputedRasterBand(
-        GDALComputedRasterBand::Operation::OP_LOGICAL_OR, *this, other);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_LOGICAL_OR,
+                              *this, other);
 }
 
 /************************************************************************/
@@ -12741,13 +12664,8 @@ GDALRasterBand::operator||(const GDALRasterBand &other) const
  */
 GDALComputedRasterBand GDALRasterBand::operator||(bool constant) const
 {
-#ifndef HAVE_MUPARSER
-    (void)constant;
-    return ThrowIfNotMuparser();
-#else
-    return GDALComputedRasterBand(
-        GDALComputedRasterBand::Operation::OP_LOGICAL_OR, *this, constant);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_LOGICAL_OR,
+                              *this, constant);
 }
 
 /************************************************************************/
@@ -12764,14 +12682,8 @@ GDALComputedRasterBand GDALRasterBand::operator||(bool constant) const
  */
 GDALComputedRasterBand operator||(bool constant, const GDALRasterBand &other)
 {
-#ifndef HAVE_MUPARSER
-    (void)constant;
-    (void)other;
-    return ThrowIfNotMuparser();
-#else
-    return GDALComputedRasterBand(
-        GDALComputedRasterBand::Operation::OP_LOGICAL_OR, constant, other);
-#endif
+    return CreateComputedBand(GDALComputedRasterBand::Operation::OP_LOGICAL_OR,
+                              constant, other);
 }
 
 #if defined(__GNUC__)

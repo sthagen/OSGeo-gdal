@@ -532,9 +532,11 @@ bool DDFFieldDefn::BuildSubfields()
                                 else if (*pszFormatCur >= '1' &&
                                          *pszFormatCur <= '9')
                                 {
-                                    nGroupSubFieldCount += static_cast<int>(
-                                        strtol(pszFormatCur, &pszNext, 10));
-                                    if (!(*pszNext))
+                                    const long nIncrement =
+                                        strtol(pszFormatCur, &pszNext, 10);
+                                    if (!(*pszNext) ||
+                                        nIncrement >
+                                            INT_MAX - nGroupSubFieldCount)
                                     {
                                         CPLError(CE_Failure, CPLE_AppDefined,
                                                  "Tag %s: invalid "
@@ -543,6 +545,8 @@ bool DDFFieldDefn::BuildSubfields()
                                                  _formatControls.c_str());
                                         return false;
                                     }
+                                    nGroupSubFieldCount +=
+                                        static_cast<int>(nIncrement);
                                     pszFormatCur = pszNext;
                                 }
                                 else if (*pszFormatCur == ',')
@@ -570,7 +574,9 @@ bool DDFFieldDefn::BuildSubfields()
                             }
                             ++pszFormatCur;
                             if (nGroupSubFieldCount < 0 ||
-                                nGroupSubFieldCount > INT_MAX / nRepeat)
+                                nGroupSubFieldCount > INT_MAX / nRepeat ||
+                                nSubFieldCounter >
+                                    INT_MAX - nGroupSubFieldCount * nRepeat)
                             {
                                 CPLError(CE_Failure, CPLE_AppDefined,
                                          "Tag %s: invalid "

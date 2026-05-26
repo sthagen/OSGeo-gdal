@@ -3655,13 +3655,9 @@ static GDALDatasetH GDALWarpCreateOutput(
                 nDstBandCount = GDALGetRasterCount(hSrcDS);
                 for (int iBand = 0; iBand < nDstBandCount; iBand++)
                 {
-                    if (psOptions->anDstBands.empty())
-                    {
-                        GDALColorInterp eInterp =
-                            GDALGetRasterColorInterpretation(
-                                GDALGetRasterBand(hSrcDS, iBand + 1));
-                        apeColorInterpretations.push_back(eInterp);
-                    }
+                    GDALColorInterp eInterp = GDALGetRasterColorInterpretation(
+                        GDALGetRasterBand(hSrcDS, iBand + 1));
+                    apeColorInterpretations.push_back(eInterp);
                 }
 
                 // Do we want to generate an alpha band in the output file?
@@ -3803,7 +3799,7 @@ static GDALDatasetH GDALWarpCreateOutput(
                 const GDALReprojectionTransformInfo *psRTI =
                     static_cast<const GDALReprojectionTransformInfo *>(
                         psTransformInfo->pReprojectArg);
-                if (psRTI && psRTI->poReverseTransform)
+                if (psRTI->poReverseTransform)
                 {
 
                     // Compute new geotransform from transformed target extent
@@ -4108,7 +4104,6 @@ static GDALDatasetH GDALWarpCreateOutput(
                 OGRSpatialReference oSrcSRS;
                 OGRSpatialReference oDstSRS;
                 CPLErrorStateBackuper oErrorStateBackuper(CPLQuietErrorHandler);
-                // DemoteTo2D requires PROJ >= 6.3
                 if (oSrcSRS.SetFromUserInput(osThisSourceSRS.c_str()) ==
                         OGRERR_NONE &&
                     oDstSRS.SetFromUserInput(osThisTargetSRS.c_str()) ==
@@ -4884,8 +4879,9 @@ static GDALDatasetH GDALWarpCreateOutput(
 /*      Convert points from georef coordinates to pixel/line based      */
 /*      on a geotransform.                                              */
 /************************************************************************/
-
-class CutlineTransformer : public OGRCoordinateTransformation
+namespace
+{
+class CutlineTransformer final : public OGRCoordinateTransformation
 {
     CPL_DISALLOW_COPY_ASSIGN(CutlineTransformer)
 
@@ -4935,14 +4931,15 @@ CutlineTransformer::~CutlineTransformer()
 {
     GDALDestroyTransformer(hSrcImageTransformer);
 }
+}  // namespace
 
-static double GetMaximumSegmentLength(OGRGeometry *poGeom)
+static double GetMaximumSegmentLength(const OGRGeometry *poGeom)
 {
     switch (wkbFlatten(poGeom->getGeometryType()))
     {
         case wkbLineString:
         {
-            OGRLineString *poLS = static_cast<OGRLineString *>(poGeom);
+            const OGRLineString *poLS = poGeom->toLineString();
             double dfMaxSquaredLength = 0.0;
             for (int i = 0; i < poLS->getNumPoints() - 1; i++)
             {
@@ -4958,27 +4955,24 @@ static double GetMaximumSegmentLength(OGRGeometry *poGeom)
 
         case wkbPolygon:
         {
-            OGRPolygon *poPoly = static_cast<OGRPolygon *>(poGeom);
-            double dfMaxLength =
-                GetMaximumSegmentLength(poPoly->getExteriorRing());
-            for (int i = 0; i < poPoly->getNumInteriorRings(); i++)
+            const OGRPolygon *poPoly = poGeom->toPolygon();
+            double dfMaxLength = 0;
+            for (const auto *poRing : *poPoly)
             {
-                dfMaxLength = std::max(
-                    dfMaxLength,
-                    GetMaximumSegmentLength(poPoly->getInteriorRing(i)));
+                dfMaxLength =
+                    std::max(dfMaxLength, GetMaximumSegmentLength(poRing));
             }
             return dfMaxLength;
         }
 
         case wkbMultiPolygon:
         {
-            OGRMultiPolygon *poMP = static_cast<OGRMultiPolygon *>(poGeom);
+            const OGRMultiPolygon *poMP = poGeom->toMultiPolygon();
             double dfMaxLength = 0.0;
-            for (int i = 0; i < poMP->getNumGeometries(); i++)
+            for (const auto *poPoly : *poMP)
             {
                 dfMaxLength =
-                    std::max(dfMaxLength,
-                             GetMaximumSegmentLength(poMP->getGeometryRef(i)));
+                    std::max(dfMaxLength, GetMaximumSegmentLength(poPoly));
             }
             return dfMaxLength;
         }

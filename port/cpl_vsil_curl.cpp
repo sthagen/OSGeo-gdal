@@ -1273,8 +1273,14 @@ retry:
 
     oFileProp.eExists = EXIST_UNKNOWN;
 
-    long mtime = 0;
-    curl_easy_getinfo(hCurlHandle, CURLINFO_FILETIME, &mtime);
+    curl_off_t filetime = -1;
+    GIntBig mtime = 0;
+    if (curl_easy_getinfo(hCurlHandle, CURLINFO_FILETIME_T, &filetime) ==
+            CURLE_OK &&
+        filetime != -1)
+    {
+        mtime = static_cast<GIntBig>(filetime);
+    }
 
     if (osVerb == "GET")
         NetworkStatisticsLogger::LogGET(sWriteFuncData.nSize);
@@ -1466,7 +1472,7 @@ retry:
             return aosHeaders;
         };
 
-        if (response_code < 400)
+        if (response_code < 300)
         {
             curl_off_t nSizeTmp = 0;
             const CURLcode code = curl_easy_getinfo(
@@ -1510,18 +1516,24 @@ retry:
                         goto retry;
                     }
 
-                    const CPLStringList aosHeaders(
-                        TokenizeHeaders(sWriteFuncHeaderData.pBuffer));
-                    if (strcmp(aosHeaders.FetchNameValueDef("transfer-encoding",
-                                                            ""),
-                               "chunked") == 0)
+                    if (poFS->GetFSPrefix() == "/vsicurl/" ||
+                        poFS->GetFSPrefix() == "/vsicurl?")
                     {
-                        CPLError(
-                            CE_Failure, CPLE_AppDefined,
-                            "Server does not seem to support range requests. "
-                            "Maybe retry with /vsicurl_streaming/ if the read "
-                            "access pattern is compatible of sequential "
-                            "reading, or download the file entirely");
+                        const CPLStringList aosHeaders(
+                            TokenizeHeaders(sWriteFuncHeaderData.pBuffer));
+                        if (strcmp(aosHeaders.FetchNameValueDef(
+                                       "transfer-encoding", ""),
+                                   "chunked") == 0)
+                        {
+                            CPLError(
+                                CE_Failure, CPLE_AppDefined,
+                                "Server does not seem to support range "
+                                "requests. "
+                                "Maybe retry with /vsicurl_streaming/ if the "
+                                "read "
+                                "access pattern is compatible of sequential "
+                                "reading, or download the file entirely");
+                        }
                     }
                 }
                 else

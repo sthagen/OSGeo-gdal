@@ -570,7 +570,7 @@ class SetupTargetLayer
     bool CanUseWriteArrowBatch(OGRLayer *poSrcLayer, OGRLayer *poDstLayer,
                                bool bJustCreatedLayer,
                                const GDALVectorTranslateOptions *psOptions,
-                               bool bPreserveFID, bool &bError,
+                               bool bPreserveFID,
                                OGRArrowArrayStream &streamSrc);
 
     void SetIgnoredFields(OGRLayer *poSrcLayer);
@@ -1335,12 +1335,16 @@ class CompositeCT final : public OGRCoordinateTransformation
 
     OGRCoordinateTransformation *GetInverse() const override
     {
-        if (!poCT1 && !poCT2)
-            return nullptr;
-        if (!poCT2)
-            return poCT1->GetInverse();
         if (!poCT1)
-            return poCT2->GetInverse();
+        {
+            if (poCT2)
+                return poCT2->GetInverse();
+            return nullptr;
+        }
+        else if (!poCT2)
+        {
+            return poCT1->GetInverse();
+        }
         auto poInvCT1 =
             std::unique_ptr<OGRCoordinateTransformation>(poCT1->GetInverse());
         auto poInvCT2 =
@@ -2960,7 +2964,7 @@ GDALDatasetH GDALVectorTranslate(const char *pszDest, GDALDatasetH hDstDS,
         CPL_TO_BOOL(poDS->TestCapability(ODsCRandomLayerRead));
     if (bRandomLayerReading && !poODS->TestCapability(ODsCRandomLayerWrite) &&
         psOptions->aosLayers.size() != 1 && psOptions->osSQLStatement.empty() &&
-        !psOptions->bQuiet)
+        poDS->GetLayerCount() > 1 && !psOptions->bQuiet)
     {
         CPLError(CE_Warning, CPLE_AppDefined,
                  "Input datasource uses random layer reading, but "
@@ -3450,8 +3454,6 @@ GDALDatasetH GDALVectorTranslate(const char *pszDest, GDALDatasetH hDstDS,
 
                         pasAssocLayers[iLayer].psInfo = std::move(psInfo);
                     }
-                    if (nRetCode)
-                        break;
                 }
 
                 int iLayer = oIter->second;
@@ -4247,10 +4249,8 @@ BuildGetArrowStreamOptions(OGRLayer *poSrcLayer, OGRLayer *poDstLayer,
 bool SetupTargetLayer::CanUseWriteArrowBatch(
     OGRLayer *poSrcLayer, OGRLayer *poDstLayer, bool bJustCreatedLayer,
     const GDALVectorTranslateOptions *psOptions, bool bPreserveFID,
-    bool &bError, OGRArrowArrayStream &streamSrc)
+    OGRArrowArrayStream &streamSrc)
 {
-    bError = false;
-
     // Check if we can use the Arrow interface to get and write features
     // as it will be faster if the input driver has a fast
     // implementation of GetArrowStream().
@@ -5296,15 +5296,12 @@ SetupTargetLayer::Setup(OGRLayer *poSrcLayer, const char *pszNewLayerName,
         iChangeWidthBy++;
     }
 
-    bool bError = false;
     OGRArrowArrayStream streamSrc;
 
     const bool bUseWriteArrowBatch =
         !EQUAL(m_poDstDS->GetDriver()->GetDescription(), "OCI") &&
         CanUseWriteArrowBatch(poSrcLayer, poDstLayer, bJustCreatedLayer,
-                              psOptions, bPreserveFID, bError, streamSrc);
-    if (bError)
-        return nullptr;
+                              psOptions, bPreserveFID, streamSrc);
 
     /* Caution : at the time of writing, the MapInfo driver */
     /* returns NULL until a field has been added */
