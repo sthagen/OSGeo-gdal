@@ -5536,7 +5536,7 @@ TIFF *GTiffDataset::CreateLL(const char *pszFilename, int nXSize, int nYSize,
         {
             ReportError(
                 pszFilename, CE_Failure, CPLE_IllegalArg,
-                "COMPRESS=%s is only compatible of un-tiled images whose "
+                "COMPRESS=%s is only compatible with un-tiled images whose "
                 "width is lesser or equal to %d pixels. "
                 "To overcome this limitation, set the TILED=YES creation "
                 "option.",
@@ -5546,17 +5546,18 @@ TIFF *GTiffDataset::CreateLL(const char *pszFilename, int nXSize, int nYSize,
         else if (l_nCompression == sLimitation.nCodecID && bTiled &&
                  l_nBlockXSize > sLimitation.nMaxDim)
         {
-            ReportError(pszFilename, CE_Failure, CPLE_IllegalArg,
-                        "COMPRESS=%s is only compatible of tiled images whose "
-                        "BLOCKXSIZE is lesser or equal to %d pixels.",
-                        sLimitation.pszCodecName, sLimitation.nMaxDim);
+            ReportError(
+                pszFilename, CE_Failure, CPLE_IllegalArg,
+                "COMPRESS=%s is only compatible with tiled images whose "
+                "BLOCKXSIZE is lesser or equal to %d pixels.",
+                sLimitation.pszCodecName, sLimitation.nMaxDim);
             return nullptr;
         }
         else if (l_nCompression == sLimitation.nCodecID &&
                  l_nBlockYSize > sLimitation.nMaxDim)
         {
             ReportError(pszFilename, CE_Failure, CPLE_IllegalArg,
-                        "COMPRESS=%s is only compatible of images whose "
+                        "COMPRESS=%s is only compatible with images whose "
                         "BLOCKYSIZE is lesser or equal to %d pixels. "
                         "To overcome this limitation, set the TILED=YES "
                         "creation option",
@@ -6153,7 +6154,7 @@ TIFF *GTiffDataset::CreateLL(const char *pszFilename, int nXSize, int nYSize,
                 ReportError(
                     pszFilename, CE_Failure, CPLE_NotSupported,
                     "PHOTOMETRIC=YCBCR not supported on a %d-band raster: "
-                    "only compatible of a 3-band (RGB) raster",
+                    "only compatible with 3-band (RGB) rasters",
                     l_nBands);
                 XTIFFClose(l_hTIFF);
                 l_fpL->CancelCreation();
@@ -9358,7 +9359,7 @@ CPLErr GTiffDataset::CreateMaskBand(int nFlagsIn)
     if (m_poMaskDS != nullptr)
     {
         ReportError(CE_Failure, CPLE_AppDefined,
-                    "This TIFF dataset has already an internal mask band");
+                    "This TIFF dataset already has an internal mask band");
         return CE_Failure;
     }
     else if (MustCreateInternalMask())
@@ -9469,7 +9470,7 @@ CPLErr GTiffRasterBand::CreateMaskBand(int nFlagsIn)
     if (m_poGDS->m_poMaskDS != nullptr)
     {
         ReportError(CE_Failure, CPLE_AppDefined,
-                    "This TIFF dataset has already an internal mask band");
+                    "This TIFF dataset already has an internal mask band");
         return CE_Failure;
     }
 
