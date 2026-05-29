@@ -545,6 +545,24 @@ def test_gdalalg_pipeline_run_existing(tmp_path):
         assert ds.GetMetadataItem("FOO") == "BAR"
     gdal.Unlink(output_filename)
 
+    pipeline_short_argname_filename = tmp_path / "pipeline_short_argname.gdalg.json"
+    with gdal.VSIFile(pipeline_short_argname_filename, "wb") as f:
+        j = json.dumps(
+            {
+                "type": "gdal_streamed_alg",
+                "relative_paths_relative_to_this_file": False,
+                "command_line": "gdal pipeline read -i ../gcore/data/byte.tif ! reproject -s EPSG:26711 -d EPSG:4326",
+            }
+        )
+        f.write(j.encode("UTF-8"))
+    out = gdaltest.runexternal(
+        f"{gdal_path} pipeline {pipeline_short_argname_filename} --output {output_filename} --reproject.output-crs EPSG:32611 --quiet"
+    )
+    assert out == ""
+    with gdal.Open(output_filename) as ds:
+        assert ds.GetSpatialRef().GetAuthorityCode() == "32611"
+    gdal.Unlink(output_filename)
+
     _, err = gdaltest.runexternal_out_and_err(
         f"{gdal_path} pipeline {pipeline_filename}"
     )
@@ -696,14 +714,7 @@ def test_gdalalg_pipeline_run_existing(tmp_path):
     assert "/i/do_not/exist" in err
 
 
-def test_gdalalg_pipeline_existing_completion(tmp_path):
-
-    import gdaltest
-    import test_cli_utilities
-
-    gdal_path = test_cli_utilities.get_gdal_path()
-    if gdal_path is None:
-        pytest.skip("gdal binary missing")
+def test_gdalalg_pipeline_existing_completion(gdal_path, tmp_path):
 
     pipeline_filename = tmp_path / "pipeline.gdalg.json"
 
@@ -717,9 +728,9 @@ def test_gdalalg_pipeline_existing_completion(tmp_path):
         )
         f.write(j.encode("UTF-8"))
 
-    out = gdaltest.runexternal(
+    out = gdaltest.run_and_parse_completion_output(
         f"{gdal_path} completion gdal pipeline {pipeline_filename} -"
-    ).split(" ")
+    )
     expected_out = [
         "--input-format=",
         "--open-option=",
@@ -739,14 +750,14 @@ def test_gdalalg_pipeline_existing_completion(tmp_path):
         assert x in out
     assert "--input-layer=" not in out
 
-    out = gdaltest.runexternal(
+    out = gdaltest.run_and_parse_completion_output(
         f"{gdal_path} completion gdal pipeline {pipeline_filename} --input-format="
-    ).split(" ")
+    )
     assert "MEM" in out
 
-    out = gdaltest.runexternal(
+    out = gdaltest.run_and_parse_completion_output(
         f"{gdal_path} completion gdal pipeline {pipeline_filename} --output=/vsimem/out.tif --creation-option="
-    ).split(" ")
+    )
     assert "COMPRESS=" in out
 
     with gdal.VSIFile(pipeline_filename, "wb") as f:
@@ -759,9 +770,9 @@ def test_gdalalg_pipeline_existing_completion(tmp_path):
         )
         f.write(j.encode("UTF-8"))
 
-    out = gdaltest.runexternal(
+    out = gdaltest.run_and_parse_completion_output(
         f"{gdal_path} completion gdal pipeline {pipeline_filename} -"
-    ).split(" ")
+    )
     expected_out = [
         "--input-format=",
         "--open-option=",
@@ -799,15 +810,15 @@ def test_gdalalg_pipeline_existing_completion(tmp_path):
         )
         f.write(j.encode("UTF-8"))
 
-    out = gdaltest.runexternal(
+    out = gdaltest.run_and_parse_completion_output(
         f"{gdal_path} completion gdal pipeline {pipeline_filename} -"
-    ).split(" ")
+    )
     assert "--edit[0].geometry-type=" in out
     assert "--edit[1].geometry-type=" in out
 
-    out = gdaltest.runexternal(
+    out = gdaltest.run_and_parse_completion_output(
         f"{gdal_path} completion gdal pipeline {pipeline_filename} --edit[0].geometry-type="
-    ).split(" ")
+    )
     assert "GEOMETRY" in out
 
 
@@ -886,7 +897,10 @@ def test_gdalalg_pipeline_nested_errors():
     with pytest.raises(
         Exception, match="Last step in an inner pipeline must not be a write-like step"
     ):
-        gdal.Run("pipeline", pipeline="read [ write foo ]")
+        gdal.Run(
+            "pipeline",
+            pipeline="read [ read ../gcore/data/byte.tif ! write foo ] ! info",
+        )
 
     with pytest.raises(
         Exception, match="'write' is not allowed as an intermediate step"
@@ -904,6 +918,36 @@ def test_gdalalg_pipeline_nested_errors():
             "pipeline",
             pipeline='read [ read ../gcore/data/byte.tif ! reproject --dst-crs "+proj=longlat +a=1" ] ! info',
         )
+
+    with pytest.raises(
+        Exception, match="'not_existing' is a unknown sub-algorithm of 'overview'"
+    ):
+        gdal.Run(
+            "pipeline",
+            pipeline="read ../gcore/data/byte.tif ! overview not_existing ! info",
+        )
+
+
+def test_gdalalg_pipeline_nested_double():
+
+    with gdal.alg.pipeline(
+        pipeline="read [ read [ read ../gcore/data/byte.tif ] ]"
+    ) as alg:
+        ds = alg.Output()
+        assert ds.GetRasterBand(1).Checksum() == 4672
+
+
+def test_gdalalg_pipeline_nested_completion(gdal_path):
+
+    out = gdaltest.run_and_parse_completion_output(
+        f"{gdal_path} completion gdal pipeline read ../gcore/data/byte.tif ! clip --like [ read --"
+    )
+    assert set(out) == {"--input", "--input-format", "--open-option", "--input-layer"}
+
+    out = gdaltest.run_and_parse_completion_output(
+        f"{gdal_path} completion gdal pipeline read ../gcore/data/byte.tif ! clip --like [ read ../gcore/data/byte.tif ] --"
+    )
+    assert "--like" in out
 
 
 def test_gdalalg_pipeline_tee_nominal_raster(tmp_vsimem):
@@ -1052,6 +1096,26 @@ def test_gdalalg_pipeline_tee_error(tmp_vsimem):
             "pipeline",
             pipeline=f"read ../gcore/data/byte.tif ! tee [ write {out_filename} ]",
         )
+
+
+def test_gdalalg_pipeline_invalid_last_step_inner_pipeline():
+
+    with pytest.raises(
+        Exception, match="Last step in an inner pipeline must not be a write-like step"
+    ):
+        gdal.Run(
+            "pipeline",
+            pipeline="read [ read ../gcore/data/byte.tif ! write --format=MEM ]",
+        )
+
+
+def test_gdalalg_pipeline_invalid_last_step(gdal_path):
+
+    _, err = gdaltest.runexternal_out_and_err(
+        f"{gdal_path} pipeline read ../gcore/data/byte.tif ! reproject"
+    )
+
+    assert "Last step should be 'write', " in err
 
 
 def test_gdalalg_pipeline_tee_output_string(tmp_vsimem):

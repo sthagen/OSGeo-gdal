@@ -137,8 +137,9 @@ bool GDALAbstractPipelineAlgorithm::CheckFirstAndLastStep(
         if (steps.back()->CanBeLastStep() && !steps.back()->CanBeMiddleStep())
         {
             ReportError(CE_Failure, CPLE_AppDefined,
-                        "No write-like step like '%s' is allowed",
-                        steps.back()->GetName().c_str());
+                        "Last step in %s pipeline must not be a "
+                        "write-like step.",
+                        m_bInnerPipeline ? "an inner" : "a");
             return false;
         }
     }
@@ -383,15 +384,28 @@ bool GDALAbstractPipelineAlgorithm::CopyStepAlgorithmFromAnother(
 bool GDALAbstractPipelineAlgorithm::ParseCommandLineArguments(
     const std::vector<std::string> &argsIn)
 {
-    return ParseCommandLineArguments(argsIn, /*forAutoComplete=*/false);
+    return ParseCommandLineArguments(argsIn, /*forAutoComplete=*/false,
+                                     /*pCurArgsForAutocomplete=*/nullptr);
 }
 
+/** Parse arguments of a pipeline.
+ *
+ * @param argsIn Pipeline arguments
+ * @param forAutoComplete true if this method is called from GetAutoComplete()
+ * @param[out] pCurArgsForAutocomplete Pointer to a vector of string, or null.
+ *                                     If provided, it will contain the arguments
+ *                                     of the active pipeline. Useful for
+ *                                     completion in nested pipelines.
+ */
 bool GDALAbstractPipelineAlgorithm::ParseCommandLineArguments(
-    const std::vector<std::string> &argsIn, bool forAutoComplete)
+    const std::vector<std::string> &argsIn, bool forAutoComplete,
+    std::vector<std::string> *pCurArgsForAutocomplete)
 {
     std::vector<std::string> args = argsIn;
+    if (pCurArgsForAutocomplete)
+        *pCurArgsForAutocomplete = args;
 
-    if (IsCalledFromCommandLine())
+    if (!m_bInnerPipeline && IsCalledFromCommandLine())
     {
         m_eLastStepAsWrite = StepConstraint::MUST_BE;
     }
@@ -605,12 +619,15 @@ bool GDALAbstractPipelineAlgorithm::ParseCommandLineArguments(
             {
                 if ((--nNestLevel) == 0)
                 {
-                    arg = BuildNestedPipeline(
-                        curStep.alg.get(), nestedPipelineArgs, forAutoComplete);
+                    arg = BuildNestedPipeline(curStep.alg.get(),
+                                              nestedPipelineArgs,
+                                              forAutoComplete, nullptr);
                     if (arg.empty())
                     {
                         return false;
                     }
+                    if (pCurArgsForAutocomplete)
+                        *pCurArgsForAutocomplete = args;
                 }
                 else
                 {
@@ -748,7 +765,7 @@ bool GDALAbstractPipelineAlgorithm::ParseCommandLineArguments(
         if (forAutoComplete)
         {
             BuildNestedPipeline(steps.back().alg.get(), nestedPipelineArgs,
-                                forAutoComplete);
+                                forAutoComplete, pCurArgsForAutocomplete);
             return true;
         }
         else
@@ -816,18 +833,7 @@ bool GDALAbstractPipelineAlgorithm::ParseCommandLineArguments(
 
     if (m_eLastStepAsWrite == StepConstraint::MUST_BE)
     {
-        if (!m_bExpectReadStep)
-        {
-            if (steps.empty())
-            {
-                ReportError(
-                    CE_Failure, CPLE_AppDefined,
-                    "At least one step must be provided in %s pipeline.",
-                    m_bInnerPipeline ? "an inner" : "a");
-                return false;
-            }
-        }
-        else if (steps.size() < 2)
+        if (steps.size() < 2)
         {
             if (!steps.empty() && helpRequested)
             {
@@ -855,17 +861,6 @@ bool GDALAbstractPipelineAlgorithm::ParseCommandLineArguments(
         {
             ReportError(CE_Failure, CPLE_AppDefined,
                         "At least one step must be provided in %s pipeline.",
-                        m_bInnerPipeline ? "an inner" : "a");
-            return false;
-        }
-
-        if (m_eLastStepAsWrite == StepConstraint::CAN_NOT_BE &&
-            steps.back().alg->CanBeLastStep() &&
-            !steps.back().alg->CanBeMiddleStep())
-        {
-            ReportError(CE_Failure, CPLE_AppDefined,
-                        "Last step in %s pipeline must not be a "
-                        "write-like step.",
                         m_bInnerPipeline ? "an inner" : "a");
             return false;
         }
@@ -1091,12 +1086,25 @@ bool GDALAbstractPipelineAlgorithm::ParseCommandLineArguments(
                                 equalPos == std::string::npos
                                     ? iterArgName
                                     : iterArgName.substr(0, equalPos));
-                            ++oIter;
-                            if (stepArg && equalPos == std::string::npos &&
-                                stepArg->GetType() != GAAT_BOOLEAN)
+                            if (stepArg && stepArg->GetName() == stepArgName)
                             {
-                                if (oIter != step.args.end())
+                                oIter = step.args.erase(oIter);
+                                if (equalPos == std::string::npos &&
+                                    stepArg->GetType() != GAAT_BOOLEAN &&
+                                    oIter != step.args.end())
+                                {
+                                    oIter = step.args.erase(oIter);
+                                }
+                            }
+                            else
+                            {
+                                ++oIter;
+                                if (stepArg && equalPos == std::string::npos &&
+                                    stepArg->GetType() != GAAT_BOOLEAN &&
+                                    oIter != step.args.end())
+                                {
                                     ++oIter;
+                                }
                             }
                         }
                         else if (idxPositional < positionalArgs.size())
@@ -1494,9 +1502,23 @@ bool GDALAbstractPipelineAlgorithm::ParseCommandLineArguments(
 /*         GDALAbstractPipelineAlgorithm::BuildNestedPipeline()         */
 /************************************************************************/
 
+/** Build a nested pipeline
+ *
+ * @param curAlg Current algorithm for which the nested pipeline will be a child.
+ *               e.g in "gdal pipeline read ... ! clip --like [ ... ]",
+ *               curAlg is "clip".
+ * @param nestedPipelineArgs Arguments of the nested pipeline, i.e. values
+ *                           between square brackets.
+ * @param forAutoComplete true if this method is called from GetAutoComplete()
+ * @param[out] pCurArgsForAutocomplete Pointer to a vector of string, or null.
+ *                                     If provided, it will contain the arguments
+ *                                     of the active pipeline. Useful for
+ *                                     completion in nested pipelines.
+ */
 std::string GDALAbstractPipelineAlgorithm::BuildNestedPipeline(
     GDALPipelineStepAlgorithm *curAlg,
-    std::vector<std::string> &nestedPipelineArgs, bool forAutoComplete)
+    std::vector<std::string> &nestedPipelineArgs, bool forAutoComplete,
+    std::vector<std::string> *pCurArgsForAutocomplete)
 {
     std::string datasetNameOut;
     CPLAssert(curAlg);
@@ -1507,6 +1529,8 @@ std::string GDALAbstractPipelineAlgorithm::BuildNestedPipeline(
     else
         nestedPipeline->m_eLastStepAsWrite = StepConstraint::CAN_NOT_BE;
     nestedPipeline->m_executionForStreamOutput = m_executionForStreamOutput;
+    if (IsCalledFromCommandLine())
+        nestedPipeline->SetCalledFromCommandLine();
     nestedPipeline->SetReferencePathForRelativePaths(
         GetReferencePathForRelativePaths());
 
@@ -1521,8 +1545,8 @@ std::string GDALAbstractPipelineAlgorithm::BuildNestedPipeline(
 
     if (curAlg->GetName() != GDALTeeStepAlgorithmAbstract::NAME)
     {
-        if (!nestedPipeline->ParseCommandLineArguments(nestedPipelineArgs,
-                                                       forAutoComplete) ||
+        if (!nestedPipeline->ParseCommandLineArguments(
+                nestedPipelineArgs, forAutoComplete, pCurArgsForAutocomplete) ||
             (!forAutoComplete && !nestedPipeline->Run()))
         {
             return datasetNameOut;
@@ -1572,13 +1596,14 @@ std::string GDALAbstractPipelineAlgorithm::BuildNestedPipeline(
 /************************************************************************/
 
 std::vector<std::string>
-GDALAbstractPipelineAlgorithm::GetAutoComplete(std::vector<std::string> &args,
+GDALAbstractPipelineAlgorithm::GetAutoComplete(std::vector<std::string> &argsIn,
                                                bool lastWordIsComplete,
                                                bool showAllOptions)
 {
+    std::vector<std::string> args;
     {
         CPLErrorStateBackuper oBackuper(CPLQuietErrorHandler);
-        ParseCommandLineArguments(args, /*forAutoComplete=*/true);
+        ParseCommandLineArguments(argsIn, /*forAutoComplete=*/true, &args);
     }
     VSIStatBufL sStat;
     if (!m_pipeline.empty() && VSIStatL(m_pipeline.c_str(), &sStat) == 0 &&
