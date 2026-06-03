@@ -276,15 +276,13 @@ def test_gdalalg_pipeline_help_doc(gdal_path):
     assert "ERROR: unknown pipeline step 'unknown'" in out
 
 
-def test_gdal_pipeline_raster_output_to_gdalg(tmp_path, gdal_path):
+def test_gdal_pipeline_raster_output_to_gdalg(tmp_path):
 
     gdal.Mkdir(tmp_path / "src with space", 0o755)
     shutil.copy("../gcore/data/byte.tif", tmp_path / "src with space")
     src_filename = str(tmp_path / "src with space" / "byte.tif").replace("\\", "/")
     out_filename = str(tmp_path / "out.gdalg.json")
-    gdaltest.runexternal(
-        f'{gdal_path} pipeline read "{src_filename}" ! write {out_filename}'
-    )
+    gdal.alg.pipeline(pipeline=f'read "{src_filename}" ! write {out_filename}')
     # Test that configuration option is not serialized
     j = json.loads(gdal.VSIFile(out_filename, "rb").read())
     assert "gdal_version" in j
@@ -1309,3 +1307,14 @@ def test_gdalalg_pipeline_raster_and_clip_vector_from_inner_pipeline(
 
     with gdal.OpenEx(byte_shp) as src_ds, gdal.OpenEx(tmp_vsimem / "out.shp") as ds:
         assert ds.GetLayer(0).GetFeatureCount() == src_ds.GetLayer(0).GetFeatureCount()
+
+
+def test_gdalalg_pipeline_error_step_does_not_use_input_from_previous_step():
+
+    with pytest.raises(
+        Exception,
+        match=r"Step nr 1 \(reproject\) does not use input dataset from previous step",
+    ):
+        gdal.alg.pipeline(
+            pipeline="read ../gcore/data/byte.tif ! reproject --input ../gcore/data/uint16.tif"
+        )
