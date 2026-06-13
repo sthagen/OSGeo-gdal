@@ -90,12 +90,19 @@ void GDALPipelineStepAlgorithm::AddRasterInputArgs(
     AddOpenOptionsArg(&m_openOptions)
         .SetHiddenForCLI(hiddenForCLI)
         .SetAvailableInPipelineStep(false);
+
+    const int nDatasetType = openForMixedRasterVector
+                                 ? (GDAL_OF_RASTER | GDAL_OF_VECTOR)
+                                 : GDAL_OF_RASTER;
     auto &arg =
         AddInputDatasetArg(
-            &m_inputDataset,
-            openForMixedRasterVector ? (GDAL_OF_RASTER | GDAL_OF_VECTOR)
-                                     : GDAL_OF_RASTER,
-            false, m_constructorOptions.inputDatasetHelpMsg.c_str())
+            &m_inputDataset, nDatasetType, false,
+            m_constructorOptions.inputDatasetHelpMsg.empty() &&
+                    m_constructorOptions.inputDatasetMaxCount == 1
+                ? CPLSPrintf(
+                      "Input %s dataset",
+                      GDALAlgorithmArgDatasetTypeName(nDatasetType).c_str())
+                : m_constructorOptions.inputDatasetHelpMsg.c_str())
             .SetDatasetInputFlags(m_constructorOptions.inputDatasetInputFlags)
             .SetMinCount(m_constructorOptions.inputDatasetRequired ? 1 : 0)
             .SetMaxCount(m_constructorOptions.inputDatasetMaxCount)
@@ -177,7 +184,12 @@ void GDALPipelineStepAlgorithm::AddVectorInputArgs(bool hiddenForCLI)
         .SetHiddenForCLI(hiddenForCLI)
         .SetAvailableInPipelineStep(false);
     auto &datasetArg =
-        AddInputDatasetArg(&m_inputDataset, GDAL_OF_VECTOR, false)
+        AddInputDatasetArg(
+            &m_inputDataset, GDAL_OF_VECTOR, false,
+            m_constructorOptions.inputDatasetHelpMsg.empty() &&
+                    m_constructorOptions.inputDatasetMaxCount == 1
+                ? "Input vector dataset"
+                : m_constructorOptions.inputDatasetHelpMsg.c_str())
             .SetMinCount(m_constructorOptions.inputDatasetRequired ? 1 : 0)
             .SetMaxCount(m_constructorOptions.inputDatasetMaxCount)
             .SetDatasetInputFlags(m_constructorOptions.inputDatasetInputFlags)
@@ -310,6 +322,96 @@ void GDALPipelineStepAlgorithm::AddOutputLayerNameArg(
         .SetHiddenForCLI(hiddenForCLI)
         .SetAvailableInPipelineStep(
             m_constructorOptions.outputLayerNameAvailableInPipelineStep);
+}
+
+/************************************************************************/
+/*      GDALPipelineStepAlgorithm::AddMdimHiddenInputDatasetArg()       */
+/************************************************************************/
+
+void GDALPipelineStepAlgorithm::AddMdimHiddenInputDatasetArg()
+{
+    AddInputDatasetArg(&m_inputDataset, GDAL_OF_MULTIDIM_RASTER, false)
+        .SetMinCount(0)
+        .SetMaxCount(m_constructorOptions.inputDatasetMaxCount)
+        .SetAutoOpenDataset(m_constructorOptions.autoOpenInputDatasets)
+        .SetMetaVar(m_constructorOptions.inputDatasetMetaVar)
+        .SetHidden();
+}
+
+/************************************************************************/
+/*            GDALPipelineStepAlgorithm::AddMdimInputArgs()             */
+/************************************************************************/
+
+void GDALPipelineStepAlgorithm::AddMdimInputArgs(bool openForMixedMdimVector,
+                                                 bool hiddenForCLI,
+                                                 bool acceptRaster)
+{
+    AddInputFormatsArg(&m_inputFormats)
+        .AddMetadataItem(
+            GAAMDI_REQUIRED_CAPABILITIES,
+            openForMixedMdimVector
+                ? std::vector<
+                      std::string>{acceptRaster
+                                       ? GDAL_ALG_DCAP_RASTER_OR_MULTIDIM_RASTER
+                                       : GDAL_DCAP_MULTIDIM_RASTER,
+                                   GDAL_DCAP_VECTOR}
+                : std::vector<
+                      std::string>{acceptRaster
+                                       ? GDAL_ALG_DCAP_RASTER_OR_MULTIDIM_RASTER
+                                       : GDAL_DCAP_MULTIDIM_RASTER})
+        .SetHiddenForCLI(hiddenForCLI)
+        .SetAvailableInPipelineStep(false);
+    AddOpenOptionsArg(&m_openOptions)
+        .SetHiddenForCLI(hiddenForCLI)
+        .SetAvailableInPipelineStep(false);
+    auto &arg =
+        AddInputDatasetArg(&m_inputDataset,
+                           (acceptRaster ? GDAL_OF_RASTER : 0) |
+                               (openForMixedMdimVector
+                                    ? (GDAL_OF_MULTIDIM_RASTER | GDAL_OF_VECTOR)
+                                    : GDAL_OF_MULTIDIM_RASTER),
+                           false,
+                           m_constructorOptions.inputDatasetHelpMsg.c_str())
+            .SetDatasetInputFlags(m_constructorOptions.inputDatasetInputFlags)
+            .SetMinCount(m_constructorOptions.inputDatasetRequired ? 1 : 0)
+            .SetMaxCount(m_constructorOptions.inputDatasetMaxCount)
+            .SetAutoOpenDataset(m_constructorOptions.autoOpenInputDatasets)
+            .SetMetaVar(m_constructorOptions.inputDatasetMetaVar)
+            .SetHiddenForCLI(hiddenForCLI)
+            .SetAvailableInPipelineStep(false);
+    if (m_constructorOptions.inputDatasetPositional && !hiddenForCLI)
+        arg.SetPositional();
+    if (m_constructorOptions.inputDatasetRequired && !hiddenForCLI)
+        arg.SetRequired();
+    if (!m_constructorOptions.inputDatasetAlias.empty())
+        arg.AddAlias(m_constructorOptions.inputDatasetAlias);
+}
+
+/************************************************************************/
+/*            GDALPipelineStepAlgorithm::AddMdimOutputArgs()            */
+/************************************************************************/
+
+void GDALPipelineStepAlgorithm::AddMdimOutputArgs(bool hiddenForCLI)
+{
+    m_outputFormatArg =
+        &(AddOutputFormatArg(&m_format, /* bStreamAllowed = */ true,
+                             /* bGDALGAllowed = */ true)
+              .AddMetadataItem(GAAMDI_REQUIRED_CAPABILITIES,
+                               {GDAL_DCAP_CREATE_MULTIDIMENSIONAL})
+              .SetHiddenForCLI(hiddenForCLI))
+             .SetAvailableInPipelineStep(false);
+    AddOutputDatasetArg(&m_outputDataset, GDAL_OF_MULTIDIM_RASTER,
+                        /* positionalAndRequired = */ !hiddenForCLI,
+                        m_constructorOptions.outputDatasetHelpMsg.c_str())
+        .SetHiddenForCLI(hiddenForCLI)
+        .SetDatasetInputFlags(GADV_NAME | GADV_OBJECT)
+        .SetAvailableInPipelineStep(false);
+    AddCreationOptionsArg(&m_creationOptions)
+        .SetHiddenForCLI(hiddenForCLI)
+        .SetAvailableInPipelineStep(false);
+    AddOverwriteArg(&m_overwrite)
+        .SetHiddenForCLI(hiddenForCLI)
+        .SetAvailableInPipelineStep(false);
 }
 
 /************************************************************************/
@@ -539,6 +641,153 @@ bool GDALPipelineStepAlgorithm::Finalize()
         ret = argValue.Close() && ret;
     ret = m_outputDataset.Close() && ret;
     return ret;
+}
+
+/************************************************************************/
+/*               CreateDatasetSingleOutputLayerIfNeeded()               */
+/************************************************************************/
+
+bool GDALPipelineStepAlgorithm::CreateDatasetSingleOutputLayerIfNeeded(
+    GDALPipelineStepRunContext &ctxt, const std::string &defaultLayerName,
+    GDALDataset *&poDstDS, bool &bTemporaryFile,
+    std::unique_ptr<GDALDataset> &poNewRetDS, std::string &outputLayerName,
+    OGRLayer *&poDstLayer)
+{
+    auto poWriteStep = ctxt.m_poNextUsableStep ? ctxt.m_poNextUsableStep : this;
+    std::string outputFilename = poWriteStep->GetOutputDataset().GetName();
+
+    poDstDS = poWriteStep->GetOutputDataset().GetDatasetRef();
+    poNewRetDS.reset();
+    bTemporaryFile = false;
+    poDstLayer = nullptr;
+    GDALDriver *poDstDriver = nullptr;
+    if (!poDstDS)
+    {
+        auto poDriverManager = GetGDALDriverManager();
+        std::string format = poWriteStep->GetOutputFormat();
+        if (m_standaloneStep || (ctxt.m_poNextUsableStep && format.empty()))
+        {
+            if (format.empty())
+            {
+                const auto aosFormats =
+                    CPLStringList(GDALGetOutputDriversForDatasetName(
+                        outputFilename.c_str(), GDAL_OF_VECTOR,
+                        /* bSingleMatch = */ true,
+                        /* bWarn = */ true));
+                if (aosFormats.size() != 1)
+                {
+                    ReportError(CE_Failure, CPLE_AppDefined,
+                                "Cannot guess driver for %s",
+                                outputFilename.c_str());
+                    return false;
+                }
+                format = aosFormats[0];
+            }
+        }
+        else if (!ctxt.m_poNextUsableStep)
+        {
+            poDstDriver = poDriverManager->GetDriverByName("GPKG");
+            if (poDstDriver)
+            {
+                bTemporaryFile = true;
+                outputFilename =
+                    CPLGenerateTempFilenameSafe(
+                        std::string("_").append(defaultLayerName).c_str()) +
+                    ".gpkg";
+                format = "GPKG";
+            }
+            else
+                format = "MEM";
+        }
+
+        if (!poDstDriver)
+            poDstDriver = poDriverManager->GetDriverByName(format.c_str());
+        if (!poDstDriver)
+        {
+            ReportError(CE_Failure, CPLE_AppDefined, "Cannot find driver %s",
+                        format.c_str());
+            return false;
+        }
+
+        poNewRetDS.reset(poDstDriver->Create(
+            outputFilename.c_str(), 0, 0, 0, GDT_Unknown,
+            CPLStringList(poWriteStep->GetCreationOptions()).List()));
+        if (!poNewRetDS)
+            return false;
+
+        if (bTemporaryFile)
+            poNewRetDS->MarkSuppressOnClose();
+
+        poDstDS = poNewRetDS.get();
+    }
+    else
+    {
+        poDstDriver = poDstDS->GetDriver();
+    }
+
+    outputLayerName = poWriteStep->GetOutputLayerName();
+    if (outputLayerName.empty() && poDstDS->GetLayerCount() > 1)
+    {
+        ReportError(CE_Failure, CPLE_AppDefined, "--%s must be specified",
+                    GDAL_ARG_NAME_OUTPUT_LAYER);
+        return false;
+    }
+
+    if (poDstDriver && EQUAL(poDstDriver->GetDescription(), "ESRI Shapefile") &&
+        (EQUAL(CPLGetExtensionSafe(poDstDS->GetDescription()).c_str(), "shp") ||
+         EQUAL(CPLGetExtensionSafe(poDstDS->GetDescription()).c_str(),
+               "shz")) &&
+        poDstDS->GetLayerCount() <= 1)
+    {
+        outputLayerName = CPLGetBasenameSafe(poDstDS->GetDescription());
+    }
+    if (outputLayerName.empty())
+        outputLayerName = defaultLayerName;
+
+    poDstLayer = poDstDS->GetLayerByName(outputLayerName.c_str());
+    if (poDstLayer)
+    {
+        if (poWriteStep->GetOverwriteLayer())
+        {
+            int iLayer = -1;
+            const int nLayerCount = poDstDS->GetLayerCount();
+            for (iLayer = 0; iLayer < nLayerCount; iLayer++)
+            {
+                if (poDstDS->GetLayer(iLayer) == poDstLayer)
+                    break;
+            }
+
+            if (iLayer < nLayerCount)
+            {
+                if (poDstDS->DeleteLayer(iLayer) != OGRERR_NONE)
+                {
+                    ReportError(CE_Failure, CPLE_AppDefined,
+                                "Cannot delete layer '%s'",
+                                outputLayerName.c_str());
+                    return false;
+                }
+            }
+            poDstLayer = nullptr;
+        }
+        else if (!poWriteStep->GetAppendLayer())
+        {
+            ReportError(CE_Failure, CPLE_AppDefined,
+                        "Layer '%s' already exists. Specify the "
+                        "--%s option to overwrite it, or --%s "
+                        "to append to it.",
+                        outputLayerName.c_str(), GDAL_ARG_NAME_OVERWRITE_LAYER,
+                        GDAL_ARG_NAME_APPEND);
+            return false;
+        }
+    }
+    else if (poWriteStep->GetAppendLayer() || poWriteStep->GetOverwriteLayer())
+    {
+        ReportError(CE_Failure, CPLE_AppDefined, "Cannot find layer '%s'",
+                    outputLayerName.c_str());
+        return false;
+    }
+
+    return true;
 }
 
 GDALAlgorithmStepRegistry::~GDALAlgorithmStepRegistry() = default;

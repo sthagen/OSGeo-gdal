@@ -771,7 +771,7 @@ GDALCOGCreator::Create(const char *pszFilename, GDALDataset *const poSrcDS,
         papszOptions, "COMPRESS", gbHasLZW ? "LZW" : "NONE");
 
     const char *pszInterleave =
-        CSLFetchNameValueDef(papszOptions, "INTERLEAVE", "PIXEL");
+        CSLFetchNameValueDef(papszOptions, GDALMD_INTERLEAVE, "PIXEL");
     if (EQUAL(osCompress, "WEBP"))
     {
         if (!EQUAL(pszInterleave, "PIXEL"))
@@ -1178,7 +1178,7 @@ GDALCOGCreator::Create(const char *pszFilename, GDALDataset *const poSrcDS,
 
         if (nBands > 1)
         {
-            aosOverviewOptions.SetNameValue("INTERLEAVE", "PIXEL");
+            aosOverviewOptions.SetNameValue(GDALMD_INTERLEAVE, "PIXEL");
         }
         if (!m_osTmpMskOverviewFilename.empty())
         {
@@ -1278,7 +1278,8 @@ GDALCOGCreator::Create(const char *pszFilename, GDALDataset *const poSrcDS,
                             CSLFetchNameValue(papszOptions, "GEOTIFF_VERSION"));
     aosOptions.SetNameValue("SPARSE_OK",
                             CSLFetchNameValue(papszOptions, "SPARSE_OK"));
-    aosOptions.SetNameValue("NBITS", CSLFetchNameValue(papszOptions, "NBITS"));
+    aosOptions.SetNameValue(GDALMD_NBITS,
+                            CSLFetchNameValue(papszOptions, GDALMD_NBITS));
 
     if (EQUAL(osOverviews, "NONE"))
     {
@@ -1382,12 +1383,12 @@ GDALCOGCreator::Create(const char *pszFilename, GDALDataset *const poSrcDS,
 
     if (EQUAL(pszInterleave, "TILE"))
     {
-        aosOptions.SetNameValue("INTERLEAVE", "BAND");
+        aosOptions.SetNameValue(GDALMD_INTERLEAVE, "BAND");
         aosOptions.SetNameValue("@TILE_INTERLEAVE", "YES");
     }
     else
     {
-        aosOptions.SetNameValue("INTERLEAVE", pszInterleave);
+        aosOptions.SetNameValue(GDALMD_INTERLEAVE, pszInterleave);
     }
 
     aosOptions.SetNameValue("@FLUSHCACHE", "YES");
@@ -1435,11 +1436,9 @@ class COGProxyDataset final : public GDALProxyDataset
         eAccess = GA_Update;
         nRasterXSize = m_poGTiffTmpDS->GetRasterXSize();
         nRasterYSize = m_poGTiffTmpDS->GetRasterYSize();
-        nBands = m_poGTiffTmpDS->GetRasterCount();
-        papoBands = static_cast<GDALRasterBand **>(
-            CPLMalloc(sizeof(GDALRasterBand *) * nBands));
-        for (int i = 0; i < nBands; ++i)
-            papoBands[i] = m_poGTiffTmpDS->GetRasterBand(i + 1);
+        const int l_nBands = m_poGTiffTmpDS->GetRasterCount();
+        for (int i = 0; i < l_nBands; ++i)
+            SetBand(i + 1, m_poGTiffTmpDS->GetRasterBand(i + 1));
     }
 
     ~COGProxyDataset() override;

@@ -1141,6 +1141,42 @@ def test_vsicurl_test_parse_html_filelist_nginx_cdn(server):
 
 
 ###############################################################################
+# Test fix for https://github.com/OSGeo/gdal/issues/14707
+
+
+def test_vsicurl_test_parse_html_filelist_nginx_autoindex_exact_size_off(server):
+
+    gdal.VSICurlClearCache()
+
+    # Test format with "autoindex_exact_size off" nginx setting
+
+    handler = webserver.SequentialHandler()
+    handler.add(
+        "GET",
+        "/mydir/",
+        200,
+        {},
+        """<html>
+<head><title>Index of /ma-cdn02/mydir/</title></head>
+<body>
+<h1>Index of /ortho/ign/</h1><hr><pre><a href="../">../</a>
+<a href="bdortho50_01_2000.cog.tif">bdortho50_01_2000.cog.tif</a>                          21-Dec-2022 10:51     10G
+</pre><hr></body>
+</html>
+
+""",
+    )
+    with webserver.install_http_handler(handler):
+        fl = gdal.ReadDir("/vsicurl/http://localhost:%d/mydir" % server.port)
+    assert fl == ["bdortho50_01_2000.cog.tif"]
+
+    stat = gdal.VSIStatL(
+        "/vsicurl/http://localhost:%d/mydir/bdortho50_01_2000.cog.tif" % server.port
+    )
+    assert stat is None
+
+
+###############################################################################
 
 
 def test_vsicurl_no_size_in_HEAD(server):
@@ -1805,6 +1841,156 @@ def test_vsicurl_header_option(server):
         full_filename = f"/vsicurl?header.foo=bar&header.Accept=application%2Fjson&url=http%3A%2F%2Flocalhost%3A{server.port}%2Ftest_vsicurl_header_option.bin"
         statres = gdal.VSIStatL(full_filename)
         assert statres.size == 3
+
+
+###############################################################################
+# Test /vsicurl?header_file=<filename>&
+
+
+@gdaltest.enable_exceptions()
+@pytest.mark.parametrize(
+    "CPL_VSIL_CURL_HEADER_FILE_KVP_ENABLED", [None, "ONLY_IN_TEMP", "YES", "NO"]
+)
+@pytest.mark.parametrize("location", ["vsimem", "tmp", "TEMP"])
+def test_vsicurl_header_file_kvp_in_temp(
+    server, tmp_vsimem, CPL_VSIL_CURL_HEADER_FILE_KVP_ENABLED, location
+):
+
+    gdal.VSICurlClearCache()
+
+    def run_test(header_file):
+
+        with gdal.VSIFile(header_file, "wb") as f:
+            f.write(b"foo: bar\n")
+
+        try:
+
+            handler = webserver.SequentialHandler()
+            handler.add(
+                "HEAD",
+                "/test_vsicurl_header_file.bin",
+                200,
+                {"Content-Length": "3"},
+                expected_headers=(
+                    {}
+                    if CPL_VSIL_CURL_HEADER_FILE_KVP_ENABLED == "NO"
+                    else {"foo": "bar"}
+                ),
+            )
+
+            with gdal.config_option(
+                "CPL_VSIL_CURL_HEADER_FILE_KVP_ENABLED",
+                CPL_VSIL_CURL_HEADER_FILE_KVP_ENABLED,
+            ), webserver.install_http_handler(handler):
+                full_filename = f"/vsicurl?header_file={header_file}&url=http%3A%2F%2Flocalhost%3A{server.port}%2Ftest_vsicurl_header_file.bin"
+                if CPL_VSIL_CURL_HEADER_FILE_KVP_ENABLED == "NO":
+                    with pytest.raises(
+                        Exception,
+                        match=r"Use of 'header_file' key-value pair in /vsicurl\? is disabled by the CPL_VSIL_CURL_HEADER_FILE_KVP_ENABLED configuration option",
+                    ):
+                        statres = gdal.VSIStatL(full_filename)
+                else:
+                    statres = gdal.VSIStatL(full_filename)
+                    assert statres.size == 3
+
+        finally:
+            gdal.Unlink(header_file)
+
+    if location == "vsimem":
+        header_file = tmp_vsimem / "subdir" / ".." / "header_file.txt"
+        run_test(header_file)
+
+    elif location == "tmp":
+        if not gdal.VSIStatL("/tmp"):
+            pytest.skip("/tmp does not exist")
+        import uuid
+
+        header_file = f"/tmp/header_file_{uuid.uuid1()}.txt"
+        run_test(header_file)
+
+    else:
+        assert location == "TEMP"
+        import uuid
+
+        header_file = f"tmp/header_file{uuid.uuid1()}_.txt"
+        with gdal.config_option("TEMP", "tmp"):
+            run_test(header_file)
+
+
+###############################################################################
+# Test /vsicurl?header_file=<filename>&
+
+
+@gdaltest.enable_exceptions()
+def test_vsicurl_header_file_kvp_path_traversal(server):
+
+    gdal.VSICurlClearCache()
+
+    handler = webserver.SequentialHandler()
+    handler.add(
+        "HEAD",
+        "/test_vsicurl_header_file.bin",
+        200,
+        {"Content-Length": "3"},
+    )
+
+    with webserver.install_http_handler(handler):
+        full_filename = f"/vsicurl?header_file=/vsimem/../etc/passwd&url=http%3A%2F%2Flocalhost%3A{server.port}%2Ftest_vsicurl_header_file.bin"
+        with pytest.raises(
+            Exception,
+            match=r"Use of 'header_file=/vsimem/../etc/passwd' key-value pair in /vsicurl\? is disabled because it refers to a file stored in a non-temporary location",
+        ):
+            gdal.VSIStatL(full_filename)
+
+
+###############################################################################
+# Test /vsicurl?header_file=<filename>&
+
+
+@gdaltest.enable_exceptions()
+@pytest.mark.parametrize(
+    "CPL_VSIL_CURL_HEADER_FILE_KVP_ENABLED,expected_headers",
+    [
+        (None, {}),
+        ("ONLY_IN_TEMP", {}),
+        ("YES", {"foo": "bar"}),
+        ("NO", {}),
+    ],
+)
+def test_vsicurl_header_file_kvp_not_in_temp(
+    server, CPL_VSIL_CURL_HEADER_FILE_KVP_ENABLED, expected_headers
+):
+
+    gdal.VSICurlClearCache()
+
+    header_file = "tmp/header_file.txt"
+    try:
+        with gdal.VSIFile(header_file, "wb") as f:
+            f.write(b"foo: bar\n")
+
+        handler = webserver.SequentialHandler()
+        handler.add(
+            "HEAD",
+            "/test_vsicurl_header_file.bin",
+            200,
+            {"Content-Length": "3"},
+            expected_headers=expected_headers,
+        )
+
+        with gdal.config_option(
+            "CPL_VSIL_CURL_HEADER_FILE_KVP_ENABLED",
+            CPL_VSIL_CURL_HEADER_FILE_KVP_ENABLED,
+        ), webserver.install_http_handler(handler):
+            full_filename = f"/vsicurl?header_file={header_file}&url=http%3A%2F%2Flocalhost%3A{server.port}%2Ftest_vsicurl_header_file.bin"
+            if CPL_VSIL_CURL_HEADER_FILE_KVP_ENABLED != "YES":
+                with pytest.raises(Exception):
+                    statres = gdal.VSIStatL(full_filename)
+            else:
+                statres = gdal.VSIStatL(full_filename)
+                assert statres.size == 3
+
+    finally:
+        gdal.Unlink(header_file)
 
 
 ###############################################################################

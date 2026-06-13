@@ -469,7 +469,8 @@ Options can be passed in the filename with the following syntax: ``/vsicurl?[opt
 - useragent=value: HTTP UserAgent header
 - referer=value: HTTP Referer header
 - cookie=value: HTTP Cookie header
-- header_file=value: Filename that contains one or several "Header: Value" lines
+- header_file=filename: Filename that contains one or several "Header: Value" lines.
+  Starting with GDAL 3.13.2, for security reasons, the filename is restricted by default to be located under ``/vsimem/``, ``/tmp`` or the value of the ``TEMP`` environment variable (or ``TMP`` if ``TEMP`` not defined). See the :config:`CPL_VSIL_CURL_HEADER_FILE_KVP_ENABLED` configuration option to define the policy.
 - header.<key>=<value>: HTTP request header of name <key> and value <value>. (GDAL >= 3.11). e.g. ``header.Accept=application%2Fjson``
 - unsafessl=yes/no
 - low_speed_time=value
@@ -778,6 +779,50 @@ The following configuration options can be set to access a
 - AWS_REGION="us-east-1"
 - AWS_SECRET_ACCESS_KEY="your_secret_access_key"
 - AWS_ACCESS_KEY_ID="your_access_key"
+
+.. _vsis3_nasa_edl:
+
+/vsis3/ and NASA Earthdata login (EDL)
+++++++++++++++++++++++++++++++++++++++
+
+Starting with GDAL 3.14, it is possible to automatically retrieve S3 credentials
+for resources protected by
+`NASA Earthdata login (EDL) <https://urs.earthdata.nasa.gov/documentation>`__.
+
+.. warning::
+
+    This mechanism only works when running GDAL on EC2 instances in
+    the ``us-west-2`` region.
+
+To enable the automatic retrieval of those S3 credentials, the
+``VSIS3_EARTHDATA_CREDENTIALS_URL`` configuration option, or path-specific option,
+must be set to a URL of the form ``https://{hostname}/s3credentials``,
+as indicated in the documentation of the data product to access.
+
+The request to obtain those S3 credentials must itself include an authentication token.
+That token can be obtained through one of the following methods, in decreasing order of
+priority:
+
+- ``EARTHDATA_TOKEN`` configuration option with value of a token from
+  ``https://urs.earthdata.nasa.gov/users/{your_account}/user_tokens``
+
+- ``EARTHDATA_USERNAME`` and ``EARTHDATA_PASSWORD`` configuration options with
+  the username and password of the EDL account, which will cause a request to
+  be emitted to ``urs.earthdata.nasa.gov`` to get or create a token.
+
+- Username and password retrieved from the file whose path is given by the
+  ``NETRC`` configuration option.
+
+- Username and password retrieved from the file in ``$HOME/.netrc`` on Unix systems,
+  or ``$USERPROFILE/_netrc`` on Windows
+
+.. note::
+
+    This is similar to how the Python
+    `earthaccess <https://earthaccess.readthedocs.io/en/latest/user/authenticate/>`__ package works.
+
+.. spelling:word-list::
+    Earthdata
 
 .. _vsis3_streaming:
 

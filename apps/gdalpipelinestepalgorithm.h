@@ -23,6 +23,8 @@
 /*                      GDALPipelineStepAlgorithm                       */
 /************************************************************************/
 
+class OGRLayer;
+
 class GDALPipelineStepAlgorithm /* non final */ : public GDALAlgorithm
 {
   public:
@@ -266,6 +268,7 @@ class GDALPipelineStepAlgorithm /* non final */ : public GDALAlgorithm
     friend class GDALPipelineAlgorithm;
     friend class GDALRasterPipelineAlgorithm;
     friend class GDALVectorPipelineAlgorithm;
+    friend class GDALMdimPipelineAlgorithm;
     friend class GDALAbstractPipelineAlgorithm;
 
     virtual bool CanBeFirstStep() const
@@ -361,6 +364,17 @@ class GDALPipelineStepAlgorithm /* non final */ : public GDALAlgorithm
     using GDALAlgorithm::AddOutputLayerNameArg;
     void AddOutputLayerNameArg(bool hiddenForCLI,
                                bool shortNameOutputLayerAllowed);
+
+    void AddMdimInputArgs(bool openForMixedRasterVector, bool hiddenForCLI,
+                          bool acceptRaster);
+    void AddMdimOutputArgs(bool hiddenForCLI);
+    void AddMdimHiddenInputDatasetArg();
+
+    bool CreateDatasetSingleOutputLayerIfNeeded(
+        GDALPipelineStepRunContext &ctxt, const std::string &defaultLayerName,
+        GDALDataset *&poDstDS, bool &bTemporaryFile,
+        std::unique_ptr<GDALDataset> &poNewRetDS, std::string &outputLayerName,
+        OGRLayer *&poDstLayer);
 
   private:
     bool RunImpl(GDALProgressFunc pfnProgress, void *pProgressData) override;

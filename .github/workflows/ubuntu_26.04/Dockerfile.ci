@@ -63,6 +63,7 @@ RUN apt-get update && \
     mariadb-client-core \
     netcdf-bin \
     openjdk-8-jdk-headless \
+    parallel \
     poppler-utils \
     postgis \
     postgresql-client \
@@ -232,7 +233,7 @@ RUN curl -LO -fsS https://github.com/apache/arrow/archive/refs/heads/main.zip \
     && rm -rf arrow-main
 
 # Build Grok JPEG 2000 library
-ARG GROK_VERSION=v20.3.3
+ARG GROK_VERSION=v20.3.4
 
 RUN git clone --recursive --depth 1 --branch ${GROK_VERSION} \
     https://github.com/GrokImageCompression/grok.git grok-git && \

@@ -140,6 +140,7 @@ constexpr static const char* const apszKnownConfigOptions[] =
    "CPL_VSIL_CURL_AUTHORIZATION_HEADER_ALLOWED_IF_REDIRECT", // from cpl_http.cpp, cpl_vsil_curl.cpp
    "CPL_VSIL_CURL_CACHE_SIZE", // from cpl_vsil_curl.cpp
    "CPL_VSIL_CURL_CHUNK_SIZE", // from cpl_vsil_curl.cpp
+   "CPL_VSIL_CURL_HEADER_FILE_KVP_ENABLED", // from cpl_vsil_curl.cpp
    "CPL_VSIL_CURL_HONOR_CACHE_CONTROL", // from cpl_vsil_curl.cpp
    "CPL_VSIL_CURL_IGNORE_GLACIER_STORAGE", // from cpl_vsil_curl.cpp
    "CPL_VSIL_CURL_IGNORE_STORAGE_CLASSES", // from cpl_vsil_curl.cpp
@@ -170,6 +171,7 @@ constexpr static const char* const apszKnownConfigOptions[] =
    "CREATE_RASTER_TABLES", // from ogrgeopackagedatasource.cpp
    "CREATE_TRIGGERS", // from ogrgeopackagedatasource.cpp
    "CURL_CA_BUNDLE", // from cpl_http.cpp
+   "DEFAULT_EARTHDATA_HOST", // from cpl_nasa_earthdata.cpp
    "DGN_LINK_FORMAT", // from ogrdgnlayer.cpp
    "DISABLE_OPEN_REAL_NETCDF_FILES", // from netcdfdataset.cpp, netcdfdrivercore.cpp
    "DRIVER_WISHED", // from test_ogrsf.cpp
@@ -195,6 +197,10 @@ constexpr static const char* const apszKnownConfigOptions[] =
    "DXF_MERGE_BLOCK_GEOMETRIES", // from ogrdxfdatasource.cpp
    "DXF_TRANSLATE_ESCAPE_SEQUENCES", // from ogrdxfdatasource.cpp
    "DXF_WRITE_HATCH", // from ogrdxfwriterlayer.cpp
+   "EARTHDATA_HOST", // from cpl_nasa_earthdata.cpp
+   "EARTHDATA_PASSWORD", // from cpl_nasa_earthdata.cpp
+   "EARTHDATA_TOKEN", // from cpl_nasa_earthdata.cpp
+   "EARTHDATA_USERNAME", // from cpl_nasa_earthdata.cpp
    "ECW_ALWAYS_UPWARD", // from ecwdataset.cpp
    "ECW_AUTOGEN_J2I", // from ecwdataset.cpp
    "ECW_CACHE_MAXMEM", // from ecwdataset.cpp
@@ -660,7 +666,7 @@ constexpr static const char* const apszKnownConfigOptions[] =
    "MITAB_MAX_LINE_LENGTH", // from mitab_middatafile.cpp
    "MITAB_SET_TOWGS84_ON_KNOWN_DATUM", // from ogrmitabspatialref.cpp
    "MRF_ALL_OVERVIEW_LEVELS", // from marfa_dataset.cpp
-   "MRF_BYPASSCACHING", // from marfa_dataset.cpp
+   "MRF_ENABLE_CACHING", // from marfa_dataset.cpp
    "MSSQLSPATIAL_ALWAYS_OUTPUT_FID", // from ogrmssqlspatialdatasource.cpp
    "MSSQLSPATIAL_BCP_SIZE", // from ogrmssqlspatialdatasource.cpp
    "MSSQLSPATIAL_LIST_ALL_TABLES", // from ogrmssqlspatialdatasource.cpp
@@ -678,6 +684,7 @@ constexpr static const char* const apszKnownConfigOptions[] =
    "NAS_INDICATOR", // from ogrnasdriver.cpp
    "NAS_SKIP_CORRUPTED_FEATURES", // from ogrnaslayer.cpp
    "NETCDF_TMP_FILE", // from netcdfdataset.cpp, netcdfmultidim.cpp
+   "NETRC", // from cpl_nasa_earthdata.cpp
    "NGW_BATCH_SIZE", // from gdalngwdataset.cpp
    "NGW_CACHE_EXPIRES", // from gdalngwdataset.cpp
    "NGW_CACHE_MAX_SIZE", // from gdalngwdataset.cpp
@@ -1090,6 +1097,7 @@ constexpr static const char* const apszKnownConfigOptions[] =
    "VSIKERCHUNK_USE_CACHE", // from vsikerchunk_json_ref.cpp
    "VSIKERCHUNK_USE_STREAMING_PARSER", // from vsikerchunk_json_ref.cpp
    "VSIS3_COPYFILE_USE_STREAMING_SOURCE", // from cpl_vsil_s3.cpp
+   "VSIS3_EARTHDATA_CREDENTIALS_URL", // from cpl_nasa_earthdata.cpp
    "VSIS3_SIMULATE_THREADING", // from cpl_vsil_s3.cpp
    "VSIS3_SYNC_MULTITHREADING", // from cpl_vsil_s3.cpp
    "VSIWEBHDFS_SIZE", // from cpl_vsil_webhdfs.cpp

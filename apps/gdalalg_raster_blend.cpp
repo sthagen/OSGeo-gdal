@@ -284,7 +284,7 @@ GDALRasterBlendAlgorithm::GDALRasterBlendAlgorithm(bool standaloneStep)
           ConstructorOptions()
               .SetStandaloneStep(standaloneStep)
               .SetAddDefaultArguments(false)
-              .SetInputDatasetHelpMsg(_("Input raster dataset"))
+              .SetInputDatasetMaxCount(1)
               .SetInputDatasetAlias("color-input")
               .SetInputDatasetMetaVar("COLOR-INPUT")
               .SetOutputDatasetHelpMsg(_("Output raster dataset")))
@@ -756,7 +756,7 @@ BlendDataset::BlendDataset(GDALDataset &oColorDS, GDALDataset &oOverlayDS,
                               m_oOverlayDS.GetDescription()));
     if (nBands > 1)
     {
-        SetMetadataItem("INTERLEAVE", "PIXEL", "IMAGE_STRUCTURE");
+        SetMetadataItem(GDALMD_INTERLEAVE, "PIXEL", GDAL_MDD_IMAGE_STRUCTURE);
     }
 
     if (bCanCreateOvr)

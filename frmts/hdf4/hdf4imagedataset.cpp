@@ -41,8 +41,6 @@
 
 #include <algorithm>
 
-constexpr int HDF4_SDS_MAXNAMELEN = 65;
-
 extern const char *const pszGDALSignature;
 
 // Signature to recognize files written by GDAL.
@@ -50,8 +48,6 @@ const char *const pszGDALSignature =
     "Created with GDAL (http://www.remotesensing.org/gdal/)";
 
 extern CPLMutex *hHDF4Mutex;
-
-constexpr int N_BUF_SIZE = 8192;
 
 /************************************************************************/
 /* ==================================================================== */
@@ -69,92 +65,6 @@ enum HDF4EOSProduct
     PROD_AST14DEM,
     PROD_MODIS_L1B,
     PROD_MODIS_L2
-};
-
-/************************************************************************/
-/* ==================================================================== */
-/*                              HDF4ImageDataset                        */
-/* ==================================================================== */
-/************************************************************************/
-
-constexpr int N_COLOR_ENTRIES = 256;
-
-class HDF4ImageDataset final : public HDF4Dataset
-{
-    friend class HDF4ImageRasterBand;
-
-    char *pszFilename;
-    int32 hHDF4;
-    int32 iGR;
-    int32 iPal;
-    int32 iDataset;
-    int32 iRank;
-    int32 iNumType;
-    int32 nAttrs;
-    int32 iInterlaceMode;
-    int32 iPalInterlaceMode;
-    int32 iPalDataType;
-    int32 nComps;
-    int32 nPalEntries;
-    int32 aiDimSizes[H4_MAX_VAR_DIMS];
-    int iXDim;
-    int iYDim;
-    int iBandDim;
-    int i4Dim;
-    int nBandCount;
-    char **papszLocalMetadata{};
-    uint8 aiPaletteData[N_COLOR_ENTRIES][3];  // XXX: Static array for now
-    char szName[HDF4_SDS_MAXNAMELEN];
-    char *pszSubdatasetName;
-    char *pszFieldName;
-
-    GDALColorTable *poColorTable;
-
-    OGRSpatialReference m_oSRS{};
-    OGRSpatialReference m_oGCPSRS{};
-    bool bHasGeoTransform;
-    GDALGeoTransform m_gt{};
-    std::vector<gdal::GCP> m_aoGCPs{};
-
-    HDF4DatasetType iDatasetType;
-
-    int32 iSDS;
-
-    int nBlockPreferredXSize;
-    int nBlockPreferredYSize;
-    bool bReadTile;
-
-    void ToGeoref(double *, double *);
-    void GetImageDimensions(char *);
-    void GetSwatAttrs(int32);
-    void GetGridAttrs(int32 hGD);
-    void CaptureNRLGeoTransform(void);
-    void CaptureL1GMTLInfo(void);
-    void CaptureCoastwatchGCTPInfo(void);
-    void ProcessModisSDSGeolocation(void);
-    int ProcessSwathGeolocation(int32, char **);
-
-    static long USGSMnemonicToCode(const char *);
-    static void ReadCoordinates(const char *, double *, double *);
-
-    CPL_DISALLOW_COPY_ASSIGN(HDF4ImageDataset)
-
-  public:
-    HDF4ImageDataset();
-    ~HDF4ImageDataset() override;
-
-    static GDALDataset *Open(GDALOpenInfo *);
-    static GDALDataset *Create(const char *pszFilename, int nXSize, int nYSize,
-                               int nBandsIn, GDALDataType eType,
-                               CSLConstList papszParamList);
-    CPLErr FlushCache(bool bAtClosing) override;
-    CPLErr GetGeoTransform(GDALGeoTransform &gt) const override;
-    CPLErr SetGeoTransform(const GDALGeoTransform &gt) override;
-    const OGRSpatialReference *GetSpatialRef() const override;
-    CPLErr SetSpatialRef(const OGRSpatialReference *poSRS) override;
-    int GetGCPCount() override;
-    const OGRSpatialReference *GetGCPSpatialRef() const override;
-    const GDAL_GCP *GetGCPs() override;
 };
 
 /************************************************************************/
@@ -1937,24 +1847,26 @@ void HDF4ImageDataset::ProcessModisSDSGeolocation(void)
     /*      We found geolocation information.  Record it as metadata.       */
     /* -------------------------------------------------------------------- */
 
-    SetMetadataItem("SRS", SRS_WKT_WGS84_LAT_LONG, "GEOLOCATION");
+    SetMetadataItem("SRS", SRS_WKT_WGS84_LAT_LONG, GDAL_MDD_GEOLOCATION);
 
     CPLString osWrk;
     osWrk.Printf("HDF4_SDS:UNKNOWN:\"%s\":%d", pszFilename, iXIndex);
-    SetMetadataItem("X_DATASET", osWrk, "GEOLOCATION");
-    SetMetadataItem("X_BAND", "1", "GEOLOCATION");
+    SetMetadataItem("X_DATASET", osWrk, GDAL_MDD_GEOLOCATION);
+    SetMetadataItem("X_BAND", "1", GDAL_MDD_GEOLOCATION);
 
     osWrk.Printf("HDF4_SDS:UNKNOWN:\"%s\":%d", pszFilename, iYIndex);
-    SetMetadataItem("Y_DATASET", osWrk, "GEOLOCATION");
-    SetMetadataItem("Y_BAND", "1", "GEOLOCATION");
+    SetMetadataItem("Y_DATASET", osWrk, GDAL_MDD_GEOLOCATION);
+    SetMetadataItem("Y_BAND", "1", GDAL_MDD_GEOLOCATION);
 
     SetMetadataItem("PIXEL_OFFSET", CPLSPrintf("%d", nPixelOffset),
-                    "GEOLOCATION");
-    SetMetadataItem("PIXEL_STEP", CPLSPrintf("%d", nPixelStep), "GEOLOCATION");
+                    GDAL_MDD_GEOLOCATION);
+    SetMetadataItem("PIXEL_STEP", CPLSPrintf("%d", nPixelStep),
+                    GDAL_MDD_GEOLOCATION);
 
     SetMetadataItem("LINE_OFFSET", CPLSPrintf("%d", nLineOffset),
-                    "GEOLOCATION");
-    SetMetadataItem("LINE_STEP", CPLSPrintf("%d", nLineStep), "GEOLOCATION");
+                    GDAL_MDD_GEOLOCATION);
+    SetMetadataItem("LINE_STEP", CPLSPrintf("%d", nLineStep),
+                    GDAL_MDD_GEOLOCATION);
 }
 
 /************************************************************************/
@@ -2561,31 +2473,31 @@ int HDF4ImageDataset::ProcessSwathGeolocation(int32 hSW, char **papszDimList)
             char *pszWKT = nullptr;
             m_oGCPSRS.exportToWkt(&pszWKT);
             if (pszWKT)
-                SetMetadataItem("SRS", pszWKT, "GEOLOCATION");
+                SetMetadataItem("SRS", pszWKT, GDAL_MDD_GEOLOCATION);
             CPLFree(pszWKT);
 
             CPLString osWrk;
             osWrk.Printf("HDF4_EOS:EOS_SWATH_GEOL:\"%s\":%s:%s", pszFilename,
                          pszSubdatasetName, papszGeolocations[iLongDim]);
-            SetMetadataItem("X_DATASET", osWrk, "GEOLOCATION");
-            SetMetadataItem("X_BAND", "1", "GEOLOCATION");
+            SetMetadataItem("X_DATASET", osWrk, GDAL_MDD_GEOLOCATION);
+            SetMetadataItem("X_BAND", "1", GDAL_MDD_GEOLOCATION);
 
             osWrk.Printf("HDF4_EOS:EOS_SWATH_GEOL:\"%s\":%s:%s", pszFilename,
                          pszSubdatasetName, papszGeolocations[iLatDim]);
-            SetMetadataItem("Y_DATASET", osWrk, "GEOLOCATION");
-            SetMetadataItem("Y_BAND", "1", "GEOLOCATION");
+            SetMetadataItem("Y_DATASET", osWrk, GDAL_MDD_GEOLOCATION);
+            SetMetadataItem("Y_BAND", "1", GDAL_MDD_GEOLOCATION);
 
             if (paiOffset && paiIncrement)
             {
                 osWrk.Printf("%ld", static_cast<long>(paiOffset[iPixelDim]));
-                SetMetadataItem("PIXEL_OFFSET", osWrk, "GEOLOCATION");
+                SetMetadataItem("PIXEL_OFFSET", osWrk, GDAL_MDD_GEOLOCATION);
                 osWrk.Printf("%ld", static_cast<long>(paiIncrement[iPixelDim]));
-                SetMetadataItem("PIXEL_STEP", osWrk, "GEOLOCATION");
+                SetMetadataItem("PIXEL_STEP", osWrk, GDAL_MDD_GEOLOCATION);
 
                 osWrk.Printf("%ld", static_cast<long>(paiOffset[iLineDim]));
-                SetMetadataItem("LINE_OFFSET", osWrk, "GEOLOCATION");
+                SetMetadataItem("LINE_OFFSET", osWrk, GDAL_MDD_GEOLOCATION);
                 osWrk.Printf("%ld", static_cast<long>(paiIncrement[iLineDim]));
-                SetMetadataItem("LINE_STEP", osWrk, "GEOLOCATION");
+                SetMetadataItem("LINE_STEP", osWrk, GDAL_MDD_GEOLOCATION);
             }
         }
 
@@ -3767,6 +3679,8 @@ GDALDataset *HDF4ImageDataset::Open(GDALOpenInfo *poOpenInfo)
 
     poDS->oOvManager.Initialize(poDS, ":::VIRTUAL:::");
     CPLAcquireMutex(hHDF4Mutex, 1000.0);
+
+    poDS->poDriver = GetGDALDriverManager()->GetDriverByName("HDF4Image");
 
     return poDS;
 }

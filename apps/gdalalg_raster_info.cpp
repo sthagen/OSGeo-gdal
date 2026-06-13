@@ -28,14 +28,12 @@
 
 GDALRasterInfoAlgorithm::GDALRasterInfoAlgorithm(bool standaloneStep,
                                                  bool openForMixedRasterVector)
-    : GDALRasterPipelineStepAlgorithm(
-          NAME, DESCRIPTION, HELP_URL,
-          ConstructorOptions()
-              .SetStandaloneStep(standaloneStep)
-              .SetInputDatasetMaxCount(1)
-              .SetAddDefaultArguments(false)
-              .SetInputDatasetHelpMsg(_("Input raster dataset"))
-              .SetInputDatasetAlias("dataset"))
+    : GDALRasterPipelineStepAlgorithm(NAME, DESCRIPTION, HELP_URL,
+                                      ConstructorOptions()
+                                          .SetStandaloneStep(standaloneStep)
+                                          .SetInputDatasetMaxCount(1)
+                                          .SetAddDefaultArguments(false)
+                                          .SetInputDatasetAlias("dataset"))
 {
     if (standaloneStep)
     {
@@ -167,7 +165,8 @@ bool GDALRasterInfoAlgorithm::RunStep(GDALPipelineStepRunContext &)
 
     if (m_subDS > 0)
     {
-        CSLConstList papszSubdatasets = GDALGetMetadata(hDS, "SUBDATASETS");
+        CSLConstList papszSubdatasets =
+            GDALGetMetadata(hDS, GDAL_MDD_SUBDATASETS);
         const int nSubdatasets = CSLCount(papszSubdatasets) / 2;
         if (m_subDS > nSubdatasets)
         {

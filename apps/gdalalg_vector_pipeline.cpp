@@ -26,10 +26,12 @@
 #include "gdalalg_vector_create.h"
 #include "gdalalg_vector_dissolve.h"
 #include "gdalalg_vector_edit.h"
+#include "gdalalg_vector_explode.h"
 #include "gdalalg_vector_explode_collections.h"
 #include "gdalalg_vector_export_schema.h"
 #include "gdalalg_vector_filter.h"
 #include "gdalalg_vector_info.h"
+#include "gdalalg_vector_layer_algebra.h"
 #include "gdalalg_vector_limit.h"
 #include "gdalalg_vector_make_point.h"
 #include "gdalalg_vector_make_valid.h"
@@ -179,6 +181,7 @@ void GDALVectorPipelineAlgorithm::RegisterAlgorithms(
     registry.Register<GDALVectorEditAlgorithm>(
         addSuffixIfNeeded(GDALVectorEditAlgorithm::NAME));
 
+    registry.Register<GDALVectorExplodeAlgorithm>();
     registry.Register<GDALVectorExplodeCollectionsAlgorithm>();
     registry.Register<GDALVectorExportSchemaAlgorithm>();
 
@@ -189,6 +192,7 @@ void GDALVectorPipelineAlgorithm::RegisterAlgorithms(
         addSuffixIfNeeded(GDALVectorReprojectAlgorithm::NAME));
 
     registry.Register<GDALVectorFilterAlgorithm>();
+    registry.Register<GDALVectorLayerAlgebraAlgorithm>();
     registry.Register<GDALVectorLimitAlgorithm>();
     registry.Register<GDALVectorMakePointAlgorithm>();
     registry.Register<GDALVectorMakeValidAlgorithm>();
@@ -417,8 +421,7 @@ OGRFeature *GDALVectorPipelineOutputLayer::GetNextRawFeature()
             std::unique_ptr<OGRFeature>(m_srcLayer.GetNextFeature());
         if (!poSrcFeature)
             return nullptr;
-        TranslateFeature(std::move(poSrcFeature), m_pendingFeatures);
-        if (m_translateError)
+        if (!TranslateFeature(std::move(poSrcFeature), m_pendingFeatures))
         {
             return nullptr;
         }
@@ -556,8 +559,12 @@ OGRFeature *GDALVectorPipelineOutputDataset::GetNextFeature(
         if (iterToDstLayer != m_mapSrcLayerToNewLayer.end())
         {
             m_belongingLayer = iterToDstLayer->second;
-            m_belongingLayer->TranslateFeature(std::move(poSrcFeature),
-                                               m_pendingFeatures);
+
+            if (!m_belongingLayer->TranslateFeature(std::move(poSrcFeature),
+                                                    m_pendingFeatures))
+            {
+                return nullptr;
+            }
 
             if (!m_pendingFeatures.empty())
                 break;
@@ -583,7 +590,7 @@ const OGRFeatureDefn *GDALVectorPipelinePassthroughLayer::GetLayerDefn() const
 /*          GDALVectorPipelinePassthroughLayer::GetLayerDefn()          */
 /************************************************************************/
 
-void GDALVectorPipelinePassthroughLayer::TranslateFeature(
+bool GDALVectorPipelinePassthroughLayer::TranslateFeature(
     std::unique_ptr<OGRFeature> poSrcFeature,
     std::vector<std::unique_ptr<OGRFeature>> &apoOutFeatures)
 {
@@ -592,6 +599,8 @@ void GDALVectorPipelinePassthroughLayer::TranslateFeature(
     {
         apoOutFeatures.push_back(std::move(poSrcFeature));
     }
+
+    return true;
 }
 
 /************************************************************************/

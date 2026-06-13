@@ -22,6 +22,8 @@
 #include "gdalalg_vector_read.h"
 #include "gdalalg_tee.h"
 
+#include "vrtdataset.h"
+
 #include <algorithm>
 #include <cassert>
 
@@ -243,7 +245,7 @@ static int GetDatasetType(GDALDataset *poDS)
 
     if (poDS->GetLayerCount() == 0 &&
         (poDS->GetRasterCount() > 0 ||
-         poDS->GetMetadata("SUBDATASETS") != nullptr))
+         poDS->GetMetadata(GDAL_MDD_SUBDATASETS) != nullptr))
     {
         return GDAL_OF_RASTER;
     }
@@ -1567,6 +1569,9 @@ std::string GDALAbstractPipelineAlgorithm::BuildNestedPipeline(
         curAlg->m_oMapDatasetNameToDataset[datasetNameOut] = poDS;
 
         poDS->SetDescription(argsStr.c_str());
+        auto poVRTDataset = dynamic_cast<VRTDataset *>(poDS);
+        if (poVRTDataset)
+            poVRTDataset->SetWritable(false);
     }
 
     m_apoNestedPipelines.emplace_back(std::move(nestedPipeline));

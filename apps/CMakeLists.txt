@@ -44,6 +44,10 @@ target_sources(appslib PRIVATE
   gdalalg_mdim_info.cpp
   gdalalg_mdim_convert.cpp
   gdalalg_mdim_mosaic.cpp
+  gdalalg_mdim_pipeline.cpp
+  gdalalg_mdim_read.cpp
+  gdalalg_mdim_reproject.cpp
+  gdalalg_mdim_write.cpp
   gdalalg_pipeline.cpp
   gdalalg_raster.cpp
   gdalalg_raster_info.cpp
@@ -119,6 +123,7 @@ target_sources(appslib PRIVATE
   gdalalg_vector_limit.cpp
   gdalalg_vector_make_point.cpp
   gdalalg_vector_set_geom_type.cpp
+  gdalalg_vector_explode.cpp
   gdalalg_vector_explode_collections.cpp
   gdalalg_vector_make_valid.cpp
   gdalalg_vector_segmentize.cpp

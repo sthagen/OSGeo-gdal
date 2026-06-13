@@ -42,13 +42,11 @@
 /************************************************************************/
 
 GDALRasterCompareAlgorithm::GDALRasterCompareAlgorithm(bool standaloneStep)
-    : GDALRasterPipelineStepAlgorithm(
-          NAME, DESCRIPTION, HELP_URL,
-          ConstructorOptions()
-              .SetStandaloneStep(standaloneStep)
-              .SetInputDatasetMaxCount(1)
-              .SetInputDatasetHelpMsg(_("Input raster dataset"))
-              .SetAddDefaultArguments(false))
+    : GDALRasterPipelineStepAlgorithm(NAME, DESCRIPTION, HELP_URL,
+                                      ConstructorOptions()
+                                          .SetStandaloneStep(standaloneStep)
+                                          .SetInputDatasetMaxCount(1)
+                                          .SetAddDefaultArguments(false))
 {
     if (standaloneStep)
     {
@@ -672,15 +670,16 @@ void GDALRasterCompareAlgorithm::DatasetComparison(
 
     if (!m_skipRPC)
     {
-        MetadataComparison(aosReport, "RPC", poRefDS->GetMetadata("RPC"),
-                           poInputDS->GetMetadata("RPC"));
+        MetadataComparison(aosReport, GDAL_MDD_RPC,
+                           poRefDS->GetMetadata(GDAL_MDD_RPC),
+                           poInputDS->GetMetadata(GDAL_MDD_RPC));
     }
 
     if (!m_skipGeolocation)
     {
-        MetadataComparison(aosReport, "GEOLOCATION",
-                           poRefDS->GetMetadata("GEOLOCATION"),
-                           poInputDS->GetMetadata("GEOLOCATION"));
+        MetadataComparison(aosReport, GDAL_MDD_GEOLOCATION,
+                           poRefDS->GetMetadata(GDAL_MDD_GEOLOCATION),
+                           poInputDS->GetMetadata(GDAL_MDD_GEOLOCATION));
     }
 
     if (!ret)
@@ -693,10 +692,10 @@ void GDALRasterCompareAlgorithm::DatasetComparison(
     // bands as this could be extremely slow
     if (nBands > 10)
     {
-        const char *pszRefInterleave =
-            poRefDS->GetMetadataItem("INTERLEAVE", "IMAGE_STRUCTURE");
-        const char *pszInputInterleave =
-            poInputDS->GetMetadataItem("INTERLEAVE", "IMAGE_STRUCTURE");
+        const char *pszRefInterleave = poRefDS->GetMetadataItem(
+            GDALMD_INTERLEAVE, GDAL_MDD_IMAGE_STRUCTURE);
+        const char *pszInputInterleave = poInputDS->GetMetadataItem(
+            GDALMD_INTERLEAVE, GDAL_MDD_IMAGE_STRUCTURE);
         if ((pszRefInterleave && EQUAL(pszRefInterleave, "PIXEL")) ||
             (pszInputInterleave && EQUAL(pszInputInterleave, "PIXEL")))
         {
@@ -1248,7 +1247,7 @@ void GDALRasterCompareAlgorithm::MetadataComparison(
 
             std::string ref = oIter->second;
             std::string input = sKeyValuePair.second;
-            if (metadataDomain == "RPC")
+            if (metadataDomain == GDAL_MDD_RPC)
             {
                 // _RPC.TXT files and in-file have a difference
                 // in white space that is not otherwise meaningful.
@@ -1312,10 +1311,11 @@ bool GDALRasterCompareAlgorithm::RunStep(GDALPipelineStepRunContext &ctxt)
     }
 
     CSLConstList papszSubDSRef =
-        m_skipSubdataset ? nullptr : poRefDS->GetMetadata("SUBDATASETS");
+        m_skipSubdataset ? nullptr : poRefDS->GetMetadata(GDAL_MDD_SUBDATASETS);
     const int nCountRef = CSLCount(papszSubDSRef) / 2;
     CSLConstList papszSubDSInput =
-        m_skipSubdataset ? nullptr : poInputDS->GetMetadata("SUBDATASETS");
+        m_skipSubdataset ? nullptr
+                         : poInputDS->GetMetadata(GDAL_MDD_SUBDATASETS);
     const int nCountInput = CSLCount(papszSubDSInput) / 2;
 
     if (!m_skipSubdataset)

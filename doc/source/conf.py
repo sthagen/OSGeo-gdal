@@ -507,6 +507,34 @@ man_pages = [
         1,
     ),
     (
+        "programs/gdal_mdim_pipeline",
+        "gdal-mdim-pipeline",
+        "Process a multidimensional dataset applying several steps",
+        [author_evenr],
+        1,
+    ),
+    (
+        "programs/gdal_mdim_read",
+        "gdal-mdim-read",
+        "Read a multidimensional dataset (pipeline only)",
+        [author_evenr],
+        1,
+    ),
+    (
+        "programs/gdal_mdim_reproject",
+        "gdal-mdim-reproject",
+        "Reproject a multidimensional dataset",
+        [author_evenr],
+        1,
+    ),
+    (
+        "programs/gdal_mdim_write",
+        "gdal-mdim-write",
+        "Write a multidimensional dataset (pipeline only)",
+        [author_evenr],
+        1,
+    ),
+    (
         "programs/gdal_pipeline",
         "gdal-pipeline",
         "Process a dataset applying several steps",
@@ -952,6 +980,13 @@ man_pages = [
         "gdal-vector-filter",
         "Filter a vector dataset",
         [author_evenr],
+        1,
+    ),
+    (
+        "programs/gdal_vector_explode",
+        "gdal-vector-explode",
+        "Explode fields or geometries of a vector dataset",
+        [author_dbaston],
         1,
     ),
     (

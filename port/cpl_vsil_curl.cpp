@@ -315,16 +315,12 @@ static int VSICurlIsFileInList(CSLConstList papszList, const char *pszTarget)
 /*                      StartsWithVSICurlPrefix()                       */
 /************************************************************************/
 
-static bool
-StartsWithVSICurlPrefix(const char *pszFilename,
-                        std::string *posFilenameAfterPrefix = nullptr)
+static bool StartsWithVSICurlPrefix(const char *pszFilename)
 {
     for (const char *pszPrefix : VSICURL_PREFIXES)
     {
         if (STARTS_WITH(pszFilename, pszPrefix))
         {
-            if (posFilenameAfterPrefix)
-                *posFilenameAfterPrefix = pszFilename + strlen(pszPrefix);
             return true;
         }
     }
@@ -422,9 +418,103 @@ static std::string VSICurlGetURLFromFilename(
                     if (pbEmptyDir)
                         *pbEmptyDir = CPLTestBool(pszValue);
                 }
+                else if (EQUAL(pszKey, "header_file"))
+                {
+#if defined(CPL_VSIL_CURL_HEADER_FILE_KVP_DISABLED)
+                    constexpr bool CPL_VSIL_CURL_HEADER_FILE_KVP_DISABLED =
+                        true;
+#else
+                    constexpr bool CPL_VSIL_CURL_HEADER_FILE_KVP_DISABLED =
+                        false;
+#endif
+                    if (CPL_VSIL_CURL_HEADER_FILE_KVP_DISABLED)
+                    {
+                        CPLError(CE_Failure, CPLE_AppDefined,
+                                 "Use of 'header_file' key-value pair in "
+                                 "/vsicurl? is disabled in this build");
+                    }
+                    else
+                    {
+                        bool bSetValue = false;
+                        const char *pszAllowHeaderFileKVP = CPLGetConfigOption(
+                            "CPL_VSIL_CURL_HEADER_FILE_KVP_ENABLED", nullptr);
+                        if (!pszAllowHeaderFileKVP ||
+                            pszAllowHeaderFileKVP[0] == 0 ||
+                            EQUAL(pszAllowHeaderFileKVP, "ONLY_IN_TEMP"))
+                        {
+                            if (STARTS_WITH(pszValue, "/vsimem/"))
+                            {
+                                bSetValue = !CPLHasUnbalancedPathTraversal(
+                                    pszValue + strlen("/vsimem/"));
+                            }
+                            else if (STARTS_WITH(pszValue, "/tmp/"))
+                            {
+                                bSetValue = !CPLHasUnbalancedPathTraversal(
+                                    pszValue + strlen("/tmp/"));
+                            }
+                            else
+                            {
+                                for (const char *pszEnvVar : {"TEMP", "TMP"})
+                                {
+                                    if (const char *pszTemp =
+                                            CPLGetConfigOption(pszEnvVar,
+                                                               nullptr))
+                                    {
+                                        std::string osTemp = pszTemp;
+                                        if (!osTemp.empty() &&
+                                            (osTemp.back() == '/' ||
+                                             osTemp.back() == '\\'))
+                                            osTemp.pop_back();
+                                        if (!osTemp.empty() &&
+                                            cpl::starts_with(
+                                                std::string_view(pszValue),
+                                                osTemp) &&
+                                            (pszValue[osTemp.size()] == '/' ||
+                                             pszValue[osTemp.size()] == '\\'))
+                                        {
+                                            bSetValue =
+                                                !CPLHasUnbalancedPathTraversal(
+                                                    pszValue + osTemp.size());
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            if (!bSetValue)
+                            {
+                                CPLError(CE_Failure, CPLE_AppDefined,
+                                         "Use of 'header_file=%s' "
+                                         "key-value pair in /vsicurl? is "
+                                         "disabled because it refers to a "
+                                         "file stored in a non-temporary "
+                                         "location. You may set the "
+                                         "CPL_VSIL_CURL_HEADER_FILE_KVP_"
+                                         "ENABLED configuration option to "
+                                         "YES to remove that restriction.",
+                                         pszValue);
+                            }
+                        }
+                        else if (CPLTestBool(pszAllowHeaderFileKVP))
+                        {
+                            bSetValue = true;
+                        }
+                        else
+                        {
+                            CPLError(CE_Failure, CPLE_AppDefined,
+                                     "Use of 'header_file' key-value pair in "
+                                     "/vsicurl? is disabled by the "
+                                     "CPL_VSIL_CURL_HEADER_FILE_KVP_ENABLED "
+                                     "configuration option");
+                        }
+
+                        if (bSetValue && paosHTTPOptions)
+                        {
+                            paosHTTPOptions->SetNameValue(pszKey, pszValue);
+                        }
+                    }
+                }
                 else if (EQUAL(pszKey, "useragent") ||
                          EQUAL(pszKey, "referer") || EQUAL(pszKey, "cookie") ||
-                         EQUAL(pszKey, "header_file") ||
                          EQUAL(pszKey, "unsafessl") ||
 #ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
                          EQUAL(pszKey, "timeout") ||
@@ -4009,7 +4099,7 @@ int VSICurlHandle::Close()
 /************************************************************************/
 
 VSICurlFilesystemHandlerBase::VSICurlFilesystemHandlerBase()
-    : oCacheFileProp{100 * 1024}, oCacheDirList{1024, 0}
+    : oCacheDirList{1024, 0}
 {
 }
 
@@ -4206,17 +4296,7 @@ void VSICurlFilesystemHandlerBase::AddRegion(const char *pszURL,
 bool VSICurlFilesystemHandlerBase::GetCachedFileProp(const char *pszURL,
                                                      FileProp &oFileProp)
 {
-    CPLMutexHolder oHolder(&hMutex);
-    bool inCache;
-    if (oCacheFileProp.tryGet(std::string(pszURL), inCache))
-    {
-        if (VSICURLGetCachedFileProp(pszURL, oFileProp))
-        {
-            return true;
-        }
-        oCacheFileProp.remove(std::string(pszURL));
-    }
-    return false;
+    return VSICURLGetCachedFileProp(pszURL, oFileProp);
 }
 
 /************************************************************************/
@@ -4226,8 +4306,6 @@ bool VSICurlFilesystemHandlerBase::GetCachedFileProp(const char *pszURL,
 void VSICurlFilesystemHandlerBase::SetCachedFileProp(const char *pszURL,
                                                      FileProp &oFileProp)
 {
-    CPLMutexHolder oHolder(&hMutex);
-    oCacheFileProp.insert(std::string(pszURL), true);
     VSICURLSetCachedFileProp(pszURL, oFileProp);
 }
 
@@ -4309,7 +4387,7 @@ void VSICurlFilesystemHandlerBase::InvalidateCachedData(const char *pszURL)
 {
     CPLMutexHolder oHolder(&hMutex);
 
-    oCacheFileProp.remove(std::string(pszURL));
+    VSICURLInvalidateCachedFileProp(pszURL);
 
     // Invalidate all cached regions for this URL
     std::list<FilenameOffsetPair> keysToRemove;
@@ -4338,12 +4416,7 @@ void VSICurlFilesystemHandlerBase::ClearCache()
 
     GetRegionCache()->clear();
 
-    {
-        const auto lambda = [](const lru11::KeyValuePair<std::string, bool> &kv)
-        { VSICURLInvalidateCachedFileProp(kv.key.c_str()); };
-        oCacheFileProp.cwalk(lambda);
-        oCacheFileProp.clear();
-    }
+    VSICURLDestroyCacheFileProp();
 
     oCacheDirList.clear();
     nCachedFilesInDirList = 0;
@@ -4378,18 +4451,6 @@ void VSICurlFilesystemHandlerBase::PartialClearCache(
             poRegionCache->remove(key);
     }
 
-    {
-        std::list<std::string> keysToRemove;
-        auto lambda = [&keysToRemove,
-                       &osURL](const lru11::KeyValuePair<std::string, bool> &kv)
-        {
-            if (strncmp(kv.key.c_str(), osURL.c_str(), osURL.size()) == 0)
-                keysToRemove.push_back(kv.key);
-        };
-        oCacheFileProp.cwalk(lambda);
-        for (const auto &key : keysToRemove)
-            oCacheFileProp.remove(key);
-    }
     VSICURLInvalidateCachedFilePropPrefix(osURL.c_str());
 
     {
@@ -4491,6 +4552,13 @@ const char *VSICurlFilesystemHandlerBase::GetActualURL(const char *pszFilename)
     "  <Option name='CPL_VSIL_CURL_ADVISE_READ_TOTAL_BYTES_LIMIT' "            \
     "type='integer' description='Maximum number of bytes AdviseRead() is "     \
     "allowed to fetch at once' default='104857600'/>"                          \
+    "  <Option name='CPL_VSIL_CURL_HEADER_FILE_KVP_ENABLED' "                  \
+    "type='string-select' description='Whether the header-file key-value "     \
+    "pair can be used in /vsicurl? filenames' default='ONLY_IN_TEMP'>"         \
+    "       <Value>ONLY_IN_TEMP</Value>"                                       \
+    "       <Value>NO</Value>"                                                 \
+    "       <Value>YES</Value>"                                                \
+    "  </Option>"                                                              \
     "  <Option name='GDAL_HTTP_MAX_CACHED_CONNECTIONS' type='integer' "        \
     "description='Maximum amount of connections that libcurl may keep alive "  \
     "in its connection cache after use'/>"                                     \
@@ -4589,12 +4657,9 @@ VSICurlFilesystemHandlerBase::Open(const char *pszFilename,
                                    const char *pszAccess, bool bSetError,
                                    CSLConstList papszOptions)
 {
-    std::string osFilenameAfterPrefix;
-    if (cpl::starts_with(std::string_view(pszFilename), GetFSPrefix()))
-    {
-        osFilenameAfterPrefix = pszFilename + GetFSPrefix().size();
-    }
-    else if (!StartsWithVSICurlPrefix(pszFilename, &osFilenameAfterPrefix))
+    const bool bStartsWithVSICurlPrefix = StartsWithVSICurlPrefix(pszFilename);
+    if (!bStartsWithVSICurlPrefix &&
+        !cpl::starts_with(std::string_view(pszFilename), GetFSPrefix()))
     {
         return nullptr;
     }
@@ -4618,9 +4683,12 @@ VSICurlFilesystemHandlerBase::Open(const char *pszFilename,
 
     bool bListDir = true;
     bool bEmptyDir = false;
-    CPL_IGNORE_RET_VAL(VSICurlGetURLFromFilename(pszFilename, nullptr, nullptr,
-                                                 nullptr, &bListDir, &bEmptyDir,
-                                                 nullptr, nullptr, nullptr));
+    std::string osURL =
+        bStartsWithVSICurlPrefix
+            ? VSICurlGetURLFromFilename(pszFilename, nullptr, nullptr, nullptr,
+                                        &bListDir, &bEmptyDir, nullptr, nullptr,
+                                        nullptr)
+            : GetURLFromFilename(pszFilename);
 
     const char *pszOptionVal = CSLFetchNameValueDef(
         papszOptions, "DISABLE_READDIR_ON_OPEN",
@@ -4637,7 +4705,7 @@ VSICurlFilesystemHandlerBase::Open(const char *pszFilename,
     bool bForceExistsCheck = false;
     FileProp cachedFileProp;
     if (!bSkipReadDir &&
-        !(GetCachedFileProp(osFilenameAfterPrefix.c_str(), cachedFileProp) &&
+        !(GetCachedFileProp(osURL.c_str(), cachedFileProp) &&
           cachedFileProp.eExists == EXIST_YES) &&
         strchr(CPLGetFilename(osFilename.c_str()), '.') != nullptr &&
         !STARTS_WITH(CPLGetExtensionSafe(osFilename.c_str()).c_str(), "zip") &&
@@ -4671,6 +4739,13 @@ VSICurlFilesystemHandlerBase::Open(const char *pszFilename,
                 return nullptr;
             }
         }
+    }
+    if (!bStartsWithVSICurlPrefix)
+        osURL = GetURLFromFilename(pszFilename);
+    if (GetCachedFileProp(osURL.c_str(), cachedFileProp) &&
+        cachedFileProp.eExists == EXIST_YES && cachedFileProp.bIsDirectory)
+    {
+        return nullptr;
     }
 
     auto poHandle =
@@ -4716,6 +4791,30 @@ static char *VSICurlParserFindEOL(char *pszData)
 }
 
 /************************************************************************/
+/*                           ParseFileSize()                            */
+/************************************************************************/
+
+static GUIntBig ParseFileSize(const char *pszStr)
+{
+    GUIntBig nFileSize = 0;
+    while (*pszStr == ' ')
+        pszStr++;
+    if (*pszStr >= '1' && *pszStr <= '9')
+    {
+        const char *pszIter = pszStr + 1;
+        while (*pszIter >= '0' && *pszIter <= '9')
+            ++pszIter;
+        if (*pszIter == 0 || *pszIter == ' ' || *pszIter == '\t' ||
+            *pszIter == '\r' || *pszIter == '\n')
+        {
+            nFileSize =
+                CPLScanUIntBig(pszStr, static_cast<int>(pszIter - pszStr));
+        }
+    }
+    return nFileSize;
+}
+
+/************************************************************************/
 /*                  VSICurlParseHTMLDateTimeFileSize()                  */
 /************************************************************************/
 
@@ -4730,6 +4829,8 @@ static bool VSICurlParseHTMLDateTimeFileSize(const char *pszStr,
 {
     for (int iMonth = 0; iMonth < 12; iMonth++)
     {
+        nFileSize = 0;
+
         char szMonth[32] = {};
         szMonth[0] = '-';
         memcpy(szMonth + 1, apszMonths[iMonth], 3);
@@ -4763,18 +4864,11 @@ static bool VSICurlParseHTMLDateTimeFileSize(const char *pszStr,
                     if (nMonthFoundLen > 15 + 2)
                     {
                         const char *pszFilesize = pszMonthFound + 15 + 2;
-                        while (*pszFilesize == ' ')
-                            pszFilesize++;
-                        if (*pszFilesize >= '1' && *pszFilesize <= '9')
-                            nFileSize = CPLScanUIntBig(
-                                pszFilesize,
-                                static_cast<int>(strlen(pszFilesize)));
+                        nFileSize = ParseFileSize(pszFilesize);
                     }
-
-                    return true;
                 }
             }
-            return false;
+            return nFileSize > 0;
         }
 
         /* Microsoft IIS */
@@ -4809,13 +4903,6 @@ static bool VSICurlParseHTMLDateTimeFileSize(const char *pszStr,
                     nHour = -1;
                 nCurOffset += 4;
 
-                const char *pszFilesize = pszMonthFound + nCurOffset;
-                while (*pszFilesize == ' ')
-                    pszFilesize++;
-                if (*pszFilesize >= '1' && *pszFilesize <= '9')
-                    nFileSize = CPLScanUIntBig(
-                        pszFilesize, static_cast<int>(strlen(pszFilesize)));
-
                 if (nDay >= 1 && nDay <= 31 && nYear >= 1900 && nHour >= 0 &&
                     nHour <= 24 && nMin >= 0 && nMin < 60)
                 {
@@ -4826,9 +4913,9 @@ static bool VSICurlParseHTMLDateTimeFileSize(const char *pszStr,
                     brokendowntime.tm_min = nMin;
                     mTime = CPLYMDHMSToUnixTime(&brokendowntime);
 
-                    return true;
+                    const char *pszFilesize = pszMonthFound + nCurOffset;
+                    nFileSize = ParseFileSize(pszFilesize);
                 }
-                nFileSize = 0;
             }
             else if (pszMonthFound - pszStr > 1 && pszMonthFound[-1] == ',' &&
                      static_cast<int>(strlen(pszMonthFound)) >
@@ -4854,13 +4941,6 @@ static bool VSICurlParseHTMLDateTimeFileSize(const char *pszStr,
                     nHour = -1;
                 nCurOffset += 2;
 
-                const char *pszFilesize = pszMonthFound + nCurOffset;
-                while (*pszFilesize == ' ')
-                    pszFilesize++;
-                if (*pszFilesize >= '1' && *pszFilesize <= '9')
-                    nFileSize = CPLScanUIntBig(
-                        pszFilesize, static_cast<int>(strlen(pszFilesize)));
-
                 if (nDay >= 1 && nDay <= 31 && nYear >= 1900 && nHour >= 0 &&
                     nHour <= 24 && nMin >= 0 && nMin < 60)
                 {
@@ -4871,11 +4951,12 @@ static bool VSICurlParseHTMLDateTimeFileSize(const char *pszStr,
                     brokendowntime.tm_min = nMin;
                     mTime = CPLYMDHMSToUnixTime(&brokendowntime);
 
-                    return true;
+                    const char *pszFilesize = pszMonthFound + nCurOffset;
+                    nFileSize = ParseFileSize(pszFilesize);
                 }
-                nFileSize = 0;
             }
-            return false;
+
+            return nFileSize > 0;
         }
     }
 
@@ -5060,9 +5141,15 @@ char **VSICurlFilesystemHandlerBase::ParseHTMLFileList(const char *pszFilename,
                     GetCachedFileProp(osCachedFilename.c_str(), cachedFileProp);
                     cachedFileProp.eExists = EXIST_YES;
                     cachedFileProp.bIsDirectory = bIsDirectory;
-                    cachedFileProp.mTime = static_cast<time_t>(mTime);
-                    cachedFileProp.bHasComputedFileSize = nFileSize > 0;
-                    cachedFileProp.fileSize = nFileSize;
+                    if (mTime > 0)
+                    {
+                        cachedFileProp.mTime = static_cast<time_t>(mTime);
+                    }
+                    if (!cachedFileProp.bHasComputedFileSize)
+                    {
+                        cachedFileProp.bHasComputedFileSize = nFileSize > 0;
+                        cachedFileProp.fileSize = nFileSize;
+                    }
                     SetCachedFileProp(osCachedFilename.c_str(), cachedFileProp);
 
                     oFileList.AddString(beginFilename);

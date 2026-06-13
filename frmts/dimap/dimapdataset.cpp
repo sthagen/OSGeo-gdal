@@ -779,7 +779,8 @@ GDALDataset *DIMAPDataset::Open(GDALOpenInfo *poOpenInfo)
 
     if (osSelectedSubdataset.empty() && aosSubdatasets.size() > 2)
     {
-        poDS->GDALDataset::SetMetadata(aosSubdatasets.List(), "SUBDATASETS");
+        poDS->GDALDataset::SetMetadata(aosSubdatasets.List(),
+                                       GDAL_MDD_SUBDATASETS);
     }
     poDS->psProduct = psProduct.release();
     poDS->psProductDim = psProductDim.release();
@@ -1122,7 +1123,8 @@ int DIMAPDataset::ReadImageInformation2()
         CPLGetXMLValue(psDoc, "Raster_Data.Data_Access.DATA_FILE_FORMAT", "");
     if (osDataFormat == "image/jp2")
     {
-        SetMetadataItem("COMPRESSION", "JPEG2000", "IMAGE_STRUCTURE");
+        SetMetadataItem(GDALMD_COMPRESSION, "JPEG2000",
+                        GDAL_MDD_IMAGE_STRUCTURE);
     }
 
     // For VHR2020: SPECTRAL_PROCESSING = PAN, MS, MS-FS, PMS, PMS-N, PMS-X,
@@ -1318,8 +1320,8 @@ int DIMAPDataset::ReadImageInformation2()
                 poVRTDS->GetRasterBand(iBand + 1));
         if (nBits > 0 && nBits != 8 && nBits != 16)
         {
-            poVRTBand->SetMetadataItem("NBITS", CPLSPrintf("%d", nBits),
-                                       "IMAGE_STRUCTURE");
+            poVRTBand->SetMetadataItem(GDALMD_NBITS, CPLSPrintf("%d", nBits),
+                                       GDAL_MDD_IMAGE_STRUCTURE);
         }
 
         for (const auto &oTileIdxNameTuple : oMapTileIdxToName)
@@ -1404,8 +1406,8 @@ int DIMAPDataset::ReadImageInformation2()
             static_cast<VRTSourcedRasterBand *>(poVRTDS->GetRasterBand(iBand)));
         if (nBits > 0 && nBits != 8 && nBits != 16)
         {
-            poBand->SetMetadataItem("NBITS", CPLSPrintf("%d", nBits),
-                                    "IMAGE_STRUCTURE");
+            poBand->SetMetadataItem(GDALMD_NBITS, CPLSPrintf("%d", nBits),
+                                    GDAL_MDD_IMAGE_STRUCTURE);
         }
         if (bTwoDataFilesPerTile)
         {
@@ -1545,26 +1547,52 @@ int DIMAPDataset::ReadImageInformation2()
         "GEOMETRIC_",
         "Processing_Information.Product_Settings.Radiometric_Settings",
         "RADIOMETRIC_",
-        "Quality_Assessment.Imaging_Quality_Measurement",
-        "CLOUDCOVER_",
         nullptr,
         nullptr};
 
     SetMetadataFromXML(psProductDim, apszMetadataTranslationDim);
+
+    if (const CPLXMLNode *psCloudCoverage = CPLGetXMLNode(
+            psProductDim, "=Dimap_Document.Dataset_Content.CLOUD_COVERAGE"))
+    {
+        if (const char *pszValue = CPLGetXMLValue(psCloudCoverage, "", nullptr))
+        {
+            SetMetadataItem("CLOUD_COVERAGE", pszValue);
+            if (const char *pszUnit =
+                    CPLGetXMLValue(psCloudCoverage, "unit", nullptr))
+            {
+                SetMetadataItem("CLOUD_COVERAGE_UNIT", pszUnit);
+                if (EQUAL(pszUnit, "percent"))
+                {
+                    // GDAL standardized metadata domain
+                    SetMetadataItem("CLOUDCOVER", pszValue, "IMAGERY");
+                }
+            }
+        }
+    }
+
+    if (const CPLXMLNode *psSnowCoverage = CPLGetXMLNode(
+            psProductDim, "=Dimap_Document.Dataset_Content.SNOW_COVERAGE"))
+    {
+        if (const char *pszValue = CPLGetXMLValue(psSnowCoverage, "", nullptr))
+        {
+            SetMetadataItem("SNOW_COVERAGE", pszValue);
+            if (const char *pszUnit =
+                    CPLGetXMLValue(psSnowCoverage, "unit", nullptr))
+            {
+                SetMetadataItem("SNOW_COVERAGE_UNIT", pszUnit);
+            }
+        }
+    }
 
     /* -------------------------------------------------------------------- */
     /*      Translate other metadata of interest: STRIP_<product_name>.XML    */
     /* -------------------------------------------------------------------- */
 
     static const char *const apszMetadataTranslationStrip[] = {
-        "Catalog.Full_Strip.Notations.Cloud_And_Quality_Notation."
-        "Data_Strip_Notation",
-        "CLOUDCOVER_",
         "Acquisition_Configuration.Platform_Configuration."
         "Ephemeris_Configuration",
-        "EPHEMERIS_",
-        nullptr,
-        nullptr};
+        "EPHEMERIS_", nullptr, nullptr};
 
     if (psProductStrip != nullptr)
         SetMetadataFromXML(psProductStrip, apszMetadataTranslationStrip);
@@ -1576,7 +1604,7 @@ int DIMAPDataset::ReadImageInformation2()
         char **papszRPC = poReader->LoadRPCXmlFile(psDoc);
         delete poReader;
         if (papszRPC)
-            SetMetadata(papszRPC, "RPC");
+            SetMetadata(papszRPC, GDAL_MDD_RPC);
         CSLDestroy(papszRPC);
     }
 
@@ -1741,11 +1769,12 @@ int DIMAPDataset::ReadImageInformation2()
                 CPLAtof(SPECTRAL_RANGE_FWHM_MIN) * dfFactorToMicrometer;
             const double dfMax =
                 CPLAtof(SPECTRAL_RANGE_FWHM_MAX) * dfFactorToMicrometer;
-            poBand->SetMetadataItem("CENTRAL_WAVELENGTH_UM",
+            poBand->SetMetadataItem(GDALMD_CENTRAL_WAVELENGTH_UM,
                                     CPLSPrintf("%.3f", (dfMin + dfMax) / 2),
-                                    "IMAGERY");
-            poBand->SetMetadataItem(
-                "FWHM_UM", CPLSPrintf("%.3f", dfMax - dfMin), "IMAGERY");
+                                    GDAL_MDD_IMAGERY);
+            poBand->SetMetadataItem(GDALMD_FWHM_UM,
+                                    CPLSPrintf("%.3f", dfMax - dfMin),
+                                    GDAL_MDD_IMAGERY);
         }
     }
 

@@ -215,6 +215,7 @@ Vector commands
    gdal_vector_filter
    gdal_vector_info
    gdal_vector_export_schema
+   gdal_vector_explode
    gdal_vector_explode_collections
    gdal_vector_grid
    gdal_vector_index
@@ -257,6 +258,7 @@ Vector commands
     - :ref:`gdal_vector_convex_hull`: Compute the convex hull of geometries of a vector dataset
     - :ref:`gdal_vector_create`: Create a vector dataset
     - :ref:`gdal_vector_edit`: Edit metadata of a vector dataset
+    - :ref:`gdal_vector_explode`: Explode fields or geometries of a vector dataset
     - :ref:`gdal_vector_explode_collections`: Explode geometries of type collection of a vector dataset
     - :ref:`gdal_vector_export_schema`: Export the OGR_SCHEMA from a vector dataset
     - :ref:`gdal_vector_filter`: Filter a vector dataset
@@ -299,6 +301,10 @@ Multidimensional raster commands
    gdal_mdim_info
    gdal_mdim_convert
    gdal_mdim_mosaic
+   gdal_mdim_pipeline
+   gdal_mdim_read
+   gdal_mdim_reproject
+   gdal_mdim_write
 
 .. only:: html
 
@@ -306,6 +312,13 @@ Multidimensional raster commands
     - :ref:`gdal_mdim_info`: Get information on a multidimensional dataset
     - :ref:`gdal_mdim_convert`: Convert a multidimensional dataset
     - :ref:`gdal_mdim_mosaic`: Build a mosaic, either virtual (VRT) or materialized, from multidimensional datasets.
+    - :ref:`gdal_mdim_read`: Read a multidimensional dataset (pipeline only)
+    - :ref:`gdal_mdim_reproject`: Reproject a multidimensional dataset
+    - :ref:`gdal_mdim_write`: Write a multidimensional dataset (pipeline only)
+
+    Pipelines:
+
+    - :ref:`gdal_mdim_pipeline`: Process a multidimensional dataset applying several steps
 
 Dataset management commands
 +++++++++++++++++++++++++++

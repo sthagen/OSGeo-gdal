@@ -89,16 +89,16 @@ CPLErr VRTRasterBand::CopyCommonInfoFrom(const GDALRasterBand *poSrcBand)
 {
     auto poSrcBandNonConst = const_cast<GDALRasterBand *>(poSrcBand);
     SetMetadata(poSrcBandNonConst->GetMetadata());
-    const char *pszNBits =
-        poSrcBandNonConst->GetMetadataItem("NBITS", "IMAGE_STRUCTURE");
-    SetMetadataItem("NBITS", pszNBits, "IMAGE_STRUCTURE");
+    const char *pszNBits = poSrcBandNonConst->GetMetadataItem(
+        GDALMD_NBITS, GDAL_MDD_IMAGE_STRUCTURE);
+    SetMetadataItem(GDALMD_NBITS, pszNBits, GDAL_MDD_IMAGE_STRUCTURE);
     if (poSrcBand->GetRasterDataType() == GDT_UInt8)
     {
         poSrcBandNonConst->EnablePixelTypeSignedByteWarning(false);
-        const char *pszPixelType =
-            poSrcBandNonConst->GetMetadataItem("PIXELTYPE", "IMAGE_STRUCTURE");
+        const char *pszPixelType = poSrcBandNonConst->GetMetadataItem(
+            "PIXELTYPE", GDAL_MDD_IMAGE_STRUCTURE);
         poSrcBandNonConst->EnablePixelTypeSignedByteWarning(true);
-        SetMetadataItem("PIXELTYPE", pszPixelType, "IMAGE_STRUCTURE");
+        SetMetadataItem("PIXELTYPE", pszPixelType, GDAL_MDD_IMAGE_STRUCTURE);
     }
     SetColorTable(poSrcBandNonConst->GetColorTable());
     SetColorInterpretation(poSrcBandNonConst->GetColorInterpretation());
@@ -1367,6 +1367,22 @@ int VRTRasterBand::GetOverviewCount()
     if (!poVRTDS->m_apoOverviews.empty() && poVRTDS->m_apoOverviews[0])
         return static_cast<int>(poVRTDS->m_apoOverviews.size());
 
+    // Deal with external .ovr with a per-dataset mask band
+    if (poVRTDS->m_poMaskBand.get() == this)
+    {
+        auto poFirstBand = poVRTDS->GetRasterBand(1);
+        const int nOvrCountFirstBand = poFirstBand->GetOverviewCount();
+        int nCount = 0;
+        for (int i = 0; i < nOvrCountFirstBand; ++i)
+        {
+            if (poFirstBand->GetOverview(i)->GetMaskFlags() == GMF_PER_DATASET)
+            {
+                ++nCount;
+            }
+        }
+        return nCount;
+    }
+
     return 0;
 }
 
@@ -1433,6 +1449,24 @@ GDALRasterBand *VRTRasterBand::GetOverview(int iOverview)
         if (m_bIsMaskBand)
             return poOvrBand->GetMaskBand();
         return poOvrBand;
+    }
+
+    // Deal with external .ovr with a per-dataset mask band
+    if (poVRTDS->m_poMaskBand.get() == this)
+    {
+        auto poFirstBand = poVRTDS->GetRasterBand(1);
+        const int nOvrCountFirstBand = poFirstBand->GetOverviewCount();
+        int nCount = 0;
+        for (int i = 0; i < nOvrCountFirstBand; ++i)
+        {
+            auto poOvrBand = poFirstBand->GetOverview(i);
+            if (poOvrBand->GetMaskFlags() == GMF_PER_DATASET)
+            {
+                if (iOverview == nCount)
+                    return poOvrBand->GetMaskBand();
+                ++nCount;
+            }
+        }
     }
 
     return nullptr;
