@@ -1944,6 +1944,7 @@ class VRTGroup final : public GDALGroup
 
     std::string m_osFilename{};
     mutable bool m_bDirty = false;
+    bool m_bGuessRegularlySpacedArrays = true;
     std::string m_osVRTPath{};
     std::vector<std::string> m_aosGroupNames{};
     std::map<std::string, std::shared_ptr<VRTGroup>> m_oMapGroups{};
@@ -2060,6 +2061,16 @@ class VRTGroup final : public GDALGroup
     void SetVRTPath(const std::string &osVRTPath)
     {
         m_osVRTPath = osVRTPath;
+    }
+
+    inline bool GetGuessRegularlySpacedArrays() const
+    {
+        return m_bGuessRegularlySpacedArrays;
+    }
+
+    void SetGuessRegularlySpacedArrays(bool b)
+    {
+        m_bGuessRegularlySpacedArrays = b;
     }
 
     void SetDirty();

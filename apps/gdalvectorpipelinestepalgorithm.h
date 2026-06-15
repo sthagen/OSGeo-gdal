@@ -120,7 +120,7 @@ class GDALVectorDecoratedDataset /* non final */
 /*                       GDALVectorOutputDataset                        */
 /************************************************************************/
 
-class GDALVectorOutputDataset final : public GDALVectorDecoratedDataset
+class GDALVectorOutputDataset : public GDALVectorDecoratedDataset
 {
 
   public:
@@ -133,7 +133,8 @@ class GDALVectorOutputDataset final : public GDALVectorDecoratedDataset
 
     const OGRLayer *GetLayer(int idx) const override
     {
-        return m_layers[idx].get();
+        return idx >= 0 && idx < GetLayerCount() ? m_layers[idx].get()
+                                                 : nullptr;
     }
 
     int TestCapability(const char *) const override;
@@ -255,17 +256,14 @@ class GDALVectorAlgorithmLayerProgressHelper
 
 /** Class that implements GetNextFeature() by forwarding to
  * OGRLayerWithTranslateFeature::TranslateFeature() implementation, which
- * might return several features.
+ * might return several features, and must apply layer filters.
  */
 class GDALVectorPipelineOutputLayer /* non final */
-    : public OGRLayerWithTranslateFeature,
-      public OGRGetNextFeatureThroughRaw<GDALVectorPipelineOutputLayer>
+    : public OGRLayerWithTranslateFeature
 {
   protected:
     explicit GDALVectorPipelineOutputLayer(OGRLayer &oSrcLayer);
     ~GDALVectorPipelineOutputLayer() override;
-
-    DEFINE_GET_NEXT_FEATURE_THROUGH_RAW(GDALVectorPipelineOutputLayer)
 
     OGRLayer &m_srcLayer;
 
@@ -274,9 +272,12 @@ class GDALVectorPipelineOutputLayer /* non final */
         m_translateError = true;
     }
 
+    bool PassesFilters(const OGRFeature *poFeature);
+
   public:
     void ResetReading() override;
-    OGRFeature *GetNextRawFeature();
+
+    OGRFeature *GetNextFeature() override final;
 
   private:
     std::vector<std::unique_ptr<OGRFeature>> m_pendingFeatures{};

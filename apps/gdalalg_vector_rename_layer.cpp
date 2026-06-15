@@ -302,9 +302,8 @@ bool GDALVectorRenameLayerAlgorithm::RunStep(GDALPipelineStepRunContext &)
     std::map<std::string, int> oMapCountNames;
     bool bNonUniqueNames = false;
     const int nLayerCount = poSrcDS->GetLayerCount();
-    for (int i = 0; i < nLayerCount; ++i)
+    for (const OGRLayer *poSrcLayer : poSrcDS->GetLayers())
     {
-        const OGRLayer *poSrcLayer = poSrcDS->GetLayer(i);
         if ((m_inputLayerName == poSrcLayer->GetDescription() ||
              nLayerCount == 1) &&
             !m_outputLayerName.empty())
@@ -410,9 +409,9 @@ bool GDALVectorRenameLayerAlgorithm::RunStep(GDALPipelineStepRunContext &)
         *poSrcDS, aosNames);
 
     // Final pass to create output layers
-    for (int i = 0; i < nLayerCount; ++i)
+    size_t i = 0;
+    for (OGRLayer *poSrcLayer : poSrcDS->GetLayers())
     {
-        OGRLayer *poSrcLayer = poSrcDS->GetLayer(i);
         if (poSrcLayer->GetDescription() != aosNames[i])
         {
             auto poLayer =
@@ -427,6 +426,7 @@ bool GDALVectorRenameLayerAlgorithm::RunStep(GDALPipelineStepRunContext &)
                 std::make_unique<GDALVectorPipelinePassthroughLayer>(
                     *poSrcLayer));
         }
+        ++i;
     }
 
     m_outputDataset.Set(std::move(outDS));
