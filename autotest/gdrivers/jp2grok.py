@@ -1649,3 +1649,83 @@ def test_jp2grok_translate_scale_multi_tile_row():
     assert np.array_equal(ds.GetRasterBand(1).ReadAsArray(), truth)
     ds = None
     gdal.Unlink(out)
+
+
+def test_jp2grok_statistics_16bit_multi_tile():
+    # 16-bit uses Grok's int32_t code path
+    # GetStatistics reads with ReadBlock, using full/partial tiles.
+    np = pytest.importorskip("numpy")
+    arr = (np.arange(300 * 300, dtype=np.uint16) % 4096).reshape(300, 300)
+    src_ds = gdal.GetDriverByName("MEM").Create("", 300, 300, 1, gdal.GDT_UInt16)
+    src_ds.GetRasterBand(1).WriteArray(arr)
+    out = "/vsimem/jp2grok_16bit_tiled.jp2"
+    gdal.GetDriverByName("JP2Grok").CreateCopy(
+        out,
+        src_ds,
+        options=["REVERSIBLE=YES", "QUALITY=100", "BLOCKXSIZE=128", "BLOCKYSIZE=128"],
+    )
+    ds = gdal.Open(out)
+    assert ds.GetRasterBand(1).GetBlockSize() == [128, 128]
+    smin, smax, smean, _ = ds.GetRasterBand(1).GetStatistics(False, True)
+    assert (smin, smax) == (float(arr.min()), float(arr.max()))
+    assert smean == pytest.approx(float(arr.mean()))
+    ds = None
+    gdal.Unlink(out)
+
+
+def _jp2grok_checksums_in_subprocess(src, num_threads):
+    # The driver resolves Grok's thread count once per process (std::call_once),
+    # so single-threaded mode must be exercised in a fresh process
+    import subprocess
+
+    code = (
+        "import sys; from osgeo import gdal; gdal.UseExceptions();"
+        "ds = gdal.OpenEx(sys.argv[1], allowed_drivers=['JP2Grok']);"
+        "print(' '.join(str(ds.GetRasterBand(b + 1).Checksum())"
+        " for b in range(ds.RasterCount)))"
+    )
+    env = dict(os.environ)
+    env["GDAL_NUM_THREADS"] = str(num_threads)
+    out = subprocess.check_output(
+        [sys.executable, "-c", code, os.path.abspath(src)], env=env
+    )
+    return out.decode().strip()
+
+
+@pytest.mark.parametrize(
+    "src", ["data/jpeg2000/byte.jp2", "data/jpeg2000/tile_size_16.jp2"]
+)
+def test_jp2grok_single_threaded_matches_multi(src):
+    # GDAL_NUM_THREADS=1 runs Grok fully single-threaded
+    # output must match multi-threaded decode.
+    if not os.path.exists(src):
+        pytest.skip(f"{src} not available")
+    st = _jp2grok_checksums_in_subprocess(src, 1)
+    mt = _jp2grok_checksums_in_subprocess(src, 8)
+    assert st == mt
+
+
+def test_jp2grok_reuse_dataset_consecutive_reads():
+    # Two reads on the same dataset instance must both be correct: the
+    # single-shot codec is rebuilt for the second operation.
+    np = pytest.importorskip("numpy")
+    truth = _truth(SYNC_SRC)
+    ds = gdal.Open(SYNC_SRC)
+    out1 = gdal.Translate("", ds, format="MEM")
+    out2 = gdal.Translate("", ds, format="MEM")
+    assert np.array_equal(out1.GetRasterBand(1).ReadAsArray(), truth)
+    assert np.array_equal(out2.GetRasterBand(1).ReadAsArray(), truth)
+
+
+def test_jp2grok_partial_reads_after_full_no_advise():
+    # Full read (drains the codec) then partial reads on the same instance
+    # without a new AdviseRead: each must rebuild/reuse correctly.
+    np = pytest.importorskip("numpy")
+    truth = _truth(SYNC_SRC)
+    ds = gdal.Open(SYNC_SRC)
+    full = gdal.Translate("", ds, format="MEM")
+    assert np.array_equal(full.GetRasterBand(1).ReadAsArray(), truth)
+    band = ds.GetRasterBand(1)
+    for x, y, w, h in [(0, 0, 100, 100), (200, 200, 100, 100), (0, 400, 100, 100)]:
+        got = band.ReadAsArray(x, y, w, h)
+        assert np.array_equal(got, truth[y : y + h, x : x + w])

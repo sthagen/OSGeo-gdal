@@ -125,7 +125,7 @@ const unsigned char *LERCDataset::GetDecodedImage()
     if (m_nMaskCount)
     {
         m_pabyDecodedMask.reset(static_cast<unsigned char *>(VSI_MALLOC_VERBOSE(
-            static_cast<size_t>(nRasterXSize) * nRasterYSize * m_nLercBands)));
+            static_cast<size_t>(nRasterXSize) * nRasterYSize * m_nMaskCount)));
         if (!m_pabyDecodedMask)
             m_pabyDecodedImage.reset();
     }
@@ -292,7 +292,8 @@ GDALRasterBand *LERCBand::GetMaskBand()
     if (poGDS->m_nMaskCount == 0)
         return GDALPamRasterBand::GetMaskBand();
     if (!m_poMaskBand)
-        m_poMaskBand = std::make_unique<LERCMaskBand>(poGDS, nBand - 1);
+        m_poMaskBand = std::make_unique<LERCMaskBand>(
+            poGDS, poGDS->m_nMaskCount == 1 ? 0 : nBand - 1);
     return m_poMaskBand.get();
 }
 
@@ -425,8 +426,10 @@ GDALDataset *LERCDataset::Open(GDALOpenInfo *poOpenInfo)
         return nullptr;
     }
     const int nDTSize = GDALGetDataTypeSizeBytes(eDT);
-    // nCols * nRows limitation is due to liblerc assuming it fits on int
+    // nCols * nRows * nDepth limitation is due to liblerc assuming it fits on int
+    // Cf third_party/LercLib/Lerc.cpp#L381
     if (nCols > std::numeric_limits<int>::max() / nRows ||
+        nCols * nRows > std::numeric_limits<int>::max() / nDepth ||
         nDepth > static_cast<unsigned>(std::numeric_limits<int>::max()) /
                      nLercBands ||
         static_cast<size_t>(nCols) * nRows >
