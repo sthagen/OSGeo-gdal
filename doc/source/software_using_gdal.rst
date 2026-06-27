@@ -60,11 +60,12 @@ Free and open source
 - `PostGIS  <http://www.postgis.net>`_ spatial database extender for PostgreSQL: The raster loader and many of the raster SQL functions rely on GDAL.
 - `PostgreSQL OGR Foreign Data Wrapper <https://github.com/pramsey/pgsql-ogr-fdw>`_ Expose OGR layer as PostgreSQL foreign tables.
 - `QGIS <https://www.qgis.org>`_ A cross platform desktop GIS.
-- `R <https://www.r-project.org>`_ A free software environment for statistical computing and graphics, with bindings to GDAL via the rgdal package.
+- `R <https://www.r-project.org>`_ A free software environment for statistical computing and graphics, with GDAL support provided by the `sf <https://r-spatial.github.io/sf/>`_ and `terra <https://rspatial.github.io/terra/>`_ packages. The `gdalraster <https://firelab.github.io/gdalraster/>`_ package provides direct GDAL API bindings.
 - `rasdaman  <https://rasdaman.org>`_  "raster data manager": scalable datacube engine with APIs and query language for spatio-temporal data.
 - `Rasterio  <https://rasterio.readthedocs.io>`_  Python library and command line utilities to read and write GDAL rasters.
 - `Rasterix  <https://github.com/mogasw/rasterix/>`_  A cross platform open source utility to process raster data based on Qt and GDAL.
 - `SAGA GIS  <https://saga-gis.sourceforge.io/en/index.html>`_ A free geographic information system (GIS), with a special 'Application Programming Interface' (API) for geographic data processing.
+- `SedonaDB  <https://sedona.apache.org/sedonadb/>`_ A single-node analytical database engine with geospatial as a first-class citizen.
 - `SNAP  <http://step.esa.int/main/toolboxes/snap>`_  Sentinel Application Platform for Earth Observation processing and analysis.
 - `StarSpan  <https://github.com/Ecotrust/starspan>`_  raster/vector analysis.
 - `t-rex  <http://t-rex.tileserver.ch>`_  Vector tile server written in Rust.
