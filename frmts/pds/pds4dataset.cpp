@@ -1748,14 +1748,16 @@ PDS4Dataset::OpenBrowse(GDALOpenInfo *poOpenInfo, const CPLXMLNode *psProduct)
         return nullptr;
     const char *pszFilename =
         CPLGetXMLValue(psFileAreaBrowse, "File.file_name", nullptr);
-    const char *pszFormat = CPLGetXMLValue(
-        psFileAreaBrowse, "Encoded_Image.encoding_standard_id", nullptr);
+    if (!pszFilename)
+        return nullptr;
     if (CPLHasPathTraversal(pszFilename))
     {
         CPLError(CE_Failure, CPLE_NotSupported, "Path traversal detected in %s",
                  pszFilename);
         return nullptr;
     }
+    const char *pszFormat = CPLGetXMLValue(
+        psFileAreaBrowse, "Encoded_Image.encoding_standard_id", "");
     const char *const apszAllowedDrivers[] = {EQUAL(pszFormat, "TIFF") ? "GTiff"
                                               : EQUAL(pszFormat, "PNG")
                                                   ? "PNG"

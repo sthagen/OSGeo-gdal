@@ -23,6 +23,8 @@
 #include <memory>
 #include <vector>
 
+class CPLJSONObject;
+
 /**
  * \file ogr_spatialref.h
  *
@@ -245,6 +247,8 @@ class CPL_DLL OGRSpatialReference
     OGRErr importFromUSGS(long iProjSys, long iZone, double *padfPrjParams,
                           long iDatum,
                           int nUSGSAngleFormat = USGS_ANGLE_PACKEDDMS);
+    OGRErr importFromISISPVL(const char *pszPVLMappingGroup);
+    OGRErr importFromISISPVL(const CPLJSONObject &oMappingGroup);
     OGRErr importFromPanorama(long, long, long, double *, bool bNorth = true);
     OGRErr importVertCSFromPanorama(int);
     OGRErr importFromOzi(const char *const *papszLines);
@@ -422,6 +426,9 @@ class CPL_DLL OGRSpatialReference
     OGRErr SetCompoundCS(const char *pszName,
                          const OGRSpatialReference *poHorizSRS,
                          const OGRSpatialReference *poVertSRS);
+
+    std::unique_ptr<OGRSpatialReference>
+    GetCompoundComponent(int iComponent) const;
 
     void SetCoordinateEpoch(double dfCoordinateEpoch);
     double GetCoordinateEpoch() const;
