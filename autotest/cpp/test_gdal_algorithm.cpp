@@ -2838,6 +2838,15 @@ TEST_F(test_gdal_algorithm, unlimited_input_single_output)
         EXPECT_EQ(alg.m_input_values, expected);
         EXPECT_STREQ(alg.m_output_value.c_str(), "my_output");
     }
+
+    {
+        MyAlgorithm alg;
+        EXPECT_TRUE(alg.ParseCommandLineArguments(
+            {"-i", "input1", "input2", "-o", "my_output"}));
+        auto expected = std::vector<std::string>{"input1", "input2"};
+        EXPECT_EQ(alg.m_input_values, expected);
+        EXPECT_STREQ(alg.m_output_value.c_str(), "my_output");
+    }
 }
 
 TEST_F(test_gdal_algorithm, single_input_unlimited_outputs)
@@ -3690,6 +3699,44 @@ TEST_F(test_gdal_algorithm, invalid_input_format)
         CPLErrorReset();
         EXPECT_FALSE(alg.ParseCommandLineArguments({"--if=GTIFF"}));
         EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
+    }
+}
+
+TEST_F(test_gdal_algorithm, input_format_alternative_capabilities)
+{
+    class MyAlgorithm : public MyAlgorithmWithDummyRun
+    {
+      public:
+        std::vector<std::string> m_if{};
+
+        MyAlgorithm()
+        {
+            AddInputFormatsArg(&m_if).AddMetadataItem(
+                GAAMDI_REQUIRED_CAPABILITIES,
+                {GDAL_DCAP_VECTOR "|" GDAL_DCAP_MULTIDIM_RASTER});
+        }
+    };
+
+    {
+        MyAlgorithm alg;
+        EXPECT_TRUE(alg.ParseCommandLineArguments({"--if=ESRI Shapefile"}));
+    }
+
+    {
+        MyAlgorithm alg;
+        EXPECT_TRUE(alg.ParseCommandLineArguments({"--if=VRT"}));
+    }
+
+    {
+        MyAlgorithm alg;
+        CPLErrorStateBackuper oErrorHandler(CPLQuietErrorHandler);
+        CPLErrorReset();
+        EXPECT_FALSE(alg.ParseCommandLineArguments({"--if=GTIFF"}));
+        EXPECT_EQ(CPLGetLastErrorType(), CE_Failure);
+        EXPECT_STREQ(CPLGetLastErrorMsg(),
+                     "test: Invalid value for argument 'input-format'. "
+                     "Driver 'GTIFF' does not expose the required "
+                     "'DCAP_VECTOR or DCAP_MULTIDIM_RASTER' capability.");
     }
 }
 

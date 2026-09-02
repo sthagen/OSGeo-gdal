@@ -694,6 +694,119 @@ TEST_F(test_cpl, CPLStringList_Base)
     ASSERT_TRUE(EQUAL(oCopy[2], "xyz"));
 }
 
+// Test CSLRemoveStrings() with the special values of nFirstLineToDelete
+// documented as meaning "remove the nNumToRemove last strings".
+TEST_F(test_cpl, CSLRemoveStrings_last_strings)
+{
+    const auto MakeList = []()
+    {
+        char **papszList = nullptr;
+        papszList = CSLAddString(papszList, "aaaa");
+        papszList = CSLAddString(papszList, "bbbb");
+        papszList = CSLAddString(papszList, "cccc");
+        papszList = CSLAddString(papszList, "dddd");
+        return papszList;
+    };
+
+    // nFirstLineToDelete == -1, discarding the removed strings.
+    {
+        char **papszList = MakeList();
+        papszList = CSLRemoveStrings(papszList, -1, 2, nullptr);
+        EXPECT_EQ(CSLCount(papszList), 2);
+        if (CSLCount(papszList) == 2)
+        {
+            EXPECT_STREQ(papszList[0], "aaaa");
+            EXPECT_STREQ(papszList[1], "bbbb");
+        }
+        CSLDestroy(papszList);
+    }
+
+    // nFirstLineToDelete == -1, retrieving the removed strings.
+    {
+        char **papszList = MakeList();
+        char **papszRemoved = nullptr;
+        papszList = CSLRemoveStrings(papszList, -1, 2, &papszRemoved);
+        EXPECT_EQ(CSLCount(papszList), 2);
+        if (CSLCount(papszList) == 2)
+        {
+            EXPECT_STREQ(papszList[0], "aaaa");
+            EXPECT_STREQ(papszList[1], "bbbb");
+        }
+        EXPECT_EQ(CSLCount(papszRemoved), 2);
+        if (CSLCount(papszRemoved) == 2)
+        {
+            EXPECT_STREQ(papszRemoved[0], "cccc");
+            EXPECT_STREQ(papszRemoved[1], "dddd");
+        }
+        CSLDestroy(papszRemoved);
+        CSLDestroy(papszList);
+    }
+
+    // nFirstLineToDelete larger than the number of strings.
+    {
+        char **papszList = MakeList();
+        papszList = CSLRemoveStrings(papszList, 100, 2, nullptr);
+        EXPECT_EQ(CSLCount(papszList), 2);
+        if (CSLCount(papszList) == 2)
+        {
+            EXPECT_STREQ(papszList[0], "aaaa");
+            EXPECT_STREQ(papszList[1], "bbbb");
+        }
+        CSLDestroy(papszList);
+    }
+
+    // nFirstLineToDelete equal to the number of strings: the range to remove
+    // would extend past the end of the list.
+    {
+        char **papszList = MakeList();
+        papszList = CSLRemoveStrings(papszList, 4, 1, nullptr);
+        EXPECT_EQ(CSLCount(papszList), 3);
+        if (CSLCount(papszList) == 3)
+        {
+            EXPECT_STREQ(papszList[0], "aaaa");
+            EXPECT_STREQ(papszList[2], "cccc");
+        }
+        CSLDestroy(papszList);
+    }
+
+    // Valid nFirstLineToDelete, but nNumToRemove makes the range overrun the
+    // end of the list by one.
+    {
+        char **papszList = MakeList();
+        papszList = CSLRemoveStrings(papszList, 3, 2, nullptr);
+        EXPECT_EQ(CSLCount(papszList), 2);
+        if (CSLCount(papszList) == 2)
+        {
+            EXPECT_STREQ(papszList[0], "aaaa");
+            EXPECT_STREQ(papszList[1], "bbbb");
+        }
+        CSLDestroy(papszList);
+    }
+
+    // Removing from a well defined offset must be unaffected. Note that all
+    // the removed strings must be freed, which ASAN/valgrind builds check.
+    {
+        char **papszList = MakeList();
+        papszList = CSLRemoveStrings(papszList, 1, 2, nullptr);
+        EXPECT_EQ(CSLCount(papszList), 2);
+        if (CSLCount(papszList) == 2)
+        {
+            EXPECT_STREQ(papszList[0], "aaaa");
+            EXPECT_STREQ(papszList[1], "dddd");
+        }
+        CSLDestroy(papszList);
+    }
+
+    // Same special values through the CPLStringList wrapper.
+    {
+        CPLStringList oCSL(MakeList());
+        oCSL.RemoveStrings(-1, 2);
+        ASSERT_EQ(oCSL.size(), 2);
+        EXPECT_STREQ(oCSL[0], "aaaa");
+        EXPECT_STREQ(oCSL[1], "bbbb");
+    }
+}
+
 TEST_F(test_cpl, CPLStringList_SetString)
 {
     CPLStringList oCSL;
@@ -6177,8 +6290,16 @@ TEST_F(test_cpl, strict_parse)
     EXPECT_EQ(cpl::strict_parse<int>("789.0"), 789);
     EXPECT_EQ(cpl::strict_parse<int>("789.0.0"), std::nullopt);
     EXPECT_EQ(cpl::strict_parse<int>("789.1"), std::nullopt);
+    EXPECT_EQ(cpl::strict_parse<int>("789e3"), 789000);
+    EXPECT_EQ(cpl::strict_parse<int>("789.e3"), 789000);
+    EXPECT_EQ(cpl::strict_parse<int>("789.0e3"), 789000);
+    EXPECT_EQ(cpl::strict_parse<int>("789.0e3f"), std::nullopt);
+    EXPECT_EQ(cpl::strict_parse<int>("789.0e3.2"), std::nullopt);
+    EXPECT_EQ(cpl::strict_parse<int>("789.0e30"), std::nullopt);
     EXPECT_EQ(cpl::strict_parse<int>("50000000000000000"), std::nullopt);
     EXPECT_EQ(cpl::strict_parse<int>(""), std::nullopt);
+    EXPECT_EQ(cpl::strict_parse<int>("123c"), std::nullopt);
+    EXPECT_EQ(cpl::strict_parse<int>("Q"), std::nullopt);
 
     EXPECT_EQ(cpl::strict_parse<double>("3.141569"), 3.141569);
     EXPECT_EQ(cpl::strict_parse<double>("3,141569"), std::nullopt);
@@ -6190,6 +6311,8 @@ TEST_F(test_cpl, strict_parse)
     EXPECT_EQ(cpl::strict_parse<double>(""), std::nullopt);
     EXPECT_EQ(cpl::strict_parse<double>("  "), std::nullopt);
     EXPECT_EQ(cpl::strict_parse<double>(" -"), std::nullopt);
+    EXPECT_EQ(cpl::strict_parse<double>("123.2e"), std::nullopt);
+    EXPECT_EQ(cpl::strict_parse<double>("q"), std::nullopt);
 
     EXPECT_EQ(cpl::strict_parse<double>("inf"),
               std::numeric_limits<double>::infinity());

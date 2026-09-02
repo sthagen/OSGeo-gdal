@@ -90,6 +90,7 @@ Jun  05, 2003 Bruce Beaumont / Abe Taaheri
 #include "hcomp.h"
 #include <math.h>
 #include "HdfEosDef.h"
+#include "hfile.h"
 
 #include "hdf4compat.h"
 
@@ -346,8 +347,12 @@ GDattach(int32 fid, const char *gridname)
 		/* ---------------------------- */
 		vgid[0] = Vattach(HDFfid, vgRef, "r");
 		VgetnameSafe(vgid[0], name, sizeof(name));
+#if LIBVER_MAJOR == 4 && LIBVER_MINOR >= 4
+        size_t sz = sizeof(class);
+        Vgetclass(vgid[0], class, &sz);
+#else
 		Vgetclass(vgid[0], class);
-
+#endif
 
 		/*
 		 * If Vgroup with gridname and class GRID found, load tables
@@ -1203,7 +1208,7 @@ GDprojinfo(int32 gridID, int32 * projcode, int32 * zonecode,
 -----------------------------------------------------------------------------*/
 intn
 GDfieldinfo(int32 gridID, const char *fieldname, int32 * rank, int32 dims[],
-	    int32 * numbertype, char *dimlist)
+	    int32 * numbertype, char dimlist[HDFE_DIMBUFSIZE+1])
 
 {
     intn            i;		    /* Loop index */
@@ -1355,7 +1360,19 @@ GDfieldinfo(int32 gridID, const char *fieldname, int32 * rank, int32 dims[],
 
 			if (i > 0)
 			{
+			    if( strlen(dimlist) + 1 > HDFE_DIMBUFSIZE )
+			    {
+			        free(metabuf);
+			        free(utlstr);
+			        return -1;
+			    }
 			    strcat(dimlist, ",");
+			}
+			if( strlen(dimlist) + strlen(dimstr) > HDFE_DIMBUFSIZE )
+			{
+			    free(metabuf);
+			    free(utlstr);
+			    return -1;
 			}
 			strcat(dimlist, dimstr);
 		    }

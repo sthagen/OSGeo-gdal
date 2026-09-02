@@ -41,7 +41,9 @@ GDALRasterFootprintAlgorithm::GDALRasterFootprintAlgorithm(bool standaloneStep)
         AddInputFormatsArg(&m_inputFormats)
             .AddMetadataItem(GAAMDI_REQUIRED_CAPABILITIES, {GDAL_DCAP_RASTER})
             .SetAvailableInPipelineStep(false);
-        AddInputDatasetArg(&m_inputDataset, GDAL_OF_RASTER)
+        AddInputDatasetArg(&m_inputDataset, GDAL_OF_RASTER, true,
+                           _("Input raster dataset"))
+            .SetMaxCount(1)
             .SetAvailableInPipelineStep(false);
 
         AddOutputDatasetArg(&m_outputDataset, GDAL_OF_VECTOR)

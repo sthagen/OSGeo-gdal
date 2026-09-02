@@ -16,6 +16,7 @@
 import array
 import base64
 import copy
+import hashlib
 import os
 import shutil
 import struct
@@ -1651,15 +1652,11 @@ def test_nitf_41(not_jpeg_9b):
     if md[gdal.DMD_CREATIONDATATYPES].find("UInt16") == -1:
         pytest.skip("12bit jpeg not available")
 
-    gdal.Unlink("data/nitf/U_4017A.NTF.aux.xml")
-
-    ds = gdal.Open("data/nitf/U_4017A.NTF")
-    assert ds.GetRasterBand(1).DataType == gdal.GDT_UInt16
-    stats = ds.GetRasterBand(1).GetStatistics(0, 1)
-    assert stats[2] >= 2385 and stats[2] <= 2386
-    ds = None
-
-    gdal.Unlink("data/nitf/U_4017A.NTF.aux.xml")
+    with gdal.config_option("GDAL_PAM_ENABLED", "NO"):
+        ds = gdal.Open("data/nitf/U_4017A.NTF")
+        assert ds.GetRasterBand(1).DataType == gdal.GDT_UInt16
+        stats = ds.GetRasterBand(1).GetStatistics(0, 1)
+        assert stats[2] >= 2385 and stats[2] <= 2386
 
 
 ###############################################################################
@@ -2051,6 +2048,13 @@ def test_nitf_52(tmp_path):
         ],
     )
     ds = None
+
+    hash = hashlib.sha256()
+    hash.update(open(tmp_path / "nitf52.ntf", "rb").read())
+    assert (
+        hash.hexdigest()
+        == "a89d1001c1655e1cbfe27b8699ccad3042a98be2df1112d4bdeb3b5185790201"
+    )
 
     ds = gdal.Open(tmp_path / "nitf52.ntf")
     wkt = ds.GetProjectionRef()

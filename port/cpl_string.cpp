@@ -587,6 +587,11 @@ char **CSLRemoveStrings(char **papszStrList, int nFirstLineToDelete,
         return nullptr;
     }
 
+    // -1, or a range extending past the end, means "remove the last
+    // nNumToRemove strings". Resolve it before deriving any pointer from it.
+    if (nFirstLineToDelete < 0 || nFirstLineToDelete > nDstLines)
+        nFirstLineToDelete = nDstLines;
+
     // Remove lines from the source StringList.
     // Either free() each line or store them to a new StringList depending on
     // the caller's choice.
@@ -599,6 +604,7 @@ char **CSLRemoveStrings(char **papszStrList, int nFirstLineToDelete,
         {
             CPLFree(*ppszDst);
             *ppszDst = nullptr;
+            ++ppszDst;
         }
     }
     else
@@ -616,9 +622,6 @@ char **CSLRemoveStrings(char **papszStrList, int nFirstLineToDelete,
     }
 
     // Shift down all the lines that follow the lines to remove.
-    if (nFirstLineToDelete == -1 || nFirstLineToDelete > nSrcLines)
-        nFirstLineToDelete = nDstLines;
-
     char **ppszSrc = papszStrList + nFirstLineToDelete + nNumToRemove;
     ppszDst = papszStrList + nFirstLineToDelete;
 
@@ -1550,6 +1553,14 @@ bool CPLTestBool(const char *pszValue)
 {
     return !(EQUAL(pszValue, "NO") || EQUAL(pszValue, "FALSE") ||
              EQUAL(pszValue, "OFF") || EQUAL(pszValue, "0"));
+}
+
+/// Return true if the config option's value represents a boolean true.
+/// \param configVal  String name of config value.
+/// \return  Whether the config option's value represents true.
+bool CPLTestConfigOption(const char *configVal)
+{
+    return CPLTestBool(CPLGetConfigOption(configVal, "NO"));
 }
 
 /************************************************************************/

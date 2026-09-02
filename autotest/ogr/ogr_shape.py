@@ -1458,9 +1458,11 @@ def test_ogr_shape_36():
 # Check that we can read from the root of a .tar.gz file
 
 
-def test_ogr_shape_37():
+def test_ogr_shape_37(tmp_vsimem):
 
-    ds = ogr.Open("/vsitar/data/shp/poly.tar.gz")
+    gdal.CopyFile("data/shp/poly.tar.gz", tmp_vsimem / "poly.tar.gz")
+
+    ds = ogr.Open(f"/vsitar/{tmp_vsimem}/poly.tar.gz")
     assert ds is not None
 
     lyr = ds.GetLayer(0)
@@ -1491,7 +1493,6 @@ def test_ogr_shape_37():
     )
 
     ds = None
-    gdal.Unlink("data/shp/poly.tar.gz.properties")
 
 
 ###############################################################################
@@ -6262,3 +6263,22 @@ def test_ogr_shape_inconsistent_record_count(tmp_vsimem):
     assert lyr.GetFeatureCount() == 2
     lyr.GetNextFeature()
     lyr.GetNextFeature()
+
+
+###############################################################################
+
+
+@gdaltest.enable_exceptions()
+def test_ogr_shape_dbf_invalid(tmp_vsimem):
+
+    with gdaltest.error_raised(
+        gdal.CE_Warning, match="exists, but cannot be opened. File likely corrupted"
+    ):
+        assert ogr.Open("data/shp/dbf-invalid.shp")
+
+    gdal.CopyFile("data/shp/dbf-invalid.dbf", tmp_vsimem / "dbf-invalid.dbf")
+
+    with pytest.raises(
+        Exception, match="exists, but cannot be opened. File likely corrupted"
+    ):
+        assert ogr.Open(tmp_vsimem / "dbf-invalid.dbf")

@@ -2279,6 +2279,47 @@ bool GDALAlgorithm::ParseCommandLineArguments(
                      std::vector<double>, std::vector<GDALArgDatasetValue>>>
         inConstructionValues;
 
+    const auto ProcessInConstructionValues = [&inConstructionValues]()
+    {
+        for (auto &[arg, value] : inConstructionValues)
+        {
+            if (arg->GetType() == GAAT_STRING_LIST)
+            {
+                if (!arg->Set(std::get<std::vector<std::string>>(
+                        inConstructionValues[arg])))
+                {
+                    return false;
+                }
+            }
+            else if (arg->GetType() == GAAT_INTEGER_LIST)
+            {
+                if (!arg->Set(
+                        std::get<std::vector<int>>(inConstructionValues[arg])))
+                {
+                    return false;
+                }
+            }
+            else if (arg->GetType() == GAAT_REAL_LIST)
+            {
+                if (!arg->Set(std::get<std::vector<double>>(
+                        inConstructionValues[arg])))
+                {
+                    return false;
+                }
+            }
+            else if (arg->GetType() == GAAT_DATASET_LIST)
+            {
+                if (!arg->Set(
+                        std::move(std::get<std::vector<GDALArgDatasetValue>>(
+                            inConstructionValues[arg]))))
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    };
+
     std::vector<std::string> lArgs(args);
     bool helpValueRequested = false;
     for (size_t i = 0; i < lArgs.size(); /* incremented in loop */)
@@ -2411,13 +2452,14 @@ bool GDALAlgorithm::ParseCommandLineArguments(
             }
         }
 
+        lArgs.erase(lArgs.begin() + i);
+
         if (!hasValue)
         {
-            if (i + 1 == lArgs.size())
+            if (i == lArgs.size())
             {
                 if (m_parseForAutoCompletion)
                 {
-                    lArgs.erase(lArgs.begin() + i);
                     break;
                 }
                 ReportError(
@@ -2426,61 +2468,41 @@ bool GDALAlgorithm::ParseCommandLineArguments(
                     name.c_str());
                 return false;
             }
-            value = lArgs[i + 1];
-            lArgs.erase(lArgs.begin() + i + 1);
+            value = lArgs[i];
+            lArgs.erase(lArgs.begin() + i);
         }
 
         if (arg && !ParseArgument(arg, name, value, inConstructionValues))
+        {
             return false;
+        }
 
-        lArgs.erase(lArgs.begin() + i);
+        // Consume next strings if it is a positional argument, until finding
+        // a value starting with dash.
+        if (!hasValue && arg && GDALAlgorithmArgTypeIsList(arg->GetType()) &&
+            std::find(m_positionalArgs.begin(), m_positionalArgs.end(), arg) !=
+                m_positionalArgs.end())
+        {
+            int countVals = 1;
+            while (i < lArgs.size() && !lArgs[i].empty() && lArgs[i][0] != '-')
+            {
+                if (countVals == arg->GetMaxCount())
+                    break;
+                if (!ParseArgument(arg, name, lArgs[i], inConstructionValues))
+                {
+                    ProcessInConstructionValues();
+                    return false;
+                }
+                lArgs.erase(lArgs.begin() + i);
+                ++countVals;
+            }
+        }
     }
 
     if (m_specialActionRequested)
     {
         return true;
     }
-
-    const auto ProcessInConstructionValues = [&inConstructionValues]()
-    {
-        for (auto &[arg, value] : inConstructionValues)
-        {
-            if (arg->GetType() == GAAT_STRING_LIST)
-            {
-                if (!arg->Set(std::get<std::vector<std::string>>(
-                        inConstructionValues[arg])))
-                {
-                    return false;
-                }
-            }
-            else if (arg->GetType() == GAAT_INTEGER_LIST)
-            {
-                if (!arg->Set(
-                        std::get<std::vector<int>>(inConstructionValues[arg])))
-                {
-                    return false;
-                }
-            }
-            else if (arg->GetType() == GAAT_REAL_LIST)
-            {
-                if (!arg->Set(std::get<std::vector<double>>(
-                        inConstructionValues[arg])))
-                {
-                    return false;
-                }
-            }
-            else if (arg->GetType() == GAAT_DATASET_LIST)
-            {
-                if (!arg->Set(
-                        std::move(std::get<std::vector<GDALArgDatasetValue>>(
-                            inConstructionValues[arg]))))
-                {
-                    return false;
-                }
-            }
-        }
-        return true;
-    };
 
     // Process positional arguments that have not been set through their
     // option name.
@@ -4577,6 +4599,56 @@ GDALAlgorithm::AddOutputOpenOptionsArg(std::vector<std::string> *pValue,
 }
 
 /************************************************************************/
+/*                    NormalizeRequiredCapability()                     */
+/************************************************************************/
+
+/** Expands the GDAL_ALG_DCAP_RASTER_OR_MULTIDIM_RASTER alias into the
+ * generic form of alternatives separated by '|'.
+ */
+static std::string NormalizeRequiredCapability(const std::string &osRequiredCap)
+{
+    return osRequiredCap == GDAL_ALG_DCAP_RASTER_OR_MULTIDIM_RASTER
+               ? GDAL_DCAP_RASTER "|" GDAL_DCAP_MULTIDIM_RASTER
+               : osRequiredCap;
+}
+
+/************************************************************************/
+/*                        DriverHasCapability()                         */
+/************************************************************************/
+
+/** Returns whether poDriver meets the osRequiredCap requirement, which may
+ * express alternatives separated by '|', among the AND-ed list of
+ * requirements requiredCaps.
+ */
+static bool DriverHasCapability(GDALDriver *poDriver,
+                                const std::string &osRequiredCap,
+                                const std::vector<std::string> &requiredCaps)
+{
+    const CPLStringList aosAlternatives(CSLTokenizeString2(
+        NormalizeRequiredCapability(osRequiredCap).c_str(), "|", 0));
+    for (const char *pszCap : cpl::Iterate(aosAlternatives))
+    {
+        const char *pszVal = poDriver->GetMetadataItem(pszCap);
+        if (pszVal && pszVal[0])
+        {
+            return true;
+        }
+        // if it supports Create, it supports CreateCopy. GDAL_DCAP_RASTER is
+        // matched as a whole entry, i.e. not as one of the '|' alternatives of
+        // an entry, which is how all requirement lists spell it.
+        else if (EQUAL(pszCap, GDAL_DCAP_CREATECOPY) &&
+                 std::find(requiredCaps.begin(), requiredCaps.end(),
+                           GDAL_DCAP_RASTER) != requiredCaps.end() &&
+                 poDriver->GetMetadataItem(GDAL_DCAP_RASTER) &&
+                 poDriver->GetMetadataItem(GDAL_DCAP_CREATE))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+/************************************************************************/
 /*                           ValidateFormat()                           */
 /************************************************************************/
 
@@ -4679,64 +4751,47 @@ bool GDALAlgorithm::ValidateFormat(const GDALAlgorithmArg &arg,
             const auto caps = arg.GetMetadataItem(GAAMDI_REQUIRED_CAPABILITIES);
             if (caps)
             {
+                auto poDriver = GDALDriver::FromHandle(hDriver);
                 for (const std::string &cap : *caps)
                 {
-                    const char *pszVal =
-                        GDALGetMetadataItem(hDriver, cap.c_str(), nullptr);
-                    if (!(pszVal && pszVal[0]))
-                    {
-                        if (cap == GDAL_DCAP_CREATECOPY &&
-                            std::find(caps->begin(), caps->end(),
-                                      GDAL_DCAP_RASTER) != caps->end() &&
-                            GDALGetMetadataItem(hDriver, GDAL_DCAP_RASTER,
-                                                nullptr) &&
-                            GDALGetMetadataItem(hDriver, GDAL_DCAP_CREATE,
-                                                nullptr))
-                        {
-                            // if it supports Create, it supports CreateCopy
-                        }
-                        else if (cap == GDAL_DMD_EXTENSIONS)
-                        {
-                            ReportError(
-                                CE_Failure, CPLE_AppDefined,
-                                "Invalid value for argument '%s'. Driver '%s' "
-                                "does "
-                                "not advertise any file format extension.",
-                                arg.GetName().c_str(), val.c_str());
-                            return false;
-                        }
-                        else
-                        {
-                            if (cap == GDAL_DCAP_CREATE)
-                            {
-                                auto updateArg = GetArg(GDAL_ARG_NAME_UPDATE);
-                                if (updateArg &&
-                                    updateArg->GetType() == GAAT_BOOLEAN &&
-                                    updateArg->IsExplicitlySet())
-                                {
-                                    continue;
-                                }
+                    if (DriverHasCapability(poDriver, cap, *caps))
+                        continue;
 
-                                ReportError(
-                                    CE_Failure, CPLE_AppDefined,
+                    if (cap == GDAL_DMD_EXTENSIONS)
+                    {
+                        ReportError(CE_Failure, CPLE_AppDefined,
+                                    "Invalid value for argument '%s'. Driver "
+                                    "'%s' does not advertise any file format "
+                                    "extension.",
+                                    arg.GetName().c_str(), val.c_str());
+                        return false;
+                    }
+                    else if (cap == GDAL_DCAP_CREATE)
+                    {
+                        auto updateArg = GetArg(GDAL_ARG_NAME_UPDATE);
+                        if (updateArg && updateArg->GetType() == GAAT_BOOLEAN &&
+                            updateArg->IsExplicitlySet())
+                        {
+                            continue;
+                        }
+
+                        ReportError(CE_Failure, CPLE_AppDefined,
                                     "Invalid value for argument '%s'. "
                                     "Driver '%s' does not have write support.",
                                     arg.GetName().c_str(), val.c_str());
-                                return false;
-                            }
-                            else
-                            {
-                                ReportError(
-                                    CE_Failure, CPLE_AppDefined,
+                        return false;
+                    }
+                    else
+                    {
+                        CPLString osCap(NormalizeRequiredCapability(cap));
+                        osCap.replaceAll("|", " or ");
+                        ReportError(CE_Failure, CPLE_AppDefined,
                                     "Invalid value for argument '%s'. Driver "
-                                    "'%s' "
-                                    "does "
-                                    "not expose the required '%s' capability.",
+                                    "'%s' does not expose the required '%s' "
+                                    "capability.",
                                     arg.GetName().c_str(), val.c_str(),
-                                    cap.c_str());
-                                return false;
-                            }
-                        }
+                                    osCap.c_str());
+                        return false;
                     }
                 }
             }
@@ -4804,29 +4859,7 @@ std::vector<std::string> GDALAlgorithm::FormatAutoCompleteFunction(
             bool ok = true;
             for (const std::string &cap : *caps)
             {
-                if (cap == GDAL_ALG_DCAP_RASTER_OR_MULTIDIM_RASTER)
-                {
-                    if (!poDriver->GetMetadataItem(GDAL_DCAP_RASTER) &&
-                        !poDriver->GetMetadataItem(GDAL_DCAP_MULTIDIM_RASTER))
-                    {
-                        ok = false;
-                        break;
-                    }
-                }
-                else if (const char *pszVal =
-                             poDriver->GetMetadataItem(cap.c_str());
-                         pszVal && pszVal[0])
-                {
-                }
-                else if (cap == GDAL_DCAP_CREATECOPY &&
-                         (std::find(caps->begin(), caps->end(),
-                                    GDAL_DCAP_RASTER) != caps->end() &&
-                          poDriver->GetMetadataItem(GDAL_DCAP_RASTER)) &&
-                         poDriver->GetMetadataItem(GDAL_DCAP_CREATE))
-                {
-                    // if it supports Create, it supports CreateCopy
-                }
-                else
+                if (!DriverHasCapability(poDriver, cap, *caps))
                 {
                     ok = false;
                     break;

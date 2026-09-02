@@ -379,7 +379,7 @@ def test_multidim_getresampled_error_single_dim():
         ar.GetResampled([None], gdal.GRIORA_NearestNeighbour, None)
 
 
-def test_multidim_getresampled_error_too_large_y():
+def test_multidim_getresampled_error_too_large_y(tmp_path):
 
     drv = gdal.GetDriverByName("MEM")
     mem_ds = drv.CreateMultiDimensional("myds")
@@ -390,8 +390,9 @@ def test_multidim_getresampled_error_too_large_y():
         "ar", [dimY, dimX], gdal.ExtendedDataType.Create(gdal.GDT_UInt8)
     )
     new_dimY = rg.CreateDimension("Ynew", None, None, 4 * 1000 * 1000 * 1000)
-    with pytest.raises(Exception, match="Too big size for Y dimension"):
-        ar.GetResampled([new_dimY, None], gdal.GRIORA_NearestNeighbour, None)
+    with gdal.config_option("CPL_TMPDIR", tmp_path):
+        with pytest.raises(Exception, match="Too big size for Y dimension"):
+            ar.GetResampled([new_dimY, None], gdal.GRIORA_NearestNeighbour, None)
 
 
 def test_multidim_getresampled_error_too_large_x():
@@ -2583,3 +2584,25 @@ def test_multidim_array_arithmetic_coordinate_variables():
     assert coordinates.WriteString("varX varY") == 0
 
     assert len((ar + ar).GetCoordinateVariables()) == 2
+
+
+def test_multidim_array_arithmetic_read_with_buffer_stride():
+    drv = gdal.GetDriverByName("MEM")
+    mem_ds = drv.CreateMultiDimensional("")
+    rg = mem_ds.GetRootGroup()
+    dimY = rg.CreateDimension("Y", None, None, 2)
+    dimX = rg.CreateDimension("X", None, None, 2)
+    ar = rg.CreateMDArray(
+        "ar", [dimY, dimX], gdal.ExtendedDataType.Create(gdal.GDT_Float64)
+    )
+    ar.Write(struct.pack("d" * 4, 1, 2, 3, 4))
+
+    # Reading the first column into a buffer shaped like the whole array
+    # puts the two values at offsets 0 and 2.
+    kwargs = {"count": [2, 1], "buffer_stride": [2, 1]}
+    assert struct.unpack("d" * 3, ar.Read(**kwargs)) == (1, 0, 3)
+    assert struct.unpack("d" * 3, (ar + ar).Read(**kwargs)) == (2, 0, 6)
+    assert struct.unpack("d" * 3, (ar * ar).Read(**kwargs)) == (1, 0, 9)
+    assert struct.unpack("d" * 3, (ar / ar).Read(**kwargs)) == (1, 0, 1)
+
+    assert struct.unpack("d" * 4, (ar + ar).Read()) == (2, 4, 6, 8)
