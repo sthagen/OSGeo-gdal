@@ -21,7 +21,8 @@ pytestmark = pytest.mark.require_driver("BASISU")
 
 @pytest.fixture(scope="module", autouse=True)
 def set_cpl_tmpdir(tmp_path_factory):
-    yield gdaltest.set_cpl_tmpdir(tmp_path_factory, "basisu")
+    with gdaltest.set_cpl_tmpdir(tmp_path_factory, "basisu"):
+        yield
 
 
 ###############################################################################

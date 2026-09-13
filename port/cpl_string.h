@@ -527,6 +527,7 @@ extern "C++"
 #if defined(DOXYGEN_SKIP) || defined(HAVE_STRING_VIEW)
         CPLStringList &AddString(std::string_view newString);
 #endif
+        CPLStringList &AddString(double adfNumber);
         CPLStringList &AddStringDirectly(char *pszNewString);
 
         /** Add a string to the list */

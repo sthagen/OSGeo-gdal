@@ -37,7 +37,8 @@ def module_disable_exceptions():
 
 @pytest.fixture(scope="module", autouse=True)
 def set_cpl_tmpdir(tmp_path_factory):
-    yield gdaltest.set_cpl_tmpdir(tmp_path_factory, "netcdf_multidim")
+    with gdaltest.set_cpl_tmpdir(tmp_path_factory, "netcdf_multidim"):
+        yield
 
 
 def test_netcdf_multidim_invalid_file():

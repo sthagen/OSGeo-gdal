@@ -9329,7 +9329,7 @@ def test_tiff_write_compression_create_and_createcopy():
         )
 
     # FIXME: this test randomly fails, especially on Windows, but also on Linux,
-    # for a unknown reason. Nothing suspicious with Valgrind however
+    # for an unknown reason. Nothing suspicious with Valgrind however
     # if 'LERC_DEFLATE' in md['DMD_CREATIONOPTIONLIST']:
     #   tests.append((['COMPRESS=LERC_DEFLATE', 'ZLEVEL=1'],['COMPRESS=LERC_DEFLATE', 'ZLEVEL=9']))
 

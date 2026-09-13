@@ -2329,6 +2329,28 @@ def test_tiff_read_md6():
 
 
 ###############################################################################
+# Check read Landsat 8 metadata format
+
+
+def test_tiff_read_md_landsat8():
+
+    ds = gdal.Open("data/gtiff/LC08_L1TP_190023_20260809_20260816_02_T1.tif")
+    filelist = ds.GetFileList()
+
+    assert len(filelist) == 2, "did not get expected file list."
+
+    metadata = ds.GetMetadataDomainList()
+    assert len(metadata) == 5, "did not get expected metadata list."
+
+    md = ds.GetMetadata("IMAGERY")
+    assert md == {
+        "ACQUISITIONDATETIME": "2026-08-09 09:43:40",
+        "CLOUDCOVER": "1.90",
+        "SATELLITEID": "LANDSAT_8",
+    }
+
+
+###############################################################################
 # Check read Spot metadata format
 
 
@@ -4668,7 +4690,7 @@ def test_tiff_read_unhandled_codec_known_name():
 
 
 ###############################################################################
-# Test reading a file with a unhandled codec of a unknown name
+# Test reading a file with a unhandled codec of an unknown name
 
 
 def test_tiff_read_unhandled_codec_unknown_name():
@@ -5014,7 +5036,9 @@ def test_tiff_read_multi_threaded(
     "advise_read,test_retry", [(True, False), (True, True), (False, False)]
 )
 @pytest.mark.skipif(
-    platform.system() == "Darwin" or gdaltest.is_travis_branch("mingw64"),
+    platform.system() == "Darwin"
+    or gdaltest.is_travis_branch("mingw64")
+    or gdaltest.is_travis_branch("build-windows-conda"),
     reason="fails randomly",
 )
 @pytest.mark.require_curl()

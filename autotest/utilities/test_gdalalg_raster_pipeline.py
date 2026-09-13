@@ -26,7 +26,8 @@ def get_pipeline_alg():
 
 @pytest.fixture(scope="module", autouse=True)
 def set_cpl_tmpdir(tmp_path_factory):
-    yield gdaltest.set_cpl_tmpdir(tmp_path_factory, "test_gdalalg_raster_pipeline")
+    with gdaltest.set_cpl_tmpdir(tmp_path_factory, "test_gdalalg_raster_pipeline"):
+        yield
 
 
 def test_gdalalg_raster_pipeline_read_and_write(tmp_vsimem):

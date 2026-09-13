@@ -473,6 +473,22 @@ CPLStringList &CPLStringList::AddString(const std::string &newString)
 /************************************************************************/
 /*                             AddString()                              */
 /************************************************************************/
+
+/**
+ * Create a new string from a number and add it to the list.
+ *
+ * @param dfNumber the number to convert to a string.
+ * @return a reference to the CPLStringList on which it was invoked.
+ */
+
+CPLStringList &CPLStringList::AddString(double dfNumber)
+{
+    return AddString(CPLSPrintf("%.17g", dfNumber));
+}
+
+/************************************************************************/
+/*                             AddString()                              */
+/************************************************************************/
 /**
  * Add a string to the list.
  *

@@ -2285,6 +2285,7 @@ def algorithm_check_ogrsf(alg, tmp_path):
 
 ###############################################################################
 #
+@contextlib.contextmanager
 def set_cpl_tmpdir(tmp_path_factory, subdir_name):
     """Yield after having created a temporary directory subdir_name in the
     pytest tmp_path one, and set CPL_TMPDIR to that path."""

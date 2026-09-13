@@ -136,7 +136,7 @@ bool GDALRasterShiftLongitudeAlgorithm::RunStep(GDALPipelineStepRunContext &)
         }
 
         const double dfSrcXOff =
-            std::round(dfDstChunkMinX - dfSrcMinX) / srcGT.xscale;
+            std::round((dfDstChunkMinX - dfSrcMinX) / srcGT.xscale);
         if (!GDALIsValueInRange<int>(dfSrcXOff))
         {
             CPLError(CE_Failure, CPLE_AppDefined,

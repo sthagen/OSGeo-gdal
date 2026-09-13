@@ -58,7 +58,7 @@ fi
 find -L \
     ogr gcore gdrivers osr alg gnm utilities pyscripts \
     -name '*.py' \
-        ! -name netcdf_cfchecks.py \
+        ! -name netcdf_cf.py \
         ! -name ogr_fgdb.py `# Don't run these` \
         ! -name ogr_pgeo.py `# Don't run these` \
         ! -name ogr_gpsbabel.py `# new-delete-type-mismatch error in gpsbabel binary that we can't suppress` \

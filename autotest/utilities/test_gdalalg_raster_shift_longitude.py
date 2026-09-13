@@ -43,7 +43,7 @@ def create_ds(
     nx = round((xmax - xmin) / dx)
     ny = round((ymax - ymin) / dy)
 
-    data = np.repeat(np.arange(xmin, xmax).reshape(1, nx), ny, axis=0)
+    data = np.repeat((xmin + dx * np.arange(nx)).reshape(1, nx), ny, axis=0)
 
     ds = gdal.GetDriverByName("MEM").Create("", nx, ny, bands, eType=dt)
     ds.SetGeoTransform((xmin, dx, 0, ymax, 0, -dy))
@@ -134,6 +134,34 @@ def test_gdalalg_raster_shift_longitude_3(alg):
         np.concatenate(
             [src_data[:, 180:], src_data[:, :180], src_data[:, [180]]], axis=1
         ),
+    )
+
+
+def test_gdalalg_raster_shift_longitude_subdegree_pixels(alg):
+    # Shift (0.25, 360.25) to (-180, 180) on a 0.5 degree grid, where the source
+    # pixel offset is a whole number of pixels but not a whole number of degrees.
+
+    src_ds = create_ds(
+        xmin=0.25, xmax=360.25, ymin=0, ymax=1, dx=0.5, dy=0.5, dt=gdal.GDT_Float64
+    )
+    src_data = src_ds.ReadAsArray()
+
+    alg["input"] = src_ds
+    alg["min-x"] = -180
+    alg["max-x"] = 180
+    alg["output-format"] = "MEM"
+
+    assert alg.Run()
+
+    dst_ds = alg.Output()
+
+    # Snapping widens the range by half a pixel each side, duplicating a column.
+    assert dst_ds.GetGeoTransform() == (-180.25, 0.5, 0, 1.0, 0, -0.5)
+    assert dst_ds.RasterXSize == 721
+
+    np.testing.assert_array_equal(
+        dst_ds.ReadAsArray(),
+        np.concatenate([src_data[:, 359:], src_data[:, :360]], axis=1),
     )
 
 

@@ -26,7 +26,8 @@ def get_alg():
 
 @pytest.fixture(scope="module", autouse=True)
 def set_cpl_tmpdir(tmp_path_factory):
-    yield gdaltest.set_cpl_tmpdir(tmp_path_factory, "test_gdalalg_raster_fill_nodata")
+    with gdaltest.set_cpl_tmpdir(tmp_path_factory, "test_gdalalg_raster_fill_nodata"):
+        yield
 
 
 def test_gdalalg_raster_fill_nodata_cannot_open_file():

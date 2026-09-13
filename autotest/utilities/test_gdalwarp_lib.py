@@ -28,7 +28,8 @@ from osgeo import gdal, ogr, osr
 
 @pytest.fixture(scope="module", autouse=True)
 def set_cpl_tmpdir(tmp_path_factory):
-    yield gdaltest.set_cpl_tmpdir(tmp_path_factory, "test_gdalwarp_lib")
+    with gdaltest.set_cpl_tmpdir(tmp_path_factory, "test_gdalwarp_lib"):
+        yield
 
 
 ###############################################################################
