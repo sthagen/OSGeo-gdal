@@ -3,7 +3,7 @@
 ###############################################################################
 #
 # Project:  GDAL/OGR Test Suite
-# Purpose:  Test basic read support for a all datatypes from a TIFF file.
+# Purpose:  Test basic read support for all datatypes from a TIFF file.
 # Author:   Frank Warmerdam <warmerdam@pobox.com>
 #
 ###############################################################################
@@ -1111,7 +1111,9 @@ def test_tiff_read_online_1():
         "imgpb17.tif",
     )
 
-    ds = gdal.Open("tmp/cache/imgpb17.tif")
+    tmp_dir = gdaltest.get_cache_dir()
+
+    ds = gdal.Open(f"{tmp_dir}/imgpb17.tif")
     gdal.ErrorReset()
     cs = ds.GetRasterBand(1).Checksum()
     ds = None
@@ -1277,7 +1279,7 @@ def test_tiff_read_irregular_tile_size_jpeg_in_tiff_overview():
 # Test GTIFF_DIRECT_IO and GTIFF_VIRTUAL_MEM_IO optimizations
 
 
-def test_tiff_direct_and_virtual_mem_io():
+def test_tiff_direct_and_virtual_mem_io(tmp_path):
 
     with gdal.ExceptionMgr(useExceptions=False):
 
@@ -1335,12 +1337,12 @@ def test_tiff_direct_and_virtual_mem_io():
                     options = [
                         ("GTIFF_DIRECT_IO", "/vsimem"),
                         ("GTIFF_VIRTUAL_MEM_IO", "/vsimem"),
-                        ("GTIFF_VIRTUAL_MEM_IO", "tmp"),
+                        ("GTIFF_VIRTUAL_MEM_IO", str(tmp_path)),
                     ]
                 for option, prefix in options:
                     if dt == gdal.GDT_CInt16:
                         niter = 3
-                    elif prefix == "tmp":
+                    elif prefix == str(tmp_path):
                         niter = 4
                     else:
                         niter = nitermax
@@ -2335,6 +2337,28 @@ def test_tiff_read_md6():
 def test_tiff_read_md_landsat8():
 
     ds = gdal.Open("data/gtiff/LC08_L1TP_190023_20260809_20260816_02_T1.tif")
+    filelist = ds.GetFileList()
+
+    assert len(filelist) == 2, "did not get expected file list."
+
+    metadata = ds.GetMetadataDomainList()
+    assert len(metadata) == 5, "did not get expected metadata list."
+
+    md = ds.GetMetadata("IMAGERY")
+    assert md == {
+        "ACQUISITIONDATETIME": "2026-08-09 09:43:40",
+        "CLOUDCOVER": "1.90",
+        "SATELLITEID": "LANDSAT_8",
+    }
+
+
+###############################################################################
+# Check read Landsat 8 metadata format
+
+
+def test_tiff_read_md_landsat8_level2():
+
+    ds = gdal.Open("data/gtiff/LC08_L2SP_190023_20260809_20260816_02_T1_SR_B2.TIF")
     filelist = ds.GetFileList()
 
     assert len(filelist) == 2, "did not get expected file list."

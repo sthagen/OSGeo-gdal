@@ -1498,7 +1498,7 @@ const char *CPL_STDCALL GDALGetProjectionRef(GDALDatasetH hDS)
  *
  * This method is the same as the C GDALSetProjection() function.
  *
- * \note Startig with GDAL 3.0, this is a compatibility layer around
+ * \note Starting with GDAL 3.0, this is a compatibility layer around
  * SetSpatialRef()
 
  * @param pszProjection projection reference string.
@@ -13327,7 +13327,7 @@ ComputeInterBandCovarianceMatrixInternal(GDALDataset *poDS,
             //
             // There might be a small gotcha in the fact that the set of
             // pixels on which the means are computed is not always the
-            // same as the the one on which the comoment is computed, if
+            // same as the one on which the comoment is computed, if
             // pixels are not valid/invalid at the same indices among bands
             // It is not obvious (to me) what should be the correct behavior.
             // The current approach has the benefit to avoid recomputing

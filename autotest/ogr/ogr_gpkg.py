@@ -37,11 +37,6 @@ def startup_and_cleanup():
 
     gdaltest.gpkg_dr = ogr.GetDriverByName("GPKG")
 
-    try:
-        os.remove("tmp/gpkg_test.gpkg")
-    except OSError:
-        pass
-
     # This is to speed-up the runtime of tests on EXT4 filesystems
     # Do not use this for production environment if you care about data safety
     # w.r.t system/OS crashes, unless you know what you are doing.
@@ -52,11 +47,6 @@ def startup_and_cleanup():
         print(gdal.ReadDir("/vsimem"))
         for f in gdal.ReadDir("/vsimem"):
             gdal.Unlink("/vsimem/" + f)
-
-    try:
-        os.remove("tmp/gpkg_test.gpkg")
-    except OSError:
-        pass
 
 
 ###############################################################################
@@ -4923,7 +4913,7 @@ def test_ogr_gpkg_48(tmp_vsimem):
 
 
 ###############################################################################
-# Test CreateGeomField() on a attributes layer
+# Test CreateGeomField() on an attributes layer
 
 
 def test_ogr_gpkg_49(tmp_vsimem):
