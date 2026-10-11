@@ -1425,6 +1425,31 @@ void wrapper_VSIGetMemFileBuffer(const char *utf8_string, GByte **out, vsi_l_off
         self._parent_ds()._add_child_ref(val)
 %}
 
+%feature("pythonappend") GetSampleOverview %{
+    if hasattr(self, '_parent_ds') and self._parent_ds():
+        self._parent_ds()._add_child_ref(val)
+%}
+
+%feature("pythonappend") GetDefaultRAT %{
+    if hasattr(self, '_parent_ds') and self._parent_ds():
+        self._parent_ds()._add_child_ref(val)
+%}
+
+%feature("pythonappend") GetRasterColorTable %{
+    if hasattr(self, '_parent_ds') and self._parent_ds():
+        self._parent_ds()._add_child_ref(val)
+%}
+
+%feature("pythonappend") GetColorTable %{
+    if hasattr(self, '_parent_ds') and self._parent_ds():
+        self._parent_ds()._add_child_ref(val)
+%}
+
+%feature("pythonappend") GetDataset %{
+    if hasattr(self, '_parent_ds') and self._parent_ds():
+        self._parent_ds()._add_child_ref(val)
+%}
+
 %feature("shadow") ComputeStatistics %{
 def ComputeStatistics(self, *args, **kwargs):
     """ComputeStatistics(Band self, bool approx_ok, callback=None, callback_data=None)
@@ -2690,6 +2715,46 @@ def ComputeInterBandCovarianceMatrix(self,
 %}
 
 %feature("pythonappend") CopyLayer %{
+    self._add_child_ref(val)
+%}
+
+%feature("pythonappend") CreateLayerFromGeomFieldDefn %{
+    self._add_child_ref(val)
+%}
+
+%feature("shadow") GetNextFeature %{
+    def GetNextFeature(self, include_layer=True, include_pct=False, callback=None, callback_data=None):
+        r"""
+        GetNextFeature(Dataset self, include_layer=True, include_pct=False, callback=None, callback_data=None) -> Feature
+
+        Fetch the next available feature from this dataset.
+
+        This method is intended for the few drivers where
+        :py:meth:`OGRLayer.GetNextFeature` is not efficient, but in general
+        :py:meth:`OGRLayer.GetNextFeature` is a more natural API.
+
+        See :cpp:func:`GDALDataset::GetNextFeature`.
+
+        Returns
+        -------
+        Feature
+        """
+
+        val = $action(self, include_layer, include_pct, callback, callback_data)
+        if include_layer:
+            self._add_child_ref(val[1])
+        return val
+%}
+
+%feature("pythonappend") GetFieldDomain %{
+    self._add_child_ref(val)
+%}
+
+%feature("pythonappend") GetStyleTable %{
+    self._add_child_ref(val)
+%}
+
+%feature("pythonappend") GetRelationship %{
     self._add_child_ref(val)
 %}
 
